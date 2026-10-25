@@ -73,7 +73,10 @@ def test_clipboard_restored_on_success_and_exception(previous, failure):
           mock.patch('pyperclip.paste', side_effect=paste), mock.patch('time.sleep')):
         text = selection_platform._read_selection_via_copy()
     assert text == ('Selected text' if failure is None else '')
-    assert state[0] == previous
+    # Without native sequence identity an unreadable clipboard cannot safely
+    # be overwritten: it may already contain a newer user copy. The dedicated
+    # preservation tests also cover restoration through native identity.
+    assert state[0] == ('Selected text' if failure == 'read' else previous)
     assert keys[-2:] == [(0x43, 2), (0x11, 2)]
 
 

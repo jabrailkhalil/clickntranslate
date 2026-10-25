@@ -1,0 +1,107 @@
+name: Unpublished desktop test candidates
+
+on:
+  push:
+    branches: [codex/test-candidates-20261025]
+  workflow_dispatch:
+
+# This workflow can upload Actions artifacts, but cannot create a release/tag.
+permissions:
+  contents: read
+
+concurrency:
+  group: test-candidates-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      VENV: .venv-linux
+      QT_QPA_PLATFORM: offscreen
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements-linux.txt
+      - name: Install build and native OCR dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y appstream xvfb tesseract-ocr tesseract-ocr-eng \
+            fonts-dejavu-core python3-gi libegl1 libgl1 libxcb-icccm4 \
+            libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-shape0 \
+            libxcb-xinerama0 libxcb-util1 libxcb-cursor0 libxkbcommon-x11-0
+          python -m venv "$VENV"
+          "$VENV/bin/python" -m pip install --upgrade pip
+          "$VENV/bin/python" -m pip install -r requirements-linux.txt pytest pyinstaller
+          "$VENV/bin/python" -m pip install --no-deps 'argostranslate~=1.11.0'
+      - name: Verify source regressions
+        run: |
+          "$VENV/bin/python" tools/run_regression_tests.py --output build/candidate/source-tests \
+            tests/test_linux_*.py tests/test_platform_support.py \
+            tests/test_ocr_subprocess_environment.py tests/test_easyocr_installer.py \
+            tests/test_ocr_paragraphs.py tests/test_document_load_order.py \
+            tests/test_document_localization.py tests/test_dynamic_pause_labels.py \
+            tests/test_selection_clipboard_preservation.py tests/test_delayed_mode_launch.py \
+            tests/test_live_translation.py tests/test_translation_chunks.py \
+            tests/test_cache_concurrency.py tests/test_build_integrity.py
+      - name: Build AppImage and portable archive
+        run: bash tools/build_linux_release.sh
+      - name: Exercise the frozen AppImage twice from a cold start
+        env:
+          QT_QPA_PLATFORM: xcb
+        run: |
+          mkdir -p build/candidate/native
+          binary="$(find releases -maxdepth 1 -name '*linux-x86_64.AppImage' -print -quit)"
+          test -n "$binary"
+          chmod +x "$binary"
+          for attempt in 1 2; do
+            mkdir -p "$RUNNER_TEMP/cnt-$attempt/data" "$RUNNER_TEMP/cnt-$attempt/cache" "$RUNNER_TEMP/cnt-$attempt/config"
+            XDG_DATA_HOME="$RUNNER_TEMP/cnt-$attempt/data" \
+            XDG_CACHE_HOME="$RUNNER_TEMP/cnt-$attempt/cache" \
+            XDG_CONFIG_HOME="$RUNNER_TEMP/cnt-$attempt/config" \
+              xvfb-run -a "$binary" --appimage-extract-and-run --candidate-smoke-test \
+                "$PWD/build/candidate/native/attempt-$attempt/report.json"
+          done
+      - name: Record exact candidate source
+        if: always()
+        run: |
+          mkdir -p build/candidate
+          git rev-parse HEAD > build/candidate/source-commit.txt
+          printf '%s\n' 'Unpublished test files. No release or tag created.' > build/candidate/TEST-CANDIDATES.txt
+      - name: Keep build and test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-candidate-checks
+          path: |
+            build/candidate
+            build/ClicknTranslate-linux/warn-*.txt
+          retention-days: 14
+          if-no-files-found: warn
+      - name: Keep unpublished Linux files
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-test-candidate
+          path: |
+            releases/*.AppImage
+            releases/*.tar.gz
+            releases/*.sha256
+            build/candidate/source-commit.txt
+            build/candidate/TEST-CANDIDATES.txt
+          compression-level: 0
+          retention-days: 14
+          if-no-files-found: error
+
+  macos:
+    uses: ./.github/workflows/macos.yml
+    with:
+      architecture: all
+      prepare_release: true
+    secrets:
+      MACOS_SIGNING_KEYCHAIN_BASE64: ${{ secrets.MACOS_SIGNING_KEYCHAIN_BASE64 }}
+      MACOS_SIGNING_KEYCHAIN_PASSWORD: ${{ secrets.MACOS_SIGNING_KEYCHAIN_PASSWORD }}

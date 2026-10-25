@@ -7,6 +7,10 @@ from pathlib import Path
 if not getattr(sys, 'frozen', False):
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'src'))
 
+if "--candidate-smoke-test" in sys.argv:
+    from candidate_smoke import prepare_profile
+    prepare_profile()
+
 from button_styles import button_qss, standard_buttons
 import json
 import getpass
@@ -1138,15 +1142,8 @@ def _windows_foreground_window():
 
 def _clipboard_sequence_number():
     """Windows increments this value whenever clipboard contents change."""
-    if platform_support.IS_MAC:
-        from macos_desktop import clipboard_sequence
-        return clipboard_sequence()
-    if not platform_support.IS_WINDOWS:
-        return None
-    try:
-        return int(ctypes.windll.user32.GetClipboardSequenceNumber())
-    except Exception:
-        return None
+    from clipboard_preservation import clipboard_sequence_number
+    return clipboard_sequence_number()
 
 
 def _wait_for_clipboard_change(previous, timeout=0.8):
@@ -1164,7 +1161,7 @@ def _wait_for_clipboard_change(previous, timeout=0.8):
 
 
 def replace_selected_text_in_foreground(original_text, translated_text,
-                                        expected_window_handle):
+                                        expected_window_handle, *, clipboard_preservation=None):
     """Safely replace a still-active Windows text selection.
 
     Translation can take seconds. During that time the user may switch windows
@@ -1184,9 +1181,13 @@ def replace_selected_text_in_foreground(original_text, translated_text,
     if not still_focused():
         return False, "focus_changed"
 
+    if clipboard_preservation is not None:
+        clipboard_preservation.preserve_current_if_changed()
     marker = f"__CLICKNTRANSLATE_SELECTION_{time.time_ns()}__"
     if not platform_support.copy_text(marker):
         return False, "clipboard_unavailable"
+    if clipboard_preservation is not None:
+        clipboard_preservation.claim(marker)
     previous = _clipboard_sequence_number()
     simulate_copy()
     changed = _wait_for_clipboard_change(previous)
@@ -1204,6 +1205,8 @@ def replace_selected_text_in_foreground(original_text, translated_text,
 
     if not platform_support.copy_text(translated_text):
         return False, "clipboard_unavailable"
+    if clipboard_preservation is not None:
+        clipboard_preservation.claim(translated_text)
     if not still_focused():
         return False, "focus_changed"
     time.sleep(0.04)
@@ -9131,15 +9134,9 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
             return
         generation = self._invalidate_document_load()
         self._document_loading = True
-        self.current_document = None
-        self.session_payload = None
-        self.translated_text = ""
-        self.translation_results = []
-        self.translation_error_message_visible = False
-        self.original_view.blockSignals(True)
-        self.original_view.clear()
-        self.original_view.blockSignals(False)
-        self.translated_view.clear()
+        # Parsing is provisional. Keep the current draft/session and result
+        # until a matching successful completion can replace them together.
+        # A failed, dismissed or superseded attachment must not erase work.
         self.progress_bar.setRange(0, 0)
         self._set_status(doc_text(self.lang, "loading"))
         self._set_busy(True, loading=True)
@@ -9182,6 +9179,9 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self._document_loading = False
         self.current_document = document
         self.session_payload = None
+        self.translated_text = ""
+        self.translation_results = []
+        self.translation_error_message_visible = False
         self.original_view.blockSignals(True)
         self.original_view.setPlainText(document.text)
         self.original_view.blockSignals(False)
@@ -12850,10 +12850,16 @@ class DarkThemeApp(QMainWindow):
         print("launch_fullscreen_translate called")
         try:
             from ocr import run_fullscreen_translate
+            from mode_coordinator import defer_mode_request, mode_request_is_current
+            token = defer_mode_request("fullscreen")
+            if token is None:
+                return
             if not self.config.get("keep_visible_on_ocr", False):
                 self.hide()
 
             def _do_translate():
+                if not mode_request_is_current(token):
+                    return
                 try:
                     run_fullscreen_translate()
                 except Exception as e:
@@ -12874,12 +12880,19 @@ class DarkThemeApp(QMainWindow):
             return
         try:
             from game_mode import game_mode_active, toggle_game_mode
+            from mode_coordinator import defer_mode_request, mode_request_is_current
+            token = defer_mode_request("game")
+            if token is None:
+                return
 
             already_active = game_mode_active()
             if not already_active and not self.config.get("keep_visible_on_ocr", False):
                 self.hide()
             # Give the game focus back before binding the region to its window.
-            QTimer.singleShot(0 if already_active else 180, toggle_game_mode)
+            def start_if_current():
+                if mode_request_is_current(token):
+                    toggle_game_mode()
+            QTimer.singleShot(0 if already_active else 180, start_if_current)
         except Exception:
             logging.exception("Could not launch dynamic translation")
 
@@ -12990,6 +13003,8 @@ class DarkThemeApp(QMainWindow):
             from macos_desktop import ensure_permission
             if not ensure_permission("accessibility", self, self.current_interface_language):
                 return
+        from mode_coordinator import cancel_deferred_mode_request
+        cancel_deferred_mode_request()
         print("launch_translate_selection called")
         source_code, target_code = (
             self._replace_selected_text_translation_pair()
@@ -13006,7 +13021,7 @@ class DarkThemeApp(QMainWindow):
 
         def _do_copy_and_translate():
             lang = self.config.get("interface_language", "ru")
-            clipboard_before_capture = None
+            clipboard_preservation = None
 
             def restore_captured_clipboard(force=False):
                 restore_enabled = bool(
@@ -13014,10 +13029,10 @@ class DarkThemeApp(QMainWindow):
                 )
                 if (
                     (platform_support.IS_WINDOWS or platform_support.IS_MAC)
-                    and clipboard_before_capture is not None
+                    and clipboard_preservation is not None
                     and (force or restore_enabled)
                 ):
-                    platform_support.copy_text(clipboard_before_capture)
+                    clipboard_preservation.restore()
 
             try:
                 preloaded = str(preloaded_text or "").strip()
@@ -13029,10 +13044,6 @@ class DarkThemeApp(QMainWindow):
                     # and nothing is written to the user's clipboard.
                     text = self._read_primary_selection()
                 else:
-                    try:
-                        clipboard_before_capture = str(pyperclip.paste() or "")
-                    except Exception:
-                        clipboard_before_capture = None
                     # Release all modifier keys first
                     KEYEVENTF_KEYUP = 0x0002
                     for vk in ((0x11, 0x12, 0x10, 0x5B, 0x5C) if platform_support.IS_WINDOWS else ()):
@@ -13042,15 +13053,20 @@ class DarkThemeApp(QMainWindow):
                         if not select_all_text_in_foreground(selection_window):
                             return
                         time.sleep(0.08)
+                    from clipboard_preservation import ClipboardPreservation
+                    clipboard_preservation = ClipboardPreservation(
+                        pyperclip.paste, platform_support.copy_text, _clipboard_sequence_number)
                     # Clear clipboard, then Ctrl+C to capture selection
                     if platform_support.copy_text("") is False:
                         # A busy clipboard must never make an unrelated old
                         # value look like newly captured selected text.
                         notify_copy_failed(self.config)
                         return
+                    clipboard_preservation.claim("")
                     simulate_copy()
                     time.sleep(0.25)
                     text = pyperclip.paste()
+                    clipboard_preservation.claim(str(text or ""))
                 if not text or not text.strip():
                     time.sleep(0.3)
                     if preloaded:
@@ -13061,6 +13077,8 @@ class DarkThemeApp(QMainWindow):
                             if platform_support.IS_LINUX
                             else pyperclip.paste()
                         )
+                        if clipboard_preservation is not None:
+                            clipboard_preservation.claim(str(text or ""))
                 if not text or not text.strip():
                     restore_captured_clipboard(force=True)
                     lang = self.config.get("interface_language", "ru")
@@ -13090,7 +13108,8 @@ class DarkThemeApp(QMainWindow):
                 fallback_copied = False
                 if replacement_attempted:
                     replacement_succeeded, _reason = replace_selected_text_in_foreground(
-                        text, translated, selection_window
+                        text, translated, selection_window,
+                        clipboard_preservation=clipboard_preservation,
                     )
                     # Ctrl+V needs the translation in the clipboard. On a safe
                     # fallback we put it there explicitly, so the user never
@@ -16020,6 +16039,12 @@ def _warm_up_ocr_after_window_is_visible():
 
 
 if __name__ == "__main__":
+    if "--candidate-smoke-test" in sys.argv:
+        from candidate_smoke import run
+        report_index = sys.argv.index("--candidate-smoke-test") + 1
+        if report_index >= len(sys.argv):
+            raise SystemExit("--candidate-smoke-test requires an output JSON path.")
+        raise SystemExit(run(sys.modules[__name__], sys.argv[report_index]))
     if "--macos-permission-report" in sys.argv:
         if not platform_support.IS_MAC:
             raise SystemExit("The permission diagnostic requires macOS.")

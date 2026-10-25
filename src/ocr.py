@@ -1042,11 +1042,40 @@ def _tesseract_psm_order(width, height):
     return psm_order
 
 
+class _TesseractSystemSubprocess:
+    """Keep pytesseract's direct probes out of the frozen application's runtime."""
+
+    _clickntranslate_system_env = True
+    _process_calls = {"Popen", "run", "call", "check_call", "check_output"}
+
+    def __init__(self, original):
+        self._original = original
+
+    def __getattr__(self, name):
+        original = getattr(self._original, name)
+        if name not in self._process_calls:
+            return original
+
+        @functools.wraps(original)
+        def system_process(*args, **kwargs):
+            kwargs["env"] = platform_support.system_subprocess_env()
+            return original(*args, **kwargs)
+
+        return system_process
+
+
 def _configure_pytesseract_system_environment(pytesseract):
     """Make pytesseract launch the distro binary outside the AppImage runtime."""
     if not (platform_support.IS_LINUX or platform_support.IS_MAC):
         return
     module = pytesseract.pytesseract
+    # get_tesseract_version() and get_languages() bypass subprocess_args in
+    # pytesseract 0.3.13. Adapt only this library's subprocess reference so those
+    # probes use the same clean environment as OCR, preserving their own cache
+    # and parsing behavior. Bundled workers and os.environ are untouched.
+    process_module = getattr(module, "subprocess", None)
+    if process_module is not None and getattr(process_module, "_clickntranslate_system_env", False) is not True:
+        module.subprocess = _TesseractSystemSubprocess(process_module)
     original = getattr(module, "subprocess_args", None)
     if not callable(original) or getattr(original, "_clickntranslate_system_env", False) is True:
         return

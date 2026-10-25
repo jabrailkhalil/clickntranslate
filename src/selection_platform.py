@@ -66,20 +66,20 @@ def read_selected_text(*, allow_copy_fallback=False, primary_text=None, validate
 
 def _read_selection_via_copy(*, validate_target=None):
     """Read via copy off the GUI thread, restoring even empty clipboard text."""
-    previous = None
-    changed = False
+    preservation = None
     try:
         import ctypes
         import time
 
         import pyperclip
 
-        previous = str(pyperclip.paste() or "")
+        from clipboard_preservation import ClipboardPreservation
+        preservation = ClipboardPreservation(pyperclip.paste, platform_support.copy_text)
         if validate_target is not None and not validate_target():
             return ""
         if not platform_support.copy_text(""):
             return ""
-        changed = True
+        preservation.claim("")
         if platform_support.IS_MAC:
             from macos_desktop import send_edit_shortcut
 
@@ -98,17 +98,34 @@ def _read_selection_via_copy(*, validate_target=None):
             finally:
                 ctypes.windll.user32.keybd_event(VK_C, 0, KEYEVENTF_KEYUP, 0)
                 ctypes.windll.user32.keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0)
-        time.sleep(0.2)
+        # Ctrl+C is delivered asynchronously to the source app. Wait for its
+        # first publication, then claim that identity immediately; claiming
+        # the still-empty clear would reject our own delayed copy as foreign.
+        deadline = time.monotonic() + .2
+        while True:
+            if validate_target is not None and not validate_target():
+                return ""
+            captured = preservation.claim_changed()
+            if captured is not None:
+                if not captured:
+                    return ""
+                break
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return ""
+            time.sleep(min(.02, remaining))
         if validate_target is not None and not validate_target():
             return ""
+        if not preservation.owns_clipboard():
+            return ""  # A newer copy is neither ours to restore nor selected text.
         text = str(pyperclip.paste() or "").strip()
         return text
     except Exception:
         logger.debug("Copy fallback selection read failed", exc_info=True)
         return ""
     finally:
-        if changed and previous is not None:
-            platform_support.copy_text(previous)
+        if preservation is not None:
+            preservation.restore()
 
 
 def foreground_token():

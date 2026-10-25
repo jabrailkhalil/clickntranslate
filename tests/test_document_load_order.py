@@ -220,3 +220,84 @@ def test_initial_path_starts_once_when_the_dialog_stays_open(document,monkeypatc
     finally:
         dialog.close()
         dialog.deleteLater()
+
+
+def _previous_document_state(dialog, kind):
+    dialog.load_plain_text('Unsaved source draft')
+    if kind == 'file':
+        dialog.current_document = parsed('Previous.txt')
+    elif kind == 'session':
+        dialog.session_payload = {'original_text': 'Unsaved source draft',
+                                  'source_file_name': 'Previous.txt'}
+    dialog._populate_provider_combo('lingva')
+    dialog._refresh_document_provider_languages()
+    dialog.source_combo.setCurrentIndex(dialog.source_combo.findData('de'))
+    dialog.target_combo.setCurrentIndex(dialog.target_combo.findData('fr'))
+    dialog.translated_text = 'Unsaved translation'
+    dialog.translated_view.setPlainText(dialog.translated_text)
+    dialog.translation_results = [SimpleNamespace(text='Unsaved translation', error='')]
+    dialog._set_busy(False)
+
+
+def _document_state(dialog):
+    return (dialog.original_view.toPlainText(), dialog.translated_view.toPlainText(),
+            dialog.translated_text, dialog.current_document, dialog.session_payload,
+            list(dialog.translation_results), dialog.translation_error_message_visible,
+            dialog._source_code(), dialog.target_combo.currentData(), dialog._provider_engine())
+
+
+@pytest.mark.parametrize('kind', ['draft', 'file', 'session'])
+@pytest.mark.parametrize('failure', ['parse', 'thread_start'])
+def test_failed_attachment_keeps_previous_unsaved_work(document, monkeypatch, tmp_path, kind, failure):
+    dialog = document
+    _previous_document_state(dialog, kind)
+    before = _document_state(dialog)
+    path = tmp_path / 'Broken.docx'
+    path.write_bytes(b'not a DOCX archive')
+    jobs = []
+    if failure == 'parse':
+        monkeypatch.setattr(main.threading, 'Thread', lambda target, **kwargs:
+                            SimpleNamespace(start=lambda: jobs.append(target)))
+    else:
+        monkeypatch.setattr(main.threading, 'Thread', lambda **kwargs:
+                            SimpleNamespace(start=mock.Mock(side_effect=RuntimeError('Worker unavailable'))))
+    with mock.patch.object(main.QFileDialog, 'getOpenFileName', return_value=(str(path), '')), \
+            mock.patch.object(main.QMessageBox, 'warning') as warning:
+        dialog.attach_button.click()
+        if failure == 'parse':
+            assert dialog._document_loading and not dialog.save_button.isEnabled()
+            assert _document_state(dialog) == before
+            jobs.pop()()
+    warning.assert_called_once()
+    assert _document_state(dialog) == before
+    assert not dialog._document_loading and dialog.attach_button.isEnabled()
+    assert dialog.save_button.isEnabled()
+
+
+@pytest.mark.parametrize('dismiss', ['close', 'reject'])
+def test_dismissing_pending_attachment_keeps_previous_work_and_ignores_late_result(loads, dismiss):
+    dialog, jobs = loads
+    _previous_document_state(dialog, 'session')
+    before = _document_state(dialog)
+    dialog.load_file('Replacement.txt')
+    getattr(dialog, dismiss)()
+    jobs.pop()()
+    assert _document_state(dialog) == before
+    assert not dialog._document_loading
+
+
+def test_successful_attachment_replaces_previous_work_only_after_parsing(loads):
+    dialog, jobs = loads
+    _previous_document_state(dialog, 'session')
+    before = _document_state(dialog)
+    dialog.load_file('Replacement.txt')
+    assert _document_state(dialog) == before
+    jobs.pop()()
+    assert dialog.original_view.toPlainText() == 'Text of Replacement.txt'
+    assert dialog.current_document.file_name == 'Replacement.txt'
+    assert dialog.session_payload is None
+    assert dialog.translated_text == dialog.translated_view.toPlainText() == ''
+    assert dialog.translation_results == []
+    assert not dialog.translation_error_message_visible
+    assert not dialog.save_button.isEnabled()
+    assert (dialog._source_code(), dialog.target_combo.currentData(), dialog._provider_engine()) == before[-3:]

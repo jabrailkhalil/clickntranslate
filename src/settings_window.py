@@ -15654,6 +15654,7 @@ finally {
                 stderr=subprocess.DEVNULL,
                 text=True,
                 timeout=30,
+                env=platform_support.system_subprocess_env(),
                 **platform_support.no_window_kwargs(),
             )
             major, _, minor = (completed.stdout or "").strip().partition(" ")

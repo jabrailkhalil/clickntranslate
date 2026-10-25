@@ -33,7 +33,8 @@ def test_select_all_runs_only_for_enabled_replacement(enabled, replace, selected
     assert order == ([('all', 42)] if selected else []) + [('copy',)]
     assert replacement.call_count == int(replace)
     if replace:
-        replacement.assert_called_once_with('Chat draft', 'Translated draft', 42)
+        replacement.assert_called_once_with('Chat draft', 'Translated draft', 42,
+                                             clipboard_preservation=mock.ANY)
         assert not harness.shown_dialogs
 
 

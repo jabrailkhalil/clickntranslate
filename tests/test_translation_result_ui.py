@@ -313,7 +313,8 @@ class TranslationResultUiTest(unittest.TestCase):
                 mock.patch.object(main, "save_translation_history"):
             harness.launch_translate_replace_selection()
 
-        replace.assert_called_once_with("Hola mundo", "Hello world", 42)
+        replace.assert_called_once_with("Hola mundo", "Hello world", 42,
+                                        clipboard_preservation=mock.ANY)
         self.assertEqual(copy.call_args_list, [mock.call(""), mock.call("Hola mundo")])
         history.assert_not_called()
         self.assertEqual(harness.shown_dialogs, [])
@@ -400,7 +401,7 @@ class TranslationResultUiTest(unittest.TestCase):
                 mock.patch.object(main.threading, "Thread", _immediate_thread), \
                 mock.patch.object(main.time, "sleep"), \
                 mock.patch.object(main, "simulate_copy"), \
-                mock.patch.object(main.pyperclip, "paste", side_effect=["Before", "Hola mundo"]), \
+                mock.patch.object(main.pyperclip, "paste", side_effect=["Before", "Hola mundo", "Hola mundo"]), \
                 mock.patch.object(translater, "translate_text", return_value="Hello world"), \
                 mock.patch.object(platform_support, "copy_text") as copy, \
                 mock.patch.object(main, "save_translation_history"):
