@@ -4014,12 +4014,14 @@ class ScreenCaptureOverlay(QWidget):
             self.show_overlay()
 
     def _refresh_memory_controls(self, config):
-        from capture_regions import text, memory_keys
+        from capture_regions import text, memory_keys, memory_controls_enabled
         locale = config.get('interface_language', 'en')
         self._memory_locale = locale
         enabled_key, _ = memory_keys(self.mode)
+        self._area_memory_available = memory_controls_enabled(config, self.mode)
         with QtCore.QSignalBlocker(self.remember_area_checkbox):
-            self.remember_area_checkbox.setChecked(config.get(enabled_key) is True)
+            self.remember_area_checkbox.setChecked(self._area_memory_available and config.get(enabled_key) is True)
+        self.remember_area_checkbox.setVisible(self._area_memory_available)
         self.remember_area_checkbox.setText(text(locale, 'remember'))
         self.remember_area_checkbox.setToolTip(text(locale, 'hint'))
         self.repeat_area_button.setText(text(locale, 'repeat'))
@@ -4068,7 +4070,7 @@ class ScreenCaptureOverlay(QWidget):
         from capture_regions import memory_keys, resolve_area, screen_identity, text
         enabled_key, area_key = memory_keys(self.mode)
         self._preview_rect = None
-        if config.get(enabled_key) is True and config.get(area_key) is not None:
+        if self._area_memory_available and config.get(enabled_key) is True and config.get(area_key) is not None:
             rect = resolve_area(config.get(area_key), self._active_screen)
             if rect is not None:
                 self._preview_rect = rect.translated(-self.geometry().topLeft())
@@ -4079,15 +4081,25 @@ class ScreenCaptureOverlay(QWidget):
         self._update_memory_actions()
 
     def _update_memory_actions(self):
-        available = self._preview_rect is not None and not self._ocr_in_progress
+        available = self._area_memory_available and self._preview_rect is not None and not self._ocr_in_progress
         self.repeat_area_button.setVisible(available)
         self.repeat_area_button.setEnabled(available and self._region_gesture is None)
-        self.memory_hint.setVisible(bool(self.memory_hint.text()) and not self._ocr_in_progress)
+        self.memory_panel.setVisible(self._area_memory_available and not self._ocr_in_progress)
+        self.memory_hint.setVisible(self._area_memory_available and bool(self.memory_hint.text()) and not self._ocr_in_progress)
 
     def _remember_area_changed(self, enabled):
-        from capture_regions import memory_keys, text
+        from capture_regions import memory_keys, memory_control_modes, text
+        if not self._area_memory_available:
+            with QtCore.QSignalBlocker(self.remember_area_checkbox):
+                self.remember_area_checkbox.setChecked(False)
+            return
         enabled_key, area_key = memory_keys(self.mode)
         updates = {enabled_key: bool(enabled)}
+        config = get_cached_ocr_config()
+        if not isinstance(config.get('capture_area_memory_modes'), (list, tuple)):
+            # Materialize legacy permissions before changing their old boolean;
+            # otherwise disabling memory would also hide the switch next time.
+            updates['capture_area_memory_modes'] = list(memory_control_modes(config))
         if not enabled:
             updates[area_key] = None
         if not _write_ocr_config_updates(updates):
@@ -4135,7 +4147,7 @@ class ScreenCaptureOverlay(QWidget):
             QMessageBox.information(self, ocr_ui_text(locale, 'language_packages'), ocr_ui_text(locale, 'install_languages_first'))
             self.close()
             return
-        if self.remember_area_checkbox.isChecked():
+        if self._area_memory_available and self.remember_area_checkbox.isChecked():
             from capture_regions import encode_area, memory_keys
             _, area_key = memory_keys(self.mode)
             area = encode_area(rect.translated(self.geometry().topLeft()), self._active_screen)
@@ -4450,7 +4462,7 @@ class ScreenCaptureOverlay(QWidget):
                 self.target_lang_combo.setVisible(True)
                 self.target_lang_combo.raise_()
             QApplication.processEvents()
-            self.memory_panel.show()
+            self.memory_panel.setVisible(self._area_memory_available)
             self.capture_toolbar.show()
             self.update_combo_position()
             self.capture_toolbar.raise_()
@@ -4550,9 +4562,12 @@ class ScreenCaptureOverlay(QWidget):
         for column in range(4):
             grid.setColumnStretch(column, 0)
         inline = inline_width <= content_width
-        self.capture_separator.setVisible(inline)
+        self.capture_separator.setVisible(self._area_memory_available and inline)
+        self.memory_panel.setVisible(self._area_memory_available and not self._ocr_in_progress)
         grid.addWidget(self.capture_languages, 0, 0, QtCore.Qt.AlignVCenter)
-        if inline:
+        if not self._area_memory_available:
+            grid.addWidget(self.capture_close_button, 0, 1, QtCore.Qt.AlignVCenter)
+        elif inline:
             grid.addWidget(self.capture_separator, 0, 1, QtCore.Qt.AlignVCenter)
             grid.addWidget(self.memory_panel, 0, 2, QtCore.Qt.AlignVCenter)
             grid.addWidget(self.capture_close_button, 0, 3, QtCore.Qt.AlignVCenter)

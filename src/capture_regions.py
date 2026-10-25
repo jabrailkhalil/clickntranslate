@@ -41,6 +41,21 @@ def memory_keys(mode):
     return f'remember_{prefix}_area', f'last_{prefix}_area'
 
 
+MEMORY_MODES = ('translate', 'copy')
+
+
+def memory_control_modes(config):
+    """Keep legacy opt-ins until the user explicitly configures the mode list."""
+    selected = config.get('capture_area_memory_modes')
+    if isinstance(selected, (list, tuple)):
+        return tuple(mode for mode in MEMORY_MODES if mode in selected)
+    return tuple(mode for mode in MEMORY_MODES if config.get(memory_keys(mode)[0]) is True)
+
+
+def memory_controls_enabled(config, mode):
+    return mode in memory_control_modes(config)
+
+
 def screen_identity(screen):
     identity = {'name': screen.name(), 'size': [screen.geometry().width(), screen.geometry().height()]}
     for key in ('serialNumber', 'manufacturer', 'model'):

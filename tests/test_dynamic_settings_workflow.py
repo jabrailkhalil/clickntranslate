@@ -46,6 +46,25 @@ def test_empty_template_catalog_has_an_action_instead_of_a_disabled_placeholder(
     assert not settings.game_delete_template_button.isEnabled()
 
 
+@pytest.mark.parametrize('trigger', ['mouse', 'keyboard'])
+def test_empty_picker_opens_builder_directly_without_an_intermediate_popup(window, app, isolated, monkeypatch, trigger):
+    from PyQt5.QtTest import QTest
+    _, store = isolated
+    settings = settings_page(window, store, monkeypatch)
+    picker = settings.game_template_combo
+    before = copy.deepcopy(window.config)
+    with mock.patch.object(workspace, 'open_template_builder') as create:
+        if trigger == 'mouse':
+            QTest.mouseClick(picker, QtCore.Qt.LeftButton, pos=picker.rect().center())
+        else:
+            picker.setFocus(QtCore.Qt.TabFocusReason)
+            QTest.keyClick(picker, QtCore.Qt.Key_Space)
+        app.processEvents()
+        create.assert_called_once()
+    assert not picker.view().isVisible()
+    assert window.config == before
+
+
 def test_saved_template_picker_keeps_current_choice_visible_when_memory_is_off(window, isolated, monkeypatch):
     _, store = isolated
     save_layout(store, 'Dialogue')

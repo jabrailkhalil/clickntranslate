@@ -204,10 +204,19 @@ def _wrap_mode_pages(settings):
     grid.setColumnStretch(0, 1)
     grid.setVerticalSpacing(5)
     # Preferences first, then one compact form. Captions stay beside their
-    # values, and all fields end at the same edge instead of forming cards.
+    # values, and all fields start at the same edge instead of forming cards.
     header = settings.game_language_row.layout()
     _empty(header)
     header.setSpacing(10)
+    labels = (settings.game_languages_label, settings.game_scan_interval_label,
+              settings.game_overlay_opacity_label, settings.game_template_label)
+    for label in labels:
+        label.setStyleSheet('font-size:14px; margin:0; padding:0;')
+        label.ensurePolished()
+        label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+    label_width = max(label.fontMetrics().horizontalAdvance(label.text()) for label in labels) + 4
+    for label in labels:
+        label.setFixedSize(label_width, 28)
     header.addStretch(1)
     header.addWidget(settings.game_languages_label)
     header.addWidget(settings.game_language_controls)
@@ -218,19 +227,31 @@ def _wrap_mode_pages(settings):
     grid.addWidget(settings.game_language_row, 4, 0)
 
     settings.game_numeric_options = QWidget(content)
-    numbers = QGridLayout(settings.game_numeric_options)
+    numbers = QVBoxLayout(settings.game_numeric_options)
     numbers.setContentsMargins(0, 0, 0, 0)
-    numbers.setHorizontalSpacing(10)
-    numbers.setVerticalSpacing(5)
-    numbers.setColumnStretch(0, 1)
-    for row, (label, control) in enumerate((
+    numbers.setSpacing(5)
+    for label, control in (
             (settings.game_scan_interval_label, settings.game_interval_controls),
-            (settings.game_overlay_opacity_label, settings.game_opacity_controls))):
+            (settings.game_overlay_opacity_label, settings.game_opacity_controls)):
+        group = QWidget(settings.game_numeric_options)
+        group.setFixedHeight(28)
+        line = QHBoxLayout(group)
+        line.setContentsMargins(0, 0, 0, 0)
+        line.setSpacing(10)
+        line.addStretch(1)
         label.setStyleSheet('font-size:14px; margin:0; padding:0;')
         label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         label.setBuddy(control)
-        numbers.addWidget(label, row, 0)
-        numbers.addWidget(control, row, 1)
+        line.addWidget(label)
+        values = QWidget(group)
+        values.setFixedSize(406, 28)
+        value_row = QHBoxLayout(values)
+        value_row.setContentsMargins(0, 0, 0, 0)
+        value_row.setSpacing(0)
+        value_row.addWidget(control)
+        value_row.addStretch(1)
+        line.addWidget(values)
+        numbers.addWidget(group)
     grid.addWidget(settings.game_numeric_options, 5, 0)
 
     settings.game_template_actions = QWidget(content)
@@ -248,9 +269,10 @@ def _wrap_mode_pages(settings):
     fields = QHBoxLayout(template_fields)
     fields.setContentsMargins(0, 0, 0, 0)
     fields.setSpacing(6)
-    settings.game_template_combo.setFixedWidth(372)
+    settings.game_template_combo.setFixedWidth(180)
     fields.addWidget(settings.game_template_combo)
     fields.addWidget(settings.game_delete_template_button)
+    fields.addStretch(1)
     template_row.addWidget(template_fields)
     grid.addWidget(settings.game_template_actions, 6, 0)
     grid.setRowStretch(7, 1)
@@ -366,15 +388,17 @@ def organize(settings, general_layout, form, updates_layout, dim_row):
             settings.replace_select_all_checkbox, settings.restore_clipboard_checkbox,
             close_flag)):
         control.setParent(content)
-        grid.addWidget(_flag(control), row, 0, 1, 1 if row < 2 else 3, Qt.AlignLeft)
-    from capture_regions import text as region_text
-    settings.remember_translation_area_checkbox = QCheckBox(region_text(lang, 'translation_setting'), content)
-    remember_area = settings.remember_translation_area_checkbox
-    remember_area.setChecked(settings.parent.config.get('remember_translate_area') is True)
-    remember_area.setToolTip(tooltip_text(region_text(lang, 'translation_setting_hint')))
-    remember_area.setAccessibleDescription(region_text(lang, 'translation_setting_hint'))
-    remember_area.toggled.connect(settings._set_remember_translation_area)
-    grid.addWidget(_flag(remember_area), 4, 0, 1, 3, Qt.AlignLeft)
+        grid.addWidget(_flag(control), row, 0, 1, 1 if row < 3 else 3, Qt.AlignLeft)
+    from capture_memory_settings import make_control, text as memory_text
+    settings.capture_memory_label = QLabel(memory_text(lang, 'label'), content)
+    settings.capture_memory_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+    settings.capture_memory_label.setStyleSheet('font-size:14px; margin:0; padding:0;')
+    settings.capture_memory_modes = make_control(settings, content)
+    settings.capture_memory_modes.setFixedSize(180, 28)
+    settings.capture_memory_label.setBuddy(settings.capture_memory_modes)
+    settings.capture_memory_label.setToolTip(tooltip_text(memory_text(lang, 'hint')))
+    grid.addWidget(settings.capture_memory_label, 2, 1)
+    grid.addWidget(settings.capture_memory_modes, 2, 2)
     settings.provider_routing_note = QLabel(content)
     settings.provider_routing_note.setObjectName('assistantNote')
     settings.provider_routing_note.setFixedHeight(28)
@@ -384,8 +408,8 @@ def organize(settings, general_layout, form, updates_layout, dim_row):
         from provider_settings import show_provider_settings
         show_provider_settings(settings, VISION_ENGINES.get(settings.parent.config.get('ocr_engine')))
     settings.provider_routing_note.linkActivated.connect(open_image_api)
-    grid.addWidget(settings.provider_routing_note, 5, 0, 1, 3)
-    grid.setRowStretch(6, 1)
+    grid.addWidget(settings.provider_routing_note, 4, 0, 1, 3)
+    grid.setRowStretch(5, 1)
     settings.translation_settings_content = content
     settings.translation_settings_scroll = _scroll(page, content, 'translationSettingsScroll')
     updates_layout.setSpacing(4)

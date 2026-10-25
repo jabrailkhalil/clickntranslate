@@ -68,6 +68,7 @@ def capture(app, monkeypatch):
     monkeypatch.setattr(QtGui.QScreen, 'availableGeometry', lambda self: QtCore.QRect(desktop))
     config = {'theme': 'Темная', 'interface_language': 'ru', 'ocr_engine': 'Windows',
               'translator_engine': 'Google', 'last_ocr_language': 'en',
+              'capture_area_memory_modes': ['translate', 'copy'],
               'ocr_translate_source_language': 'en', 'ocr_translate_target_language': 'ru'}
     monkeypatch.setattr(ocr, 'get_cached_ocr_config', lambda: config)
     monkeypatch.setattr(ocr, 'installed_ocr_language_codes', lambda **kw: ['en', 'ru'])

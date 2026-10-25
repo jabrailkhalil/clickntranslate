@@ -134,7 +134,7 @@ def test_section_buttons_and_longest_dynamic_names_fit_every_theme_and_zoom(wind
                 assert remember.sizeHint().width() <= remember.width(), context
                 assert template.isVisible() and template.isEnabled(), context
                 assert settings.game_template_controls.width() == settings.game_language_controls.width(), context
-                assert template.width() + 6 + settings.game_delete_template_button.width() == settings.game_template_controls.width(), context
+                assert template.width() == settings.game_interval_controls.width() == 180, context
                 flag_rects = [rect_in(flag, settings.settings_game_page) for flag in (
                     settings.game_pause_inactive_checkbox, settings.game_manual_output_checkbox,
                     settings.game_toolbar_checkbox, remember)]
@@ -144,8 +144,8 @@ def test_section_buttons_and_longest_dynamic_names_fit_every_theme_and_zoom(wind
                     rect_in(settings.game_numeric_options, settings.settings_game_page).top()), context
                 language_fields = rect_in(settings.game_language_controls, settings.settings_game_page)
                 template_fields = rect_in(settings.game_template_controls, settings.settings_game_page)
-                assert language_fields.left() == template_fields.left(), context
-                assert language_fields.right() == template_fields.right(), context
+                assert language_fields == QtCore.QRect(template_fields.x(), language_fields.y(),
+                    template_fields.width(), language_fields.height()), context
                 previous = rect_in(row, settings.settings_game_page)
                 for label, value in ((settings.game_scan_interval_label, settings.game_interval_controls),
                                      (settings.game_overlay_opacity_label, settings.game_opacity_controls)):
@@ -156,11 +156,16 @@ def test_section_buttons_and_longest_dynamic_names_fit_every_theme_and_zoom(wind
                     assert label.fontMetrics().horizontalAdvance(label.text()) <= label.width(), context
                     if settings.layoutDirection() == QtCore.Qt.RightToLeft:
                         assert caption.left() - field.right() - 1 == 10, (context, caption, field)
-                        assert field.left() == language_fields.left(), context
+                        assert field.right() == language_fields.right(), context
                     else:
                         assert field.left() - caption.right() - 1 == 10, (context, caption, field)
-                        assert field.right() == language_fields.right(), context
+                        assert field.left() == language_fields.left(), context
                     previous = field
+                captions = [rect_in(label, settings.settings_game_page) for label in (
+                    settings.game_languages_label, settings.game_scan_interval_label,
+                    settings.game_overlay_opacity_label, settings.game_template_label)]
+                assert len({rect.left() for rect in captions}) == 1, (context, captions)
+                assert len({rect.right() for rect in captions}) == 1, (context, captions)
                 assert template_rect.top() > previous.bottom(), context
                 for container, children in (
                         (settings.game_template_actions, (settings.game_template_label, settings.game_template_controls)),

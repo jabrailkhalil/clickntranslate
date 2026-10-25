@@ -10,6 +10,38 @@ from capture_regions import LANGUAGES
 @pytest.mark.parametrize('dark', [True, False])
 @pytest.mark.parametrize('dpi', [96, 144, 192])
 @pytest.mark.parametrize('mode', ['copy', 'translate'])
+@pytest.mark.parametrize('width', [480, 1200])
+def test_unselected_modes_have_a_compact_language_only_toolbar(capture, app, monkeypatch, locale, dark, dpi, mode, width):
+    from PyQt5 import QtGui
+    config, _, _, create = capture
+    config.update(interface_language=locale, theme='Темная' if dark else 'Светлая',
+                  capture_area_memory_modes=[], remember_translate_area=True, remember_copy_area=True)
+    desktop = QtCore.QRect(-width, -100, width, 800)
+    monkeypatch.setattr(QtGui.QScreen, 'geometry', lambda self: QtCore.QRect(desktop))
+    monkeypatch.setattr(QtGui.QScreen, 'availableGeometry', lambda self: QtCore.QRect(desktop))
+    monkeypatch.setattr(QtGui.QScreen, 'logicalDotsPerInch', lambda self: dpi)
+    value = create(mode)
+    assert not value.remember_area_checkbox.isVisible()
+    assert not value.memory_panel.isVisible()
+    assert not value.repeat_area_button.isVisible()
+    assert not value.capture_separator.isVisible()
+    assert value._preview_rect is None
+    toolbar = value.capture_toolbar
+    rectangles = []
+    for control in (value.lang_combo, value.translate_arrow_label, value.target_lang_combo, value.capture_close_button):
+        if control is None:
+            continue
+        rect = QtCore.QRect(control.mapTo(toolbar, QtCore.QPoint()), control.size())
+        assert toolbar.contentsRect().contains(rect), (locale, dark, dpi, mode, rect, toolbar.rect())
+        assert not any(previous.intersects(rect) for previous in rectangles)
+        rectangles.append(rect)
+    assert len({rect.center().y() for rect in rectangles}) <= 2
+
+
+@pytest.mark.parametrize('locale', LANGUAGES)
+@pytest.mark.parametrize('dark', [True, False])
+@pytest.mark.parametrize('dpi', [96, 144, 192])
+@pytest.mark.parametrize('mode', ['copy', 'translate'])
 @pytest.mark.parametrize('width', [480, 640, 1200])
 @pytest.mark.parametrize('preview', [False, True])
 def test_toolbar_contains_caption_flags_and_language_fields(capture, app, monkeypatch, locale, dark, dpi, mode, width, preview):

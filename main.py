@@ -276,6 +276,9 @@ DEFAULT_CONFIG = {
     "game_last_template": "",
     "remember_copy_area": False,
     "remember_translate_area": False,
+    # None keeps earlier opt-ins; an explicit list controls which capture modes
+    # expose the contextual memory switch, independently of its current value.
+    "capture_area_memory_modes": None,
     "last_copy_area": None,
     "last_translate_area": None,
     "game_show_original_text": False,

@@ -803,6 +803,18 @@ class _ResultModeDelegate(PopupRowDelegate):
         super().paint(painter, option, index)
 
 
+class TemplatePickerCombo(DropDownCombo):
+    """An empty catalog opens its sole action directly, without a second click."""
+
+    create_requested = QtCore.pyqtSignal()
+
+    def showPopup(self):
+        if self.property('templateCatalogAvailable') is False:
+            self.create_requested.emit()
+            return
+        super().showPopup()
+
+
 class ResultWindowModeCombo(DropDownCombo):
     """Drop-down that turns the result window on or off per action.
 
@@ -3892,6 +3904,14 @@ def validated_import_settings(payload, defaults):
             area = validated_area(value)
             if value is None or area is not None:
                 accepted[key] = area
+            continue
+        if key == 'capture_area_memory_modes':
+            from capture_regions import MEMORY_MODES
+            if value is None:
+                accepted[key] = None
+            elif isinstance(value, (list, tuple)) and all(
+                    isinstance(mode, str) and mode in MEMORY_MODES for mode in value):
+                accepted[key] = [mode for mode in MEMORY_MODES if mode in value]
             continue
         if key == 'desktop_assistant_position':
             import math
@@ -10973,7 +10993,8 @@ class SettingsWindow(QWidget):
         self.game_remember_template_checkbox.setStyleSheet('margin:0; padding:0;')
         self.game_remember_template_checkbox.setToolTip(tooltip_text(region_text(lang, 'dynamic_hint')))
         self.game_remember_template_checkbox.setChecked(self.parent.config.get('game_remember_template') is True)
-        self.game_template_combo = DropDownCombo(self.settings_game_page)
+        self.game_template_combo = TemplatePickerCombo(self.settings_game_page)
+        self.game_template_combo.create_requested.connect(self._create_dynamic_template)
         self.game_template_combo.setMinimumWidth(0)
         self.game_template_combo.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.game_template_combo.setFixedHeight(28)
@@ -11155,10 +11176,43 @@ class SettingsWindow(QWidget):
         self.auto_save_setting('game_remember_template', bool(enabled))
         self._refresh_game_templates()
 
-    def _set_remember_translation_area(self, enabled):
-        if not enabled:
-            self.parent.config['last_translate_area'] = None
-        self.auto_save_setting('remember_translate_area', bool(enabled))
+    def _refresh_capture_memory_modes(self):
+        from capture_regions import memory_control_modes
+        control = getattr(self, 'capture_memory_modes', None)
+        if control is not None:
+            control.set_checked_modes(memory_control_modes(self.parent.config))
+
+    def _save_capture_memory_modes(self):
+        from capture_regions import MEMORY_MODES, memory_control_modes, memory_keys
+        from capture_memory_settings import text as memory_text
+        selected = self.capture_memory_modes.checked_modes()
+        previous_modes = memory_control_modes(self.parent.config)
+        updates = {'capture_area_memory_modes': list(selected)}
+        for mode in MEMORY_MODES:
+            enabled_key, area_key = memory_keys(mode)
+            if mode not in selected:
+                updates.update({enabled_key: False, area_key: None})
+            elif mode not in previous_modes:
+                updates[enabled_key] = True
+        missing = object()
+        before = {key: self.parent.config.get(key, missing) for key in updates}
+        self.parent.config.update(updates)
+        try:
+            if self.parent.save_config() is False:
+                raise OSError('Could not save capture memory preferences')
+        except Exception:
+            for key, value in before.items():
+                if value is missing:
+                    self.parent.config.pop(key, None)
+                else:
+                    self.parent.config[key] = value
+            self._refresh_capture_memory_modes()
+            logging.exception('Could not save capture memory preferences')
+            QMessageBox.warning(self, memory_text(self.parent.current_interface_language, 'label').rstrip(':： '),
+                                memory_text(self.parent.current_interface_language, 'error'))
+            return False
+        _invalidate_main_config_cache()
+        return True
 
     def _create_dynamic_template(self):
         from dynamic_workspace import open_template_builder
@@ -11334,10 +11388,7 @@ class SettingsWindow(QWidget):
         if index == 3:
             self.settings_assistant_page.refresh()
         if index == 1:
-            remember_area = getattr(self, 'remember_translation_area_checkbox', None)
-            if remember_area is not None:
-                with QtCore.QSignalBlocker(remember_area):
-                    remember_area.setChecked(self.parent.config.get('remember_translate_area') is True)
+            self._refresh_capture_memory_modes()
             updates_page.raise_()
         elif index == 2:
             game_page.raise_()
@@ -14292,8 +14343,10 @@ finally {
                         self._apply_engine_combo_style(combo)
                 except RuntimeError:
                     pass
-        result_control = getattr(self, "result_window_control", None)
-        if result_control is not None:
+        for result_control in (getattr(self, "result_window_control", None),
+                               getattr(self, "capture_memory_modes", None)):
+            if result_control is None:
+                continue
             try:
                 # Same styling as the engine pickers: the three rows now live in
                 # a drop-down, so they must not drift apart visually.
