@@ -526,6 +526,9 @@ class DropDownCombo(QComboBox):
         background, text = colors['surface'], colors['text']
         from combo_popup import popup_scale
         factor = popup_scale(self)
+        popup.setProperty('roundedPopupRadius', round(5*factor))
+        popup.setProperty('roundedPopupInset', .5)
+        popup.setProperty('roundedPopupStroke', 1.)
         # Disabled section labels store their own ForegroundRole. A stylesheet
         # change alone leaves that brush in the previous theme (black on black
         # after the first light -> dark switch).
@@ -632,7 +635,7 @@ class DropDownCombo(QComboBox):
                 painter.setRenderHint(QtGui.QPainter.Antialiasing)
                 painter.setPen(QtGui.QPen(QtGui.QColor(colors['border']), 1))
                 painter.setBrush(QtGui.QColor(colors['surface']))
-                radius = round(5*popup_scale(self))
+                radius = float(watched.property('roundedPopupRadius') or round(5*popup_scale(self)))
                 painter.drawRoundedRect(QtCore.QRectF(watched.rect()).adjusted(.5, .5, -.5, -.5), radius, radius)
                 return True
             elif event.type() in (QtCore.QEvent.Move, QtCore.QEvent.Resize, QtCore.QEvent.Show):
@@ -817,7 +820,7 @@ class ResultWindowModeCombo(DropDownCombo):
     ROW_HEIGHT = 28
 
     def __init__(self, modes, labels, summaries, dark=True, parent=None,
-                 short_labels=None, header="", header_color="#f4f6fb"):
+                 short_labels=None, header="", header_color="#f4f6fb", footer=""):
         super().__init__(parent)
         self._modes = tuple(modes)
         self._summaries = dict(summaries)
@@ -852,6 +855,7 @@ class ResultWindowModeCombo(DropDownCombo):
             item.setSizeHint(QtCore.QSize(0, self.ROW_HEIGHT))
             self.model().appendRow(item)
 
+        append_header(footer)
         self._refresh_icons()
         # Toggle on press instead of letting the view "select" a row, so the
         # list stays open and no row ever looks like the chosen one.
@@ -974,6 +978,10 @@ class ResultWindowModeCombo(DropDownCombo):
 
     def set_help_text(self, text):
         self._help = str(text or "")
+        for row in range(self.model().rowCount()):
+            item = self.model().item(row)
+            if not item.isEnabled():
+                item.setToolTip(self._help)
         self._refresh_text()
 
     def set_dark(self, dark):
@@ -3708,6 +3716,23 @@ for _locale, _opacity_caption in zip(
          'Arka plan opaklığı:', 'पृष्ठभूमि की अपारदर्शिता:', 'Opasitas latar:')):
     SETTINGS_TEXT[_locale]['game_overlay_opacity'] = _opacity_caption
 SETTINGS_TEXT['ru']['game_scan_interval'] = 'Интервал проверки:'
+
+# Each row names its actual destination. In the main composer the result is
+# inline; calling all three actions "open a window" hid that distinction.
+from result_presentation_text import RESULT_PRESENTATION_TEXT
+for _locale, _copy in RESULT_PRESENTATION_TEXT.items():
+    for _key, _value in _copy.items():
+        _setting_key = {
+            'label': 'result_window_label', 'header': 'result_window_modes_header',
+            'selection': 'result_window_row_selection', 'area': 'result_window_row_area',
+            'main': 'result_window_row_main', 'all': 'result_window_summary_all',
+            'none': 'result_window_summary_none', 'footer': 'result_window_footer',
+            'help': 'result_window_tooltip',
+            'tooltip_selection': 'result_window_mode_selection_tooltip',
+            'tooltip_area': 'result_window_mode_area_tooltip',
+            'tooltip_main': 'result_window_mode_main_tooltip',
+        }[_key]
+        SETTINGS_TEXT[_locale][_setting_key] = _value
 
 def settings_text(lang, key):
     texts = SETTINGS_TEXT.get(lang, SETTINGS_TEXT["en"])
@@ -10325,6 +10350,7 @@ class SettingsWindow(QWidget):
                           for mode in RESULT_WINDOW_MODES},
             header=settings_text(lang, "result_window_modes_header"),
             header_color="#f4f6fb" if self.parent.current_theme != "Светлая" else "#202124",
+            footer=settings_text(lang, 'result_window_footer'),
         )
         self.result_window_control.setObjectName("resultWindowModes")
         self.result_window_control.setFixedSize(engine_combo_width, engine_control_height)
@@ -11131,6 +11157,11 @@ class SettingsWindow(QWidget):
         self.auto_save_setting('game_remember_template', bool(enabled))
         self._refresh_game_templates()
 
+    def _set_remember_translation_area(self, enabled):
+        if not enabled:
+            self.parent.config['last_translate_area'] = None
+        self.auto_save_setting('remember_translate_area', bool(enabled))
+
     def _create_dynamic_template(self):
         from dynamic_workspace import open_template_builder
         def saved(value):
@@ -11241,6 +11272,10 @@ class SettingsWindow(QWidget):
         if index == 3:
             self.settings_assistant_page.refresh()
         if index == 1:
+            remember_area = getattr(self, 'remember_translation_area_checkbox', None)
+            if remember_area is not None:
+                with QtCore.QSignalBlocker(remember_area):
+                    remember_area.setChecked(self.parent.config.get('remember_translate_area') is True)
             updates_page.raise_()
         elif index == 2:
             game_page.raise_()

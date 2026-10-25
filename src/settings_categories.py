@@ -210,9 +210,10 @@ def _wrap_mode_pages(settings):
     header.setStretch(1, 0)
     header.setSpacing(10)
     header.addStretch(1)
-    grid.addWidget(settings.game_language_row, 0, 0)
-
-    grid.addWidget(settings.game_remember_template_checkbox, 1, 0, Qt.AlignLeft)
+    for row, checkbox in enumerate((settings.game_pause_inactive_checkbox,
+            settings.game_manual_output_checkbox, settings.game_toolbar_checkbox,
+            settings.game_remember_template_checkbox)):
+        grid.addWidget(checkbox, row, 0, Qt.AlignLeft)
     settings.game_template_actions = QWidget(content)
     template_row = QHBoxLayout(settings.game_template_actions)
     rtl = settings.layoutDirection() == Qt.RightToLeft
@@ -221,7 +222,8 @@ def _wrap_mode_pages(settings):
     template_row.addWidget(settings.game_template_combo)
     template_row.addWidget(settings.game_create_template_button)
     template_row.addStretch(1)
-    grid.addWidget(settings.game_template_actions, 2, 0)
+    grid.addWidget(settings.game_template_actions, 4, 0)
+    grid.addWidget(settings.game_language_row, 5, 0)
 
     settings.game_numeric_options = QWidget(content)
     numbers = QHBoxLayout(settings.game_numeric_options)
@@ -244,10 +246,7 @@ def _wrap_mode_pages(settings):
         stack.addWidget(control, 0, Qt.AlignLeft)
         numbers.addWidget(group)
     numbers.addStretch(1)
-    grid.addWidget(settings.game_numeric_options, 3, 0)
-    for row, checkbox in enumerate((settings.game_pause_inactive_checkbox,
-            settings.game_manual_output_checkbox, settings.game_toolbar_checkbox), 4):
-        grid.addWidget(checkbox, row, 0, Qt.AlignLeft)
+    grid.addWidget(settings.game_numeric_options, 6, 0)
     grid.setRowStretch(7, 1)
     settings.game_settings_content = content
     settings.game_settings_scroll = _scroll(page, content, 'dynamicSettingsScroll')
@@ -362,6 +361,14 @@ def organize(settings, general_layout, form, updates_layout, dim_row):
             close_flag)):
         control.setParent(content)
         grid.addWidget(_flag(control), row, 0, 1, 1 if row < 2 else 3, Qt.AlignLeft)
+    from capture_regions import text as region_text
+    settings.remember_translation_area_checkbox = QCheckBox(region_text(lang, 'translation_setting'), content)
+    remember_area = settings.remember_translation_area_checkbox
+    remember_area.setChecked(settings.parent.config.get('remember_translate_area') is True)
+    remember_area.setToolTip(tooltip_text(region_text(lang, 'translation_setting_hint')))
+    remember_area.setAccessibleDescription(region_text(lang, 'translation_setting_hint'))
+    remember_area.toggled.connect(settings._set_remember_translation_area)
+    grid.addWidget(_flag(remember_area), 4, 0, 1, 3, Qt.AlignLeft)
     settings.provider_routing_note = QLabel(content)
     settings.provider_routing_note.setObjectName('assistantNote')
     settings.provider_routing_note.setFixedHeight(28)
@@ -371,8 +378,8 @@ def organize(settings, general_layout, form, updates_layout, dim_row):
         from provider_settings import show_provider_settings
         show_provider_settings(settings, VISION_ENGINES.get(settings.parent.config.get('ocr_engine')))
     settings.provider_routing_note.linkActivated.connect(open_image_api)
-    grid.addWidget(settings.provider_routing_note, 4, 0, 1, 3)
-    grid.setRowStretch(5, 1)
+    grid.addWidget(settings.provider_routing_note, 5, 0, 1, 3)
+    grid.setRowStretch(6, 1)
     settings.translation_settings_content = content
     settings.translation_settings_scroll = _scroll(page, content, 'translationSettingsScroll')
     updates_layout.setSpacing(4)

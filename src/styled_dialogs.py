@@ -13,6 +13,7 @@ import math
 import os
 import re
 import sys
+from functools import lru_cache
 from pathlib import Path
 
 from PyQt5 import QtCore, QtGui, QtWidgets, sip
@@ -105,7 +106,7 @@ TOOLTIP_WRAP_WIDTH = 240
 def tooltip_text(text, width: int = TOOLTIP_WRAP_WIDTH) -> str:
     """Return tooltip markup that wraps consistently at a readable width."""
     value = str(text or "")
-    if not value:
+    if not tooltip_has_text(value):
         return ""
     if len(value) <= TOOLTIP_WRAP_THRESHOLD and "\n" not in value:
         return value
@@ -115,6 +116,27 @@ def tooltip_text(text, width: int = TOOLTIP_WRAP_WIDTH) -> str:
     return f'<qt><div style="width:{int(width)}px">{escaped}</div></qt>'
 
 
+def _tooltip_plain_text(value):
+    """Visible tooltip copy, without HTML chrome or direction-only content."""
+    return _cached_tooltip_plain_text(str(value or ''))
+
+
+@lru_cache(maxsize=1024)
+def _cached_tooltip_plain_text(text):
+    if re.search(r'<(?:qt|html|body|div|span|p|br|b|i|strong|em|a|table)\b', text, re.I):
+        document = QtGui.QTextDocument()
+        document.setHtml(text)
+        text = document.toPlainText()
+    return text
+
+
+def tooltip_has_text(value):
+    # A language direction mark is useful around real copy, but cannot form a
+    # tooltip on its own. Painting it produced the empty grey bubbles.
+    text = _tooltip_plain_text(value)
+    return bool(text.strip(' \t\r\n\u00a0\u200b\u200c\u200d\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069'))
+
+
 def _ensure_control_tooltip(widget):
     """Fill missing control hints without overwriting dedicated explanations.
 
@@ -122,7 +144,7 @@ def _ensure_control_tooltip(widget):
     composite controls inherit their parent's explanation.
     """
     generated = widget.property('automaticHoverHint')
-    if widget.toolTip() and widget.toolTip() != generated:
+    if tooltip_has_text(widget.toolTip()) and widget.toolTip() != generated:
         return
     if not isinstance(widget, (QtWidgets.QAbstractButton, QtWidgets.QComboBox,
                               QtWidgets.QLineEdit, QtWidgets.QAbstractSpinBox,
@@ -130,25 +152,25 @@ def _ensure_control_tooltip(widget):
                               QtWidgets.QTextEdit, QtWidgets.QPlainTextEdit)):
         return
     text = widget.accessibleDescription() or widget.accessibleName()
-    if not text and isinstance(widget, QtWidgets.QLineEdit):
+    if not tooltip_has_text(text) and isinstance(widget, QtWidgets.QLineEdit):
         parent = widget.parentWidget()
         while parent is not None:
-            if parent.toolTip():
+            if tooltip_has_text(parent.toolTip()):
                 text = parent.toolTip()
                 break
             parent = parent.parentWidget()
-    if not text and isinstance(widget, QtWidgets.QAbstractButton):
+    if not tooltip_has_text(text) and isinstance(widget, QtWidgets.QAbstractButton):
         text = widget.text().replace('&&', '\0').replace('&', '').replace('\0', '&')
-    if not text:
+    if not tooltip_has_text(text):
         root = widget.parentWidget()
         if root is not None:
             label = next((label for label in root.findChildren(
                           QtWidgets.QLabel, options=QtCore.Qt.FindDirectChildrenOnly)
                           if label.buddy() is widget), None)
             text = label.text().rstrip(':： ') if label is not None else ''
-    if not text and isinstance(widget, QtWidgets.QComboBox):
+    if not tooltip_has_text(text) and isinstance(widget, QtWidgets.QComboBox):
         text = widget.currentData(QtCore.Qt.ToolTipRole) or widget.currentText()
-    if not text and hasattr(widget, 'placeholderText'):
+    if not tooltip_has_text(text) and hasattr(widget, 'placeholderText'):
         text = widget.placeholderText()
     value = str(text or '')
     if not value.startswith('<qt>'):
@@ -242,11 +264,7 @@ def _hover_tooltip_document(widget, anchor):
     Smaller QToolTip CSS therefore does not give us predictable bubble bounds.
     Keep Qt's hover lifetime, but own both text layout and painting explicitly.
     """
-    text = widget.text()
-    if re.search(r'<(?:qt|html|body|div|span|p|br|b|i|strong|em|a|table)\b', text, re.I):
-        source = QtGui.QTextDocument()
-        source.setHtml(text)
-        text = source.toPlainText()
+    text = _tooltip_plain_text(widget.text())
     owner = widget.property('_q_stylesheet_parent')
     factor = interface_scale_factor(widget=owner if isinstance(owner, QtWidgets.QWidget) else widget)
     font = QtGui.QFontDatabase.systemFont(QtGui.QFontDatabase.GeneralFont)
@@ -275,6 +293,9 @@ def _hover_tooltip_document(widget, anchor):
 def _paint_hover_tooltip(widget):
     # Reused QTipLabels can change text without a Show or Resize event. Layout
     # at paint time too, so a long hint cannot leave its size on the next one.
+    if not tooltip_has_text(widget.text()):
+        widget.hide()
+        return
     document = _fit_hover_tooltip(widget, QtGui.QCursor.pos())
     if document is None:
         return
@@ -366,22 +387,26 @@ def _apply_rounded_popup_mask(widget, radius: float = 8.0) -> None:
     try:
         if sip.isdeleted(widget):
             return
-        if sys.platform == 'darwin':
-            # Cocoa now composites the translucent surface correctly. A
-            # logical-pixel QRegion would cut its antialiased Retina edge
-            # into visible two-pixel steps.
-            # No mask was installed on Cocoa, so no native operation is
-            # needed here (including for a queued update after tip disposal).
+        from rounded_windows import uses_alpha_surface
+        if uses_alpha_surface(widget):
+            if not widget.mask().isEmpty():
+                widget.clearMask()
             return
         rect = widget.rect()
         if rect.width() < 2 or rect.height() < 2:
             return
-        path = QtGui.QPainterPath()
-        if _is_tooltip(widget) or isinstance(widget, StatusPopup):
+        if _is_tooltip(widget):
             radius = 4.0
-        path.addRoundedRect(QtCore.QRectF(rect), radius, radius)
-        polygon = path.toFillPolygon().toPolygon()
-        widget.setMask(QtGui.QRegion(polygon))
+        else:
+            radius = float(widget.property('roundedPopupRadius') or radius)
+        from rounded_windows import rounded_clip_region
+        # The painter stores its geometry on the popup. Do not substitute a
+        # different radius here: that cuts away the visible curved outline.
+        inset = widget.property('roundedPopupInset')
+        stroke = widget.property('roundedPopupStroke')
+        inset = .5 if inset is None else float(inset)
+        stroke = 1. if stroke is None else float(stroke)
+        widget.setMask(rounded_clip_region(rect, radius, inset=inset, stroke_width=stroke))
     except (AttributeError, RuntimeError):
         # The shared QTipLabel can be destroyed before the queued pass runs.
         return
@@ -407,6 +432,9 @@ class StatusPopup(QtWidgets.QLabel):
         from window_appearance import scaled_stylesheet
         screen = QtWidgets.QApplication.screenAt(QtGui.QCursor.pos()) or self.screen()
         factor = desktop_control_scale(screen)
+        self.setProperty('roundedPopupRadius', round(4*factor))
+        self.setProperty('roundedPopupInset', 0.)
+        self.setProperty('roundedPopupStroke', 0.)
         set_widget_stylesheet(self, scaled_stylesheet(
             tooltip_stylesheet().replace('QToolTip', 'QLabel'), factor))
 

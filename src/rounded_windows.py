@@ -5,6 +5,39 @@ import weakref
 from PyQt5 import QtCore, QtGui, sip
 
 
+def rounded_clip_region(rect, radius, *, inset=0.0, stroke_width=0.0):
+    """A conservative native clip matching a rounded painted surface.
+
+    Radius and geometry must be the same ones used by the surface painter.
+    An integer native mask clips transparent corners, never its visible stroke.
+    """
+    rect = QtCore.QRect(rect)
+    if rect.isEmpty():
+        return QtGui.QRegion()
+    radius = max(0., min(float(radius), max(0., min(rect.width(), rect.height())/2-inset)))
+    path = QtGui.QPainterPath()
+    path.addRoundedRect(QtCore.QRectF(rect).adjusted(inset,inset,-inset,-inset), radius, radius)
+    if stroke_width:
+        stroke = QtGui.QPainterPathStroker()
+        stroke.setWidth(stroke_width)
+        path = path.united(stroke.createStroke(path))
+    region = QtGui.QRegion(path.toFillPolygon().toPolygon())
+    # This is only a fallback for non-composited platforms. A conservative
+    # pixel around the integer polygon retains the antialiased painted edge.
+    expanded = QtGui.QRegion(region)
+    for x,y in ((-1,0),(1,0),(0,-1),(0,1),(-1,-1),(1,-1),(-1,1),(1,1)):
+        expanded |= region.translated(x,y)
+    return expanded.intersected(QtGui.QRegion(rect))
+
+
+def uses_alpha_surface(window):
+    """Layered native windows and graphics scenes already clip by paint alpha."""
+    return (window.graphicsProxyWidget() is not None
+            or sys.platform in ('win32','darwin')
+            and window.testAttribute(QtCore.Qt.WA_TranslucentBackground)
+            and bool(window.windowFlags() & QtCore.Qt.FramelessWindowHint))
+
+
 class _RoundedSurface(QtCore.QObject):
     def __init__(self, window, surface, radius):
         super().__init__(window)
@@ -33,16 +66,19 @@ class _RoundedSurface(QtCore.QObject):
         if (window is None or surface is None or sip.isdeleted(window)
                 or sip.isdeleted(surface) or not window.isWindow()):
             return
-        if sys.platform == 'darwin':
-            return  # Cocoa uses the translucent, antialiased painted surface.
+        if uses_alpha_surface(window):
+            # QRegion uses integer logical coordinates and cuts curved border
+            # pixels at fractional DPI. The painted transparent surface keeps
+            # all antialiasing on Windows/Cocoa and in a graphics proxy.
+            if not window.mask().isEmpty():
+                window.clearMask()
+            return
         rect = QtCore.QRectF(surface.rect())
         if rect.isEmpty():
             return
         rect.moveTopLeft(QtCore.QPointF(surface.mapTo(window, QtCore.QPoint())))
         factor = float(window.property('ui_effective_scale') or 1.0)
-        path = QtGui.QPainterPath()
-        path.addRoundedRect(rect, self.radius * factor, self.radius * factor)
-        region = QtGui.QRegion(path.toFillPolygon().toPolygon())
+        region = rounded_clip_region(rect.toAlignedRect(), self.radius * factor)
         if window.mask() != region:
             window.setMask(region)
 

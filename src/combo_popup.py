@@ -141,7 +141,12 @@ class PopupRowDelegate(QtWidgets.QStyledItemDelegate):
         painter.restore()
 
     def helpEvent(self, event, view, option, index):
-        if index.isValid() and not index.data(QtCore.Qt.ToolTipRole):
+        app = QtWidgets.QApplication.instance()
+        if app is not None and app.property('buttonTooltipsEnabled') is False:
+            QtWidgets.QToolTip.hideText()
+            return False
+        from styled_dialogs import tooltip_has_text
+        if index.isValid() and not tooltip_has_text(index.data(QtCore.Qt.ToolTipRole)):
             label = self.label(index)
             if self.sizeHint(option, index).width() > option.rect.width():
                 QtWidgets.QToolTip.showText(event.globalPos(), '<span>'+html.escape(label)+'</span>', view)

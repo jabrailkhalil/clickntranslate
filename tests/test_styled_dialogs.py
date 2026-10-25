@@ -261,7 +261,8 @@ def test_document_pane_borders_survive_theme_and_language_switches():
                     (20, editor.y() - 1, editor.y(), pane.height() // 2)]
             assert all(color == edge[0] for color in edge)
             assert edge[0] != image.pixelColor(round(12 * dpr), round(pane.height() / 2 * dpr))
-        left, right = dialog.document_splitter.widget(0), dialog.document_splitter.widget(1)
+        left, right = sorted((dialog.document_splitter.widget(0), dialog.document_splitter.widget(1)),
+                             key=lambda pane: pane.x())
         assert right.x() - (left.x() + left.width()) >= 10
 
         margins = dialog.window_frame.layout().contentsMargins()

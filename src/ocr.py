@@ -4513,9 +4513,11 @@ class ScreenCaptureOverlay(QWidget):
         local = bounds.translated(-self.geometry().topLeft())
         factor = self.property('ui_effective_scale') or 1.
         grid = self.capture_toolbar_grid
+        self.capture_toolbar.ensurePolished()
         margins = grid.contentsMargins()
+        frame = self.capture_toolbar.contentsMargins()
         maximum = max(80, min(self.width(), local.width()) - round(24*factor))
-        content_width = max(1, maximum-margins.left()-margins.right())
+        content_width = max(1, maximum-margins.left()-margins.right()-frame.left()-frame.right())
         for control in (self.remember_area_checkbox, self.repeat_area_button):
             control.ensurePolished()
             control.setMinimumWidth(control.sizeHint().width())
@@ -4526,8 +4528,22 @@ class ScreenCaptureOverlay(QWidget):
             self.memory_grid.removeWidget(self.repeat_area_button)
             self.memory_grid.addWidget(self.repeat_area_button, 1, 0)
         self.memory_grid.invalidate()
-        self.capture_languages.layout().invalidate()
-        inline_width = (self.capture_languages.sizeHint().width() + self.memory_panel.sizeHint().width()
+        self.memory_panel.setMinimumSize(self.memory_grid.minimumSize())
+        languages = self.capture_languages.layout()
+        languages.invalidate()
+        controls = [item for item in (self.lang_combo, self.translate_arrow_label, self.target_lang_combo)
+                    if item is not None]
+        language_margins = languages.contentsMargins()
+        # Fractional monitor DPI can round the layout's aggregate hint down
+        # while each fixed-size field rounds up. Keep the actual field edges
+        # inside their intermediate panel as well as the outer toolbar.
+        self.capture_languages.setMinimumSize(
+            sum(item.width() for item in controls) + languages.spacing() * max(0, len(controls)-1)
+                + language_margins.left() + language_margins.right(),
+            max((item.height() for item in controls), default=0)
+                + language_margins.top() + language_margins.bottom())
+        inline_width = (self.capture_languages.sizeHint().expandedTo(self.capture_languages.minimumSize()).width()
+                        + self.memory_panel.sizeHint().expandedTo(self.memory_panel.minimumSize()).width()
                         + self.capture_close_button.width() + 1 + 3*grid.horizontalSpacing())
         for widget in (self.capture_languages, self.capture_separator, self.memory_panel, self.capture_close_button):
             grid.removeWidget(widget)
@@ -4544,7 +4560,10 @@ class ScreenCaptureOverlay(QWidget):
             grid.addWidget(self.capture_close_button, 0, 1, QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
             grid.addWidget(self.memory_panel, 1, 0, 1, 2)
         grid.invalidate()
-        size = grid.sizeHint()
+        # The frame's border consumes space outside its layout margins. Using
+        # the grid hint alone makes every child row two pixels too small and
+        # clips the language flags and checkbox card along their edges.
+        size = self.capture_toolbar.sizeHint()
         self.capture_toolbar.setFixedSize(min(maximum, size.width()), size.height())
         grid.activate()
         x = local.center().x()-self.capture_toolbar.width()//2

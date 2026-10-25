@@ -46,7 +46,7 @@ def test_settings_controls_are_in_the_page_their_behavior_belongs_to(window, app
          ('translator_combo', 'result_window_control', 'copy_translated_checkbox',
           'replace_select_all_checkbox', 'restore_clipboard_checkbox',
           'close_result_on_outside_click_checkbox', 'translation_offline_button',
-          'translation_api_button')),
+          'translation_api_button', 'remember_translation_area_checkbox')),
         (PAGE_OCR, settings.settings_ocr_page,
          ('ocr_engine_combo', 'ocr_join_paragraphs_checkbox', 'keep_visible_checkbox',
           'freeze_screen_checkbox', 'dim_screen_during_ocr_checkbox',

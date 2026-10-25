@@ -347,10 +347,13 @@ for _locale, _layout_copy in LAYOUT_COPY.items():
 
 def guide_updates(language):
     from settings_sections import PAGE_APPLICATION, PAGE_TRANSLATION, PAGE_DYNAMIC, page_caption, section_text
+    from result_presentation_text import text as presentation_text
     c = COPY.get(language, COPY['en'])
     entries = {key: (c[i], c[i+1]) for key, i in (
         ('result_text', 5), ('result_behavior', 7), ('selection_behavior', 9))}
     entries.update({
+        'result_window': (presentation_text(language, 'label').rstrip(':： '),
+                          presentation_text(language, 'help')),
         'api_connections': (page_caption(language, PAGE_TRANSLATION) + ' → ' + section_text(language, 'api'), c[4]),
         'settings_page_main': (page_caption(language, PAGE_APPLICATION), c[1]),
         'settings_page_updates': (page_caption(language, PAGE_TRANSLATION), c[2]),
@@ -363,6 +366,7 @@ def guide_updates(language):
 
 def update_help(content):
     from selection_options import TEXT
+    from result_presentation_text import text as presentation_text
     for lang, sections in content.items():
         c = COPY.get(lang, COPY['en'])
         for index, (title, items) in enumerate(sections):
@@ -372,6 +376,7 @@ def update_help(content):
         sections.append((guide_updates(lang)['api_connections'][0], [c[4], c[11]]))
         sections.append((c[5], [c[6]]))
         sections.append((c[7], [c[8]]))
+        sections.append((presentation_text(lang, 'label').rstrip(':： '), [presentation_text(lang, 'help')]))
         sections.append((c[9], [c[10], TEXT.get(lang, TEXT['en'])[5]]))
         from settings_sections import PAGE_APPLICATION, page_caption
         sections.append((page_caption(lang, PAGE_APPLICATION), [c[12]]))

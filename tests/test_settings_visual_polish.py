@@ -136,7 +136,13 @@ def test_section_buttons_and_longest_dynamic_names_fit_every_theme_and_zoom(wind
                 assert remember.sizeHint().width() <= remember.width(), context
                 assert template.width() == settings.game_interval_controls.width(), context
                 assert template.isVisible() == bool(remember.isChecked() and template.property('templateCatalogAvailable')), context
-                assert rect_in(row, settings.settings_game_page).bottom() < remember_rect.top(), context
+                flag_rects = [rect_in(flag, settings.settings_game_page) for flag in (
+                    settings.game_pause_inactive_checkbox, settings.game_manual_output_checkbox,
+                    settings.game_toolbar_checkbox, remember)]
+                assert all(first.bottom() < second.top() for first, second in zip(flag_rects, flag_rects[1:])), context
+                assert max(rect.bottom() for rect in flag_rects) < min(
+                    create_rect.top(), rect_in(row, settings.settings_game_page).top(),
+                    rect_in(settings.game_numeric_options, settings.settings_game_page).top()), context
                 for label, value in ((settings.game_scan_interval_label, settings.game_interval_controls),
                                      (settings.game_overlay_opacity_label, settings.game_opacity_controls)):
                     caption = rect_in(label, settings.settings_game_page)

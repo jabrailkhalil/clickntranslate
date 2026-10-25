@@ -352,13 +352,15 @@ class SettingsEngineLayoutTest(unittest.TestCase):
         control = settings.result_window_control
 
         self.assertIsInstance(control, QComboBox)
-        # Screen-area OCR and plain copy never open a result window, so they
-        # must not be offered here; only these three modes actually show one.
-        self.assertEqual(control.count(), len(main.RESULT_WINDOW_MODES) + 1)
+        # The two explanatory rows are not additional delivery-mode switches.
+        self.assertEqual(control.count(), len(main.RESULT_WINDOW_MODES) + 2)
         header = control.model().item(0)
         self.assertEqual(header.text(), settings_text("en", "result_window_modes_header"))
         self.assertFalse(header.isEnabled())
         self.assertIsNone(header.data(Qt.UserRole))
+        footer = control.model().item(control.count()-1)
+        self.assertFalse(footer.isEnabled())
+        self.assertEqual(footer.text(), settings_text('en', 'result_window_footer'))
 
         for mode in main.RESULT_WINDOW_MODES:
             item = control._item(mode)
