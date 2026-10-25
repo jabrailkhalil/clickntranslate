@@ -448,6 +448,12 @@ def recognize(provider, image, source, target, config, cancel=None):
             raise ValueError
     except (ValueError, KeyError, TypeError):
         raise ProviderError('The model returned an invalid recognition result. Try a smaller selection.') from None
+    if target and not direct and config.get('ocr_join_paragraphs') is True:
+        # OCR-only models can still return visual line wraps despite the prompt.
+        # Apply the same deterministic step as local OCR before a second service
+        # receives the text; copy-only recognition keeps the original layout.
+        from ocr_paragraphs import merge_text_lines
+        original = merge_text_lines(original)
     return VisionResult(original, translated if direct else None)
 
 

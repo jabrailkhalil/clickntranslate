@@ -257,6 +257,26 @@ def test_vision_one_request_keeps_translation_and_does_not_use_local_ocr(app):
     local.assert_not_called()
 
 
+@pytest.mark.parametrize('join', [False, True])
+def test_vision_ocr_only_import_reflows_before_main_window_translation(app, join):
+    import json
+    import api_providers as api
+    from test_ocr_paragraphs import REPORTED_LINES
+    engine = next(name for name, code in api.VISION_ENGINES.items() if code == 'openai')
+    source = '\n'.join(REPORTED_LINES) + '\n\nSecond paragraph.'
+    config = {'ocr_engine': engine, 'ocr_join_paragraphs': join,
+              'api_providers': {'openai': {'url': api.BY_KEY['openai'].url,
+                  'model': 'test-model', 'vision': True, 'direct': False}}}
+    with (mock.patch.object(api, 'credential', return_value='test-secret'),
+          mock.patch.object(api, '_text_response', return_value=json.dumps({
+              'source': source, 'translation': None})),
+          mock.patch('ocr.create_position_ocr_worker') as local):
+        text, translated = image_input.recognize_image(photo(), config, 'en', 'ar', lambda: False)
+    expected = ' '.join(REPORTED_LINES) + '\n\nSecond paragraph.' if join else source
+    assert text == expected and translated is None
+    local.assert_not_called()
+
+
 def test_vision_errors_use_localized_safe_feedback(app):
     from api_providers import VISION_ENGINES,ProviderError
     engine=next(name for name,code in VISION_ENGINES.items() if code=='openai')

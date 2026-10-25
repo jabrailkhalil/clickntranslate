@@ -129,26 +129,46 @@ def test_section_buttons_and_longest_dynamic_names_fit_every_theme_and_zoom(wind
 
                 template = settings.game_template_combo
                 remember = settings.game_remember_template_checkbox
-                create = settings.game_create_template_button
-                create_rect, remember_rect = rect_in(create, settings.settings_game_page), rect_in(remember, settings.settings_game_page)
-                assert not settings.game_template_label.isVisible(), context
-                assert create_rect.top() > remember_rect.bottom(), context
+                template_rect = rect_in(settings.game_template_actions, settings.settings_game_page)
+                assert settings.game_template_label.isVisible(), context
                 assert remember.sizeHint().width() <= remember.width(), context
-                assert template.width() == settings.game_interval_controls.width(), context
-                assert template.isVisible() == bool(remember.isChecked() and template.property('templateCatalogAvailable')), context
+                assert template.isVisible() and template.isEnabled(), context
+                assert settings.game_template_controls.width() == settings.game_language_controls.width(), context
+                assert template.width() + 6 + settings.game_delete_template_button.width() == settings.game_template_controls.width(), context
                 flag_rects = [rect_in(flag, settings.settings_game_page) for flag in (
                     settings.game_pause_inactive_checkbox, settings.game_manual_output_checkbox,
                     settings.game_toolbar_checkbox, remember)]
                 assert all(first.bottom() < second.top() for first, second in zip(flag_rects, flag_rects[1:])), context
                 assert max(rect.bottom() for rect in flag_rects) < min(
-                    create_rect.top(), rect_in(row, settings.settings_game_page).top(),
+                    template_rect.top(), rect_in(row, settings.settings_game_page).top(),
                     rect_in(settings.game_numeric_options, settings.settings_game_page).top()), context
+                language_fields = rect_in(settings.game_language_controls, settings.settings_game_page)
+                template_fields = rect_in(settings.game_template_controls, settings.settings_game_page)
+                assert language_fields.left() == template_fields.left(), context
+                assert language_fields.right() == template_fields.right(), context
+                previous = rect_in(row, settings.settings_game_page)
                 for label, value in ((settings.game_scan_interval_label, settings.game_interval_controls),
                                      (settings.game_overlay_opacity_label, settings.game_opacity_controls)):
                     caption = rect_in(label, settings.settings_game_page)
                     field = rect_in(value, settings.settings_game_page)
-                    assert 0 <= field.top()-caption.bottom()-1 <= 4, (context, caption, field)
-                    assert abs(field.center().x()-caption.center().x()) <= 40, (context, caption, field)
+                    assert field.top() > previous.bottom(), (context, previous, field)
+                    assert abs(field.center().y()-caption.center().y()) <= 1, (context, caption, field)
+                    assert label.fontMetrics().horizontalAdvance(label.text()) <= label.width(), context
+                    if settings.layoutDirection() == QtCore.Qt.RightToLeft:
+                        assert caption.left() - field.right() - 1 == 10, (context, caption, field)
+                        assert field.left() == language_fields.left(), context
+                    else:
+                        assert field.left() - caption.right() - 1 == 10, (context, caption, field)
+                        assert field.right() == language_fields.right(), context
+                    previous = field
+                assert template_rect.top() > previous.bottom(), context
+                for container, children in (
+                        (settings.game_template_actions, (settings.game_template_label, settings.game_template_controls)),
+                        (settings.game_template_controls, (template, settings.game_delete_template_button))):
+                    for child in children:
+                        assert container.contentsRect().contains(rect_in(child, container)), (context, child.objectName())
+                assert settings.game_settings_content.rect().contains(template_rect.translated(
+                    -settings.game_settings_content.mapTo(settings.settings_game_page, QtCore.QPoint()))), context
 
 
 @pytest.mark.parametrize('dark', [True, False])

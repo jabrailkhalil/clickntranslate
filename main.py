@@ -191,7 +191,7 @@ DEFAULT_REPLACE_SELECTION_HOTKEY = "Ctrl+Shift+Q"
 DEFAULT_TOGGLE_WINDOW_HOTKEY = "Ctrl+Shift+Space"
 DEFAULT_GAME_HOTKEY = "Ctrl+Alt+G"
 HOTKEY_DEFAULTS_REVISION = 5
-STARTUP_NEWS_ID = "version-1.8-3000-downloads"
+STARTUP_NEWS_ID = "version-1.8-workflows"
 LAYOUT_EDITOR_MODE = "--layout-editor" in sys.argv
 
 # Defaults used by the normal application and by the developer-only visual
@@ -3031,203 +3031,198 @@ def clipboard_copy_icon(theme_name):
     return QIcon(pixmap)
 
 
-WELCOME_TEXT = {
-    "en": {
-        "window": "News",
-        "eyebrow": "Portable screen translator",
-        "title": "Welcome to Click'n'Translate!",
-        "body": "Version {version} brings a major update to the interface and everyday workflows. Thank you for your support — already 3,000 downloads!",
-        "feature_ocr": "Screen OCR",
-        "feature_translate": "Online + offline",
-        "feature_updates": "3,000 downloads",
-        "telegram": "Open Telegram",
-        "github": "Star the project on GitHub",
-        "support": "Click'n'Translate is a free project. We'd be grateful if you joined us on Telegram and gave us a star on GitHub.",
-        "checkbox": "Don't show this window again",
-        "guide": "Show me around",
-        "skip": "Skip",
-        "close": "Start",
-    },
-    "ru": {
-        "window": "Новости",
-        "eyebrow": "Портативный экранный переводчик",
-        "title": "Добро пожаловать в Click'n'Translate!",
-        "body": "Версия {version} — большое обновление интерфейса и удобства работы. Спасибо за поддержку — уже 3 000 скачиваний!",
-        "feature_ocr": "OCR с экрана",
-        "feature_translate": "Онлайн + офлайн",
-        "feature_updates": "3 000 скачиваний",
-        "telegram": "Открыть Telegram",
-        "github": "Поставить звезду проекту на GitHub",
-        "support": "Click'n'Translate — бесплатный проект. Будем благодарны, если вы присоединитесь к нашему Telegram и поставите звезду на GitHub.",
-        "checkbox": "Больше не показывать это окно",
-        "guide": "Пройти обучение",
-        "skip": "Пропустить",
-        "close": "Начать",
-    },
-    "es": {
-        "window": "Noticias",
-        "eyebrow": "Traductor de pantalla portátil",
-        "title": "¡Bienvenido a Click'n'Translate!",
-        "body": "La versión {version} trae una gran actualización de la interfaz y del uso diario. ¡Gracias por su apoyo: ya son 3.000 descargas!",
-        "feature_ocr": "OCR de pantalla",
-        "feature_translate": "Online + offline",
-        "feature_updates": "3.000 descargas",
-        "telegram": "Abrir Telegram",
-        "github": "Dar una estrella al proyecto en GitHub",
-        "support": "Click'n'Translate es un proyecto gratuito. Nos alegraría que te unieras a nuestro Telegram y nos dieras una estrella en GitHub.",
-        "checkbox": "No volver a mostrar esta ventana",
-        "guide": "Ver guía",
-        "skip": "Omitir",
-        "close": "Empezar",
-    },
-    "de": {
-        "window": "Neuigkeiten",
-        "eyebrow": "Portabler Bildschirmübersetzer",
-        "title": "Willkommen bei Click'n'Translate!",
-        "body": "Version {version} bringt eine große Überarbeitung der Oberfläche und der täglichen Bedienung. Danke für eure Unterstützung — schon 3.000 Downloads!",
-        "feature_ocr": "Bildschirm-OCR",
-        "feature_translate": "Online + offline",
-        "feature_updates": "3.000 Downloads",
-        "telegram": "Telegram öffnen",
-        "github": "Dem Projekt auf GitHub einen Stern geben",
-        "support": "Click'n'Translate ist ein kostenloses Projekt. Wir freuen uns, wenn ihr unserem Telegram-Kanal beitretet und uns auf GitHub einen Stern gebt.",
-        "checkbox": "Dieses Fenster nicht mehr anzeigen",
-        "guide": "Tour starten",
-        "skip": "Überspringen",
-        "close": "Starten",
-    },
-    "fr": {
-        "window": "Actualités",
-        "eyebrow": "Traducteur d'écran portable",
-        "title": "Bienvenue dans Click'n'Translate !",
-        "body": "La version {version} apporte une grande refonte de l’interface et de l’utilisation au quotidien. Merci pour votre soutien — déjà 3 000 téléchargements !",
-        "feature_ocr": "OCR d'écran",
-        "feature_translate": "En ligne + hors ligne",
-        "feature_updates": "3 000 téléchargements",
-        "telegram": "Ouvrir Telegram",
-        "github": "Mettre une étoile au projet sur GitHub",
-        "support": "Click'n'Translate est un projet gratuit. Nous vous serions reconnaissants de rejoindre notre Telegram et de nous laisser une étoile sur GitHub.",
-        "checkbox": "Ne plus afficher cette fenêtre",
-        "guide": "Voir le guide",
-        "skip": "Passer",
-        "close": "Commencer",
-    },
-    "zh": {
-        "window": "更新",
-        "eyebrow": "便携式屏幕翻译器",
-        "title": "欢迎使用 Click'n'Translate！",
-        "body": "{version} 版大幅改进了界面和日常使用体验。感谢大家的支持，下载量已达 3,000 次！",
-        "feature_ocr": "屏幕 OCR",
-        "feature_translate": "在线 + 离线翻译",
-        "feature_updates": "3,000 次下载",
-        "telegram": "打开 Telegram",
-        "github": "在 GitHub 上为项目点亮星标",
-        "support": "Click'n'Translate 是一个免费项目。欢迎加入我们的 Telegram，并在 GitHub 上为项目点亮星标。感谢你的支持！",
-        "checkbox": "不再显示此窗口",
-        "guide": "开始引导",
-        "skip": "跳过",
-        "close": "开始",
-    },
-
-    'pt': {'window': 'Notícias',
-     'eyebrow': 'Tradutor de tela portátil',
-     'title': "Bem-vindo ao Click'n'Translate!",
-     'body': 'A versão {version} traz uma grande atualização na interface e nos fluxos de trabalho '
-             'diários. Obrigado pelo seu apoio – já são 3.000 downloads!',
-     'feature_ocr': 'OCR de tela',
-     'feature_translate': 'Online + offline',
-     'feature_updates': '3.000 downloads',
-     'telegram': 'Abra Telegram',
-     'github': 'Dê uma estrela ao projeto no GitHub',
-     'support': "Click'n'Translate é um projeto gratuito. Ficaríamos gratos se você se juntasse a nós "
-                'no Telegram e nos desse uma estrela no GitHub.',
-     'checkbox': 'Não mostrar esta janela novamente',
-     'guide': 'Conhecer o aplicativo',
-     'skip': 'Pular',
-     'close': 'Iniciar'},
-    'it': {'window': 'Novità',
-     'eyebrow': 'Traduttore di schermi portatile',
-     'title': "Benvenuto in Click'n'Translate!",
-     'body': "La versione {version} apporta un importante aggiornamento all'interfaccia e ai flussi di "
-             'lavoro quotidiani. Grazie per il vostro supporto: già 3.000 download!',
-     'feature_ocr': 'OCR dello schermo',
-     'feature_translate': 'Online + offline',
-     'feature_updates': '3.000 download',
-     'telegram': 'Apri Telegram',
-     'github': 'Aggiungi una stella al progetto su GitHub',
-     'support': "Click'n'Translate è un progetto gratuito. Ti saremmo grati se ti unissi a noi su "
-                'Telegram e ci dessi una stella su GitHub.',
-     'checkbox': 'Non mostrare più questa finestra',
-     'guide': 'Mostra la guida',
-     'skip': 'Salta',
-     'close': 'Avvia'},
-
-    'ar': {'window': 'الأخبار',
-     'eyebrow': 'مترجم محمول للنصوص على الشاشة',
-     'title': "مرحبًا بك في Click'n'Translate!",
-     'body': 'يقدم الإصدار {version} تحديثًا كبيرًا للواجهة وللمهام اليومية. شكرًا لدعمكم، فقد تجاوزنا '
-             '3,000 تنزيل!',
-     'feature_ocr': 'التعرف على نص الشاشة',
-     'feature_translate': 'عبر الإنترنت ودون اتصال',
-     'feature_updates': '3,000 تنزيل',
-     'telegram': 'فتح Telegram',
-     'github': 'أضف نجمة للمشروع على GitHub',
-     'support': "Click'n'Translate مشروع مجاني. يسعدنا انضمامك إلى Telegram ومنح المشروع نجمة على "
-                'GitHub.',
-     'checkbox': 'عدم إظهار هذه النافذة مجددًا',
-     'guide': 'عرّفني على التطبيق',
-     'skip': 'تخطي',
-     'close': 'ابدأ'},
-
-    'tr': {'window': 'Yenilikler',
-     'eyebrow': 'Taşınabilir ekran çevirmeni',
-     'title': "Click'n'Translate'e hoş geldiniz!",
-     'body': '{version} sürümü arayüz ve günlük kullanımda büyük yenilikler getiriyor. Desteğiniz için '
-             'teşekkürler — 3.000 indirmeye ulaştık!',
-     'feature_ocr': 'Ekran OCR',
-     'feature_translate': 'Çevrimiçi + çevrimdışı',
-     'feature_updates': '3.000 indirme',
-     'telegram': "Telegram'ı aç",
-     'github': "GitHub'da projeye yıldız verin",
-     'support': "Click'n'Translate ücretsiz bir projedir. Telegram'da bize katılıp GitHub'da yıldız "
-                'verirseniz seviniriz.',
-     'checkbox': 'Bu pencereyi bir daha gösterme',
-     'guide': 'Bana tanıt',
-     'skip': 'Atla',
-     'close': 'Başlat'},
-    'hi': {'window': 'नया क्या है',
-     'eyebrow': 'पोर्टेबल स्क्रीन अनुवादक',
-     'title': "Click'n'Translate में आपका स्वागत है!",
-     'body': 'संस्करण {version} में इंटरफ़ेस और रोज़मर्रा के कामों में बड़े सुधार हैं। आपके समर्थन के '
-             'लिए धन्यवाद — 3,000 डाउनलोड पूरे हुए!',
-     'feature_ocr': 'स्क्रीन OCR',
-     'feature_translate': 'ऑनलाइन + ऑफ़लाइन',
-     'feature_updates': '3,000 डाउनलोड',
-     'telegram': 'Telegram खोलें',
-     'github': 'GitHub पर प्रोजेक्ट को स्टार दें',
-     'support': "Click'n'Translate एक मुफ़्त प्रोजेक्ट है। Telegram पर जुड़कर और GitHub पर स्टार देकर "
-                'हमारा साथ दें।',
-     'checkbox': 'यह विंडो दोबारा न दिखाएँ',
-     'guide': 'ऐप का परिचय दें',
-     'skip': 'छोड़ें',
-     'close': 'शुरू करें'},
-    'id': {'window': 'Berita',
-     'eyebrow': 'Penerjemah layar portabel',
-     'title': "Selamat datang di Click'n'Translate!",
-     'body': 'Versi {version} membawa pembaruan besar pada antarmuka dan penggunaan sehari-hari. '
-             'Terima kasih atas dukungannya — sudah 3.000 unduhan!',
-     'feature_ocr': 'OCR layar',
-     'feature_translate': 'Daring + luring',
-     'feature_updates': '3.000 unduhan',
-     'telegram': 'Buka Telegram',
-     'github': 'Beri bintang proyek di GitHub',
-     'support': "Click'n'Translate adalah proyek gratis. Kami akan senang jika Anda bergabung di "
-                'Telegram dan memberi bintang di GitHub.',
-     'checkbox': 'Jangan tampilkan jendela ini lagi',
-     'guide': 'Tunjukkan panduan',
-     'skip': 'Lewati',
-     'close': 'Mulai'},
-}
+WELCOME_TEXT = {'en': {'window': 'News',
+        'eyebrow': 'What’s new',
+        'title': "Welcome to Click'n'Translate!",
+        'body': 'New in version {version}:',
+        'telegram': 'Open Telegram',
+        'github': 'Star the project on GitHub',
+        'support': 'Thank you for your support! Find us on Telegram and GitHub.',
+        'checkbox': "Don't show this window again",
+        'guide': 'Show me around',
+        'skip': 'Skip',
+        'close': 'Start',
+        'features': ('Join wrapped OCR lines into paragraphs.',
+                     'Open, drop or paste images and documents.',
+                     'Reuse selected screen areas and saved dynamic layouts.',
+                     'Connect API providers for OCR and translation.',
+                     'More interface languages and keyboard navigation.')},
+ 'ru': {'window': 'Новости',
+        'eyebrow': 'Что нового',
+        'title': "Добро пожаловать в Click'n'Translate!",
+        'body': 'Новое в версии {version}:',
+        'telegram': 'Открыть Telegram',
+        'github': 'Поставить звезду проекту на GitHub',
+        'support': 'Спасибо за поддержку! Мы есть в Telegram и на GitHub.',
+        'checkbox': 'Больше не показывать это окно',
+        'guide': 'Пройти обучение',
+        'skip': 'Пропустить',
+        'close': 'Начать',
+        'features': ('Объединение строк OCR в абзацы.',
+                     'Открытие, перетаскивание и вставка изображений и документов.',
+                     'Запоминание выделенной области и шаблоны динамического перевода.',
+                     'Подключение API для распознавания и перевода.',
+                     'Новые языки интерфейса и управление с клавиатуры.')},
+ 'es': {'window': 'Noticias',
+        'eyebrow': 'Novedades',
+        'title': "¡Bienvenido a Click'n'Translate!",
+        'body': 'Nuevo en la versión {version}:',
+        'telegram': 'Abrir Telegram',
+        'github': 'Dar una estrella al proyecto en GitHub',
+        'support': '¡Gracias por tu apoyo! Estamos en Telegram y GitHub.',
+        'checkbox': 'No volver a mostrar esta ventana',
+        'guide': 'Ver guía',
+        'skip': 'Omitir',
+        'close': 'Empezar',
+        'features': ('Une las líneas OCR de un párrafo.',
+                     'Abre, arrastra o pega imágenes y documentos.',
+                     'Reutiliza áreas seleccionadas y diseños dinámicos guardados.',
+                     'Conecta proveedores API para OCR y traducción.',
+                     'Más idiomas de interfaz y navegación con teclado.')},
+ 'de': {'window': 'Neuigkeiten',
+        'eyebrow': 'Was ist neu?',
+        'title': "Willkommen bei Click'n'Translate!",
+        'body': 'Neu in Version {version}:',
+        'telegram': 'Telegram öffnen',
+        'github': 'Dem Projekt auf GitHub einen Stern geben',
+        'support': 'Danke für eure Unterstützung! Ihr findet uns auf Telegram und GitHub.',
+        'checkbox': 'Dieses Fenster nicht mehr anzeigen',
+        'guide': 'Tour starten',
+        'skip': 'Überspringen',
+        'close': 'Starten',
+        'features': ('Umgebrochene OCR-Zeilen zu Absätzen verbinden.',
+                     'Bilder und Dokumente öffnen, ablegen oder einfügen.',
+                     'Markierte Bereiche und gespeicherte dynamische Layouts wiederverwenden.',
+                     'API-Anbieter für OCR und Übersetzung anbinden.',
+                     'Mehr Oberflächensprachen und Tastaturbedienung.')},
+ 'fr': {'window': 'Actualités',
+        'eyebrow': 'Nouveautés',
+        'title': "Bienvenue dans Click'n'Translate !",
+        'body': 'Nouveau dans la version {version} :',
+        'telegram': 'Ouvrir Telegram',
+        'github': 'Mettre une étoile au projet sur GitHub',
+        'support': 'Merci pour votre soutien ! Retrouvez-nous sur Telegram et GitHub.',
+        'checkbox': 'Ne plus afficher cette fenêtre',
+        'guide': 'Voir le guide',
+        'skip': 'Passer',
+        'close': 'Commencer',
+        'features': ('Réunir les lignes OCR en paragraphes.',
+                     'Ouvrir, déposer ou coller des images et documents.',
+                     'Réutiliser les zones sélectionnées et les modèles dynamiques enregistrés.',
+                     'Connecter des API pour la reconnaissance et la traduction.',
+                     'Plus de langues d’interface et navigation au clavier.')},
+ 'zh': {'window': '更新',
+        'eyebrow': '更新内容',
+        'title': "欢迎使用 Click'n'Translate！",
+        'body': '{version} 版新增：',
+        'telegram': '打开 Telegram',
+        'github': '在 GitHub 上为项目点亮星标',
+        'support': '感谢你的支持！欢迎在 Telegram 和 GitHub 上关注我们。',
+        'checkbox': '不再显示此窗口',
+        'guide': '开始引导',
+        'skip': '跳过',
+        'close': '开始',
+        'features': ('将 OCR 换行合并为段落。',
+                     '打开、拖放或粘贴图片和文档。',
+                     '重复使用所选区域和保存的动态翻译布局。',
+                     '连接 API 服务进行文字识别和翻译。',
+                     '更多界面语言和键盘导航。')},
+ 'pt': {'window': 'Notícias',
+        'eyebrow': 'Novidades',
+        'title': "Bem-vindo ao Click'n'Translate!",
+        'body': 'Novidades da versão {version}:',
+        'telegram': 'Abra Telegram',
+        'github': 'Dê uma estrela ao projeto no GitHub',
+        'support': 'Obrigado pelo apoio! Estamos no Telegram e no GitHub.',
+        'checkbox': 'Não mostrar esta janela novamente',
+        'guide': 'Conhecer o aplicativo',
+        'skip': 'Pular',
+        'close': 'Iniciar',
+        'features': ('Unir linhas OCR em parágrafos.',
+                     'Abrir, arrastar ou colar imagens e documentos.',
+                     'Reutilizar áreas selecionadas e modelos dinâmicos salvos.',
+                     'Conectar APIs para reconhecimento e tradução.',
+                     'Mais idiomas de interface e navegação pelo teclado.')},
+ 'it': {'window': 'Novità',
+        'eyebrow': 'Novità',
+        'title': "Benvenuto in Click'n'Translate!",
+        'body': 'Novità della versione {version}:',
+        'telegram': 'Apri Telegram',
+        'github': 'Aggiungi una stella al progetto su GitHub',
+        'support': 'Grazie per il sostegno! Ci trovi su Telegram e GitHub.',
+        'checkbox': 'Non mostrare più questa finestra',
+        'guide': 'Mostra la guida',
+        'skip': 'Salta',
+        'close': 'Avvia',
+        'features': ('Unisci le righe OCR in paragrafi.',
+                     'Apri, trascina o incolla immagini e documenti.',
+                     'Riutilizza aree selezionate e modelli dinamici salvati.',
+                     'Collega API per riconoscimento e traduzione.',
+                     'Più lingue dell’interfaccia e navigazione da tastiera.')},
+ 'ar': {'window': 'الأخبار',
+        'eyebrow': 'ما الجديد',
+        'title': "مرحبًا بك في Click'n'Translate!",
+        'body': 'الجديد في الإصدار {version}:',
+        'telegram': 'فتح Telegram',
+        'github': 'أضف نجمة للمشروع على GitHub',
+        'support': 'شكرًا لدعمكم! تجدوننا على Telegram وGitHub.',
+        'checkbox': 'عدم إظهار هذه النافذة مجددًا',
+        'guide': 'عرّفني على التطبيق',
+        'skip': 'تخطي',
+        'close': 'ابدأ',
+        'features': ('دمج أسطر OCR الملتفة في فقرات.',
+                     'فتح الصور والمستندات أو سحبها أو لصقها.',
+                     'إعادة استخدام المناطق المحددة وقوالب الترجمة الديناميكية المحفوظة.',
+                     'ربط خدمات API للتعرف على النص والترجمة.',
+                     'المزيد من لغات الواجهة والتنقل بلوحة المفاتيح.')},
+ 'tr': {'window': 'Yenilikler',
+        'eyebrow': 'Yenilikler',
+        'title': "Click'n'Translate'e hoş geldiniz!",
+        'body': '{version} sürümündeki yenilikler:',
+        'telegram': "Telegram'ı aç",
+        'github': "GitHub'da projeye yıldız verin",
+        'support': 'Desteğiniz için teşekkürler! Bizi Telegram ve GitHub’da bulabilirsiniz.',
+        'checkbox': 'Bu pencereyi bir daha gösterme',
+        'guide': 'Bana tanıt',
+        'skip': 'Atla',
+        'close': 'Başlat',
+        'features': ('OCR satırlarını paragraflarda birleştirme.',
+                     'Görsel ve belgeleri açma, sürükleme veya yapıştırma.',
+                     'Seçilen alanları ve kayıtlı dinamik şablonları yeniden kullanma.',
+                     'OCR ve çeviri için API sağlayıcılarına bağlanma.',
+                     'Daha fazla arayüz dili ve klavyeyle gezinme.')},
+ 'hi': {'window': 'नया क्या है',
+        'eyebrow': 'नया क्या है',
+        'title': "Click'n'Translate में आपका स्वागत है!",
+        'body': 'संस्करण {version} में नया:',
+        'telegram': 'Telegram खोलें',
+        'github': 'GitHub पर प्रोजेक्ट को स्टार दें',
+        'support': 'आपके समर्थन के लिए धन्यवाद! हम Telegram और GitHub पर हैं।',
+        'checkbox': 'यह विंडो दोबारा न दिखाएँ',
+        'guide': 'ऐप का परिचय दें',
+        'skip': 'छोड़ें',
+        'close': 'शुरू करें',
+        'features': ('OCR की टूटी पंक्तियों को अनुच्छेदों में जोड़ें।',
+                     'चित्र और दस्तावेज़ खोलें, खींचें या पेस्ट करें।',
+                     'चुने हुए क्षेत्र और सहेजे गए गतिशील टेम्पलेट फिर इस्तेमाल करें।',
+                     'OCR और अनुवाद के लिए API सेवाएँ जोड़ें।',
+                     'अधिक इंटरफ़ेस भाषाएँ और कीबोर्ड से नेविगेशन।')},
+ 'id': {'window': 'Berita',
+        'eyebrow': 'Yang baru',
+        'title': "Selamat datang di Click'n'Translate!",
+        'body': 'Baru di versi {version}:',
+        'telegram': 'Buka Telegram',
+        'github': 'Beri bintang proyek di GitHub',
+        'support': 'Terima kasih atas dukungannya! Temukan kami di Telegram dan GitHub.',
+        'checkbox': 'Jangan tampilkan jendela ini lagi',
+        'guide': 'Tunjukkan panduan',
+        'skip': 'Lewati',
+        'close': 'Mulai',
+        'features': ('Gabungkan baris OCR menjadi paragraf.',
+                     'Buka, seret, atau tempel gambar dan dokumen.',
+                     'Gunakan kembali area pilihan dan templat dinamis tersimpan.',
+                     'Hubungkan layanan API untuk OCR dan terjemahan.',
+                     'Lebih banyak bahasa antarmuka dan navigasi papan ketik.')}}
 
 
 def welcome_text(lang):
@@ -3241,7 +3236,7 @@ def welcome_text(lang):
 STARTUP_NEWS_TEXT = {
     language: {
         "window": copy["window"] + " · V{version}",
-        "title": copy["feature_updates"],
+        "title": copy["eyebrow"],
         "intro": copy["body"].format(version=APP_VERSION),
         "continue": {'en': 'Got it', 'ru': 'Понятно', 'es': 'Entendido', 'de': 'Verstanden', 'fr': 'Compris', 'zh': '知道了',
             'pt': 'Entendi',
@@ -3263,12 +3258,14 @@ def startup_news_text(lang):
 
 
 def startup_news_html(lang, version=APP_VERSION):
+    from html import escape
     text = startup_news_text(lang)
+    features = ''.join(f'<li>{escape(point)}</li>' for point in welcome_text(lang)['features'])
     return (
         f"<div style='line-height:1.35'>"
-        f"<div style='font-size:18px;font-weight:800'>{text['title']}</div>"
-        f"<p>{text['intro']}</p>"
-        f"<div style='font-size:11px'>Click'n'Translate · V{version}</div>"
+        f"<div style='font-size:18px;font-weight:800'>{escape(text['title'])}</div>"
+        f"<p>{escape(text['intro'])}</p><ul>{features}</ul>"
+        f"<div style='font-size:11px'>Click'n'Translate · V{escape(str(version))}</div>"
         f"</div>"
     )
 
@@ -8123,6 +8120,8 @@ class WelcomeDialog(QDialog):
         self._stop_animations()
         self._clear_layout()
         text = welcome_text(self.lang)
+        from interface_direction import apply_interface_direction
+        apply_interface_direction(self.lang, self)
         from classic_style import classic_palette
         dark = getattr(self.parent, 'current_theme', DEFAULT_CONFIG['theme']) != 'Светлая'
         colors = classic_palette(dark)
@@ -8170,12 +8169,12 @@ class WelcomeDialog(QDialog):
                 font-size: 12px;
                 font-weight: 400;
             }}
-            QLabel#welcomeChip {{
-                color: {colors['muted']};
+            QLabel#welcomeFeature, QLabel#welcomeFeatureBullet {{
+                color: {colors['text']};
                 background: transparent;
                 border: none;
                 padding: 0;
-                font-size: 13px;
+                font-size: 14px;
                 font-weight: 400;
             }}
 
@@ -8257,10 +8256,6 @@ class WelcomeDialog(QDialog):
 
         hero = QVBoxLayout()
         hero.setSpacing(6)
-        eyebrow = QLabel(text["eyebrow"])
-        eyebrow.setObjectName("welcomeEyebrow")
-        hero.addWidget(eyebrow)
-
         title = QLabel(text["title"])
         title.setObjectName("welcomeTitle")
         title.setWordWrap(True)
@@ -8272,15 +8267,25 @@ class WelcomeDialog(QDialog):
         hero.addWidget(body)
         card_layout.addLayout(hero)
 
-        chips = QVBoxLayout()
-        chips.setSpacing(3)
-        for key in ("feature_ocr", "feature_translate", "feature_updates"):
-            chip = QLabel(text[key])
-            chip.setObjectName("welcomeChip")
-            chip.setAlignment(Qt.AlignLeading | Qt.AlignVCenter)
-            chip.setWordWrap(True)
-            chips.addWidget(chip)
-        card_layout.addLayout(chips)
+        features = QGridLayout()
+        features.setContentsMargins(0, 0, 0, 0)
+        features.setHorizontalSpacing(8)
+        features.setVerticalSpacing(5)
+        features.setColumnStretch(1, 1)
+        self.feature_labels = []
+        for row, point in enumerate(text['features']):
+            bullet = QLabel('•')
+            bullet.setObjectName('welcomeFeatureBullet')
+            bullet.setAlignment(Qt.AlignLeading | Qt.AlignTop)
+            label = QLabel(point)
+            label.setObjectName('welcomeFeature')
+            label.setTextFormat(Qt.PlainText)
+            label.setAlignment(Qt.AlignLeading | Qt.AlignTop)
+            label.setWordWrap(True)
+            features.addWidget(bullet, row, 0, Qt.AlignTop)
+            features.addWidget(label, row, 1)
+            self.feature_labels.append(label)
+        card_layout.addLayout(features)
         support = QLabel(text["support"])
         support.setObjectName("welcomeSupport")
         support.setWordWrap(True)

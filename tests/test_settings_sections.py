@@ -53,7 +53,7 @@ def test_settings_controls_are_in_the_page_their_behavior_belongs_to(window, app
           'ocr_languages_btn', 'ocr_api_button')),
         (PAGE_DYNAMIC, settings.settings_game_page,
          ('game_source_combo', 'game_target_combo', 'game_remember_template_checkbox',
-          'game_create_template_button', 'game_launch_button')),
+          'game_template_combo', 'game_delete_template_button', 'game_launch_button')),
         (PAGE_COMPANION, settings.settings_assistant_page,
          ('desktop_assistant_checkbox',)),
     )

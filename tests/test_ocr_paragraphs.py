@@ -1,5 +1,5 @@
 """Wrapped game text must reach the translator as paragraphs, for any target."""
-from types import SimpleNamespace
+from types import MethodType, SimpleNamespace
 from unittest import mock
 
 import pytest
@@ -122,3 +122,75 @@ def test_dynamic_translation_keeps_paragraph_breaks_after_normalization():
     from game_mode import normalize_game_ocr_text
     assert normalize_game_ocr_text('First paragraph\ncontinues.\n\nSecond paragraph.', join_paragraphs=True) == (
         'First paragraph continues.\n\nSecond paragraph.')
+
+
+def inline_thread(*, target, args=(), **_kwargs):
+    """Complete network-mocked jobs deterministically without real GUI actions."""
+    return SimpleNamespace(start=lambda: target(*args))
+
+
+@pytest.mark.parametrize('enabled', [False, True])
+def test_area_windows_paragraphs_reach_the_actual_translation_job(enabled):
+    from PyQt5 import QtCore
+    lines = []
+    for x, y, w, h, text in rows(REPORTED_LINES):
+        word = SimpleNamespace(text=text, bounding_rect=SimpleNamespace(x=x, y=y, width=w, height=h))
+        lines.append(SimpleNamespace(text=text, words=[word]))
+    recognized = SimpleNamespace(lines=lines)
+    parent = QtCore.QObject()
+    jobs = []
+    def start(text, source, target):
+        job = ocr._AreaTranslationJob(parent, text, source, target, 'Google', 'hilal-test')
+        jobs.append(job)
+        job.start()
+        return ocr._AREA_TRANSLATION_PENDING
+    owner = SimpleNamespace(mode='translate', _current_translate_pair=lambda: ('en', 'ar'),
+                            _start_area_translation=start)
+    with (mock.patch('threading.Thread', side_effect=inline_thread),
+          mock.patch('translater.translate_text', return_value='ترجمة') as translate):
+        source = ocr.OCRWorker._extract_result_text(recognized, join_paragraphs=enabled)
+        assert ocr.ScreenCaptureOverlay._handle_ocr_result_inner(owner, source) is ocr._AREA_TRANSLATION_PENDING
+    assert translate.call_args.args == ((' ' if enabled else '\n').join(REPORTED_LINES), 'en', 'ar')
+    assert translate.call_args.kwargs['engine'] == 'Google'
+
+
+@pytest.mark.parametrize('enabled', [False, True])
+def test_fullscreen_paragraphs_reach_the_actual_translation_call(enabled):
+    owner = SimpleNamespace(_translation_run_id=7, _ocr_scale_x=1, _ocr_scale_y=1,
+                            _translation_result_ready=mock.Mock())
+    owner._translate_all = lambda *args: ocr.FullScreenTranslateOverlay._translate_all(owner, *args)
+    with (mock.patch.object(ocr, 'get_cached_ocr_config', return_value={
+              'ocr_join_paragraphs': enabled, 'translator_engine': 'Google'}),
+          mock.patch('threading.Thread', side_effect=inline_thread),
+          mock.patch('translater.translate_text', side_effect=lambda text, *args, **kwargs: text) as translate):
+        ocr.FullScreenTranslateOverlay._on_ocr_complete(owner, rows(REPORTED_LINES), 7, 'en', 'ar')
+    assert translate.call_count == 1
+    payload, source, target = translate.call_args.args
+    assert (source, target) == ('en', 'ar')
+    if enabled:
+        assert payload == ' '.join(REPORTED_LINES)
+    else:
+        assert payload == '\n'.join(f'[[[CXT{i:04d}]]]\n{text}' for i, text in enumerate(REPORTED_LINES))
+    _run, blocks, error = owner._translation_result_ready.emit.call_args.args
+    assert not error and len(blocks) == (1 if enabled else 12)
+
+
+@pytest.mark.parametrize('enabled', [False, True])
+def test_dynamic_paragraphs_reach_the_actual_translation_call(enabled):
+    import game_mode
+    owner = SimpleNamespace(_closed=False, paused=False, _target_is_active=lambda: True,
+                            config={'ocr_join_paragraphs': enabled, 'translator_engine': 'Google'},
+                            _last_source_text='', _translation_busy=False, _revision=0,
+                            source_language='en', target_language='ar',
+                            card=SimpleNamespace(hide=mock.Mock()),
+                            _set_status=mock.Mock(), translation_ready=mock.Mock())
+    owner._start_translation = MethodType(game_mode.GameTranslationOverlay._start_translation, owner)
+    source = '\n'.join(REPORTED_LINES) + '\n\nAnother paragraph.'
+    expected = (' '.join(REPORTED_LINES) + '\n\nAnother paragraph.'
+                if enabled else '\n'.join(REPORTED_LINES) + '\nAnother paragraph.')
+    with (mock.patch('threading.Thread', side_effect=inline_thread),
+          mock.patch.object(game_mode, 'notify_current_activity'),
+          mock.patch('translater.translate_text', return_value='ترجمة') as translate):
+        game_mode.GameTranslationOverlay._consume_ocr_result(owner, source)
+    assert translate.call_args.args == (expected, 'en', 'ar')
+    assert owner.translation_ready.emit.call_args.args[1:] == (expected, 'ترجمة', '')

@@ -203,50 +203,56 @@ def _wrap_mode_pages(settings):
         grid.setRowMinimumHeight(row, 0)
     grid.setColumnStretch(0, 1)
     grid.setVerticalSpacing(5)
-    # The language caption stays with its pair instead of stretching across
-    # the page. All other labels sit over the value they describe.
+    # Preferences first, then one compact form. Captions stay beside their
+    # values, and all fields end at the same edge instead of forming cards.
     header = settings.game_language_row.layout()
-    header.setStretch(0, 0)
-    header.setStretch(1, 0)
+    _empty(header)
     header.setSpacing(10)
     header.addStretch(1)
+    header.addWidget(settings.game_languages_label)
+    header.addWidget(settings.game_language_controls)
     for row, checkbox in enumerate((settings.game_pause_inactive_checkbox,
             settings.game_manual_output_checkbox, settings.game_toolbar_checkbox,
             settings.game_remember_template_checkbox)):
         grid.addWidget(checkbox, row, 0, Qt.AlignLeft)
-    settings.game_template_actions = QWidget(content)
-    template_row = QHBoxLayout(settings.game_template_actions)
-    rtl = settings.layoutDirection() == Qt.RightToLeft
-    template_row.setContentsMargins(0 if rtl else 30, 0, 30 if rtl else 0, 0)
-    template_row.setSpacing(8)
-    template_row.addWidget(settings.game_template_combo)
-    template_row.addWidget(settings.game_create_template_button)
-    template_row.addStretch(1)
-    grid.addWidget(settings.game_template_actions, 4, 0)
-    grid.addWidget(settings.game_language_row, 5, 0)
+    grid.addWidget(settings.game_language_row, 4, 0)
 
     settings.game_numeric_options = QWidget(content)
-    numbers = QHBoxLayout(settings.game_numeric_options)
+    numbers = QGridLayout(settings.game_numeric_options)
     numbers.setContentsMargins(0, 0, 0, 0)
-    numbers.setSpacing(20)
-    for attribute, label, control in (
-            ('game_timing_group', settings.game_scan_interval_label, settings.game_interval_controls),
-            ('game_background_group', settings.game_overlay_opacity_label, settings.game_opacity_controls)):
-        group = QWidget(settings.game_numeric_options)
-        setattr(settings, attribute, group)
-        stack = QVBoxLayout(group)
-        stack.setContentsMargins(0, 0, 0, 0)
-        stack.setSpacing(2)
-        label.setFixedHeight(20)
+    numbers.setHorizontalSpacing(10)
+    numbers.setVerticalSpacing(5)
+    numbers.setColumnStretch(0, 1)
+    for row, (label, control) in enumerate((
+            (settings.game_scan_interval_label, settings.game_interval_controls),
+            (settings.game_overlay_opacity_label, settings.game_opacity_controls))):
         label.setStyleSheet('font-size:14px; margin:0; padding:0;')
-        label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         label.setBuddy(control)
-        group.setFixedWidth(max(180, label.fontMetrics().horizontalAdvance(label.text()) + 4))
-        stack.addWidget(label)
-        stack.addWidget(control, 0, Qt.AlignLeft)
-        numbers.addWidget(group)
-    numbers.addStretch(1)
-    grid.addWidget(settings.game_numeric_options, 6, 0)
+        numbers.addWidget(label, row, 0)
+        numbers.addWidget(control, row, 1)
+    grid.addWidget(settings.game_numeric_options, 5, 0)
+
+    settings.game_template_actions = QWidget(content)
+    template_row = QHBoxLayout(settings.game_template_actions)
+    template_row.setContentsMargins(0, 0, 0, 0)
+    template_row.setSpacing(10)
+    template_row.addStretch(1)
+    settings.game_template_label.show()
+    settings.game_template_label.setFixedHeight(28)
+    settings.game_template_label.setStyleSheet('font-size:14px; margin:0; padding:0;')
+    template_row.addWidget(settings.game_template_label)
+    template_fields = QWidget(settings.game_template_actions)
+    settings.game_template_controls = template_fields
+    template_fields.setFixedSize(406, 28)
+    fields = QHBoxLayout(template_fields)
+    fields.setContentsMargins(0, 0, 0, 0)
+    fields.setSpacing(6)
+    settings.game_template_combo.setFixedWidth(372)
+    fields.addWidget(settings.game_template_combo)
+    fields.addWidget(settings.game_delete_template_button)
+    template_row.addWidget(template_fields)
+    grid.addWidget(settings.game_template_actions, 6, 0)
     grid.setRowStretch(7, 1)
     settings.game_settings_content = content
     settings.game_settings_scroll = _scroll(page, content, 'dynamicSettingsScroll')

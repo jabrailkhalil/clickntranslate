@@ -114,7 +114,8 @@ def test_dynamic_settings_offer_template_memory_and_explicit_choice(window, isol
     settings = window.settings_window
     settings._set_settings_page(2)
     assert not settings.game_remember_template_checkbox.isChecked()
-    assert not settings.game_template_combo.isEnabled()
+    assert settings.game_template_combo.isEnabled()
+    assert settings.game_template_combo.isVisible()
     settings.game_remember_template_checkbox.setChecked(True)
     assert settings.game_template_combo.isEnabled()
     index = settings.game_template_combo.findData('Dialogue')
@@ -126,7 +127,8 @@ def test_dynamic_settings_offer_template_memory_and_explicit_choice(window, isol
     settings._set_settings_page(2)
     assert settings.game_template_combo.currentData() == 'Dialogue'
     settings.game_remember_template_checkbox.setChecked(False)
-    assert not settings.game_template_combo.isEnabled()
+    assert settings.game_template_combo.isEnabled()
+    assert settings.game_template_combo.currentData() == 'Dialogue'
     assert window.config['game_last_template'] == 'Dialogue'
 
 
@@ -244,7 +246,8 @@ def test_dynamic_memory_settings_fit_the_fixed_page_in_all_languages(window, app
     page = settings.settings_game_page
     controls = [settings.game_pause_inactive_checkbox, settings.game_manual_output_checkbox,
                 settings.game_toolbar_checkbox, settings.game_remember_template_checkbox,
-                settings.game_create_template_button, settings.game_help_button, settings.game_launch_button]
+                settings.game_template_combo, settings.game_delete_template_button,
+                settings.game_help_button, settings.game_launch_button]
     for widget in controls:
         rect = QtCore.QRect(widget.mapTo(page, QtCore.QPoint()), widget.size())
         assert page.rect().contains(rect), (locale, theme, widget.objectName(), rect, page.rect())

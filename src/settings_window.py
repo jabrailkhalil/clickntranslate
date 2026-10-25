@@ -10983,7 +10983,6 @@ class SettingsWindow(QWidget):
         if isinstance(remembered_name, str) and remembered_name:
             self.game_template_combo.addItem(remembered_name, remembered_name)
             self.game_template_combo.setCurrentIndex(0)
-        self.game_template_combo.setEnabled(self.game_remember_template_checkbox.isChecked())
         self.game_template_combo.setToolTip(tooltip_text(region_text(lang, 'dynamic_hint')))
         self.game_template_combo.setAccessibleName(region_text(lang, 'template_label'))
         self.game_template_combo.setPlaceholderText(dynamic_text(lang, 'choose_template'))
@@ -10992,15 +10991,14 @@ class SettingsWindow(QWidget):
         self.game_template_label.setToolTip(self.game_template_combo.toolTip())
         self.game_template_label.setBuddy(self.game_template_combo)
         self.game_template_label.hide()
-        self.game_create_template_button = OpticallyCenteredPushButton(
-            dynamic_text(lang, 'create_template'), self.settings_game_page)
-        self.game_create_template_button.setFixedHeight(28)
-        self.game_create_template_button.setObjectName('gameCreateTemplateButton')
-        self.game_create_template_button.setProperty('buttonRole', 'secondary')
-        self.game_create_template_button.setToolTip(tooltip_text(dynamic_text(lang, 'create_template_hint')))
-        self.game_create_template_button.setAccessibleName(dynamic_text(lang, 'create_template'))
-        self.game_create_template_button.setAccessibleDescription(dynamic_text(lang, 'create_template_hint'))
-        self.game_create_template_button.clicked.connect(self._create_dynamic_template)
+        self.game_delete_template_button = QToolButton(self.settings_game_page)
+        self.game_delete_template_button.setText('×')
+        self.game_delete_template_button.setFixedSize(28, 28)
+        self.game_delete_template_button.setObjectName('gameDeleteTemplate')
+        self.game_delete_template_button.setCursor(Qt.PointingHandCursor)
+        self.game_delete_template_button.setToolTip(tooltip_text(dynamic_text(lang, 'delete_selected_template')))
+        self.game_delete_template_button.setAccessibleName(dynamic_text(lang, 'delete_selected_template'))
+        self.game_delete_template_button.clicked.connect(self._delete_game_template)
         self.game_remember_template_checkbox.toggled.connect(self._game_template_memory_changed)
         self.game_template_combo.activated.connect(self._game_template_selected)
         game_layout.addWidget(self.game_remember_template_checkbox, 2, 0, Qt.AlignLeft | Qt.AlignVCenter)
@@ -11199,6 +11197,11 @@ class SettingsWindow(QWidget):
     def _game_template_selected(self, index):
         from dynamic_templates import TemplateStore
         name = self.game_template_combo.itemData(index)
+        if isinstance(name, dict) and name.get('action') == 'create_template':
+            # Restore the saved choice before opening the builder. Cancelling
+            # creation must not leave an action displayed as a selected layout.
+            self._refresh_game_templates()
+            return self._create_dynamic_template()
         try:
             value = next((item for item in TemplateStore().load() if item['name'] == name), None)
         except Exception:
@@ -11209,9 +11212,57 @@ class SettingsWindow(QWidget):
         else:
             self._refresh_game_templates()
 
+    def _delete_game_template(self):
+        from dynamic_templates import TemplateStore, text as dynamic_text
+        import html
+        name = self.game_template_combo.currentData()
+        if not isinstance(name, str) or not name:
+            return False
+        store = TemplateStore()
+        lang = self.parent.current_interface_language
+        try:
+            templates = store.load()
+            if not any(item['name'] == name for item in templates):
+                self._refresh_game_templates()
+                return False
+        except Exception:
+            logging.exception('Could not load dynamic template before deletion')
+            self._refresh_game_templates()
+            return False
+        question = dynamic_text(lang, 'delete_template_question').format(name=name)
+        if QMessageBox.question(self, dynamic_text(lang, 'delete_template_title'),
+                '<p>' + html.escape(question) + '</p>',
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.No) != QMessageBox.Yes:
+            return False
+        previous_name = self.parent.config.get('game_last_template', '')
+        deleted = False
+        try:
+            store.delete(name)
+            deleted = True
+            self.parent.config['game_last_template'] = ''
+            if self.parent.save_config() is False:
+                raise OSError('Could not save the selected template preference')
+        except Exception:
+            self.parent.config['game_last_template'] = previous_name
+            if deleted:
+                try:
+                    store._write(templates)
+                except Exception:
+                    logging.exception('Could not restore dynamic template after failed preference save')
+            logging.exception('Could not delete dynamic template')
+            QMessageBox.warning(self, dynamic_text(lang, 'delete_template_title'),
+                dynamic_text(lang, 'delete_template_error'))
+            self._refresh_game_templates()
+            return False
+        _invalidate_main_config_cache()
+        self._refresh_game_templates()
+        return True
+
     def _refresh_game_templates(self):
         from dynamic_templates import TemplateStore, text as dynamic_text
         from capture_regions import text as region_text
+        from combo_popup import CHECKED_ROLE
+        import html
         lang = self.parent.current_interface_language
         name = self.parent.config.get('game_last_template', '')
         try:
@@ -11222,22 +11273,33 @@ class SettingsWindow(QWidget):
             self.game_template_combo.clear()
             for item in templates:
                 self.game_template_combo.addItem(item['name'], item['name'])
+                self.game_template_combo.setItemData(self.game_template_combo.count()-1,
+                    '<qt>' + html.escape(item['name']) + '</qt>', Qt.ToolTipRole)
             index = self.game_template_combo.findData(name)
             missing = bool(name) and index < 0
             if missing and templates:
                 self.game_template_combo.addItem(str(name), str(name))
                 index = self.game_template_combo.count()-1
                 self.game_template_combo.model().item(index).setEnabled(False)
-            self.game_template_combo.setCurrentIndex(index if index >= 0 else -1)
+            self.game_template_combo.addItem(dynamic_text(lang, 'create_template'), {'action': 'create_template'})
+            action_index = self.game_template_combo.count()-1
+            self.game_template_combo.setItemData(action_index, False, CHECKED_ROLE)
+            self.game_template_combo.setItemData(action_index,
+                tooltip_text(dynamic_text(lang, 'create_template_hint')), Qt.ToolTipRole)
+            self.game_template_combo.setCurrentIndex(index if index >= 0 else action_index if not templates else -1)
         self.game_template_combo.setProperty('templateCatalogAvailable', bool(templates))
         combo_hint = region_text(lang, 'dynamic_missing' if missing else 'dynamic_hint')
+        if name:
+            combo_hint = str(name) + '\n' + combo_hint
         self.game_template_combo.setToolTip(tooltip_text(combo_hint))
         self.game_template_combo.setAccessibleDescription(combo_hint)
         with QtCore.QSignalBlocker(self.game_remember_template_checkbox):
             self.game_remember_template_checkbox.setChecked(self.parent.config.get('game_remember_template') is True)
-        remembered = self.game_remember_template_checkbox.isChecked()
-        self.game_template_combo.setEnabled(remembered and bool(templates))
-        self.game_template_combo.setVisible(remembered and bool(templates))
+        self.game_template_combo.setEnabled(True)
+        self.game_template_combo.setVisible(True)
+        self.game_delete_template_button.setEnabled(any(item['name'] == name for item in templates))
+        set_widget_stylesheet(self.game_delete_template_button,
+            button_qss(self.parent.current_theme != 'Светлая', 'close', 'QToolButton', icon=True))
         hint = (region_text(lang, 'dynamic_missing') if missing
                 else region_text(lang, 'dynamic_hint') if templates
                 else dynamic_text(lang, 'templates_empty'))
@@ -11457,6 +11519,10 @@ class SettingsWindow(QWidget):
         set_widget_stylesheet(combo, compact_combo_style(dark))
         if isinstance(combo, DropDownCombo):
             combo.set_popup_background("#17181d" if dark else "#e9e4ed")
+        if combo is getattr(self, 'game_template_combo', None):
+            delete_button = getattr(self, 'game_delete_template_button', None)
+            if delete_button is not None:
+                set_widget_stylesheet(delete_button, button_qss(dark, 'close', 'QToolButton', icon=True))
 
     def _engine_combo_style(self):
         is_dark = getattr(getattr(self, "parent", None), "current_theme", "") != "Светлая"

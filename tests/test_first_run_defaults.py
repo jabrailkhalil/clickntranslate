@@ -64,6 +64,8 @@ def test_fresh_config_does_not_mutate_shared_defaults():
 def test_intro_is_short_localized_and_has_current_version(language):
     text = main.welcome_text(language)
     assert main.APP_VERSION in text['body']
-    assert '000' in text['body'] and '000' in text['feature_updates']
+    assert '000' not in str(text)
+    assert len(text['features']) == 5
+    assert all(point.strip() and len(point) < 100 for point in text['features'])
     assert len(text['body']) < 190
     assert set(main.startup_news_text(language)) == {'window', 'title', 'intro', 'continue'}
