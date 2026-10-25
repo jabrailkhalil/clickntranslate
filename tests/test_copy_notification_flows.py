@@ -27,6 +27,8 @@ class _Receiver(QtWidgets.QWidget):
         self._copy_notice = CopyNotificationPopup()
         self._copy_notification_signal.connect(
             self._show_copy_notification, QtCore.Qt.QueuedConnection)
+        from copy_feedback import register_copy_feedback
+        register_copy_feedback(self)
 
 
 @pytest.fixture
@@ -65,15 +67,18 @@ def test_ocr_copy_delivers_localized_feedback_independently_of_history(
         assert main.TRANSLATION_RESULT_DIALOG_TEXT["ar"]["copied"] in receiver.widget._copy_notice.text()
 
 
-def test_copy_failure_does_not_announce_success(receiver):
+@pytest.mark.parametrize('failure', ['reported', 'exception'])
+def test_copy_failure_does_not_announce_success(receiver, failure):
     receiver.config["notifications"] = True
     owner = SimpleNamespace(mode="copy", close=mock.Mock())
-    with mock.patch.object(ocr.platform_support, "copy_text", side_effect=RuntimeError("clipboard busy")):
+    with mock.patch.object(ocr.platform_support, "copy_text", return_value=False,
+                           side_effect=RuntimeError('clipboard busy') if failure == 'exception' else None):
         result = ocr.ScreenCaptureOverlay._handle_ocr_result_inner(owner, "recognized text")
     receiver.app.processEvents()
     assert result is not True
     assert not receiver.widget._copy_notice.isVisible()
     main.threading.Thread.assert_not_called()
+    owner.close.assert_not_called()
 
 
 @pytest.mark.parametrize("source", ["", " \t\r\n"])
@@ -96,6 +101,9 @@ def test_empty_ocr_does_not_replace_clipboard_or_announce_success(receiver, isol
 def test_worker_dispatch_queues_notice_on_the_gui_thread(monkeypatch):
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     widget = _Receiver({"notifications": True, "interface_language": "de"})
+    def forbidden_widget_scan():
+        raise AssertionError('Workers must not enumerate GUI widgets')
+    monkeypatch.setattr(QtWidgets.QApplication, 'topLevelWidgets', staticmethod(forbidden_widget_scan))
     # Create the worker before any fixture could replace threading.Thread.
     results = []
     worker = threading.Thread(target=lambda: results.append(main.notify_copy_completed(widget.config)))
@@ -187,3 +195,37 @@ def test_manual_close_then_new_copy_reopens_notice():
     finally:
         popup.close()
         popup.deleteLater()
+
+
+def test_disposed_native_receiver_does_not_receive_feedback():
+    from copy_feedback import emit_copy_feedback
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    widget = _Receiver({'notifications': True})
+    popup = widget._copy_notice
+    widget.deleteLater()
+    app.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)
+    try:
+        assert emit_copy_feedback('en') is False
+        assert emit_copy_feedback('en', failed=True) is False
+    finally:
+        popup.close()
+        popup.deleteLater()
+
+
+def test_a_new_registered_owner_survives_old_owner_disposal():
+    from copy_feedback import emit_copy_feedback
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    previous = _Receiver({'notifications': True})
+    current = _Receiver({'notifications': True})
+    try:
+        previous.deleteLater()
+        app.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)
+        assert emit_copy_feedback('ru') is True
+        app.processEvents()
+        assert current._copy_notice.isVisible()
+        assert main.TRANSLATION_RESULT_DIALOG_TEXT['ru']['copied'] in current._copy_notice.text()
+    finally:
+        for popup in (previous._copy_notice, current._copy_notice):
+            popup.close()
+            popup.deleteLater()
+        current.deleteLater()

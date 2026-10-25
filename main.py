@@ -1285,26 +1285,39 @@ def notify_copy_completed(config=None):
     source = config if isinstance(config, dict) else get_cached_config()
     if not bool(source.get("notifications", True)):
         return False
-    app = QApplication.instance()
-    if app is None:
-        return False
     lang = normalize_interface_language(source.get("interface_language", "en"))
-    for widget in app.topLevelWidgets():
-        signal = getattr(widget, "_copy_notification_signal", None)
-        if signal is None:
-            continue
-        try:
-            signal.emit(lang)
-            return True
-        except RuntimeError:
-            continue
-    return False
+    from copy_feedback import emit_copy_feedback
+    return emit_copy_feedback(lang)
 
 
 def save_copy_history(text):
     """Асинхронно сохранить текст в историю копирований (не блокирует UI)."""
     notify_copy_completed()
     threading.Thread(target=_save_copy_history_sync, args=(text,), daemon=True).start()
+
+
+def notify_copy_failed(config=None):
+    """Report a clipboard failure through the existing status UI, on its thread."""
+    source = config if isinstance(config, dict) else get_cached_config()
+    lang = normalize_interface_language(source.get('interface_language', 'en'))
+    from copy_feedback import emit_copy_feedback
+    return emit_copy_feedback(lang, failed=True)
+
+
+def copy_result_text(text, *, record_history=True, config=None):
+    """Only confirm and record copies that the platform actually accepted."""
+    try:
+        copied = platform_support.copy_text(text)
+    except Exception:
+        copied = False
+    if copied is False:
+        notify_copy_failed(config)
+        return False
+    if record_history:
+        save_copy_history(text)
+    else:
+        notify_copy_completed(config)
+    return True
 
 
 def save_translation_history(original_text, translated_text, language):
@@ -6762,6 +6775,23 @@ TRANSLATION_RESULT_DIALOG_TEXT = {
 }
 
 
+for _lang, _copy_error in {
+    'en': 'Could not copy. Please try again.',
+    'ru': 'Не удалось скопировать. Попробуйте ещё раз.',
+    'es': 'No se pudo copiar. Inténtalo de nuevo.',
+    'de': 'Kopieren fehlgeschlagen. Bitte erneut versuchen.',
+    'fr': 'Copie impossible. Réessayez.',
+    'zh': '无法复制，请重试。',
+    'pt': 'Não foi possível copiar. Tente novamente.',
+    'it': 'Impossibile copiare. Riprova.',
+    'ar': 'تعذّر النسخ. يُرجى المحاولة مجددًا.',
+    'tr': 'Kopyalanamadı. Lütfen tekrar deneyin.',
+    'hi': 'कॉपी नहीं हो सका। फिर से कोशिश करें।',
+    'id': 'Tidak dapat menyalin. Silakan coba lagi.',
+}.items():
+    TRANSLATION_RESULT_DIALOG_TEXT[_lang]['copy_failed'] = _copy_error
+
+
 for _lang, _edited in {
     "ru": "Текст изменён — можно скопировать",
     "en": "Text edited — ready to copy",
@@ -7169,9 +7199,7 @@ class TranslationResultDialog(QDialog):
         self.image_importer.failed.connect(self._image_failed)
         self.image_importer.busy_changed.connect(self._image_busy_changed)
         self.source_edit.image_requested.connect(self._import_image)
-        self.text_edit.image_requested.connect(self._import_image)
         self.source_edit.file_requested.connect(self._open_attachment)
-        self.text_edit.file_requested.connect(self._open_attachment)
         self.source_text = self.source_edit.toPlainText()
         self.translated_text = self.text_edit.toPlainText()
         self.source_panel = self._editor_panel(self.text["source_tab"], self.source_combo, self.source_edit)
@@ -7209,13 +7237,15 @@ class TranslationResultDialog(QDialog):
 
         buttons = QHBoxLayout()
         buttons.setSpacing(8)
-        self.image_button = QPushButton(attachment_text(self.lang, 'browse'))
-        self.image_button.setIcon(browse_icon(theme != 'Светлая'))
-        self.image_button.setToolTip(tooltip_text(attachment_text(self.lang, 'hint')))
-        self.image_button.setAutoDefault(False)
-        self.image_button.clicked.connect(self._choose_attachment)
-        buttons.addWidget(self.image_button)
-        self.close_button = QPushButton(ui_text(self.lang, "close"))
+        # File picking belongs to the main/document inputs. A result window
+        # only needs an escape from recognition initiated by pasting in Source.
+        self.image_cancel_button = QPushButton(image_text(self.lang, 'cancel'))
+        self.image_cancel_button.setToolTip(tooltip_text(image_text(self.lang, 'cancel')))
+        self.image_cancel_button.setAutoDefault(False)
+        self.image_cancel_button.clicked.connect(self._cancel_image_import)
+        self.image_cancel_button.hide()
+        buttons.addWidget(self.image_cancel_button)
+        self.close_button = QPushButton(ui_text(self.lang, "close"), self)
         self.close_button.setObjectName("translationResultClose")
         self.close_button.clicked.connect(self.accept)
         self.close_button.hide()
@@ -7352,7 +7382,7 @@ class TranslationResultDialog(QDialog):
         return combo
 
     def _text_editor(self, name, text, placeholder):
-        editor = ImageInputTextEdit(self)
+        editor = ImageInputTextEdit(self) if name == 'translationSourceText' else QTextEdit(self)
         editor.setObjectName(name)
         editor.setAcceptRichText(False)
         editor.setPlainText(text)
@@ -7528,14 +7558,9 @@ class TranslationResultDialog(QDialog):
         self._status_message = str(message)
         self._render_status()
 
-    def _choose_attachment(self):
-        if self.image_importer.busy:
-            self.image_importer.cancel()
-            self._set_status(self.text['ready'])
-            return
-        path, _ = QFileDialog.getOpenFileName(self, attachment_text(self.lang, 'browse'), '', attachment_file_filter(self.lang))
-        if path:
-            self._open_attachment(path)
+    def _cancel_image_import(self):
+        self.image_importer.cancel()
+        self._set_status(self.text['ready'])
 
     def _open_attachment(self, path):
         if self.image_importer.busy:
@@ -7557,8 +7582,7 @@ class TranslationResultDialog(QDialog):
         self.text_edit.setReadOnly(busy)
         for control in (self.source_combo, self.target_combo, self.engine_combo, self.swap_button):
             control.setEnabled(not busy)
-        self.image_button.setText(image_text(self.lang, 'cancel') if busy else attachment_text(self.lang, 'browse'))
-        self.image_button.setToolTip(tooltip_text(image_text(self.lang, 'cancel') if busy else attachment_text(self.lang, 'hint')))
+        self.image_cancel_button.setVisible(busy)
         self._update_actions()
         if busy:
             self.translate_button.setEnabled(False)
@@ -7642,9 +7666,8 @@ class TranslationResultDialog(QDialog):
         self.source_toggle.setText(toggle)
         self.source_toggle.setToolTip(tooltip_text(toggle))
         self.source_toggle.setAccessibleName(toggle)
-        busy = self.image_importer.busy
-        self.image_button.setText(image_text(self.lang, 'cancel') if busy else attachment_text(self.lang, 'browse'))
-        self.image_button.setToolTip(tooltip_text(image_text(self.lang, 'cancel') if busy else attachment_text(self.lang, 'hint')))
+        self.image_cancel_button.setText(image_text(self.lang, 'cancel'))
+        self.image_cancel_button.setToolTip(tooltip_text(image_text(self.lang, 'cancel')))
         status = self._status_message
         for key, value in old_text.items():
             if value == status and key in self.text:
@@ -7864,10 +7887,9 @@ class TranslationResultDialog(QDialog):
         self.translated_text = translated_text
         self._update_actions()
         save_translation_history(original, translated_text, target)
-        if self.auto_copy:
-            platform_support.copy_text(translated_text)
-            save_copy_history(translated_text)
-        self._set_status(self.text["auto_copied"] if self.auto_copy else self.text["ready"])
+        copied = self.auto_copy and copy_result_text(translated_text)
+        self._set_status(self.text['copy_failed'] if self.auto_copy and not copied
+                         else self.text['auto_copied'] if copied else self.text['ready'])
 
     @staticmethod
     def _replace_editor_text(editor, text):
@@ -7881,9 +7903,8 @@ class TranslationResultDialog(QDialog):
             cursor.endEditBlock()
 
     def _copy_result(self):
-        platform_support.copy_text(self.translated_text)
-        save_copy_history(self.translated_text)
-        self._set_status(self.text["copied"])
+        copied = copy_result_text(self.translated_text)
+        self._set_status(self.text['copied'] if copied else self.text['copy_failed'])
 
     def done(self, result):
         self._closed = True
@@ -8015,7 +8036,6 @@ class TranslationResultDialog(QDialog):
             combo.set_popup_background(surface)
         self.copy_button.setIcon(clipboard_copy_icon(theme))
         self.copy_button.setIconSize(QSize(18, 18))
-        self.image_button.setIcon(browse_icon(dark))
 
     def _appearance_manager(self):
         from window_appearance import install_window_appearance
@@ -10655,6 +10675,7 @@ class DarkThemeApp(QMainWindow):
     _argos_translation_cancelled_signal = QtCore.pyqtSignal()
     _launch_update_signal = QtCore.pyqtSignal(str)
     _copy_notification_signal = QtCore.pyqtSignal(str)
+    _copy_failure_signal = QtCore.pyqtSignal(str)
 
     def __init__(self, *, background_services=True):
         from ui_scaling import configure_interface_style
@@ -10667,6 +10688,7 @@ class DarkThemeApp(QMainWindow):
         self._hotkey_services_enabled = services and not platform_support.IS_LINUX
         self._launch_update_signal.connect(self._on_launch_update_found)
         self._copy_notification_signal.connect(self._show_copy_notification, Qt.QueuedConnection)
+        self._copy_failure_signal.connect(self._show_copy_failure, Qt.QueuedConnection)
         self._show_selection_signal.connect(self._show_selection_translation)
         self._argos_status_signal.connect(self._on_argos_status)
         self._argos_progress_signal.connect(self._on_argos_progress)
@@ -12796,20 +12818,29 @@ class DarkThemeApp(QMainWindow):
     def _init_status_tooltip(self):
         """Initialize floating status tooltip."""
         from styled_dialogs import CopyNotificationPopup
-        self._copy_notice = CopyNotificationPopup()
-        self._status_label = StatusPopup()
+        # Window flags keep these native surfaces separate even while the
+        # owner is hidden; QObject ownership disposes timers and styles safely.
+        self._copy_notice = CopyNotificationPopup(self)
+        self._status_label = StatusPopup(self)
         self._status_label.hide()
+        self._status_dismiss = QTimer(self)
+        self._status_dismiss.setSingleShot(True)
+        self._status_dismiss.timeout.connect(self._on_hide_status)
+        from copy_feedback import register_copy_feedback
+        register_copy_feedback(self)
         self._show_status_signal.connect(self._on_show_status)
         self._hide_status_signal.connect(self._on_hide_status)
 
     def _on_show_status(self, text):
         from styled_dialogs import position_popup_near_cursor
+        self._status_dismiss.stop()
         self._status_label.setText(text)
         self._status_label.adjustSize()
         position_popup_near_cursor(self._status_label)
         self._status_label.show()
 
     def _on_hide_status(self):
+        self._status_dismiss.stop()
         self._status_label.hide()
 
     @QtCore.pyqtSlot(str)
@@ -12822,7 +12853,20 @@ class DarkThemeApp(QMainWindow):
         message = TRANSLATION_RESULT_DIALOG_TEXT.get(
             lang, TRANSLATION_RESULT_DIALOG_TEXT["en"]
         )["copied"]
-        self._copy_notice.show_message(message)
+        self._copy_notice.show_message(message, anchor=QApplication.activeWindow())
+
+    def _preview_copy_notification(self):
+        """Show where copy feedback appears without pretending text was copied."""
+        from settings_window import settings_text
+        self._copy_notice.show_message(
+            settings_text(self.current_interface_language, 'copy_notification_preview'),
+            anchor=self)
+
+    @QtCore.pyqtSlot(str)
+    def _show_copy_failure(self, language_code=''):
+        lang = normalize_interface_language(language_code or self.current_interface_language)
+        self._copy_notice.show_message(TRANSLATION_RESULT_DIALOG_TEXT[lang]['copy_failed'],
+                                       anchor=QApplication.activeWindow(), success=False)
 
     def _read_primary_selection(self):
         """Text currently highlighted anywhere on a Linux desktop.
@@ -12921,7 +12965,11 @@ class DarkThemeApp(QMainWindow):
                             return
                         time.sleep(0.08)
                     # Clear clipboard, then Ctrl+C to capture selection
-                    platform_support.copy_text("")
+                    if platform_support.copy_text("") is False:
+                        # A busy clipboard must never make an unrelated old
+                        # value look like newly captured selected text.
+                        notify_copy_failed(self.config)
+                        return
                     simulate_copy()
                     time.sleep(0.25)
                     text = pyperclip.paste()
@@ -12961,6 +13009,7 @@ class DarkThemeApp(QMainWindow):
 
                 replacement_attempted = replace_selection
                 replacement_succeeded = False
+                fallback_copied = False
                 if replacement_attempted:
                     replacement_succeeded, _reason = replace_selected_text_in_foreground(
                         text, translated, selection_window
@@ -12969,8 +13018,7 @@ class DarkThemeApp(QMainWindow):
                     # fallback we put it there explicitly, so the user never
                     # loses a finished translation even if focus moved.
                     if not replacement_succeeded:
-                        platform_support.copy_text(translated)
-                        save_copy_history(translated)
+                        fallback_copied = copy_result_text(translated, config=self.config)
                     elif self.config.get("copy_translated_text", False):
                         # Successful replacement leaves the translated text in
                         # the clipboard; record it only when auto-copy is on.
@@ -12981,30 +13029,33 @@ class DarkThemeApp(QMainWindow):
                         # auto-copy checkbox really remains off.
                         time.sleep(0.08)
                         restore_captured_clipboard()
-                    self._show_status_signal.emit(
-                        ui_text(
-                            lang,
-                            "selection_replaced" if replacement_succeeded
-                            else "selection_replace_fallback",
-                        )
-                    )
+                    if not replacement_succeeded and not fallback_copied:
+                        self._show_status_signal.emit(TRANSLATION_RESULT_DIALOG_TEXT[lang]['copy_failed'])
+                        self._show_selection_signal.emit(
+                            translated, False, lang, self.config.get('theme', 'Темная'),
+                            text, source_code, target_code)
+                    else:
+                        self._show_status_signal.emit(ui_text(
+                            lang, 'selection_replaced' if replacement_succeeded
+                            else 'selection_replace_fallback'))
 
-                    # Translate-and-replace is a separate, deliberately
-                    # seamless mode.  Its result is already either pasted into
-                    # the verified selection or copied as a safe fallback, so
-                    # it must never continue into the ordinary selected-text
-                    # result dialog (regardless of the user's dialog setting).
+                    # Replacement remains seamless when either pasting or the
+                    # clipboard fallback succeeds. If both failed, the existing
+                    # result window above keeps the finished text recoverable.
                     time.sleep(1.2)
                     self._hide_status_signal.emit()
                     return
 
                 if result_window_hidden_for(self.config, "selection"):
-                    platform_support.copy_text(translated)
-                    save_copy_history(translated)
+                    copied = copy_result_text(translated, config=self.config)
                     dialog_text = TRANSLATION_RESULT_DIALOG_TEXT.get(
                         lang, TRANSLATION_RESULT_DIALOG_TEXT["en"]
                     )
-                    self._show_status_signal.emit(dialog_text["copied"])
+                    self._show_status_signal.emit(dialog_text['copied'] if copied else dialog_text['copy_failed'])
+                    if not copied:
+                        self._show_selection_signal.emit(
+                            translated, False, lang, self.config.get('theme', 'Темная'),
+                            text, source_code, target_code)
                     time.sleep(1.2)
                     self._hide_status_signal.emit()
                     return
@@ -14956,8 +15007,7 @@ class DarkThemeApp(QMainWindow):
     def _copy_main_result(self):
         snapshot = getattr(self, '_main_result_snapshot', None)
         if snapshot:
-            platform_support.copy_text(snapshot['translated_text'])
-            save_copy_history(snapshot['translated_text'])
+            copy_result_text(snapshot['translated_text'], config=self.config)
 
     def open_text_translation(self):
         """Open the editable translator directly, including from the tray companion."""
@@ -15578,17 +15628,19 @@ class DarkThemeApp(QMainWindow):
         if result_window_hidden_for(config, "main"):
             # Hiding the result window explicitly makes the clipboard the only
             # delivery channel, independent of the auto-copy preference.
-            platform_support.copy_text(translated_text)
-            save_copy_history(translated_text)
+            copied = copy_result_text(translated_text, config=config)
             dialog_text = TRANSLATION_RESULT_DIALOG_TEXT.get(
                 lang, TRANSLATION_RESULT_DIALOG_TEXT["en"]
             )
-            self._show_status_signal.emit(dialog_text["copied"])
-            QTimer.singleShot(1200, self._hide_status_signal.emit)
+            self._show_status_signal.emit(dialog_text['copied'] if copied else dialog_text['copy_failed'])
+            timer = getattr(self, '_status_dismiss', None)
+            if timer is not None:
+                timer.start(1200)
+            if not copied:
+                self._show_inline_main_result(translated_text, source_text, source_lang, target_lang)
             return
         if auto_copy:
-            platform_support.copy_text(translated_text)
-            save_copy_history(translated_text)
+            copy_result_text(translated_text, config=config)
         self._show_inline_main_result(translated_text, source_text, source_lang, target_lang)
 
     def _start_argos_translation(self, text, source_code, target_code):
@@ -15827,9 +15879,7 @@ def _live_translation_result_dialogs():
 def show_translation_dialog(parent, translated_text, auto_copy=True, lang='ru', theme='Темная',
                             source_text="", source_lang="", target_lang="",
                             result_mode="main"):
-    if auto_copy:
-        platform_support.copy_text(translated_text)
-        save_copy_history(translated_text)
+    copy_failed = auto_copy and not copy_result_text(translated_text)
     _translation_result_dialogs[:] = _live_translation_result_dialogs()
     dialog = TranslationResultDialog(
         parent,
@@ -15842,6 +15892,8 @@ def show_translation_dialog(parent, translated_text, auto_copy=True, lang='ru', 
         target_lang=target_lang,
         result_mode=result_mode,
     )
+    if copy_failed:
+        dialog._set_status(dialog.text['copy_failed'])
     stack_index = min(len(_translation_result_dialogs), 4)
     dialog._stack_offset = QtCore.QPoint(18 * stack_index, 48 * stack_index)
     dialog.setAttribute(Qt.WA_DeleteOnClose, True)

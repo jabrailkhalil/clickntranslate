@@ -418,8 +418,8 @@ _TOOLTIP_FILTER = None
 class StatusPopup(QtWidgets.QLabel):
     """A non-activating status tip with a painted, translucent surface."""
 
-    def __init__(self):
-        super().__init__(None, QtCore.Qt.ToolTip | QtCore.Qt.WindowStaysOnTopHint
+    def __init__(self, parent=None):
+        super().__init__(parent, QtCore.Qt.ToolTip | QtCore.Qt.WindowStaysOnTopHint
                          | QtCore.Qt.FramelessWindowHint)
         self.setProperty('clickntranslateRoundedPopup', True)
         self.setAttribute(QtCore.Qt.WA_TranslucentBackground, True)
@@ -430,7 +430,8 @@ class StatusPopup(QtWidgets.QLabel):
     def _refresh_theme(self):
         from ui_scaling import desktop_control_scale
         from window_appearance import scaled_stylesheet
-        screen = QtWidgets.QApplication.screenAt(QtGui.QCursor.pos()) or self.screen()
+        screen = (getattr(self, '_placement_screen', None)
+                  or QtWidgets.QApplication.screenAt(QtGui.QCursor.pos()) or self.screen())
         factor = desktop_control_scale(screen)
         self.setProperty('roundedPopupRadius', round(4*factor))
         self.setProperty('roundedPopupInset', 0.)
@@ -456,26 +457,45 @@ class StatusPopup(QtWidgets.QLabel):
 class CopyNotificationPopup(StatusPopup):
     """Quiet copy confirmation that also works without system notifications."""
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        # A confirmation is independent of hover tips and their native lifetime.
+        # Tool windows stay out of the taskbar; these flags also prevent a copy
+        # confirmation from stealing focus from the user's current application.
+        self.setWindowFlags(QtCore.Qt.Tool | QtCore.Qt.WindowStaysOnTopHint
+                            | QtCore.Qt.FramelessWindowHint | QtCore.Qt.WindowDoesNotAcceptFocus)
         self.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, True)
         self.setWordWrap(False)
         self._dismiss = QtCore.QTimer(self)
         self._dismiss.setSingleShot(True)
         self._dismiss.timeout.connect(self.hide)
 
-    def show_message(self, message, duration_ms=1800):
-        self._refresh_theme()
-        self.setText('✓  ' + str(message))
-        screen = (QtWidgets.QApplication.screenAt(QtGui.QCursor.pos())
+    def show_message(self, message, duration_ms=3000, anchor=None, *, success=True):
+        anchor_rect = None
+        if isinstance(anchor, QtWidgets.QWidget) and not sip.isdeleted(anchor) and anchor.isVisible():
+            from ui_scaling import widget_global_rect
+            anchor_rect = widget_global_rect(anchor)
+        screen = (QtWidgets.QApplication.screenAt(anchor_rect.center()) if anchor_rect else None)
+        screen = (screen or QtWidgets.QApplication.screenAt(QtGui.QCursor.pos())
                   or QtWidgets.QApplication.primaryScreen())
         if screen is None:
             return
+        self._placement_screen = screen
+        self._refresh_theme()
+        self.setText(('✓  ' if success else '') + str(message))
         bounds = screen.availableGeometry().adjusted(18, 18, -18, -18)
         from ui_scaling import desktop_control_scale
-        self.setMaximumWidth(min(round(360 * desktop_control_scale(screen)), bounds.width()))
+        factor = desktop_control_scale(screen)
+        self.setMaximumWidth(min(round(360 * factor), bounds.width()))
         self.adjustSize()
-        self.move(bounds.right() - self.width() + 1, bounds.bottom() - self.height() + 1)
+        destination = bounds
+        if anchor_rect:
+            inset = round(12 * factor)
+            destination = anchor_rect.adjusted(inset, inset, -inset, -inset)
+        x = destination.right() - self.width() + 1
+        y = destination.bottom() - self.height() + 1
+        self.move(max(bounds.left(), min(x, bounds.right() - self.width() + 1)),
+                  max(bounds.top(), min(y, bounds.bottom() - self.height() + 1)))
         self.show()
         self.raise_()
         # Repeated copies extend the current notice instead of an older timer

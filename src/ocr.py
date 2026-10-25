@@ -5777,14 +5777,16 @@ class ScreenCaptureOverlay(QWidget):
         theme = config.get("theme", "Темная")
         lang = config.get("interface_language", "ru")
         auto_copy = config.get("copy_translated_text", False)
-        from main import result_window_hidden_for, show_translation_dialog, save_copy_history
+        from main import result_window_hidden_for, show_translation_dialog, copy_result_text
 
+        copy_failed = False
         if result_window_hidden_for(config, "area"):
-            platform_support.copy_text(translated_text)
-            save_copy_history(translated_text)
-            save_translation_history(text, translated_text, target_code)
-            self.close()
-            return True
+            if copy_result_text(translated_text, config=config):
+                save_translation_history(text, translated_text, target_code)
+                self.close()
+                return True
+            copy_failed = True
+            auto_copy = False
 
         self.hide()
         dialog_parent = None
@@ -5802,6 +5804,8 @@ class ScreenCaptureOverlay(QWidget):
         if engine is not None:
             result_dialog.set_window_engine(engine)
             result_dialog._engine_override = True
+        if copy_failed:
+            result_dialog._set_status(result_dialog.text['copy_failed'])
         save_translation_history(text, translated_text, target_code)
         self.close()
         return True
@@ -5830,9 +5834,9 @@ class ScreenCaptureOverlay(QWidget):
             else:
                 try:
                     # Ленивый импорт для избежания циклического импорта
-                    from main import save_copy_history
-                    platform_support.copy_text(text)
-                    save_copy_history(text)
+                    from main import copy_result_text
+                    if not copy_result_text(text):
+                        return False
                     logging.info(
                         f"[OCR:{session_id}] Recognized text copied; len={len(text)}, "
                         f"preview={_text_preview(text)}"

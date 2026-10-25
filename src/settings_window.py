@@ -2034,7 +2034,8 @@ SETTINGS_TEXT = {
         "restore_clipboard_after_selection": "Restore clipboard after selected-text actions",
         "restore_clipboard_tooltip": "Restore what was in the clipboard after a visible selection translation or a successful replacement. Explicit copy actions still keep the result.",
         "copy_notification": "Notify me after text is copied",
-        "copy_notification_tooltip": "Show a quiet on-screen confirmation when a result is copied, including in shadow mode.",
+        "copy_notification_tooltip": "After OCR copying or the Copy button, shows a confirmation for three seconds near the lower-right corner of the active app window. In shadow mode it appears at the monitor’s lower-right corner. Translation without copying does not trigger it.",
+        "copy_notification_preview": "Copy notifications are on",
         "create_bug_report": "Bug report",
         "bug_report_tooltip": "Create a diagnostic ZIP without clipboard contents, histories or document text.",
         "export_settings": "Export",
@@ -2171,7 +2172,8 @@ SETTINGS_TEXT = {
         "restore_clipboard_after_selection": "Восстанавливать буфер после работы с выделением",
         "restore_clipboard_tooltip": "Возвращает прежнее содержимое буфера после показа перевода или успешной замены. Явное копирование всё равно сохраняет результат.",
         "copy_notification": "Уведомлять после копирования текста",
-        "copy_notification_tooltip": "Показывает короткое уведомление на экране после копирования результата, в том числе в режиме тени.",
+        "copy_notification_tooltip": "После копирования OCR или кнопкой «Копировать» на три секунды показывает подтверждение внизу справа в активном окне приложения. В режиме тени — внизу справа на мониторе. Перевод без копирования не вызывает уведомление.",
+        "copy_notification_preview": "Уведомления о копировании включены",
         "create_bug_report": "Баг-репорт",
         "bug_report_tooltip": "Создаёт диагностический ZIP без содержимого буфера, историй и текста документов.",
         "export_settings": "Экспорт",
@@ -2309,7 +2311,8 @@ SETTINGS_TEXT = {
         "restore_clipboard_after_selection": "Restaurar el portapapeles tras usar texto seleccionado",
         "restore_clipboard_tooltip": "Restaura el contenido anterior tras mostrar una traducción o reemplazar la selección. Las copias explícitas conservan el resultado.",
         "copy_notification": "Notificar después de copiar texto",
-        "copy_notification_tooltip": "Muestra una confirmación discreta en pantalla al copiar un resultado, también en modo sombra.",
+        "copy_notification_tooltip": "Tras copiar con OCR o con el botón Copiar, muestra una confirmación durante tres segundos abajo a la derecha de la ventana activa. En modo sombra aparece abajo a la derecha del monitor. Traducir sin copiar no la muestra.",
+        "copy_notification_preview": "Notificaciones de copia activadas",
         "create_bug_report": "Informe de error",
         "bug_report_tooltip": "Crea un ZIP de diagnóstico sin portapapeles, historiales ni texto de documentos.",
         "export_settings": "Exportar", "import_settings": "Importar",
@@ -2445,7 +2448,8 @@ SETTINGS_TEXT = {
         "restore_clipboard_after_selection": "Zwischenablage nach Textauswahl wiederherstellen",
         "restore_clipboard_tooltip": "Stellt den vorherigen Inhalt nach einer sichtbaren Übersetzung oder erfolgreichen Ersetzung wieder her. Explizites Kopieren behält das Ergebnis.",
         "copy_notification": "Nach dem Kopieren benachrichtigen",
-        "copy_notification_tooltip": "Zeigt beim Kopieren eine kurze Bestätigung auf dem Bildschirm, auch im Schattenmodus.",
+        "copy_notification_tooltip": "Nach dem OCR-Kopieren oder der Schaltfläche Kopieren erscheint drei Sekunden lang eine Bestätigung unten rechts im aktiven App-Fenster. Im Schattenmodus erscheint sie unten rechts auf dem Monitor. Übersetzen ohne Kopieren löst sie nicht aus.",
+        "copy_notification_preview": "Kopierbenachrichtigungen sind aktiv",
         "create_bug_report": "Fehlerbericht",
         "bug_report_tooltip": "Erstellt eine Diagnose-ZIP ohne Zwischenablage, Verläufe oder Dokumenttext.",
         "export_settings": "Exportieren", "import_settings": "Importieren",
@@ -2581,7 +2585,8 @@ SETTINGS_TEXT = {
         "restore_clipboard_after_selection": "Restaurer le presse-papiers après une sélection",
         "restore_clipboard_tooltip": "Restaure le contenu précédent après l’affichage d’une traduction ou un remplacement réussi. Une copie explicite conserve le résultat.",
         "copy_notification": "Notifier après la copie du texte",
-        "copy_notification_tooltip": "Affiche une confirmation discrète à l’écran après la copie, même en mode ombre.",
+        "copy_notification_tooltip": "Après une copie OCR ou le bouton Copier, affiche une confirmation pendant trois secondes en bas à droite de la fenêtre active. En mode ombre, elle apparaît en bas à droite de l’écran. Une traduction sans copie ne la déclenche pas.",
+        "copy_notification_preview": "Notifications de copie activées",
         "create_bug_report": "Rapport de bug",
         "bug_report_tooltip": "Crée un ZIP de diagnostic sans presse-papiers, historiques ni texte de document.",
         "export_settings": "Exporter", "import_settings": "Importer",
@@ -2717,7 +2722,8 @@ SETTINGS_TEXT = {
         "restore_clipboard_after_selection": "处理所选文本后恢复剪贴板",
         "restore_clipboard_tooltip": "显示翻译或成功替换后恢复原剪贴板内容；明确的复制操作仍会保留结果。",
         "copy_notification": "复制文本后通知我",
-        "copy_notification_tooltip": "复制结果后在屏幕上显示简短提示，在阴影模式下也会显示。",
+        "copy_notification_tooltip": "通过 OCR 或“复制”按钮复制后，在当前应用窗口右下角显示确认提示三秒。阴影模式下显示在当前屏幕右下角。仅翻译而不复制时不会提示。",
+        "copy_notification_preview": "复制通知已开启",
         "create_bug_report": "创建安全错误报告",
         "bug_report_tooltip": "创建不包含剪贴板、历史记录或文档文本的诊断 ZIP。",
         "export_settings": "导出设置", "import_settings": "导入设置",
@@ -2855,8 +2861,8 @@ SETTINGS_TEXT = {
                                   'seleção visível ou uma substituição bem-sucedida. As ações de cópia '
                                   'explícitas ainda mantêm o resultado.',
      'copy_notification': 'Avise-me depois que o texto for copiado',
-     'copy_notification_tooltip': 'Mostra uma confirmação silenciosa na tela quando um resultado é '
-                                  'copiado, inclusive no modo sombra.',
+     'copy_notification_tooltip': 'Após copiar pelo OCR ou pelo botão Copiar, mostra uma confirmação por três segundos no canto inferior direito da janela ativa. No modo sombra, aparece no canto inferior direito do monitor. Traduzir sem copiar não a exibe.',
+     'copy_notification_preview': 'Notificações de cópia ativadas',
      'create_bug_report': 'Relatar problema',
      'bug_report_tooltip': 'Crie um ZIP de diagnóstico sem conteúdo da área de transferência, '
                            'históricos ou texto de documento.',
@@ -3015,8 +3021,8 @@ SETTINGS_TEXT = {
                                   'selezione visibile o una sostituzione riuscita. Le azioni di copia '
                                   'esplicite mantengono comunque il risultato.',
      'copy_notification': 'Avvisami dopo che il testo è stato copiato',
-     'copy_notification_tooltip': 'Mostra una silenziosa conferma sullo schermo quando un risultato '
-                                  'viene copiato, anche in modalità ombra.',
+     'copy_notification_tooltip': 'Dopo la copia OCR o il pulsante Copia, mostra una conferma per tre secondi in basso a destra nella finestra attiva. In modalità ombra appare in basso a destra sul monitor. Tradurre senza copiare non la mostra.',
+     'copy_notification_preview': 'Notifiche di copia attive',
      'create_bug_report': 'Segnala un problema',
      'bug_report_tooltip': 'Crea uno ZIP diagnostico senza contenuto degli appunti, cronologie o testo '
                            'del documento.',
@@ -3178,7 +3184,8 @@ SETTINGS_TEXT = {
      'restore_clipboard_tooltip': 'استعد محتوى الحافظة السابق بعد إظهار ترجمة النص المحدد أو استبداله '
                                   'بنجاح. تبقى نتائج إجراءات النسخ الصريحة في الحافظة.',
      'copy_notification': 'إشعاري بعد نسخ النص',
-     'copy_notification_tooltip': 'إظهار تأكيد هادئ على الشاشة عند نسخ النتيجة، بما في ذلك وضع الظل.',
+     'copy_notification_tooltip': 'بعد نسخ OCR أو زر النسخ، يظهر تأكيد لثلاث ثوانٍ أسفل يمين نافذة التطبيق النشطة. في وضع الظل يظهر أسفل يمين الشاشة. الترجمة دون نسخ لا تعرض إشعارًا.',
+     'copy_notification_preview': 'إشعارات النسخ مفعلة',
      'create_bug_report': 'تقرير مشكلة',
      'bug_report_tooltip': 'إنشاء ملف ZIP تشخيصي دون محتوى الحافظة أو السجلات أو نصوص المستندات.',
      'export_settings': 'تصدير',
@@ -3327,7 +3334,8 @@ SETTINGS_TEXT = {
      'restore_clipboard_tooltip': 'Görünür seçim çevirisi veya başarılı değiştirmeden sonra önceki '
                                   'panoyu geri getirir. Açık kopyalama işlemleri sonucu korur.',
      'copy_notification': 'Metin kopyalanınca bildir',
-     'copy_notification_tooltip': 'Gölge modunda da sonuç kopyalanınca sessiz ekran onayı gösterir.',
+     'copy_notification_tooltip': 'OCR ile veya Kopyala düğmesiyle kopyalama sonrası etkin pencerenin sağ alt köşesinde üç saniyelik onay gösterir. Gölge modunda monitörün sağ altında görünür. Kopyalamadan çeviri yapmak bildirim göstermez.',
+     'copy_notification_preview': 'Kopyalama bildirimleri açık',
      'create_bug_report': 'Hata raporu',
      'bug_report_tooltip': "Pano içeriği, geçmişler ve belge metni olmadan tanılama ZIP'i oluşturur.",
      'export_settings': 'Dışa aktar',
@@ -3478,7 +3486,8 @@ SETTINGS_TEXT = {
      'restore_clipboard_tooltip': 'दिखने वाले चयन अनुवाद या सफल बदलाव के बाद पुराना क्लिपबोर्ड लौटाएँ। '
                                   'स्पष्ट कॉपी क्रियाएँ परिणाम रखती हैं।',
      'copy_notification': 'टेक्स्ट कॉपी होने पर बताएँ',
-     'copy_notification_tooltip': 'छाया मोड में भी परिणाम कॉपी होने पर शांत पुष्टि दिखाएँ।',
+     'copy_notification_tooltip': 'OCR या कॉपी बटन से कॉपी करने पर सक्रिय ऐप विंडो के नीचे दाईं ओर तीन सेकंड की पुष्टि दिखती है। छाया मोड में यह मॉनिटर के नीचे दाईं ओर दिखती है। बिना कॉपी किए अनुवाद पर सूचना नहीं आती।',
+     'copy_notification_preview': 'कॉपी सूचनाएँ चालू हैं',
      'create_bug_report': 'बग रिपोर्ट',
      'bug_report_tooltip': 'क्लिपबोर्ड, इतिहास या दस्तावेज़ टेक्स्ट के बिना निदान ZIP बनाएँ।',
      'export_settings': 'निर्यात',
@@ -3626,8 +3635,8 @@ SETTINGS_TEXT = {
                                   'penggantian berhasil. Tindakan salin eksplisit tetap mempertahankan '
                                   'hasil.',
      'copy_notification': 'Beri tahu setelah teks disalin',
-     'copy_notification_tooltip': 'Tampilkan konfirmasi senyap saat hasil disalin, termasuk dalam mode '
-                                  'bayangan.',
+     'copy_notification_tooltip': 'Setelah menyalin lewat OCR atau tombol Salin, tampilkan konfirmasi selama tiga detik di kanan bawah jendela aktif. Dalam mode bayangan, konfirmasi muncul di kanan bawah monitor. Terjemahan tanpa menyalin tidak memunculkannya.',
+     'copy_notification_preview': 'Notifikasi salinan aktif',
      'create_bug_report': 'Laporan bug',
      'bug_report_tooltip': 'Buat ZIP diagnostik tanpa isi papan klip, riwayat, atau teks dokumen.',
      'export_settings': 'Ekspor',
@@ -10006,22 +10015,37 @@ class SettingsWindow(QWidget):
             # Dynamic translation has one supported workflow in this release.
             merged["game_capture_mode"] = "region"
 
-            self.parent.config = merged
+            # Publish runtime/UI and OS changes only after the imported profile
+            # has been saved atomically. save_config reads these attributes,
+            # so stage them for the write and roll back before showing an error.
+            previous = {name: getattr(self.parent, name) for name in (
+                'config', 'current_theme', 'current_interface_language',
+                'start_minimized', 'translation_mode', 'autostart')}
+            try:
+                self.parent.config = merged
+                self.parent.current_theme = merged["theme"]
+                self.parent.current_interface_language = merged["interface_language"]
+                self.parent.start_minimized = bool(merged.get("start_minimized", False))
+                self.parent.translation_mode = merged.get("translation_mode", "English")
+                self.parent.autostart = bool(merged.get("autostart", False))
+                self.parent.save_config(capture_languages=False)
+            except Exception:
+                for name, value in previous.items():
+                    setattr(self.parent, name, value)
+                raise
             app = QApplication.instance()
             if app is not None:
                 app.setProperty(
                     "buttonTooltipsEnabled",
                     bool(merged.get("button_tooltips_enabled", True)),
                 )
-            self.parent.current_theme = merged["theme"]
-            self.parent.current_interface_language = merged["interface_language"]
-            self.parent.start_minimized = bool(merged.get("start_minimized", False))
-            self.parent.translation_mode = merged.get("translation_mode", "English")
-            self.parent.autostart = bool(merged.get("autostart", False))
-            actual_autostart = self.parent.set_autostart(self.parent.autostart)
-            self.parent.autostart = bool(actual_autostart)
-            self.parent.config["autostart"] = self.parent.autostart
-            self.parent.save_config(capture_languages=False)
+            requested_autostart = self.parent.autostart
+            if requested_autostart != previous['autostart']:
+                actual_autostart = bool(self.parent.set_autostart(requested_autostart))
+                self.parent.autostart = actual_autostart
+                self.parent.config["autostart"] = actual_autostart
+                if actual_autostart != requested_autostart:
+                    self.parent.save_config(capture_languages=False)
 
             restart_hotkeys = getattr(self.parent, "restart_all_hotkey_listeners", None)
             if callable(restart_hotkeys):
@@ -10160,6 +10184,13 @@ class SettingsWindow(QWidget):
 
     def setup_new_layout(self):
         # Scale/screen signals can arrive while a secondary page replaces the form.
+        for name in ('history_cards_layout', 'copy_history_cards_layout'):
+            layout = getattr(self, name, None)
+            if layout is None or sip.isdeleted(layout):
+                continue
+            pager = getattr(layout, '_history_pager', None)
+            if pager is not None and not sip.isdeleted(pager):
+                pager.stop()
         self.ui_scale_control = None
         self.ui_scale_value = None
         self.translation_font_control = None
@@ -10802,9 +10833,13 @@ class SettingsWindow(QWidget):
         )
         self.copy_notification_checkbox.setObjectName("settingsPageCheckbox")
         self.copy_notification_checkbox.setFixedHeight(page_checkbox_height)
-        self.copy_notification_checkbox.toggled.connect(
-            lambda state: self.auto_save_setting("notifications", bool(state))
-        )
+        def set_copy_notifications(checked):
+            self.auto_save_setting("notifications", bool(checked))
+            if checked:
+                self.parent._preview_copy_notification()
+            else:
+                self.parent._copy_notice.hide()
+        self.copy_notification_checkbox.toggled.connect(set_copy_notifications)
         updates_layout.addWidget(
             self.copy_notification_checkbox, alignment=Qt.AlignLeft
         )
@@ -11812,7 +11847,18 @@ class SettingsWindow(QWidget):
         if shell is None:
             return
         try:
-            shell.setStyleSheet(self._secondary_view_stylesheet())
+            style = self._secondary_view_stylesheet()
+            set_widget_stylesheet(shell, style)
+            count_label = shell.findChild(QLabel, 'secondaryCount')
+            if count_label is not None:
+                set_widget_stylesheet(count_label, style)
+            for name in ('history_scroll_area', 'copy_history_scroll_area'):
+                area = getattr(self, name, None)
+                if area is not None and not sip.isdeleted(area) and shell.isAncestorOf(area):
+                    # Apply the same shared rules on the scroll-content root.
+                    # QGraphicsProxyWidget can retain inherited QSS across a
+                    # QScrollArea viewport after its outer palette changes.
+                    set_widget_stylesheet(area.widget(), style)
         except RuntimeError:
             self.secondary_view_shell = None
 
@@ -12285,6 +12331,13 @@ class SettingsWindow(QWidget):
         return scroll, cards_layout
 
     def _clear_history_cards(self, cards_layout):
+        if cards_layout is None or sip.isdeleted(cards_layout):
+            return
+        pager = getattr(cards_layout, '_history_pager', None)
+        if pager is not None and not sip.isdeleted(pager):
+            pager.stop()
+            pager.deleteLater()
+        cards_layout._history_pager = None
         while cards_layout.count():
             item = cards_layout.takeAt(0)
             widget = item.widget()
@@ -12348,9 +12401,10 @@ class SettingsWindow(QWidget):
         copy_button.setProperty("historyField", field_name)
         copy_button.setCursor(Qt.PointingHandCursor)
         copy_button.setMinimumHeight(28)
-        copy_button.clicked.connect(
-            lambda _checked=False, value=str(text or ""): QApplication.clipboard().setText(value)
-        )
+        def copy_history_text(_checked=False, value=str(text or '')):
+            from main import copy_result_text
+            copy_result_text(value, record_history=False, config=self.parent.config)
+        copy_button.clicked.connect(copy_history_text)
         delete_button = QPushButton(history_record_text(lang, "delete"))
         delete_button.setObjectName("historyDeleteButton")
         delete_button.setProperty("recordIndex", record_index)
@@ -12447,8 +12501,14 @@ class SettingsWindow(QWidget):
         records = records if isinstance(records, list) else []
         cards_layout = self.copy_history_cards_layout if copy_mode else self.history_cards_layout
         count_label = self.copy_history_count_label if copy_mode else self.history_count_label
-        self._clear_history_cards(cards_layout)
         count_label.setText(str(len(records)))
+        previous = getattr(cards_layout, '_history_pager', None)
+        language = self.parent.current_interface_language
+        if (previous is not None and not sip.isdeleted(previous) and previous.current()
+                and previous.records == records and previous.language == language):
+            # Repainting a theme does not require rebuilding the same cards.
+            return
+        self._clear_history_cards(cards_layout)
         cards = []
         if not records:
             empty_label = QLabel(settings_text(self.parent.current_interface_language, "history_empty"))
@@ -12456,21 +12516,42 @@ class SettingsWindow(QWidget):
             empty_label.setAlignment(Qt.AlignCenter)
             empty_label.setWordWrap(True)
             cards_layout.addWidget(empty_label)
-        else:
-            for record_index, record in reversed(list(enumerate(records))):
-                cards.append(
-                    self._add_history_record_card(
-                        cards_layout,
-                        record,
-                        record_index,
-                        copy_mode,
-                    )
-                )
         cards_layout.addStretch(1)
+        if records:
+            from history_paging import HistoryCardPager
+            name = 'copy_history_scroll_area' if copy_mode else 'history_scroll_area'
+            kind = 'copy_history' if copy_mode else 'history'
+            scroll = getattr(self, name)
+            pager = HistoryCardPager(scroll, cards_layout, records,
+                lambda record, index: self._add_history_record_card(cards_layout, record, index, copy_mode),
+                lambda: getattr(self, '_secondary_view_kind', None) == kind and getattr(self, name, None) is scroll,
+                lambda current: self._history_batch_added(current, copy_mode))
+            pager.language = language
+            cards_layout._history_pager = pager
+            cards = pager.cards
         if copy_mode:
             self.copy_history_record_cards = cards
         else:
             self.history_record_cards = cards
+        if records:
+            pager.append_batch()
+            # The footer is created after this first population.
+            QtCore.QTimer.singleShot(0, lambda: self._history_batch_added(pager, copy_mode)
+                                     if not sip.isdeleted(pager) and pager.current() else None)
+
+    def _history_batch_added(self, pager, copy_mode):
+        if not pager.current():
+            return
+        controls = [button for card in pager.cards for button in card.findChildren(QtWidgets.QAbstractButton)]
+        shell = getattr(self, 'secondary_view_shell', None)
+        prefix = 'copy_history' if copy_mode else 'history'
+        for suffix in ('clear_button', 'back_button'):
+            button = getattr(self, prefix+'_'+suffix, None)
+            if (button is not None and not sip.isdeleted(button) and shell is not None
+                    and shell.isAncestorOf(button)):
+                controls.append(button)
+        for first, second in zip(controls, controls[1:]):
+            QtWidgets.QWidget.setTabOrder(first, second)
 
     @staticmethod
     def _write_history_records(history_file, records):
@@ -14459,8 +14540,15 @@ finally {
         if area is not None and not sip.isdeleted(area):
             # Layouts calculate the final scroll range after the translated
             # controls have been polished; restore position in that turn.
-            QtCore.QTimer.singleShot(0, lambda area=area: (
-                area.verticalScrollBar().setValue(position) if not sip.isdeleted(area) else None))
+            layout = area.widget().layout() if area_name else None
+            pager = (getattr(layout, '_history_pager', None)
+                     if layout is not None and not sip.isdeleted(layout) else None)
+            if pager is not None and not sip.isdeleted(pager):
+                # Materialize only enough batches to reach the old position.
+                pager.restore_position(position)
+            else:
+                QtCore.QTimer.singleShot(0, lambda area=area: (
+                    area.verticalScrollBar().setValue(position) if not sip.isdeleted(area) else None))
 
     def update_language(self):
         self.init_ui()

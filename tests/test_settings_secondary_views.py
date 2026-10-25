@@ -302,12 +302,12 @@ class SettingsSecondaryViewsTest(unittest.TestCase):
         self.settings._set_settings_page(1)
         self.app.processEvents()
         checkbox = self.settings.close_result_on_outside_click_checkbox
-        self.assertFalse(checkbox.isChecked())
+        self.assertTrue(checkbox.isChecked())
         self.assertNotEqual(checkbox.text(), "")
         checkbox.click()
-        self.assertTrue(self.parent.config["close_result_window_on_outside_click"])
-        checkbox.click()
         self.assertFalse(self.parent.config["close_result_window_on_outside_click"])
+        checkbox.click()
+        self.assertTrue(self.parent.config["close_result_window_on_outside_click"])
 
     def test_duplicate_hotkey_keeps_previous_binding_and_names_the_owner(self):
         self.settings.show_hotkeys_screen()

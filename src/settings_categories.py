@@ -1,5 +1,6 @@
 """Arrange program and translation preferences in the fixed settings viewport."""
 from PyQt5.QtCore import Qt, QSize
+from PyQt5 import sip
 from PyQt5.QtWidgets import (
     QBoxLayout, QCheckBox, QFrame, QGridLayout, QHBoxLayout, QLabel, QLayout,
     QScrollArea, QSizePolicy, QVBoxLayout, QWidget,
@@ -222,7 +223,11 @@ def _fit_dynamic_flag(control, width):
 
 
 def fit_dynamic_flags(settings):
-    if not hasattr(settings, 'game_flags_panel'):
+    # Histories and the hotkey editor temporarily replace and destroy the
+    # category pages. Their Python attributes survive until init_ui rebuilds
+    # them; a theme change must not measure those deleted Qt controls.
+    panel = getattr(settings, 'game_flags_panel', None)
+    if panel is None or sip.isdeleted(panel):
         return
     for control in (settings.game_pause_inactive_checkbox, settings.game_manual_output_checkbox,
                     settings.game_toolbar_checkbox, settings.game_remember_template_checkbox):

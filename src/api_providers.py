@@ -39,7 +39,11 @@ _LOCAL = threading.local()
 
 
 class ProviderError(RuntimeError):
-    pass
+    def __init__(self, message, *, status_code=None):
+        super().__init__(message)
+        # Retain transport classification when the UI localizes the message.
+        # No response body, URL or credentials are stored in this exception.
+        self.status_code = status_code
 
 
 def _valid_response(function):
@@ -247,7 +251,7 @@ def credential(provider, config):
     return get_key(provider, profile(provider, config)['url'])
 
 
-def validate(provider, config):
+def validate(provider, config, *, api_key=None):
     item = profile(provider, config)
     validate_url(item['url'])
     if provider not in {'openai-compatible', 'libretranslate', 'deepl'} and item['url'] != BY_KEY[provider].url:
@@ -256,15 +260,17 @@ def validate(provider, config):
         raise ProviderError('DeepL API accepts only the official Free or Pro address.')
     if BY_KEY[provider].protocol not in {'deepl', 'libre'} and not item['model']:
         raise ProviderError('Set the model in Settings > Translation and OCR > API connections.')
-    if not credential(provider, config) and not (provider == 'openai-compatible' and urlsplit(item['url']).hostname in {'localhost', '127.0.0.1', '::1'}):
+    key = credential(provider, config) if api_key is None else api_key
+    if not key and not (provider == 'openai-compatible' and urlsplit(item['url']).hostname in {'localhost', '127.0.0.1', '::1'}):
         raise ProviderError('Add an API key in Settings > Translation and OCR > API connections.')
     return item
 
 
-def cache_identity(provider, config):
+def cache_identity(provider, config, *, api_key=None):
     item = profile(provider, config)
     # A changed model/server/key cannot reuse another connection's result.
-    data = json.dumps(item, sort_keys=True) + '\0' + credential(provider, config)
+    key = credential(provider, config) if api_key is None else api_key
+    data = json.dumps(item, sort_keys=True) + '\0' + key
     return provider + ':' + hashlib.sha256(data.encode()).hexdigest()[:24]
 
 
@@ -300,7 +306,7 @@ def _post(url, headers, payload, cancel=None):
                 code = response.status_code
                 detail = {401: 'API key rejected', 403: 'API access denied',
                           429: 'API quota or rate limit reached'}.get(code, 'API request failed')
-                raise ProviderError(f'{detail} (HTTP {code}).')
+                raise ProviderError(f'{detail} (HTTP {code}).', status_code=code)
             chunks, size = [], 0
             for chunk in response.iter_content(65536):
                 _check_translation_cancelled(cancel)
@@ -383,9 +389,9 @@ def _text_response(spec, item, key, instruction, text, image=None, cancel=None):
     return result
 
 
-def translate(provider, text, source, target, config, cancel=None):
-    spec, item = BY_KEY[provider], validate(provider, config)
-    key = credential(provider, config)
+def translate(provider, text, source, target, config, cancel=None, *, api_key=None):
+    spec, item = BY_KEY[provider], validate(provider, config, api_key=api_key)
+    key = credential(provider, config) if api_key is None else api_key
     if spec.protocol == 'deepl':
         payload = {'text': [text], 'target_lang': ('ZH' if target.startswith('zh') else target.upper())}
         if source != 'auto':

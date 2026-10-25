@@ -11,6 +11,7 @@ import types
 import zipfile
 import zlib
 import hashlib
+from copy import deepcopy
 from languages import language_english_name, translator_api_code
 from translation_chunks import PROVIDER_BYTE_LIMITS, split_text, restore_boundary_whitespace
 from translation_availability import OfflineProviderUnavailable
@@ -1380,8 +1381,18 @@ class ProviderRateLimitError(RuntimeError):
     pass
 
 
+def _provider_status_code(error):
+    return getattr(error, 'status_code', None) or getattr(getattr(error, 'response', None), 'status_code', None)
+
+
 def _is_provider_rate_limit(error):
-    return isinstance(error, ProviderRateLimitError) or getattr(getattr(error, 'response', None), 'status_code', None) == 429
+    return isinstance(error, ProviderRateLimitError) or _provider_status_code(error) == 429
+
+
+def _blocks_remaining_requests(error):
+    # A rejected key, denied access or exhausted quota cannot be repaired by
+    # sending the next document paragraph through the same connection.
+    return _is_provider_rate_limit(error) or _provider_status_code(error) in {401, 403}
 
 
 def _check_translation_cancelled(callback):
@@ -1401,8 +1412,11 @@ def _libretranslate_server():
 
 
 class _TranslationCache:
-    def __init__(self, source, target):
+    def __init__(self, source, target, *, config=None):
         self.source, self.target = source, target
+        self.config = deepcopy(config if config is not None else get_cached_translator_config())
+        self._api_keys = {}
+        self._bound_identities = {}
         try:
             from main import get_data_file
             self.data_dir = os.path.dirname(get_data_file('config.json'))
@@ -1410,10 +1424,11 @@ class _TranslationCache:
             self.data_dir = None
 
     @staticmethod
-    def _engine_key(engine, segment=False):
+    def _engine_key(engine, segment=False, *, config=None, api_key=None):
         if engine in {'openai', 'openai-compatible', 'gemini', 'anthropic', 'deepl'}:
             from api_providers import cache_identity
-            engine = cache_identity(engine, get_cached_translator_config())
+            engine = cache_identity(engine, get_cached_translator_config() if config is None else config,
+                                    api_key=api_key)
         if engine == 'hymt':
             # Ignore translations produced with the old, duplicated template.
             engine = 'hymt:prompt-v2'
@@ -1423,12 +1438,26 @@ class _TranslationCache:
             engine += ':' + hashlib.sha256((url + '\0' + key).encode('utf-8')).hexdigest()[:16]
         return ('segment-v2:' if segment else '') + engine
 
+    def connection_key(self, engine):
+        if engine not in self._api_keys:
+            from api_providers import credential
+            self._api_keys[engine] = credential(engine, self.config)
+        return self._api_keys[engine]
+
+    def _bound_engine_key(self, engine, segment=False):
+        if engine not in {'openai', 'openai-compatible', 'gemini', 'anthropic', 'deepl'}:
+            return self._engine_key(engine, segment)
+        if engine not in self._bound_identities:
+            self._bound_identities[engine] = self._engine_key(engine, config=self.config,
+                                                            api_key=self.connection_key(engine))
+        return ('segment-v2:' if segment else '') + self._bound_identities[engine]
+
     def get(self, text, engine, segment=False):
         if self.data_dir:
             try:
                 from cache_manager import get_cached_translation
                 result = get_cached_translation(self.data_dir, text, self.source, self.target,
-                    engine=self._engine_key(engine, segment), strict_engine=True)
+                    engine=self._bound_engine_key(engine, segment), strict_engine=True)
                 return result if isinstance(result, str) and result.strip() else None
             except Exception:
                 pass
@@ -1439,7 +1468,7 @@ class _TranslationCache:
             try:
                 from cache_manager import save_cached_translation
                 save_cached_translation(self.data_dir, text, self.source, self.target, result,
-                    engine=self._engine_key(engine, segment))
+                    engine=self._bound_engine_key(engine, segment))
             except Exception:
                 pass
 
@@ -1462,7 +1491,7 @@ def translate_text(
     print(f"Using translator: {engine.upper()}")
 
     # Check translation cache first
-    cache = _TranslationCache(source_code, target_code)
+    cache = _TranslationCache(source_code, target_code, config=config)
     cached = cache.get(text, engine)
     if cached:
         print(f"Using cached translation ({len(text)} chars)")
@@ -1493,9 +1522,11 @@ def translate_text(
     if engine in {'openai', 'openai-compatible', 'gemini', 'anthropic', 'deepl'}:
         from api_providers import translate, ProviderError, display_error
         try:
-            result = translate(engine, text, source_code, target_code, config, cancel_callback)
+            result = translate(engine, text, source_code, target_code, cache.config, cancel_callback,
+                               api_key=cache.connection_key(engine))
         except ProviderError as error:
-            raise ProviderError(display_error(error, config.get('interface_language', 'en'))) from None
+            raise ProviderError(display_error(error, config.get('interface_language', 'en')),
+                                status_code=error.status_code) from None
         return _cache_and_return(result)
 
     if engine in online_engines:
@@ -1784,7 +1815,9 @@ def _libretranslate_request(text, source_code, target_code):
                 raise _BatchNotSupportedError(last_error)
             if r.status_code == 429:
                 raise ProviderRateLimitError(last_error)
-        except (_BatchNotSupportedError, ProviderRateLimitError):
+            if r.status_code in (401, 403):
+                raise requests.HTTPError(last_error, response=r)
+        except (_BatchNotSupportedError, ProviderRateLimitError, requests.HTTPError):
             raise
         except Exception as e:
             last_error = f"{base_url}: {e}"
@@ -1802,15 +1835,15 @@ def iter_translate_texts(texts, source_code, target_code, *, engine=None,
     config = get_cached_translator_config()
     engine = (engine or config.get('translator_engine', 'Google')).lower()
     texts = list(texts)
-    cache = _TranslationCache(source_code, target_code)
+    cache = _TranslationCache(source_code, target_code, config=config)
     batch_size = 4 if engine == 'libretranslate' else 1
     offset = 0
-    rate_limit_error = ''
+    blocked_error = ''
     while offset < len(texts):
         _check_translation_cancelled(cancel_callback)
-        if rate_limit_error:
+        if blocked_error:
             cached = cache.get(texts[offset], engine) if texts[offset].strip() else texts[offset]
-            yield offset, cached or '', '' if cached else rate_limit_error
+            yield offset, cached or '', '' if cached is not None else blocked_error
             offset += 1
             continue
         group = texts[offset:offset + batch_size]
@@ -1825,8 +1858,8 @@ def iter_translate_texts(texts, source_code, target_code, *, engine=None,
             except Exception as exc:
                 _check_translation_cancelled(cancel_callback)
                 result, error = '', str(exc)
-                if _is_provider_rate_limit(exc):
-                    rate_limit_error = error
+                if _blocks_remaining_requests(exc):
+                    blocked_error = error
             yield offset, result, error
             offset += 1
             continue
@@ -1859,8 +1892,8 @@ def iter_translate_texts(texts, source_code, target_code, *, engine=None,
         except TranslationCancelledError:
             raise
         except Exception as exc:
-            if _is_provider_rate_limit(exc):
-                rate_limit_error = str(exc)
+            if _blocks_remaining_requests(exc):
+                blocked_error = str(exc)
             for index in pending:
                 _check_translation_cancelled(cancel_callback)
                 results[index] = ('', str(exc))

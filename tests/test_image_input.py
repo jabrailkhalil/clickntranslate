@@ -121,23 +121,62 @@ def test_browse_routes_documents_and_images_and_keeps_cancel_available(window, t
     window._image_importer.busy = False
 
 
-def test_result_window_browse_and_paste_files_use_the_document_workspace(window, app, tmp_path, isolated_clipboard):
+def test_result_window_keeps_attachments_in_source_and_not_in_translated_output(window, app, tmp_path, isolated_clipboard):
     dialog = main.TranslationResultDialog(window, '', auto_copy=False, lang='ru')
     path = str(tmp_path/'book.pdf')
     mime = QtCore.QMimeData()
     mime.setUrls([QtCore.QUrl.fromLocalFile(path)])
     isolated_clipboard.setMimeData(mime)
     try:
+        dialog.show()
+        app.processEvents()
+        assert not hasattr(dialog, 'image_button')
+        assert not dialog.image_cancel_button.isVisible()
         with mock.patch.object(window, 'open_document_translation') as document:
             QTest.keyClick(dialog.source_edit, QtCore.Qt.Key_V, QtCore.Qt.ControlModifier)
             document.assert_called_once_with(mime.urls()[0].toLocalFile())
-        with (mock.patch.object(main.QFileDialog, 'getOpenFileName', return_value=(path, '')),
-              mock.patch.object(window, 'open_document_translation') as document):
-            dialog.image_button.click()
-            document.assert_called_once_with(path)
+        with (mock.patch.object(window, 'open_document_translation') as document,
+              mock.patch.object(dialog.image_importer, 'start') as recognize):
+            dialog.text_edit.insertFromMimeData(mime)
+            mime = QtCore.QMimeData()
+            mime.setImageData(photo())
+            isolated_clipboard.setMimeData(mime)
+            dialog.text_edit.insertFromMimeData(mime)
+            document.assert_not_called()
+            recognize.assert_not_called()
+        mime = QtCore.QMimeData()
+        mime.setText('Editable translated draft')
+        dialog.text_edit.selectAll()
+        dialog.text_edit.insertFromMimeData(mime)
+        assert dialog.text_edit.toPlainText() == 'Editable translated draft'
         dialog.refresh_language('ar')
         dialog.refresh_theme('Светлая')
-        assert dialog.image_button.text() == image_input.attachment_text('ar', 'browse')
+        assert not dialog.image_cancel_button.isVisible()
+    finally:
+        dialog.reject()
+
+
+def test_result_source_photo_paste_can_be_cancelled_without_a_browse_action(window, app, isolated_clipboard):
+    dialog = main.TranslationResultDialog(window, 'Previous translation', auto_copy=False, lang='ru',
+                                         source_text='Previous source')
+    mime = QtCore.QMimeData()
+    mime.setImageData(photo())
+    isolated_clipboard.setMimeData(mime)
+    try:
+        dialog.show()
+        app.processEvents()
+        with mock.patch.object(image_input.threading, 'Thread'):
+            QTest.keyClick(dialog.source_edit, QtCore.Qt.Key_V, QtCore.Qt.ControlModifier)
+        assert dialog.image_importer.busy
+        assert dialog.image_cancel_button.isVisible()
+        assert dialog.image_cancel_button.icon().isNull()
+        dialog.image_cancel_button.click()
+        assert not dialog.image_importer.busy
+        assert not dialog.image_cancel_button.isVisible()
+        assert not dialog.source_edit.isReadOnly()
+        assert not dialog.text_edit.isReadOnly()
+        assert dialog.source_edit.toPlainText() == 'Previous source'
+        assert dialog.text_edit.toPlainText() == 'Previous translation'
     finally:
         dialog.reject()
 
