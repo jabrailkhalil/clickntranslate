@@ -8530,7 +8530,8 @@ class WelcomeDialog(QDialog):
         super().closeEvent(event)
 
 class DocumentTranslationDialog(CenteredFramelessDialog):
-    _document_loaded_signal = QtCore.pyqtSignal(object)
+    _document_loaded_signal = QtCore.pyqtSignal(int, object)
+    _document_load_error_signal = QtCore.pyqtSignal(int, str)
     _document_error_signal = QtCore.pyqtSignal(str)
     _document_progress_signal = QtCore.pyqtSignal(int, int, str)
     _document_partial_signal = QtCore.pyqtSignal(str, int, int)
@@ -8547,11 +8548,15 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self.translation_results = []
         self.translation_error_message_visible = False
         self.translation_running = False
+        self._document_load_generation = 0
+        self._document_loading = False
+        self._initial_load_timer = None
         self._translation_cancel_event = None
         self._active_translation_source_text = ""
         self._active_translation_target_code = ""
 
         self._document_loaded_signal.connect(self._on_document_loaded)
+        self._document_load_error_signal.connect(self._on_document_load_error)
         self._document_error_signal.connect(self._on_document_error)
         self._document_progress_signal.connect(self._on_translation_progress)
         self._document_partial_signal.connect(self._on_document_partial)
@@ -8572,7 +8577,17 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self._set_status(doc_text(self.lang, "no_file"))
         self._set_busy(False)
         if initial_path:
-            QTimer.singleShot(0, lambda: self.load_file(initial_path))
+            self._initial_load_path = initial_path
+            self._initial_load_generation = self._document_load_generation
+            self._initial_load_timer = QTimer(self)
+            self._initial_load_timer.setSingleShot(True)
+            self._initial_load_timer.timeout.connect(self._start_initial_document_load)
+            self._initial_load_timer.start(0)
+
+    @QtCore.pyqtSlot()
+    def _start_initial_document_load(self):
+        if self._initial_load_generation == self._document_load_generation:
+            self.load_file(self._initial_load_path)
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -8586,10 +8601,12 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
             self._set_status(doc_text(self.lang, 'canceling_translation'))
 
     def reject(self):
+        self._invalidate_document_load()
         self._request_translation_cancel()
         super().reject()
 
     def closeEvent(self, event):
+        self._invalidate_document_load()
         self._request_translation_cancel()
         super().closeEvent(event)
 
@@ -9062,6 +9079,8 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         if self.translation_running:
             canceling = self._translation_cancel_event is not None and self._translation_cancel_event.is_set()
             self.current_status = doc_text(self.lang, "canceling_translation" if canceling else "translating")
+        elif self._document_loading:
+            self.current_status = doc_text(self.lang, 'loading')
         elif self.current_document:
             self.current_status = doc_text(self.lang, "loaded")
         elif self.session_payload:
@@ -9081,6 +9100,9 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
                 return
 
     def _on_original_text_changed(self):
+        if self._document_loading or (self._initial_load_timer is not None and self._initial_load_timer.isActive()):
+            # A new draft supersedes a parser result still on its way back.
+            self._invalidate_document_load()
         if self.current_document or self.session_payload or self.translation_running:
             return
         if self.original_view.toPlainText().strip():
@@ -9107,6 +9129,8 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
     def load_file(self, path):
         if self.translation_running:
             return
+        generation = self._invalidate_document_load()
+        self._document_loading = True
         self.current_document = None
         self.session_payload = None
         self.translated_text = ""
@@ -9123,15 +9147,39 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         def worker():
             try:
                 document = parse_document(path)
-                self._document_loaded_signal.emit(document)
-            except DocumentParseError as exc:
-                self._document_error_signal.emit(str(exc))
             except Exception as exc:
-                self._document_error_signal.emit(str(exc))
+                try:
+                    self._document_load_error_signal.emit(generation, str(exc))
+                except RuntimeError:
+                    pass  # The owning dialog may have been destroyed.
+            else:
+                try:
+                    self._document_loaded_signal.emit(generation, document)
+                except RuntimeError:
+                    pass
 
-        threading.Thread(target=worker, daemon=True).start()
+        try:
+            threading.Thread(target=worker, daemon=True).start()
+        except Exception as exc:
+            self._on_document_load_error(generation, str(exc))
 
-    def _on_document_loaded(self, document):
+    def _invalidate_document_load(self):
+        self._document_load_generation += 1
+        if self._initial_load_timer is not None:
+            self._initial_load_timer.stop()
+        was_loading, self._document_loading = self._document_loading, False
+        if was_loading:
+            self.progress_bar.setRange(0, 100)
+            self.progress_bar.setValue(0)
+            self._set_busy(False)
+            self._set_status(doc_text(self.lang, 'loaded' if self.original_view.toPlainText().strip() else 'no_file'))
+        return self._document_load_generation
+
+    @QtCore.pyqtSlot(int, object)
+    def _on_document_loaded(self, generation, document):
+        if generation != self._document_load_generation or not self._document_loading:
+            return
+        self._document_loading = False
         self.current_document = document
         self.session_payload = None
         self.original_view.blockSignals(True)
@@ -9143,7 +9191,16 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self._set_busy(False)
         self._set_status(doc_text(self.lang, "loaded"))
 
+    @QtCore.pyqtSlot(int, str)
+    def _on_document_load_error(self, generation, message):
+        if generation != self._document_load_generation or not self._document_loading:
+            return
+        self._document_loading = False
+        self._on_document_error(message)
+
     def _on_document_error(self, message):
+        from document_messages import localized_document_error
+        message = localized_document_error(message, self.lang)
         if self.translation_running:
             canceled = self._translation_cancel_event is not None and self._translation_cancel_event.is_set()
             notify_activity(self.parent_app, 'idle' if canceled else 'error', f'document:{id(self)}')
@@ -9152,12 +9209,17 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
         self._set_busy(False)
-        self._set_status(str(message))
-        QMessageBox.warning(self, doc_text(self.lang, "error"), str(message))
+        self.status_pill.setTextFormat(Qt.PlainText)
+        self._set_status(message)
+        # File names and library diagnostics are data, never rich-text markup.
+        from html import escape
+        QMessageBox.warning(self, doc_text(self.lang, "error"),
+                            '<qt>' + escape(message).replace('\n', '<br>') + '</qt>')
 
     def remove_file(self):
         if self.translation_running:
             return
+        self._invalidate_document_load()
         self.current_document = None
         self.session_payload = None
         self.translated_text = ""
@@ -9190,7 +9252,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
 
     def _start_translation(self, text):
         text = str(text or "").strip()
-        if not text or self.translation_running:
+        if not text or self.translation_running or self._document_loading:
             return
         engine = self._provider_engine()
         source = self._source_code()
@@ -9233,6 +9295,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
                     progress_callback=progress,
                     cancel_event=cancel_event,
                     partial_callback=self._document_partial_signal.emit,
+                    interface_language=self.lang,
                 )
                 self._document_done_signal.emit(translated, results)
             except Exception as exc:
@@ -9373,6 +9436,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         except Exception as exc:
             QMessageBox.warning(self, doc_text(self.lang, "error"), str(exc))
             return
+        self._invalidate_document_load()
         self.current_document = None
         self.session_payload = payload
         self.translated_text = payload.get("translated_text", "")
@@ -9551,7 +9615,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
             if button is not None:
                 canceling = self._translation_cancel_event is not None and self._translation_cancel_event.is_set()
                 button.setEnabled((not canceling if attribute == 'translate_file_button' else False)
-                                  if self.translation_running else ready)
+                                  if self.translation_running else ready and not self._document_loading)
         self._update_document_swap_button()
 
     def _on_document_provider_changed(self):
@@ -9576,10 +9640,13 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         source = self.source_combo.currentData()
         target = self.target_combo.currentData()
         button.setEnabled(
-            bool(source and target and (str(target), str(source)) in self._document_translation_pairs())
+            bool(not self.translation_running and not self._document_loading
+                 and source and target and (str(target), str(source)) in self._document_translation_pairs())
         )
 
     def _swap_document_languages(self):
+        if self.translation_running or self._document_loading:
+            return
         source = self.source_combo.currentData()
         target = self.target_combo.currentData()
         if not source or not target:
@@ -9651,6 +9718,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         value = str(text or "")
         if not value.strip() or self.translation_running:
             return
+        self._invalidate_document_load()
         self.current_document = None
         self.session_payload = None
         self.translated_text = ""
@@ -9666,6 +9734,8 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self._set_status(doc_text(self.lang, "loaded"))
 
     def _set_busy(self, busy, loading=False):
+        loading = bool(loading or self._document_loading)
+        busy = bool(busy or loading)
         self.progress_bar.setVisible(busy)
         has_translation = bool(str(self.translated_text or "").strip())
         self.attach_button.setEnabled(not busy)

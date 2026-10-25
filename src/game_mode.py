@@ -46,6 +46,7 @@ GAME_TEXT = {
         "scanning": "Reading the selected area…",
         "translating": "Translating…",
         "paused": "Paused while the target app is inactive",
+        "paused_manual": "Paused manually",
         "no_text": "No readable text yet",
         "pause": "Pause",
         "resume": "Resume",
@@ -70,6 +71,7 @@ GAME_TEXT = {
         "scanning": "Читаю выбранную область…",
         "translating": "Перевожу…",
         "paused": "Пауза: целевое окно неактивно",
+        "paused_manual": "Пауза включена вручную",
         "no_text": "Читаемого текста пока нет",
         "pause": "Пауза",
         "resume": "Продолжить",
@@ -94,6 +96,7 @@ GAME_TEXT = {
         "scanning": "Leyendo el área seleccionada…",
         "translating": "Traduciendo…",
         "paused": "En pausa mientras la aplicación vinculada está inactiva",
+        "paused_manual": "Pausado manualmente",
         "no_text": "Aún no hay texto legible",
         "pause": "Pausa",
         "resume": "Continuar",
@@ -118,6 +121,7 @@ GAME_TEXT = {
         "scanning": "Ausgewählter Bereich wird gelesen…",
         "translating": "Übersetze…",
         "paused": "Pausiert, solange die Ziel-App inaktiv ist",
+        "paused_manual": "Manuell pausiert",
         "no_text": "Noch kein lesbarer Text",
         "pause": "Pause",
         "resume": "Fortsetzen",
@@ -142,6 +146,7 @@ GAME_TEXT = {
         "scanning": "Lecture de la zone sélectionnée…",
         "translating": "Traduction…",
         "paused": "En pause tant que l’application liée est inactive",
+        "paused_manual": "Mis en pause manuellement",
         "no_text": "Aucun texte lisible pour l’instant",
         "pause": "Pause",
         "resume": "Reprendre",
@@ -166,6 +171,7 @@ GAME_TEXT = {
         "scanning": "正在读取所选区域…",
         "translating": "正在翻译…",
         "paused": "绑定应用未激活，已暂停",
+        "paused_manual": "已手动暂停",
         "no_text": "暂未发现可读文字",
         "pause": "暂停",
         "resume": "继续",
@@ -190,6 +196,7 @@ GAME_TEXT = {
      'scanning': 'Lendo a área selecionada…',
      'translating': 'Traduzindo…',
      'paused': 'Pausado enquanto o aplicativo de destino está inativo',
+     'paused_manual': 'Pausado manualmente',
      'no_text': 'Ainda não há texto legível',
      'pause': 'Pausa',
      'resume': 'Continuar',
@@ -213,6 +220,7 @@ GAME_TEXT = {
      'scanning': "Lettura dell'area selezionata…",
      'translating': 'Traduzione…',
      'paused': "In pausa mentre l'app di destinazione è inattiva",
+     'paused_manual': 'In pausa manualmente',
      'no_text': 'Nessun testo ancora leggibile',
      'pause': 'Pausa',
      'resume': 'Riprendi',
@@ -237,6 +245,7 @@ GAME_TEXT = {
      'scanning': 'جارٍ قراءة المنطقة المحددة…',
      'translating': 'جارٍ الترجمة…',
      'paused': 'متوقفة مؤقتًا لأن التطبيق المستهدف غير نشط',
+     'paused_manual': 'متوقفة مؤقتًا يدويًا',
      'no_text': 'لم يظهر نص مقروء بعد',
      'pause': 'إيقاف مؤقت',
      'resume': 'استئناف',
@@ -260,6 +269,7 @@ GAME_TEXT = {
      'scanning': 'Seçili alan okunuyor…',
      'translating': 'Çevriliyor…',
      'paused': 'Hedef uygulama etkin olmadığı için duraklatıldı',
+     'paused_manual': 'Elle duraklatıldı',
      'no_text': 'Henüz okunabilir metin yok',
      'pause': 'Duraklat',
      'resume': 'Sürdür',
@@ -283,6 +293,7 @@ GAME_TEXT = {
      'scanning': 'चुना क्षेत्र पढ़ा जा रहा है…',
      'translating': 'अनुवाद हो रहा है…',
      'paused': 'लक्ष्य ऐप निष्क्रिय होने से रुका है',
+     'paused_manual': 'मैन्युअल रूप से रोका गया',
      'no_text': 'अभी पढ़ने योग्य टेक्स्ट नहीं है',
      'pause': 'विराम दें',
      'resume': 'जारी रखें',
@@ -306,6 +317,7 @@ GAME_TEXT = {
      'scanning': 'Membaca area pilihan…',
      'translating': 'Menerjemahkan…',
      'paused': 'Dijeda saat aplikasi tujuan tidak aktif',
+     'paused_manual': 'Dijeda secara manual',
      'no_text': 'Belum ada teks terbaca',
      'pause': 'Jeda',
      'resume': 'Lanjutkan',
@@ -1199,7 +1211,7 @@ class GameTranslationOverlay(QtWidgets.QWidget):
                 'Region state; window=%s, state=%s', self.target_window, key)
             self._diagnostic_status = key
         startup_visible = (not self._has_shown_translation
-                           and key not in {'paused', 'capture_error', 'ocr_error', 'translation_error'})
+                           and key not in {'paused', 'paused_manual', 'capture_error', 'ocr_error', 'translation_error'})
         if startup_visible != self._startup_frame_visible:
             self._startup_frame_visible = startup_visible
             self.update()
@@ -1562,7 +1574,7 @@ class GameTranslationOverlay(QtWidgets.QWidget):
             game_text(self.language, "resume" if self.paused else "pause")
         )
         self.pause_button.setAccessibleName(self.pause_button.toolTip())
-        self._set_status("paused" if self.paused else "waiting", active=not self.paused)
+        self._set_status("paused_manual" if self.paused else "waiting", active=not self.paused)
 
     def _reselect(self):
         target = self.target_window
@@ -1932,7 +1944,7 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
     def _set_status(self, key, error=False):
         if hasattr(self, 'controls'):
             self.controls.label.setToolTip(game_text(self.language, key))
-        if key == 'paused':
+        if key in {'paused', 'paused_manual'}:
             self._status = ''
             self._status_is_error = False
             self.update()
@@ -2261,6 +2273,8 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
         self._pending_lines = None
         if self._translation_cancel is not None:
             self._translation_cancel.set()
+        if self.paused:
+            self._set_status('paused_manual')
         self.update()
         if not self.paused:
             self._scan_once()
