@@ -916,10 +916,10 @@ class LanguagePackageDialogTest(unittest.TestCase):
     def test_all_manager_buttons_are_connected_and_safe_to_click(self):
         expected_action_counts = {
             "windows_table": 3,
-            "tesseract_table": 3 if platform_support.IS_WINDOWS else 2,
-            "easyocr_table": 3 if platform_support.IS_WINDOWS else 2,
+            "tesseract_table": 3 if __import__("component_runtime").managed_install_supported() else 2,
+            "easyocr_table": 3 if __import__("component_runtime").managed_install_supported() else 2,
             "rapidocr_table": 1,
-            "argos_table": 3 if platform_support.IS_WINDOWS else 2,
+            "argos_table": 3 if __import__("component_runtime").managed_install_supported() else 2,
         }
         for name, expected_count in expected_action_counts.items():
             table = getattr(self.dialog, name, None)

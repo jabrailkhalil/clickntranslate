@@ -46,10 +46,17 @@ def run(prepared,catalog_path,output):
     module,name=validators[engine];validate=getattr(module,name)
     kwargs={'tesseract':{'languages':['eng','rus','ara']},'easyocr':{'groups':bundle['languages']},
             'argos':{'pairs':[('en','ru'),('ru','en'),('en','ar'),('ar','en')]}}.get(engine,{})
-    started=time.perf_counter();first=install(**kwargs)
+    captured=[]
+    def record_validation(folder,receipt,*args):
+        result=validate(folder,receipt,*args);captured.append(result);return result
+    setattr(module,name,record_validation)
+    started=time.perf_counter()
+    try:first=install(**kwargs)
+    finally:setattr(module,name,validate)
     print('Installed and natively validated '+engine,flush=True)
     selected=first['receipt']['languages'];after=len(downloads)
-    native_validation=validate(first['folder'],first['receipt'])
+    assert captured, 'Installation did not execute native validation'
+    native_validation=captured[-1]
     newer=dict(bundle,id=bundle['id']+'-lifecycle-r2',revision=2);catalog['bundles'].append(newer)
     updated=install();assert updated['receipt']['languages']==selected and len(downloads)==after
     store.rollback(bundle['component'],validate,catalog)

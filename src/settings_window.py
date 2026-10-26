@@ -15014,8 +15014,6 @@ finally {
         msg.addButton(engine_text(lang, "cancel"), QMessageBox.NoRole)
         msg.exec_()
         if msg.clickedButton() == yes_btn:
-            if platform_support.IS_MAC:
-                self.save_ocr_engine("Tesseract")
             self.start_tesseract_install()
             return
 
@@ -15051,8 +15049,6 @@ finally {
         msg.addButton(engine_text(lang, "cancel"), QMessageBox.NoRole)
         msg.exec_()
         if msg.clickedButton() == yes_btn:
-            if platform_support.IS_MAC:
-                self.save_ocr_engine(EASYOCR_ENGINE_DISPLAY)
             self.start_easyocr_install()
             return
 
@@ -15076,8 +15072,6 @@ finally {
         msg.addButton(engine_text(lang, "cancel"), QMessageBox.NoRole)
         msg.exec_()
         if msg.clickedButton() == yes_btn:
-            if platform_support.IS_MAC:
-                self.save_ocr_engine(RAPIDOCR_ENGINE_DISPLAY)
             self.start_rapidocr_install()
             return
 
@@ -15301,6 +15295,8 @@ finally {
         ):
             return
         lang = self.parent.current_interface_language
+        config = getattr(self.parent,'config',{}) or {}
+        self.previous_ocr_engine = config.get('ocr_engine') or getattr(self,'previous_ocr_engine',None) or platform_support.default_ocr_engine()
         self._tesseract_install_in_progress = True
         self._tesseract_install_phase = "starting"
         self._tesseract_cancel_requested.clear()
@@ -15480,6 +15476,10 @@ finally {
             prev_engine = self.previous_ocr_engine or platform_support.default_ocr_engine()
             self._set_ocr_combo_silently(prev_engine)
             self.save_ocr_engine(prev_engine)
+        if platform_support.IS_MAC and getattr(self,'_component_tesseract_select_on_success',True):
+            restore = getattr(self,'_set_ocr_combo_silently',None)
+            if callable(restore):
+                restore(getattr(self,'previous_ocr_engine',None) or (getattr(self.parent,'config',{}) or {}).get('ocr_engine') or platform_support.default_ocr_engine())
         lang = self.parent.current_interface_language
         QMessageBox.warning(
             self,
@@ -15771,6 +15771,8 @@ finally {
         ):
             return
         lang = self.parent.current_interface_language
+        config = getattr(self.parent,'config',{}) or {}
+        self.previous_ocr_engine = config.get('ocr_engine') or getattr(self,'previous_ocr_engine',None) or platform_support.default_ocr_engine()
         self._rapidocr_install_in_progress = True
         self._rapidocr_install_phase = "starting"
         self._rapidocr_cancel_requested.clear()
@@ -16029,6 +16031,10 @@ finally {
             prev_engine = self.previous_ocr_engine or platform_support.default_ocr_engine()
             self._set_ocr_combo_silently(prev_engine)
             self.save_ocr_engine(prev_engine)
+        if platform_support.IS_MAC and getattr(self,'_component_rapidocr_select_on_success',True):
+            restore = getattr(self,'_set_ocr_combo_silently',None)
+            if callable(restore):
+                restore(getattr(self,'previous_ocr_engine',None) or (getattr(self.parent,'config',{}) or {}).get('ocr_engine') or platform_support.default_ocr_engine())
         lang = self.parent.current_interface_language
         QMessageBox.warning(
             self,
@@ -16075,6 +16081,8 @@ finally {
         ):
             return
         lang = self.parent.current_interface_language
+        config = getattr(self.parent,'config',{}) or {}
+        self.previous_ocr_engine = config.get('ocr_engine') or getattr(self,'previous_ocr_engine',None) or platform_support.default_ocr_engine()
         self._easyocr_install_in_progress = True
         self._easyocr_install_phase = "starting"
         self._easyocr_cancel_requested.clear()
@@ -16346,6 +16354,10 @@ finally {
             prev_engine = self.previous_ocr_engine or platform_support.default_ocr_engine()
             self._set_ocr_combo_silently(prev_engine)
             self.save_ocr_engine(prev_engine)
+        if platform_support.IS_MAC and getattr(self,'_component_easyocr_select_on_success',True):
+            restore = getattr(self,'_set_ocr_combo_silently',None)
+            if callable(restore):
+                restore(getattr(self,'previous_ocr_engine',None) or (getattr(self.parent,'config',{}) or {}).get('ocr_engine') or platform_support.default_ocr_engine())
         lang = self.parent.current_interface_language
         QMessageBox.warning(
             self,
@@ -16378,6 +16390,7 @@ finally {
         ):
             return
         lang = self.parent.current_interface_language
+        self.previous_translator_engine = (getattr(self.parent,'config',{}) or {}).get('translator_engine') or getattr(self,'previous_translator_engine',None) or 'google'
         self._hymt_install_in_progress = True
         self._hymt_install_phase = "starting"
         self._hymt_cancel_requested.clear()
