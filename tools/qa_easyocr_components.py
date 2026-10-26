@@ -65,9 +65,11 @@ def run(catalog_path, runtime, models, output):
     for code, text, name in samples:
         image = Image.new('RGB',(900,150),'white')
         draw = ImageDraw.Draw(image)
-        choices=('Nirmala.ttc','Nirmala.ttf','Latha.ttf') if code=='ta' else (name,)
-        path=next((fonts/name for name in choices if (fonts/name).is_file()),None)
-        if path is None:raise RuntimeError('Missing QA font for '+code+': '+', '.join(choices))
+        choices=[PROJECT/'src/icons/fonts/LiberationSans-Regular.ttf'] if code in ('en','ru') else [
+            models/'qa-fonts'/('NotoSansArabic.ttf' if code=='ar' else 'NotoSansTamil.ttf')]
+        choices += [fonts/name for name in (('Nirmala.ttc','Nirmala.ttf','Latha.ttf') if code=='ta' else (name,))]
+        path=next((path for path in choices if path.is_file()),None)
+        if path is None:raise RuntimeError('Missing QA font for '+code)
         font = ImageFont.truetype(str(path),52)
         rendered=text
         options={}
