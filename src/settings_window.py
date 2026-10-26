@@ -6630,6 +6630,8 @@ class OcrLanguageManagerDialog(QDialog):
             [
                 (language_manager_text(self.lang, "install_selected"), self._install_selected_argos, "primary"),
                 (language_manager_text(self.lang, "remove_highlighted"), self._remove_selected_argos, "danger"),
+                *([(component_update_label(self.lang, 'Argos'), self._update_argos_engine, 'secondary')]
+                  if platform_support.IS_WINDOWS else []),
             ],
             header_labels=[
                 "",
@@ -6639,6 +6641,10 @@ class OcrLanguageManagerDialog(QDialog):
             ],
             search_placeholder=language_manager_text(self.lang, "search"),
         )
+        from component_texts import update_hint
+        for button in self.argos_table._package_action_buttons:
+            if button.text() == component_update_label(self.lang, 'Argos'):
+                button.setToolTip(update_hint(self.lang, 'Argos'))
 
     def _engine_remove_button_style(self):
         return button_qss(self._is_dark_theme(), "danger",
@@ -7535,7 +7541,9 @@ class OcrLanguageManagerDialog(QDialog):
             import translater
             packages = translater.argos_package_catalog(refresh=refresh)
         except Exception as exc:
-            error = str(exc)
+            from component_catalog import ComponentError
+            from component_texts import error_text
+            error = error_text(self.lang, exc) if isinstance(exc, ComponentError) else str(exc)
             if refresh:
                 try:
                     packages = translater.argos_package_catalog(refresh=False)
@@ -8403,6 +8411,7 @@ class OcrLanguageManagerDialog(QDialog):
 
     def _change_managed_tesseract_languages(self, codes, remove=False):
         from component_runtime import install_tesseract
+        from component_download import ComponentDownloader
         from component_catalog import ComponentError
         from component_texts import error_text
         tess_codes = [tesseract_language_code(code) for code in codes]
@@ -8414,8 +8423,8 @@ class OcrLanguageManagerDialog(QDialog):
 
         try:
             install_tesseract(
-                lambda url, destination: self.owner._download_file(url, destination,
-                    timeout=180, cancel_callback=lambda: self._cancel_requested.is_set()),
+                ComponentDownloader(check_cancel, lambda url, done, total: self._emit_language_progress(
+                    language_manager_text(self.lang, 'tess_down'), int(90 * done / total), True)),
                 languages=() if remove else tess_codes,
                 remove_languages=tess_codes if remove else (), legacy_data_dirs=data_dirs,
                 check_cancel=check_cancel,
@@ -9453,7 +9462,14 @@ try {{
                 pairs.append((source_code, target_code))
         return pairs
 
-    def _install_argos_worker(self, codes):
+    def _update_argos_engine(self):
+        self._run_language_task('Argos', [], self._update_argos_runtime_worker,
+                                success_message=engine_text(self.lang, 'done'))
+
+    def _update_argos_runtime_worker(self, _codes):
+        self._install_argos_worker([], runtime_update=True)
+
+    def _install_argos_worker(self, codes, runtime_update=False):
         try:
             import translater
 
@@ -9465,17 +9481,19 @@ try {{
             def progress_callback(message, downloaded_bytes, total_bytes):
                 total_bytes = int(total_bytes or 0)
                 downloaded_bytes = int(downloaded_bytes or 0)
+                label = 'Argos' + (f' {message}' if message and message != 'Argos' else '')
                 if total_bytes > 0:
                     percent = int(downloaded_bytes * 100 / max(total_bytes, 1))
                     self._emit_language_progress(
-                        f"Argos {message}: {downloaded_bytes // (1024 * 1024)} / {max(1, total_bytes // (1024 * 1024))} MB",
+                        f"{label}: {downloaded_bytes // (1024 * 1024)} / {max(1, total_bytes // (1024 * 1024))} MB",
                         percent,
                         True,
                     )
                 else:
-                    self._emit_language_progress(f"Argos {message}", 0, False)
+                    self._emit_language_progress(label, 0, False)
 
-            translater.install_argos_packages(
+            installer = translater._change_managed_argos if runtime_update else translater.install_argos_packages
+            installer(
                 pairs,
                 status_callback=status_callback,
                 progress_callback=progress_callback,
@@ -9489,7 +9507,9 @@ try {{
             if self._cancel_requested.is_set():
                 self._finish_language_task("Argos", canceled=True)
             else:
-                self._finish_language_task("Argos", str(exc))
+                from component_catalog import ComponentError
+                from component_texts import error_text
+                self._finish_language_task('Argos', error_text(self.lang, exc) if isinstance(exc, ComponentError) else str(exc))
 
     def _remove_argos_worker(self, codes):
         try:
@@ -9500,7 +9520,9 @@ try {{
             )
             self._finish_language_task("Argos")
         except Exception as exc:
-            self._finish_language_task("Argos", str(exc))
+            from component_catalog import ComponentError
+            from component_texts import error_text
+            self._finish_language_task('Argos', error_text(self.lang, exc) if isinstance(exc, ComponentError) else str(exc))
 
 
 class SettingsWindow(QWidget):
@@ -15272,14 +15294,16 @@ finally {
         try:
             lang = getattr(getattr(self, "parent", None), "current_interface_language", "en")
             from component_runtime import install_tesseract
+            from component_download import ComponentDownloader
             from component_catalog import ComponentError
             from component_texts import error_text
             import ocr
             previous = self._find_available_tesseract_exe()
             try:
                 runtime = install_tesseract(
-                    lambda url, destination: self._download_file(url, destination, timeout=180,
-                        cancel_callback=lambda: self._tesseract_cancel_requested.is_set()),
+                    ComponentDownloader(self._check_tesseract_cancel_requested,
+                        lambda url, done, total: self._emit_tesseract_progress(
+                            engine_text(lang, 'downloading_engine', engine='Tesseract'), int(90 * done / total))),
                     legacy_data_dirs=ocr._tesseract_data_directories(previous) if previous else (),
                     check_cancel=self._check_tesseract_cancel_requested,
                     progress=lambda index, total: self._emit_tesseract_progress(
@@ -15701,12 +15725,14 @@ finally {
             lang = getattr(getattr(self, "parent", None), "current_interface_language", "en")
             if platform_support.IS_WINDOWS:
                 from component_runtime import install_rapidocr
+                from component_download import ComponentDownloader
                 from component_catalog import ComponentError
                 from component_texts import error_text
                 try:
                     install_rapidocr(
-                        lambda url, destination: self._download_file(url, destination,
-                            cancel_callback=lambda: self._rapidocr_cancel_requested.is_set()),
+                        ComponentDownloader(self._check_rapidocr_cancel_requested,
+                            lambda url, done, total: self._emit_rapidocr_progress(
+                                engine_text(lang, 'downloading_engine', engine='RapidOCR'), int(90 * done / total))),
                         check_cancel=self._check_rapidocr_cancel_requested,
                         progress=lambda index, total: self._emit_rapidocr_progress(
                             engine_text(lang, 'preparing', engine='RapidOCR'), int(90 * index / total)))

@@ -107,6 +107,15 @@ def test_removed_languages_do_not_reappear_from_legacy_environment_or_defaults(t
     assert ocr._tesseract_reported_languages(empty['command'][0]) == set()
 
 
+def test_language_removal_works_without_network_or_catalog(tmp_path, monkeypatch, native_catalog):
+    root, _, _, install = installer(tmp_path, monkeypatch, native_catalog)
+    install()
+    def unavailable(*_):
+        pytest.fail('Pure language removal must work offline')
+    result = runtime.install_tesseract(unavailable, root=root, remove_languages=['rus'], catalog_loader=unavailable)
+    assert result['receipt']['languages'] == ['eng']
+
+
 def test_copied_windows_install_is_not_used_on_another_platform(tmp_path, monkeypatch, native_catalog):
     root, _, _, install = installer(tmp_path, monkeypatch, native_catalog)
     install()

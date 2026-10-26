@@ -5,7 +5,7 @@ Application releases and their `/releases/latest` feed are unchanged.
 
 ## Current rollout
 
-The first published managed profile is Windows x64 CPython 3.12 + RapidOCR 3.10.0 with explicit PP-OCRv5 models. It is **preview**: the source application and standalone runtime are tested, but a frozen application with the new client has not been built. The stable channel deliberately has no approved profile yet. Windows Tesseract 5.5.3 is integrated with the store and tested as a **local candidate**, not a public catalog approval. macOS/Linux retain their existing installation paths until their managed profiles pass native validation. EasyOCR, Argos and Hy-MT have not been migrated to the new store. Android needs its own installer and executable-code policy.
+The first published managed profile is Windows x64 CPython 3.12 + RapidOCR 3.10.0 with explicit PP-OCRv5 models. It is **preview**: the source application and standalone runtime are tested, but a frozen application with the new client has not been built. The stable channel deliberately has no approved profile yet. Windows Tesseract 5.5.3 and Argos 1.11.0 are integrated with the store and tested as **local candidates**, not public catalog approvals. macOS/Linux retain their existing installation paths until their managed profiles pass native validation. EasyOCR and Hy-MT have not been migrated to the new store. Android needs its own installer and executable-code policy.
 
 Select preview only for local QA with `CLICKNTRANSLATE_COMPONENT_CHANNEL=preview`. Isolate QA files with `CLICKNTRANSLATE_COMPONENTS_DIR`; this is separate from the user's normal engine directory. No unsigned catalog fallback or on-the-fly dependency resolution is permitted in the managed Windows RapidOCR flow.
 
@@ -27,9 +27,20 @@ Select preview only for local QA with `CLICKNTRANSLATE_COMPONENT_CHANNEL=preview
 - `component_runtime.py` starts the selected interpreter/adapter in an isolated process. OCR never needs to import ONNX/OpenCV in Qt.
 - An update stages a complete new generation and performs real inference before committing its active pointer. One previous generation is retained.
 - Unchanged artifacts are checked and reused. A worker holds a generation lease so removal/cleanup cannot delete its runtime. Pending cleanup completes when that worker releases its lease.
+- Large artifacts resume with HTTP Range/If-Range, bounded retries, cancellation and approved size limits. A server ignoring Range restarts the file. Malformed ranges restart instead of appending inconsistent bytes. A full SHA-256 check is required before extraction or activation.
+- Removing selected languages/directions is an offline transaction reconstructed only from the current authenticated receipt and verified object cache. It cannot add files or change the engine version. Cached catalog rows are for presentation; installation still authenticates a fresh catalog.
 - Rollback requires an approved, non-revoked previous bundle in a trusted catalog; rollback never resets TUF trust state.
 - Corrupted/expired/unreachable update data cannot replace a working generation. Already installed offline OCR does not require a network refresh.
 - Files and receipts are flushed before activation. Recovery removes uncommitted candidates. Filesystem/hardware durability still depends on the operating system; absolute power-loss guarantees cannot be inferred from process-crash tests.
+
+## Argos and native-runtime candidates
+
+- The initial Argos candidate has four pinned original model archives: EN→RU, RU→EN, EN→AR and AR→EN. RU↔AR uses the installed English pivot. The candidate does not claim support for the entire upstream index; legacy installations remain unchanged until an explicit managed update.
+- The SDK and CTranslate2 run in a private Python process, never in Qt. The existing dependency-free sentence splitter avoids installing Torch/Stanza/SpaCy. The worker forces local CPU inference and immutable package directories, regardless of inherited Argos cloud-provider settings.
+- Adding a direction, updating the runtime and rolling back preserve the selected set. Every selected model performs real inference before activation. Cancellation kills and waits for the validator before removing its staging directory. Translation holds a generation lease, including while streaming chunks.
+- `tools/prepare_msvc.py` extracts pinned CAB data from the official Microsoft redistributable without executing EXE/MSI installers or installing anything system-wide. Source/archive/individual DLL hashes are recorded. `tools/runtime_dlls.py` rejects missing private imports and incompatible bundled exports; `runtime_bootstrap.py` verifies the private MSVC DLL paths before importing native SDKs.
+- Current prepared RapidOCR/Argos candidates fix reliance on the developer machine's global MSVC installation. The previously published RapidOCR preview is not silently overwritten. New artifact publication remains separate from preparation and requires redistribution review plus final-byte native validation. Source tests do not prove operation on a clean or frozen Windows application.
+- Recipes preserve original licenses/notices. The Microsoft runtime description records `redistribution_review: false` until checked for publication. The Tesseract third-party DLL inventory is a separate gate.
 
 ## Publication
 

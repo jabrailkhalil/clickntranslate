@@ -132,8 +132,9 @@ def materialize_bundle(bundle, languages):
         return dict(bundle)
     files = [*bundle['files']]
     for code in selected:
-        files.extend(bundle['language_files'][code])
-    return {key: value for key, value in dict(bundle, files=files, languages=selected).items()
+        files.extend(dict(item, language=code) for item in bundle['language_files'][code])
+    return {key: value for key, value in dict(bundle, files=files, languages=selected,
+                                             available_languages=list(bundle['languages'])).items()
             if key != 'language_files'}
 
 

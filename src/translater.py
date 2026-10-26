@@ -11,6 +11,7 @@ import types
 import zipfile
 import zlib
 import hashlib
+from contextlib import nullcontext
 from copy import deepcopy
 from languages import language_english_name, translator_api_code
 from translation_chunks import PROVIDER_BYTE_LIMITS, split_text, restore_boundary_whitespace
@@ -191,9 +192,9 @@ def preload_argos_runtime():
 
 def argos_unavailable_reason():
     """Returns why the offline Argos runtime cannot be used, or '' when it can."""
+    if _argos_worker_path():
+        return ''
     if getattr(sys, "frozen", False) and not os.environ.get("CLICKNTRANSLATE_ARGOS_WORKER"):
-        if _argos_worker_path():
-            return ""
         return "Argos offline worker is missing from this build."
     if _ensure_argos_available():
         return ""
@@ -210,9 +211,21 @@ def get_portable_dir():
     return portable_paths.portable_base_dir()
 
 
+def _managed_argos_runtime():
+    if os.environ.get('CLICKNTRANSLATE_ARGOS_WORKER'):
+        return None
+    from component_runtime import managed_runtime
+    return managed_runtime('argos')
+
+
 def _argos_worker_path():
     """Returns the packaged non-Qt Argos worker, or an empty string."""
-    if not getattr(sys, "frozen", False) or os.environ.get("CLICKNTRANSLATE_ARGOS_WORKER"):
+    if os.environ.get('CLICKNTRANSLATE_ARGOS_WORKER'):
+        return ''
+    runtime = _managed_argos_runtime()
+    if runtime:
+        return runtime['command'][0]
+    if not getattr(sys, "frozen", False):
         return ""
     executable_dir = os.path.dirname(sys.executable)
     worker_name = platform_support.executable_name("ArgosWorker")
@@ -675,6 +688,8 @@ def _download_argos_package(
 
 def models_installed_ru_en():
     """Return True if both RU and EN language models are installed in Argos."""
+    if _managed_argos_runtime():
+        return {('ru','en'), ('en','ru')}.issubset(argos_installed_direct_pairs_fast())
     if not _ensure_argos_available():
         return False
     try:
@@ -692,6 +707,9 @@ def _installed_pairs():
 
 def _argos_package_data_dirs():
     """Return plausible Argos package roots without importing its native runtime."""
+    runtime = _managed_argos_runtime()
+    if runtime:
+        return [str(path) for path in (runtime['folder'] / 'models').glob('*') if path.is_dir()]
     _prepare_argos_environment()
     candidates = []
     if arg_pkg is not None:
@@ -921,6 +939,15 @@ def ensure_language_pair(
 
     Returns True when something was installed.
     """
+    if _managed_argos_runtime():
+        direct = argos_installed_direct_pairs_fast()
+        available = {(row['source_code'], row['target_code']) for row in argos_package_catalog()
+                     if row['available']}
+        plan = _plan_language_pair(source_code, target_code, available, direct)
+        if not plan:
+            return False
+        install_argos_packages(plan, status_callback, progress_callback, cancel_callback)
+        return True
     if not _ensure_argos_available():
         return False
     if _get_translation_object(source_code, target_code) is not None:
@@ -1026,7 +1053,18 @@ def _run_argos_worker_request(
     timeout=1800,
     partial_callback=None,
 ):
-    worker_path = _argos_worker_path()
+    runtime = _managed_argos_runtime()
+    from component_catalog import component_store_path
+    from component_store import ComponentStore
+    with (ComponentStore(component_store_path()).lease(runtime['receipt']['generation'])
+          if runtime else nullcontext()):
+        return _run_argos_worker_request_inner(request, status_callback, progress_callback,
+            cancel_callback, timeout, partial_callback, runtime)
+
+
+def _run_argos_worker_request_inner(request, status_callback=None, progress_callback=None,
+                                    cancel_callback=None, timeout=1800, partial_callback=None, runtime=None):
+    worker_path = runtime['command'][0] if runtime else _argos_worker_path()
     if not worker_path:
         raise RuntimeError("Argos offline worker is missing from this build.")
 
@@ -1079,6 +1117,9 @@ def _run_argos_worker_request(
 
     try:
         request = dict(request or {})
+        if runtime:
+            request['root_dir'] = str(runtime['folder'])
+            request['work_dir'] = request_dir
         request["event_path"] = event_path
         request["cancel_path"] = cancel_path
         with open(request_path, "w", encoding="utf-8") as request_file:
@@ -1093,8 +1134,13 @@ def _run_argos_worker_request(
         with open(stdout_path, "w", encoding="utf-8") as stdout_file, open(
             stderr_path, "w", encoding="utf-8", errors="replace"
         ) as stderr_file:
+            command = [*runtime['command'], request_path] if runtime else [worker_path, request_path]
+            options = {}
+            if runtime:
+                from component_runtime import worker_environment
+                options['env'] = worker_environment()
             process = subprocess.Popen(
-                [worker_path, request_path],
+                command,
                 stdout=stdout_file,
                 stderr=stderr_file,
                 text=True,
@@ -1102,6 +1148,7 @@ def _run_argos_worker_request(
                 errors="replace",
                 startupinfo=startupinfo,
                 creationflags=creationflags,
+                **options,
             )
             deadline = time.monotonic() + max(1, int(timeout))
             while process.poll() is None:
@@ -1148,6 +1195,7 @@ def _run_argos_worker_request(
         if process is not None and process.poll() is None:
             try:
                 process.kill()
+                process.wait(timeout=10)
             except Exception:
                 pass
         shutil.rmtree(request_dir, ignore_errors=True)
@@ -1155,6 +1203,9 @@ def _run_argos_worker_request(
 
 def argos_package_catalog(refresh=False):
     """Return Argos direct packages without loading its native runtime in Qt."""
+    if _managed_argos_runtime():
+        from component_argos import catalog_rows
+        return catalog_rows(refresh=refresh)
     if _argos_worker_path():
         payload = _run_argos_worker_request(
             {"action": "catalog", "refresh": bool(refresh)},
@@ -1174,6 +1225,11 @@ def install_argos_packages(
 ):
     """Install selected direct Argos packages in-process or via ArgosWorker."""
     pairs = _normalize_argos_pairs(pairs)
+    if not pairs:
+        return []
+    if _managed_argos_runtime():
+        _change_managed_argos(pairs, status_callback, progress_callback, cancel_callback)
+        return pairs
     if _argos_worker_path():
         payload = _run_argos_worker_request(
             {"action": "install_packages", "pairs": pairs},
@@ -1198,6 +1254,11 @@ def install_argos_packages(
 def uninstall_argos_packages(pairs, status_callback=None):
     """Uninstall selected direct Argos packages in-process or via ArgosWorker."""
     pairs = _normalize_argos_pairs(pairs)
+    if not pairs:
+        return []
+    if _managed_argos_runtime():
+        _change_managed_argos(pairs, status_callback, remove=True)
+        return pairs
     if _argos_worker_path():
         payload = _run_argos_worker_request(
             {"action": "uninstall_packages", "pairs": pairs},
@@ -1210,8 +1271,28 @@ def uninstall_argos_packages(pairs, status_callback=None):
     return _uninstall_argos_packages_local(pairs, status_callback=status_callback)
 
 
+def _change_managed_argos(pairs=(), status_callback=None, progress_callback=None,
+                           cancel_callback=None, *, remove=False):
+    from component_argos import install
+    from component_download import ComponentDownloader
+    def check_cancel():
+        _check_argos_install_cancelled(cancel_callback)
+    def progress(url, done, total):
+        match = re.search(r'translate-([a-z]{2,3})_([a-z]{2,3})-', url)
+        label = f'{match[1].upper()}→{match[2].upper()}' if match else 'Argos'
+        _emit_argos_progress(progress_callback, label, done, total)
+    result = install(ComponentDownloader(check_cancel, progress), pairs=() if remove else pairs,
+        remove_pairs=pairs if remove else (), legacy_pairs=argos_installed_direct_pairs_fast(),
+        check_cancel=check_cancel,
+        progress=lambda index, total: _emit_status(status_callback, f'Argos: {index + 1}/{total}'))
+    _invalidate_argos_cache()
+    return result
+
+
 def argos_pair_installed(source_code, target_code):
     """Return whether Argos can translate this pair without a download."""
+    if _managed_argos_runtime():
+        return source_code == target_code or (source_code, target_code) in argos_installed_translation_pairs_fast()
     if _argos_worker_path():
         payload = _run_argos_worker_request(
             {

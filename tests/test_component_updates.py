@@ -218,6 +218,29 @@ def test_cancellation_preserves_active_generation(tmp_path):
     assert store.active('ocr.rapidocr')['receipt']['revision'] == 1
 
 
+def test_cancellation_inside_large_archive_rolls_back_candidate(tmp_path):
+    catalog, archive = fixture_catalog(tmp_path)
+    store = ComponentStore(tmp_path / 'store')
+    with store.lock():
+        first = store.install(catalog, catalog['bundles'][0], lambda _, dest: shutil.copyfile(archive, dest), lambda *_: None)
+        large = tmp_path / 'large.zip'
+        with zipfile.ZipFile(large, 'w') as output:
+            output.writestr('large.bin', b'x' * (3 * 1024 * 1024))
+        digest = hashlib.sha256(large.read_bytes()).hexdigest()
+        catalog['artifacts'][digest] = {'size':large.stat().st_size, 'unpacked_size':4*1024**2,
+                                       'urls':['https://example.org/large.zip']}
+        candidate = dict(catalog['bundles'][0], id='rapidocr-r2', revision=2,
+                         files=[{'sha256':digest, 'kind':'zip', 'destination':'runtime'}])
+        def cancel():
+            if any(path.stat().st_size >= 1024**2 for path in (store.root / 'generations').glob('*/runtime/large.bin')):
+                raise InterruptedError('Canceled during extraction')
+        with pytest.raises(InterruptedError):
+            store.install(catalog, candidate, lambda _, dest: shutil.copyfile(large, dest),
+                          lambda *_: pytest.fail('An incomplete candidate must not be validated'), check_cancel=cancel)
+        assert store.active('ocr.rapidocr')['folder'] == first['folder']
+        assert not list((store.root / 'generations').glob('*/runtime/large.bin'))
+
+
 def test_archive_expansion_and_symlinks_are_rejected(tmp_path):
     archive = tmp_path / 'large.zip'
     with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as output:

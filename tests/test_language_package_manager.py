@@ -919,7 +919,7 @@ class LanguagePackageDialogTest(unittest.TestCase):
             "tesseract_table": 3 if platform_support.IS_WINDOWS else 2,
             "easyocr_table": 2,
             "rapidocr_table": 1,
-            "argos_table": 2,
+            "argos_table": 3 if platform_support.IS_WINDOWS else 2,
         }
         for name, expected_count in expected_action_counts.items():
             table = getattr(self.dialog, name, None)
@@ -933,7 +933,8 @@ class LanguagePackageDialogTest(unittest.TestCase):
         self.dialog._rapidocr_status_cache = (False, "missing")
         self.dialog._populate_easyocr_table(self.dialog.easyocr_table)
         self.dialog._argos_catalog_request_active = True
-        with mock.patch("settings_window.QMessageBox.information"):
+        with mock.patch("settings_window.QMessageBox.information"), \
+                mock.patch.object(self.dialog, '_run_language_task') as queued:
             # os.startfile does not exist off Windows, hence create=True.
             with mock.patch("settings_window.os.startfile", create=True) as startfile:
                 for name in expected_action_counts:
@@ -956,6 +957,9 @@ class LanguagePackageDialogTest(unittest.TestCase):
         self.assertGreaterEqual(self.owner.rapidocr_installs, 1)
         self.assertIs(self.owner.last_progress_owner, self.dialog)
         self.assertEqual(self.dialog.result(), self.dialog.Accepted)
+        if platform_support.IS_WINDOWS:
+            queued.assert_any_call('Argos', [], self.dialog._update_argos_runtime_worker,
+                                  success_message=engine_text(self.dialog.lang, 'done'))
 
 
 class TesseractLanguageDownloadTest(unittest.TestCase):

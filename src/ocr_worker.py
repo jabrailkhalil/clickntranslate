@@ -8,6 +8,10 @@ import sys
 import time
 import traceback
 
+from runtime_bootstrap import activate
+
+_PRIVATE_DLL_RUNTIME = activate()
+
 from PIL import Image, ImageDraw
 from ocr_text_layout import order_ocr_items, ocr_text_from_items
 
@@ -232,7 +236,7 @@ def run_request(request):
             instance = _rapidocr_engine(dict(request, language_code=code))
             instance(probe, use_det=False)
             instance(probe)
-        return {'available': True, 'error': ''}
+        return {'available': True, 'error': '', 'dll_runtime': _PRIVATE_DLL_RUNTIME}
     if engine == "rapidocr":
         return {"results": _recognize_rapidocr(request), "error": ""}
     if engine == "easyocr":

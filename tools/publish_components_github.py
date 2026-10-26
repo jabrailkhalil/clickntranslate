@@ -55,12 +55,14 @@ def setup(client, repo, keys):
     print('Component repository ready; two restricted online role keys configured.')
 
 
-def release(client, repo, archive):
-    tag = 'rapidocr-windows-x64-r1'
+def release(client, repo, archive, tag='rapidocr-windows-x64-r1', name=None):
+    import re
+    if not re.fullmatch(r'[a-z0-9][a-z0-9.-]{0,100}', tag):
+        raise ValueError('Invalid immutable component release tag')
     existing = client.get(f'https://api.github.com/repos/{repo}/releases/tags/{tag}', timeout=30)
     if existing.status_code == 404:
         value = request(client, 'POST', f'repos/{repo}/releases', json={'tag_name': tag,
-            'name': 'RapidOCR Windows x64 — preview 1', 'draft': True, 'prerelease': True,
+            'name': name or tag, 'draft': True, 'prerelease': True,
             'make_latest': 'false', 'body': 'Preview component runtime. Install through ClicknTranslate; this is not an application release.'})
     else:
         existing.raise_for_status()
@@ -93,11 +95,13 @@ if __name__ == '__main__':
     parser.add_argument('--repo', default='jabrailkhalil/clickntranslate-components')
     parser.add_argument('--keys', type=Path)
     parser.add_argument('--archive', type=Path)
+    parser.add_argument('--tag', default='rapidocr-windows-x64-r1')
+    parser.add_argument('--name')
     args = parser.parse_args()
     api = session()
     if args.action == 'setup':
         setup(api, args.repo, args.keys)
     elif args.action == 'release':
-        release(api, args.repo, args.archive)
+        release(api, args.repo, args.archive, args.tag, args.name)
     else:
         pages(api, args.repo)

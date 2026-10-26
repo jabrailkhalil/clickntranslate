@@ -14,10 +14,11 @@ from component_store import ComponentStore
 
 
 def managed_runtime(engine='rapidocr'):
-    if engine not in ('rapidocr', 'tesseract'):
+    components = {'rapidocr':'ocr.rapidocr', 'tesseract':'ocr.tesseract', 'argos':'translation.argos'}
+    if engine not in components:
         return None
     try:
-        runtime = ComponentStore(component_store_path()).active('ocr.' + engine)
+        runtime = ComponentStore(component_store_path()).active(components[engine])
         if runtime:
             from component_catalog import current_platform
             target = current_platform()
@@ -59,6 +60,7 @@ def validate_rapidocr(folder, receipt):
             raise ComponentError('validation_failed', 'invalid worker response') from exc
         if result.returncode or payload.get('error'):
             raise ComponentError('validation_failed', str(payload.get('error') or 'worker exit')[:300])
+        return payload
 
 
 def install_rapidocr(download, *, check_cancel=lambda: None, progress=lambda *_: None,
@@ -112,6 +114,8 @@ def validate_tesseract(folder, receipt, check_cancel=lambda: None):
     folder = Path(folder)
     command = runtime_command(folder, receipt)
     data = folder / 'runtime/tessdata'
+    if {path.stem for path in data.glob('*.traineddata')} != set(receipt['languages']):
+        raise ComponentError('validation_failed', 'Tesseract model set')
     environment = worker_environment()
     environment.pop('TESSDATA_PREFIX', None)
     kwargs = dict(capture_output=True, text=True, encoding='utf-8', errors='replace',
@@ -170,11 +174,14 @@ def install_tesseract(download, *, languages=(), remove_languages=(), legacy_dat
     store = ComponentStore(root or component_store_path())
     with store.lock():
         check_cancel()
-        catalog = catalog_loader(store.root)
         try:
             old = store.active('ocr.tesseract')
         except ComponentError:
             old = None
+        if old and remove_languages and not languages:
+            return store.remove_languages('ocr.tesseract', remove_languages,
+                lambda folder, receipt: validate_tesseract(folder, receipt, check_cancel), check_cancel, progress)
+        catalog = catalog_loader(store.root)
         installed = set(old['receipt']['languages']) if old else set()
         if not old:
             for data_dir in legacy_data_dirs:

@@ -12,6 +12,7 @@ import uuid
 import zipfile
 
 from component_catalog import ComponentError, SAFE_ID, safe_relative, runtime_command
+from component_download import ComponentDownloader
 
 
 @contextmanager
@@ -186,16 +187,30 @@ class ComponentStore:
 
     def obtain(self, digest, artifact, download, check_cancel):
         path = self.object_path(digest)
+        if path.is_symlink():
+            raise ComponentError('invalid_artifact', 'cache link')
         if path.is_file() and path.stat().st_size == artifact['size'] and file_digest(path) == digest:
             return path
         path.parent.mkdir(parents=True, exist_ok=True)
+        partial = self.root / 'downloads' / digest
+        partial.parent.mkdir(parents=True, exist_ok=True)
+        if partial.is_symlink():
+            raise ComponentError('invalid_artifact', 'download link')
+        if partial.is_file() and partial.stat().st_size == artifact['size']:
+            if file_digest(partial) == digest:
+                os.replace(partial, path)
+                ComponentDownloader.complete(partial)
+                return path
+            partial.unlink()
+            ComponentDownloader.complete(partial)
         last_error = None
         for url in artifact['urls']:
             check_cancel()
-            partial = self.root / 'downloads' / digest
-            partial.parent.mkdir(parents=True, exist_ok=True)
             try:
-                download(url, str(partial))
+                if isinstance(download, ComponentDownloader):
+                    download.artifact(url, str(partial), artifact)
+                else:
+                    download(url, str(partial))
                 check_cancel()
                 if partial.stat().st_size != artifact['size'] or file_digest(partial) != digest:
                     partial.unlink(missing_ok=True)
@@ -210,7 +225,7 @@ class ComponentStore:
         raise ComponentError('download_failed', type(last_error).__name__) from last_error
 
     @staticmethod
-    def extract(archive, destination, limit):
+    def extract(archive, destination, limit, check_cancel=lambda: None):
         """Restrict paths, Windows device names, links, collisions and zip bombs."""
         destination.mkdir(parents=True, exist_ok=True)
         with zipfile.ZipFile(archive) as bundle:
@@ -219,6 +234,7 @@ class ComponentStore:
                 raise ComponentError('unsafe_archive', 'expanded size')
             names = set()
             for info in entries:
+                check_cancel()
                 safe_relative(info.orig_filename.rstrip('/'))
                 name = info.filename.rstrip('/')
                 safe_relative(name)
@@ -236,7 +252,12 @@ class ComponentStore:
                 else:
                     target.parent.mkdir(parents=True, exist_ok=True)
                     with bundle.open(info) as source, open(target, 'xb') as output:
-                        shutil.copyfileobj(source, output)
+                        while True:
+                            check_cancel()
+                            block = source.read(1024 * 1024)
+                            if not block:
+                                break
+                            output.write(block)
                         output.flush()
                         os.fsync(output.fileno())
                     if mode & stat.S_IXUSR:
@@ -260,7 +281,8 @@ class ComponentStore:
             raise ComponentError('not_enough_space')
         generation = uuid.uuid4().hex
         folder = self.generation(generation)
-        receipt = {**bundle, 'bundle': bundle['id'], 'generation': generation, 'installed_at': int(time.time())}
+        receipt = {**bundle, 'bundle': bundle['id'], 'generation': generation, 'installed_at': int(time.time()),
+                   'artifacts': {item['sha256']: catalog['artifacts'][item['sha256']] for item in bundle['files']}}
         with self.database() as db:
             db.execute('INSERT INTO operations VALUES (?,?,?,?)', (generation, bundle['component'], generation, 'preparing'))
         committed = False
@@ -273,12 +295,18 @@ class ComponentStore:
                 source = self.obtain(item['sha256'], artifact, download, check_cancel)
                 target = folder / safe_relative(item['destination'])
                 if item['kind'] == 'zip':
-                    self.extract(source, target, artifact['unpacked_size'])
+                    self.extract(source, target, artifact['unpacked_size'], check_cancel)
                 else:
                     target.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copyfile(source, target)
-                    with open(target, 'r+b') as synced:
-                        os.fsync(synced.fileno())
+                    with open(source, 'rb') as original, open(target, 'wb') as output:
+                        while True:
+                            check_cancel()
+                            block = original.read(1024 * 1024)
+                            if not block:
+                                break
+                            output.write(block)
+                        output.flush()
+                        os.fsync(output.fileno())
             check_cancel()
             validate(folder, receipt)
             check_cancel()
@@ -315,6 +343,29 @@ class ComponentStore:
             with self.database() as db:
                 db.execute('DELETE FROM active WHERE component=?', (component,))
             self.collect_unused()
+
+    def remove_languages(self, component, languages, validate, check_cancel=lambda: None, progress=lambda *_: None):
+        """Caller holds the writer lock. Pure deletion needs no metadata/network.
+
+        Only files from the active, previously authenticated plan can be kept;
+        this operation cannot add an artifact or change its runtime version.
+        """
+        active = self.active(component)
+        if not active:
+            raise ComponentError('component_removed')
+        receipt = active['receipt']
+        selected = set(receipt['languages']) - set(languages)
+        files = receipt['files']
+        if selected != set(receipt['languages']) and not any('language' in item for item in files):
+            raise ComponentError('component_repair_required')
+        bundle = dict(receipt, languages=sorted(selected), files=[item for item in files
+                         if 'language' not in item or item['language'] in selected])
+        if 'artifacts' not in receipt:
+            raise ComponentError('component_repair_required')
+        def unavailable(*_):
+            raise ComponentError('component_cache_missing')
+        return self.install({'artifacts':receipt['artifacts']}, bundle, unavailable,
+                            validate, check_cancel, progress)
 
     def rollback(self, component, validate, catalog):
         with self.lock(), self.database() as db:
