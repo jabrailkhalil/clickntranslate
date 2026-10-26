@@ -46,6 +46,19 @@ def test_select_checks_platform_app_channel_and_languages(tmp_path):
         choose_bundle(catalog, 'ocr.rapidocr', '2.0', channel='preview', target=target)
 
 
+def test_future_adapter_contract_does_not_block_compatible_existing_updates(tmp_path):
+    catalog, _ = fixture_catalog(tmp_path)
+    # Its layout is deliberately unknown to this client: it must not attempt to
+    # parse or launch the future adapter as a Python worker.
+    catalog['bundles'].append({'id':'future-rapidocr', 'component':'ocr.rapidocr',
+                              'contract':2, 'revision':100, 'channel':'preview',
+                              'future_runtime':{'opaque':'future schema'}})
+    loaded = parse_catalog(json.dumps(catalog))
+    selected = choose_bundle(loaded, 'ocr.rapidocr', '1.8.2', channel='preview',
+        target={'os':'windows', 'arch':'x86_64', 'os_version':'10'})
+    assert selected['id'] == 'rapidocr-win-r1'
+
+
 def test_failed_install_keeps_previous_and_reuses_bytes(tmp_path):
     catalog, archive = fixture_catalog(tmp_path)
     store = ComponentStore(tmp_path / 'store')

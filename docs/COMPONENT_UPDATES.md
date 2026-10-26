@@ -22,6 +22,7 @@ Select preview only for local QA with `CLICKNTRANSLATE_COMPONENT_CHANNEL=preview
 ## Client
 
 - `component_catalog.py` authenticates metadata using `python-tuf`, then validates and selects compatible descriptions.
+- Entries with a newer adapter contract are ignored by older clients, so adding a future engine adapter does not block updates for their compatible existing engines. A new layout must use a new contract instead of changing an existing contract in place.
 - `component_store.py` keeps verified objects and installed generations, with a SQLite activation journal and interprocess locks.
 - `component_runtime.py` starts the selected interpreter/adapter in an isolated process. OCR never needs to import ONNX/OpenCV in Qt.
 - An update stages a complete new generation and performs real inference before committing its active pointer. One previous generation is retained.

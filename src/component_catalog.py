@@ -79,6 +79,10 @@ def parse_catalog(data):
             raise ComponentError('invalid_catalog', 'contract/channel')
         if not isinstance(bundle.get('revision'), int) or bundle['revision'] < 1:
             raise ComponentError('invalid_catalog', 'bundle revision')
+        if bundle['contract'] > CONTRACT:
+            # A future engine adapter must not prevent older clients updating
+            # the components they still understand. Selection ignores it too.
+            continue
         for key in ('os', 'arch', 'min_os', 'app'):
             if not isinstance(bundle.get(key), str):
                 raise ComponentError('invalid_catalog', key)
