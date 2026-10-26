@@ -65,7 +65,10 @@ def run(catalog_path, runtime, models, output):
     for code, text, name in samples:
         image = Image.new('RGB',(900,150),'white')
         draw = ImageDraw.Draw(image)
-        font = ImageFont.truetype(str(fonts/name),52)
+        choices=('Nirmala.ttc','Nirmala.ttf','Latha.ttf') if code=='ta' else (name,)
+        path=next((fonts/name for name in choices if (fonts/name).is_file()),None)
+        if path is None:raise RuntimeError('Missing QA font for '+code+': '+', '.join(choices))
+        font = ImageFont.truetype(str(path),52)
         rendered=text
         options={}
         if code=='ar':
