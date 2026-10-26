@@ -113,6 +113,9 @@ def native(output,runtime,recipe):
         executable=folder/'bin/llama-cli'
     (runtime/'bin').mkdir(parents=True)
     shutil.copy2(executable,runtime/'bin'/executable.name)
+    if recipe['engine']=='tesseract':
+        for name in ('configs','tessconfigs'):
+            shutil.copytree(sources['tesseract']/'tessdata'/name,runtime/'tessdata'/name)
     for name,source in sources.items():
         for path in source.rglob('*'):
             if path.is_file() and (path.name.upper().startswith(('LICENSE','COPYING','NOTICE','COPYRIGHT'))):

@@ -104,6 +104,9 @@ def run(prepared,catalog_path,output):
         if engine=='tesseract':
             text=runtime.recognize_tesseract(image,active['command'][0],active['folder']/'runtime/tessdata','eng',6)
             assert text.strip();samples.append({'en':text})
+            positioned=runtime.recognize_tesseract(image,active['command'][0],active['folder']/'runtime/tessdata','eng',6,positions=True)
+            assert 'TEST' in ' '.join(positioned['text']),positioned
+            samples.append({'tsv_layout':'passed'})
         else:
             path=output/'probe.png';image.save(path)
             for code in ('en','ru','ar'):
