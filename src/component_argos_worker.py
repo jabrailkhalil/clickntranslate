@@ -30,6 +30,10 @@ def main():
             os.environ[key] = str(Path(temporary) / key.lower())
         os.environ['ARGOS_PACKAGES_DIR'] = str(Path(temporary) / 'empty-packages')
         os.environ.pop('ARGOS_TRANSLATE_PACKAGE_DIR', None)
+        # This child owns temporary state only. Avoid platform user-data helpers
+        # and GUI/macOS modules, even when importing the legacy translation API.
+        import portable_paths
+        portable_paths.portable_base_dir = lambda: temporary
         with contextlib.redirect_stdout(sys.stderr):
             import translater
             if not translater._ensure_argos_available():

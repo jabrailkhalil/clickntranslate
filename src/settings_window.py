@@ -30,6 +30,7 @@ import importlib.util
 from pathlib import Path
 from package_installation import install_directory
 from rapidocr_models import RAPIDOCR_VERSION
+from component_runtime import managed_install_supported
 from component_texts import update_label as component_update_label
 from urllib.parse import urlparse
 try:
@@ -6529,7 +6530,7 @@ class OcrLanguageManagerDialog(QDialog):
                 (language_manager_text(self.lang, "install_selected"), self._install_selected_tesseract, "primary"),
                 (language_manager_text(self.lang, "remove_highlighted"), self._remove_selected_tesseract, "danger"),
                 *(([(component_update_label(self.lang, 'Tesseract'),
-                     self._update_tesseract_engine, 'secondary')]) if platform_support.IS_WINDOWS else []),
+                     self._update_tesseract_engine, 'secondary')]) if managed_install_supported() else []),
             ],
             missing_engine="Tesseract",
             install_engine_callback=self._install_tesseract_engine,
@@ -6544,7 +6545,7 @@ class OcrLanguageManagerDialog(QDialog):
                 (language_manager_text(self.lang, "install_selected"), self._install_selected_easyocr, "primary"),
                 (language_manager_text(self.lang, "remove_highlighted"), self._remove_selected_easyocr, "danger"),
                 *([(component_update_label(self.lang, 'EasyOCR'), self._update_easyocr_engine, 'secondary')]
-                  if platform_support.IS_WINDOWS else []),
+                  if managed_install_supported() else []),
             ],
             missing_engine=EASYOCR_ENGINE_DISPLAY,
             install_engine_callback=self._install_easyocr_engine,
@@ -6586,7 +6587,7 @@ class OcrLanguageManagerDialog(QDialog):
             language_manager_text(self.lang, "hymt_note"),
             self._populate_hymt_table,
             [(component_update_label(self.lang, 'Hy-MT'), self._update_hymt_engine, 'secondary')]
-            if platform_support.IS_WINDOWS else [],
+            if managed_install_supported() else [],
             header_labels=[
                 "",
                 language_manager_text(self.lang, "component"),
@@ -6611,7 +6612,7 @@ class OcrLanguageManagerDialog(QDialog):
                 (language_manager_text(self.lang, "install_selected"), self._install_selected_argos, "primary"),
                 (language_manager_text(self.lang, "remove_highlighted"), self._remove_selected_argos, "danger"),
                 *([(component_update_label(self.lang, 'Argos'), self._update_argos_engine, 'secondary')]
-                  if platform_support.IS_WINDOWS else []),
+                  if managed_install_supported() else []),
             ],
             header_labels=[
                 "",
@@ -8371,7 +8372,7 @@ class OcrLanguageManagerDialog(QDialog):
 
     def _install_tesseract_worker(self, codes):
         try:
-            if platform_support.IS_WINDOWS:
+            if managed_install_supported():
                 self._change_managed_tesseract_languages(codes)
                 self._finish_language_task('Tesseract')
                 return
@@ -9355,7 +9356,7 @@ try {{
     def _remove_tesseract_worker(self, codes):
         try:
             from component_runtime import managed_runtime
-            if platform_support.IS_WINDOWS and managed_runtime('tesseract'):
+            if managed_runtime('tesseract'):
                 self._change_managed_tesseract_languages(codes, remove=True)
                 self._finish_language_task('Tesseract')
                 return
@@ -14883,14 +14884,14 @@ finally {
         from component_easyocr import legacy_disabled
         if managed_runtime('easyocr'):
             return True
-        if platform_support.IS_WINDOWS and legacy_disabled():
+        if managed_install_supported() and legacy_disabled():
             return False
         return self._easyocr_package_present_under(self._local_easyocr_dir())
 
     def _easyocr_runtime_installed(self):
         from component_easyocr import legacy_disabled
         from component_runtime import managed_runtime
-        if platform_support.IS_WINDOWS and not managed_runtime('easyocr') and legacy_disabled():
+        if managed_install_supported() and not managed_runtime('easyocr') and legacy_disabled():
             return False
         if self._local_easyocr_installed():
             return True
@@ -15287,9 +15288,6 @@ finally {
         self.start_tesseract_install()
 
     def start_tesseract_install(self, progress_owner=None, *, select_on_success=True):
-        if platform_support.IS_LINUX:
-            self._show_linux_tesseract_hint(self.parent.current_interface_language)
-            return
         if (
             self._tesseract_install_in_progress
             or self._rapidocr_install_in_progress
@@ -15307,7 +15305,7 @@ finally {
         self.ocr_engine_combo.setEnabled(False)
         self._set_parent_topmost_for_tesseract_install(False)
         self._show_tesseract_progress(engine_text(lang, "preparing", engine="Tesseract"), 0)
-        worker = self._install_macos_tesseract_worker if platform_support.IS_MAC else self._install_tesseract_worker
+        worker = self._install_tesseract_worker
         threading.Thread(target=worker, daemon=True).start()
 
     def _install_macos_tesseract_worker(self):
@@ -15789,7 +15787,7 @@ finally {
         final_dir = self._local_rapidocr_dir()
         try:
             lang = getattr(getattr(self, "parent", None), "current_interface_language", "en")
-            if platform_support.IS_WINDOWS:
+            if managed_install_supported():
                 from component_runtime import install_rapidocr
                 from component_download import ComponentDownloader
                 from component_catalog import ComponentError
@@ -16112,7 +16110,7 @@ finally {
         final_dir = self._local_easyocr_dir()
         try:
             lang = getattr(getattr(self, "parent", None), "current_interface_language", "en")
-            if platform_support.IS_WINDOWS:
+            if managed_install_supported():
                 from component_easyocr import install, COMPONENT
                 from component_download import ComponentDownloader
                 from component_catalog import component_store_path, ComponentError
@@ -16367,9 +16365,6 @@ finally {
         )
 
     def start_hymt_install(self, progress_owner=None, *, select_on_success=True):
-        if platform_support.IS_LINUX:
-            self._show_manual_hymt_hint(self.parent.current_interface_language)
-            return
         if (
             self._hymt_install_in_progress
             or self._tesseract_install_in_progress
@@ -16451,7 +16446,7 @@ finally {
             raise HyMTInstallCancelledError("Hy-MT installation canceled by user.")
 
     def _install_hymt_worker(self):
-        if not platform_support.IS_WINDOWS:
+        if not managed_install_supported():
             return self._install_hymt_legacy_worker()
         try:
             from component_hymt import install

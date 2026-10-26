@@ -1,0 +1,47 @@
+{
+  "schema": 1,
+  "profile": "linux-x64",
+  "os": "linux",
+  "arch": "x86_64",
+  "min_os": "5.15",
+  "engine": "argos",
+  "component": "translation.argos",
+  "app": ">=1.8.2,<2",
+  "contract": 3,
+  "channel": "preview",
+  "revision": 1,
+  "filename": "argos-linux-x64-runtime.zip",
+  "redistribution_review": false,
+  "libc": {
+    "name": "glibc",
+    "min": "2.35"
+  },
+  "python_source": {
+    "filename": "cpython-3.12.10+20250409-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz",
+    "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20250409/cpython-3.12.10%2B20250409-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz",
+    "sha256": "8c59b9ac6bff2dc3934181d7bc82594f9f59a613afed8d72c9e89d7194e790ee",
+    "size": 21261066
+  },
+  "adapter_files": [
+    "component_argos_worker.py",
+    "argos_worker.py",
+    "translater.py",
+    "languages.py",
+    "extended_languages.py",
+    "translation_chunks.py",
+    "translation_availability.py",
+    "platform_support.py",
+    "portable_paths.py",
+    "runtime_bootstrap.py"
+  ],
+  "requirements": [
+    "ctranslate2==4.8.2",
+    "sentencepiece==0.2.1",
+    "sacremoses==0.1.1",
+    "requests>=2.32,<3",
+    "packaging<27"
+  ],
+  "requirements_no_deps": [
+    "argostranslate==1.11.0"
+  ]
+}

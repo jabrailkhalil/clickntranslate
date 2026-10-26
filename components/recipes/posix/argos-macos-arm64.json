@@ -1,0 +1,43 @@
+{
+  "schema": 1,
+  "profile": "macos-arm64",
+  "os": "macos",
+  "arch": "arm64",
+  "min_os": "14",
+  "engine": "argos",
+  "component": "translation.argos",
+  "app": ">=1.8.2,<2",
+  "contract": 3,
+  "channel": "preview",
+  "revision": 1,
+  "filename": "argos-macos-arm64-runtime.zip",
+  "redistribution_review": false,
+  "python_source": {
+    "filename": "cpython-3.12.10+20250409-aarch64-apple-darwin-install_only_stripped.tar.gz",
+    "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20250409/cpython-3.12.10%2B20250409-aarch64-apple-darwin-install_only_stripped.tar.gz",
+    "sha256": "0be1fe0b35a4d3c382141764ef16ed3b8cc2b4620b657f678daa7b7f8df39699",
+    "size": 15598867
+  },
+  "adapter_files": [
+    "component_argos_worker.py",
+    "argos_worker.py",
+    "translater.py",
+    "languages.py",
+    "extended_languages.py",
+    "translation_chunks.py",
+    "translation_availability.py",
+    "platform_support.py",
+    "portable_paths.py",
+    "runtime_bootstrap.py"
+  ],
+  "requirements": [
+    "ctranslate2==4.8.2",
+    "sentencepiece==0.2.1",
+    "sacremoses==0.1.1",
+    "requests>=2.32,<3",
+    "packaging<27"
+  ],
+  "requirements_no_deps": [
+    "argostranslate==1.11.0"
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "schema": 1,
+  "profile": "macos-arm64",
+  "os": "macos",
+  "arch": "arm64",
+  "min_os": "14",
+  "engine": "easyocr",
+  "component": "ocr.easyocr",
+  "app": ">=1.8.2,<2",
+  "contract": 3,
+  "channel": "preview",
+  "revision": 1,
+  "filename": "easyocr-macos-arm64-runtime.zip",
+  "redistribution_review": false,
+  "python_source": {
+    "filename": "cpython-3.12.10+20250409-aarch64-apple-darwin-install_only_stripped.tar.gz",
+    "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20250409/cpython-3.12.10%2B20250409-aarch64-apple-darwin-install_only_stripped.tar.gz",
+    "sha256": "0be1fe0b35a4d3c382141764ef16ed3b8cc2b4620b657f678daa7b7f8df39699",
+    "size": 15598867
+  },
+  "adapter_files": [
+    "ocr_worker.py",
+    "rapidocr_models.py",
+    "easyocr_models.py",
+    "ocr_text_layout.py",
+    "ocr_paragraphs.py",
+    "runtime_bootstrap.py"
+  ],
+  "requirements": [
+    "easyocr==1.7.2",
+    "torch==2.14.1",
+    "torchvision==0.29.1",
+    "opencv-python-headless==4.12.0.88",
+    "Pillow==12.3.0",
+    "numpy<3",
+    "scikit-image<0.27"
+  ]
+}

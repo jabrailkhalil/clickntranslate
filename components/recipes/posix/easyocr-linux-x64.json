@@ -1,0 +1,56 @@
+{
+  "schema": 1,
+  "profile": "linux-x64",
+  "os": "linux",
+  "arch": "x86_64",
+  "min_os": "5.15",
+  "engine": "easyocr",
+  "component": "ocr.easyocr",
+  "app": ">=1.8.2,<2",
+  "contract": 3,
+  "channel": "preview",
+  "revision": 1,
+  "filename": "easyocr-linux-x64-runtime.zip",
+  "redistribution_review": false,
+  "libc": {
+    "name": "glibc",
+    "min": "2.35"
+  },
+  "python_source": {
+    "filename": "cpython-3.12.10+20250409-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz",
+    "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20250409/cpython-3.12.10%2B20250409-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz",
+    "sha256": "8c59b9ac6bff2dc3934181d7bc82594f9f59a613afed8d72c9e89d7194e790ee",
+    "size": 21261066
+  },
+  "adapter_files": [
+    "ocr_worker.py",
+    "rapidocr_models.py",
+    "easyocr_models.py",
+    "ocr_text_layout.py",
+    "ocr_paragraphs.py",
+    "runtime_bootstrap.py"
+  ],
+  "requirements": [
+    "easyocr==1.7.2",
+    "torch==2.14.1+cpu",
+    "torchvision==0.29.1+cpu",
+    "opencv-python-headless==5.0.0.93",
+    "Pillow==12.3.0",
+    "numpy<3",
+    "scikit-image<0.27"
+  ],
+  "source_wheels": [
+    {
+      "filename": "torch-2.14.1+cpu-cp312-cp312-manylinux_2_28_x86_64.whl",
+      "url": "https://download-r2.pytorch.org/whl/cpu/torch-2.14.1%2Bcpu-cp312-cp312-manylinux_2_28_x86_64.whl",
+      "sha256": "5a6363570c753812540a05eb82380e329469cbe668643e88111414c12627711f",
+      "size": 196253677
+    },
+    {
+      "filename": "torchvision-0.29.1+cpu-cp312-cp312-manylinux_2_28_x86_64.whl",
+      "url": "https://download-r2.pytorch.org/whl/cpu/torchvision-0.29.1%2Bcpu-cp312-cp312-manylinux_2_28_x86_64.whl",
+      "sha256": "ef220d4b21878c58947851beb7337382897159105f012f0c9c07bf7e84174d7e",
+      "size": 1708098
+    }
+  ]
+}

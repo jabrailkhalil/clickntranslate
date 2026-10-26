@@ -1840,7 +1840,7 @@ def easyocr_importable():
     global _EASY_OCR_IMPORT_ERROR
     from component_runtime import managed_runtime
     from component_easyocr import legacy_disabled
-    if platform_support.IS_WINDOWS and not managed_runtime('easyocr') and legacy_disabled():
+    if not managed_runtime('easyocr') and legacy_disabled():
         return False, 'EasyOCR is not installed'
     if _native_ocr_worker_enabled():
         available, error = _probe_native_ocr_worker("easyocr", _easyocr_local_root())
@@ -1897,7 +1897,7 @@ def easyocr_available(language_code="en", download_enabled=False):
     global _EASY_OCR_IMPORT_ERROR
     from component_runtime import managed_runtime
     from component_easyocr import legacy_disabled
-    if platform_support.IS_WINDOWS and not managed_runtime('easyocr') and legacy_disabled():
+    if not managed_runtime('easyocr') and legacy_disabled():
         return False
     if _native_ocr_worker_enabled():
         available, error = _probe_native_ocr_worker(
@@ -2186,7 +2186,7 @@ def _easyocr_installed_language_codes():
         receipt = runtime['receipt']
         return installed_languages(root, [language.code for language in APP_LANGUAGES],
             model_files=receipt.get('model_files'),language_groups=receipt.get('language_groups'))
-    if platform_support.IS_WINDOWS and legacy_disabled():
+    if legacy_disabled():
         return []
     if not _python_package_file_present(_easyocr_local_candidate_paths(root), ("easyocr",)):
         return []

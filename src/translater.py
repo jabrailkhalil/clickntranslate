@@ -353,10 +353,9 @@ def _get_hymt_runtime():
             return runtime_info(managed['folder'], managed['receipt'])
         except ComponentError:
             return {'root':str(managed['folder']), 'model':'', 'runner':''}
-    if platform_support.IS_WINDOWS:
-        from component_hymt import legacy_disabled
-        if legacy_disabled():
-            return {'root':_local_hymt_dir(), 'model':'', 'runner':''}
+    from component_hymt import legacy_disabled
+    if legacy_disabled():
+        return {'root':_local_hymt_dir(), 'model':'', 'runner':''}
     if _hymt_runtime_cache is not None:
         return _hymt_runtime_cache
     root_dir = _local_hymt_dir()
@@ -1257,7 +1256,8 @@ def install_argos_packages(
     pairs = _normalize_argos_pairs(pairs)
     if not pairs:
         return []
-    if _managed_argos_runtime():
+    from component_runtime import managed_install_supported
+    if _managed_argos_runtime() or (not os.environ.get('CLICKNTRANSLATE_ARGOS_WORKER') and managed_install_supported()):
         _change_managed_argos(pairs, status_callback, progress_callback, cancel_callback)
         return pairs
     if _argos_worker_path():

@@ -9,7 +9,7 @@ from urllib.parse import urlparse
 
 CATALOG_URL = 'https://jabrailkhalil.github.io/clickntranslate-components/metadata/'
 TARGET_URL = 'https://jabrailkhalil.github.io/clickntranslate-components/targets/'
-CONTRACT = 2
+CONTRACT = 3
 SAFE_ID = re.compile(r'^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$')
 SHA256 = re.compile(r'^[0-9a-f]{64}$')
 
@@ -40,7 +40,11 @@ def current_platform():
                platform.version() if name == 'windows' else platform.release())
     numeric = re.match(r'^\d+(?:\.\d+)*', version)
     version = numeric.group() if numeric else '0'  # unknown OS fails minimum-version checks
-    return {'os': name, 'arch': arch, 'os_version': version}
+    result = {'os': name, 'arch': arch, 'os_version': version}
+    if name == 'linux':
+        libc_name, libc_version = platform.libc_ver()
+        result.update(libc=libc_name, libc_version=libc_version or '0')
+    return result
 
 
 def parse_catalog(data):
@@ -89,6 +93,13 @@ def parse_catalog(data):
             # A future engine adapter must not prevent older clients updating
             # the components they still understand. Selection ignores it too.
             continue
+        if bundle.get('isolated_python') or bundle.get('libc'):
+            if bundle['contract'] < 3:
+                raise ComponentError('invalid_catalog', 'POSIX isolation/ABI requires contract 3')
+        if 'libc' in bundle:
+            libc = bundle['libc']
+            if not isinstance(libc, dict) or libc.get('name') != 'glibc' or not isinstance(libc.get('min'), str):
+                raise ComponentError('invalid_catalog', 'libc constraint')
         for key in ('os', 'arch', 'min_os', 'app'):
             if not isinstance(bundle.get(key), str):
                 raise ComponentError('invalid_catalog', key)
@@ -162,7 +173,10 @@ def runtime_command(folder, receipt):
     command = [folder / safe_relative(path) for path in paths]
     if any(not path.is_file() for path in command):
         raise ComponentError('installed_component_damaged', 'incomplete runtime')
-    return [str(path) for path in command]
+    values = [str(path) for path in command]
+    if receipt.get('runtime', 'python') == 'python' and receipt.get('isolated_python'):
+        values.insert(1, '-I')
+    return values
 
 
 def choose_bundle(catalog, component, app_version, *, channel='stable', target=None, languages=()):
@@ -177,6 +191,13 @@ def choose_bundle(catalog, component, app_version, *, channel='stable', target=N
     for bundle in catalog['bundles']:
         if bundle['component'] != component or bundle.get('revoked') or bundle['contract'] > CONTRACT:
             continue
+        libc = bundle.get('libc')
+        if libc:
+            try:
+                if target.get('libc') != libc['name'] or Version(target.get('libc_version','0')) < Version(libc['min']):
+                    continue
+            except InvalidVersion:
+                continue
         if bundle['channel'] != channel or bundle['os'] != target['os'] or bundle['arch'] != target['arch']:
             continue
         if Version(app_version) not in SpecifierSet(bundle['app']):

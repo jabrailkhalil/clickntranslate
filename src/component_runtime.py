@@ -6,11 +6,19 @@ import subprocess
 import tempfile
 import csv
 import io
+import time
 from contextlib import contextmanager, nullcontext
 
 from component_catalog import (ComponentError, choose_bundle, component_store_path,
                                trusted_catalog, safe_relative, materialize_bundle, runtime_command, native_data_path)
 from component_store import ComponentStore
+
+
+def managed_install_supported():
+    from component_catalog import current_platform
+    target = current_platform()
+    return (target['os'] in ('windows','macos','linux')
+            and target['arch'] in ('x86_64','arm64'))
 
 
 def managed_runtime(engine='rapidocr'):
@@ -25,6 +33,11 @@ def managed_runtime(engine='rapidocr'):
             target = current_platform()
             if any(runtime['receipt'].get(key) != target[key] for key in ('os', 'arch')):
                 return None  # copied portable profile from another operating system
+            if runtime['receipt'].get('contract',1) >= 3:
+                from app_version import APP_VERSION
+                receipt=runtime['receipt']
+                choose_bundle({'bundles':[dict(receipt,id=receipt['bundle'])]},receipt['component'],APP_VERSION,
+                              channel=receipt['channel'],target=target)
         return runtime
     except ComponentError:
         # A damaged optional install must not prevent the settings UI opening.
@@ -35,6 +48,8 @@ def worker_environment():
     import platform_support
     environment = platform_support.system_subprocess_env()
     for name in ('PYTHONPATH', 'PYTHONHOME', 'PYTHONSTARTUP', 'PYTHONUSERBASE',
+                 'LD_PRELOAD', 'LD_AUDIT', 'LD_LIBRARY_PATH', 'DYLD_INSERT_LIBRARIES',
+                 'DYLD_LIBRARY_PATH', 'DYLD_FRAMEWORK_PATH',
                  'CLICKNTRANSLATE_RAPIDOCR_MODEL_DIR', 'CLICKNTRANSLATE_UPDATE_TOKEN',
                  'GITHUB_TOKEN', 'GH_TOKEN', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY',
                  'GEMINI_API_KEY', 'DEEPL_API_KEY'):
@@ -44,15 +59,32 @@ def worker_environment():
     return environment
 
 
-def validate_rapidocr(folder, receipt):
+def run_cancellable(command, *, timeout, check_cancel=lambda:None, **kwargs):
+    kwargs.pop('capture_output', None)
+    process = subprocess.Popen(command,stdout=subprocess.PIPE,stderr=subprocess.PIPE,**kwargs)
+    try:
+        deadline=time.monotonic()+timeout
+        while True:
+            check_cancel()
+            try:
+                stdout,stderr=process.communicate(timeout=.05)
+                check_cancel()
+                return subprocess.CompletedProcess(command,process.returncode,stdout,stderr)
+            except subprocess.TimeoutExpired:
+                if time.monotonic()>=deadline:raise ComponentError('validation_failed','Native worker timeout')
+    finally:
+        if process.poll() is None:process.kill()
+        process.communicate(timeout=10)
+
+
+def validate_rapidocr(folder, receipt, check_cancel=lambda:None):
     folder = Path(folder)
-    command = [str(folder / safe_relative(receipt['python'])),
-               str(folder / safe_relative(receipt['worker']))]
+    command = runtime_command(folder,receipt)
     with tempfile.TemporaryDirectory(prefix='clickntranslate_component_probe_') as temporary:
         request = Path(temporary) / 'request.json'
         request.write_text(json.dumps({'action': 'validate', 'engine': 'rapidocr',
             'root_dir': str(folder), 'allow_download': False}), encoding='utf-8')
-        result = subprocess.run([*command, str(request)], capture_output=True, text=True,
+        result = run_cancellable([*command, str(request)], check_cancel=check_cancel, capture_output=True, text=True,
             encoding='utf-8', errors='replace', timeout=180,
             creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0), env=worker_environment())
         try:
@@ -78,7 +110,8 @@ def install_rapidocr(download, *, check_cancel=lambda: None, progress=lambda *_:
         bundle = choose_bundle(catalog, 'ocr.rapidocr', APP_VERSION,
             channel=channel or os.environ.get('CLICKNTRANSLATE_COMPONENT_CHANNEL', 'stable'),
             languages=old['receipt']['languages'] if old else ())
-        return store.install(catalog, bundle, download, validate_rapidocr, check_cancel, progress)
+        return store.install(catalog, bundle, download,
+            lambda folder,receipt:validate_rapidocr(folder,receipt,check_cancel),check_cancel,progress)
 
 
 def tesseract_generation(command, root=None):
@@ -121,7 +154,7 @@ def validate_tesseract(folder, receipt, check_cancel=lambda: None):
     environment.pop('TESSDATA_PREFIX', None)
     kwargs = dict(capture_output=True, text=True, encoding='utf-8', errors='replace',
                   timeout=45, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0), env=environment)
-    result = subprocess.run([*command, '--version'], **kwargs)
+    result = run_cancellable([*command, '--version'], check_cancel=check_cancel, **kwargs)
     prefix = receipt.get('version_prefix', 'tesseract ')
     if result.returncode or not result.stdout.startswith(prefix):
         raise ComponentError('validation_failed', 'Tesseract version')
@@ -132,8 +165,8 @@ def validate_tesseract(folder, receipt, check_cancel=lambda: None):
         image.save(probe)
         for language in receipt['languages']:
             check_cancel()
-            result = subprocess.run([*command, str(probe), 'stdout', '--tessdata-dir', native_data_path(data),
-                '-l', language, '--oem', '1', '--psm', '6'], **kwargs)
+            result = run_cancellable([*command, str(probe), 'stdout', '--tessdata-dir', native_data_path(data),
+                '-l', language, '--oem', '1', '--psm', '6'], check_cancel=check_cancel, **kwargs)
             if result.returncode:
                 raise ComponentError('validation_failed', f'Tesseract {language}')
 

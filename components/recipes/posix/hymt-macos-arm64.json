@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "profile": "macos-arm64",
+  "os": "macos",
+  "arch": "arm64",
+  "min_os": "14",
+  "engine": "hymt",
+  "component": "translation.hymt",
+  "app": ">=1.8.2,<2",
+  "contract": 3,
+  "channel": "preview",
+  "revision": 1,
+  "filename": "hymt-macos-arm64-runtime.zip",
+  "redistribution_review": false,
+  "sources": [
+    {
+      "name": "llama",
+      "url": "https://github.com/ggml-org/llama.cpp/archive/refs/tags/b11899.tar.gz",
+      "size": 38557549,
+      "sha256": "78bf279e95fd362bcca9cfe5cf7a2296092c6ae6e2b52cb96c9266a46b3f767e"
+    }
+  ],
+  "version": "b11899"
+}

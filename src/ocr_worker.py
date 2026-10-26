@@ -260,7 +260,7 @@ def _validate_easyocr(request):
     from easyocr_models import PROBE_CODES, MODEL_FILES
     torch = _configure_easyocr_cpu()
     torchvision = importlib.import_module('torchvision')
-    if torch.version.cuda is not None or '+cpu' not in torch.__version__:
+    if torch.version.cuda is not None or (sys.platform != 'darwin' and '+cpu' not in torch.__version__):
         raise RuntimeError('Managed EasyOCR requires the declared CPU-only Torch runtime')
     # Loading torchvision alone does not verify its compiled operator ABI.
     torchvision.ops.nms(torch.tensor([[0.,0.,10.,10.]]), torch.tensor([1.]), .5)

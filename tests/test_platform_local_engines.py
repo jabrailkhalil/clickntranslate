@@ -63,14 +63,20 @@ class HymtInstallPolicyTest(unittest.TestCase):
         # The guard must come before the pinned Windows archive is returned.
         self.assertLess(body.index("IS_WINDOWS"), body.index("HYMT_RUNTIME_URL_WIN64"))
 
-    def test_linux_install_explains_manual_setup_before_starting_downloads(self):
+    def test_linux_install_queues_the_managed_worker(self):
         from settings_window import SettingsWindow
         from types import SimpleNamespace
         owner = SimpleNamespace(parent=SimpleNamespace(current_interface_language='ru'),
-                                _show_manual_hymt_hint=mock.Mock())
-        with mock.patch.object(platform_support, 'IS_LINUX', True):
+            _hymt_install_in_progress=False,_rapidocr_install_in_progress=False,
+            _easyocr_install_in_progress=False,_tesseract_install_in_progress=False,
+            _hymt_cancel_requested=mock.Mock(),translator_combo=mock.Mock(),
+            _set_parent_topmost_for_tesseract_install=mock.Mock(),_show_hymt_progress=mock.Mock(),
+            _install_hymt_worker=mock.Mock(),_show_manual_hymt_hint=mock.Mock())
+        with mock.patch.object(platform_support, 'IS_LINUX', True),mock.patch('settings_window.threading.Thread') as thread:
             SettingsWindow.start_hymt_install(owner)
-        owner._show_manual_hymt_hint.assert_called_once_with('ru')
+        owner._show_manual_hymt_hint.assert_not_called()
+        thread.assert_called_once_with(target=owner._install_hymt_worker,daemon=True)
+        thread.return_value.start.assert_called_once()
 
 
 if __name__ == "__main__":
