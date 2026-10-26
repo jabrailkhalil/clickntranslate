@@ -38,6 +38,9 @@ def describe(runtime_path,recipes):
     if engine in ('tesseract','hymt'):
         bundle['runtime']='native'
         bundle['executable']='runtime/bin/'+('tesseract' if engine=='tesseract' else 'llama-cli')
+        if engine=='tesseract':
+            bundle['version_prefix']='tesseract '+recipe['version']
+            bundle['upstream']=recipe['version']+' source build'
     else:
         bundle['isolated_python']=True
         bundle['python']='runtime/python/bin/python3.12'

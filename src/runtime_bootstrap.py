@@ -12,6 +12,22 @@ def activate():
     global _INFO
     if _INFO is not None:
         return _INFO
+    if sys.platform == 'linux' and not getattr(sys,'frozen',False):
+        root=Path(sys.executable).resolve().parents[2]
+        marker=root/'COMPONENT.json'
+        if marker.is_file() and json.loads(marker.read_bytes()).get('zlib_source'):
+            import ctypes
+            library=root/'python/lib/libz.so.1'
+            handle=ctypes.CDLL(str(library),mode=ctypes.RTLD_GLOBAL)
+            _HANDLES.append(handle)
+            class DlInfo(ctypes.Structure):
+                _fields_=[('name',ctypes.c_char_p),('base',ctypes.c_void_p),('symbol',ctypes.c_char_p),('address',ctypes.c_void_p)]
+            info=DlInfo();dladdr=ctypes.CDLL(None).dladdr
+            dladdr.argtypes=[ctypes.c_void_p,ctypes.POINTER(DlInfo)];dladdr.restype=ctypes.c_int
+            if not dladdr(ctypes.cast(handle.zlibVersion,ctypes.c_void_p),ctypes.byref(info)) or Path(os.fsdecode(info.name)).resolve()!=library.resolve():
+                raise RuntimeError('An external zlib runtime was loaded')
+            _INFO={'libz.so.1':'bundled'}
+            return _INFO
     if os.name != 'nt' or getattr(sys, 'frozen', False):
         _INFO = {}
         return _INFO

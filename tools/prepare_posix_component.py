@@ -46,7 +46,7 @@ def audit(root):
         relative=path.relative_to(root).as_posix()
         if sys.platform=='darwin' and magic in (b'\xcf\xfa\xed\xfe',b'\xfe\xed\xfa\xcf',b'\xca\xfe\xba\xbe',b'\xca\xfe\xba\xbf'):
             result=subprocess.run(['otool','-L',str(path)],capture_output=True,text=True,check=True)
-            dependencies=[line.strip().split(' (',1)[0] for line in result.stdout.splitlines()[1:]]
+            dependencies=[line.strip().split(' (',1)[0] for line in result.stdout.splitlines() if line.startswith('\t')]
             identity=subprocess.run(['otool','-D',str(path)],capture_output=True,text=True)
             own_ids={line.strip() for line in identity.stdout.splitlines()[1:]}
             dependencies=[dep for dep in dependencies if dep not in own_ids]
@@ -62,7 +62,7 @@ def audit(root):
                 name,dest=line.strip().split('=>',1);name=name.strip();dest=dest.strip().split(' (',1)[0]
                 if name not in base and name not in libraries:
                     raise RuntimeError('External ELF dependency: '+relative+' -> '+name+' '+dest)
-                dependencies.append({'name':name,'resolution':'base ABI' if name in base else 'bundled'})
+                dependencies.append({'name':name,'resolution':'bundled' if name in libraries else 'base ABI'})
             rows.append({'path':relative,'dependencies':dependencies})
     return {'platform':current_platform(),'native_files':rows,'redistribution_review':False}
 
@@ -124,6 +124,18 @@ def native(output,runtime,recipe):
 def python_runtime(output,runtime,recipe):
     source=output/'python.tar.gz';fetch(recipe['python_source'],source)
     unpack(source,runtime)
+    if recipe.get('zlib_source'):
+        archive=output/'zlib-source.tar.gz';fetch(recipe['zlib_source'],archive)
+        sources=output/'zlib-source';unpack(archive,sources)
+        source=next(p for p in sources.iterdir() if p.is_dir());build=output/'zlib-build'
+        subprocess.run(['cmake','-S',str(source),'-B',str(build),'-DCMAKE_BUILD_TYPE=Release',
+                        '-DZLIB_BUILD_EXAMPLES=OFF','-DCMAKE_POSITION_INDEPENDENT_CODE=ON'],check=True)
+        subprocess.run(['cmake','--build',str(build),'--parallel','4','--target','zlib'],check=True)
+        library=next(p for p in build.glob('libz.so.*') if p.is_file() and not p.is_symlink())
+        shutil.copy2(library,runtime/'python/lib/libz.so.1')
+        licenses=runtime/'licenses/zlib';licenses.mkdir(parents=True)
+        for path in source.glob('*'):
+            if path.name.upper().startswith(('LICENSE','COPYING','README')) and path.is_file():shutil.copy2(path,licenses/path.name)
     # Optional GUI/password modules are not used by these workers and would
     # introduce distro Tk/X11/libcrypt dependencies into an otherwise private SDK.
     extensions=runtime/'python/lib/python3.12/lib-dynload'
