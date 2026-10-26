@@ -12,8 +12,34 @@ import threading
 import zipfile
 
 import pytest
+import component_catalog
 from component_catalog import ComponentError, choose_bundle, parse_catalog, trusted_catalog
 from component_store import ComponentStore
+
+
+@pytest.mark.parametrize('system,release,kernel,mac,expected', [
+    ('win32','2022Server','10.0.20348','','10.0.20348'),
+    ('win32','11','10.0.26100','','10.0.26100'),
+    ('win32','8.1','6.3.9600','','6.3.9600'),
+    ('linux','6.8.0-1024-azure','','','6.8.0'),
+    ('darwin','24.6.0','','15.7','15.7'),
+    ('linux','unknown','','','0'),
+])
+def test_os_detection_uses_numeric_native_versions(monkeypatch, system, release, kernel, mac, expected):
+    monkeypatch.setattr(component_catalog.sys, 'platform', system)
+    monkeypatch.setattr(component_catalog.platform, 'machine', lambda:'AMD64')
+    monkeypatch.setattr(component_catalog.platform, 'release', lambda:release)
+    monkeypatch.setattr(component_catalog.platform, 'version', lambda:kernel)
+    monkeypatch.setattr(component_catalog.platform, 'mac_ver', lambda:(mac, (), ''))
+    result = component_catalog.current_platform()
+    assert result['os_version'] == expected and result['arch'] == 'x86_64'
+
+
+def test_unrecognized_target_version_returns_controlled_incompatibility(tmp_path):
+    catalog, _ = fixture_catalog(tmp_path)
+    with pytest.raises(ComponentError, match='no_compatible_update'):
+        choose_bundle(catalog, 'ocr.rapidocr', '1.8.2', channel='preview',
+            target={'os':'windows','arch':'x86_64','os_version':'unknown'})
 
 
 def fixture_catalog(tmp_path):

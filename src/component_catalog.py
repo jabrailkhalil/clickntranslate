@@ -33,7 +33,13 @@ def current_platform():
     machine = platform.machine().lower()
     arch = {'amd64': 'x86_64', 'aarch64': 'arm64'}.get(machine, machine)
     name = {'win32': 'windows', 'darwin': 'macos'}.get(sys.platform, sys.platform)
-    version = platform.mac_ver()[0] if name == 'macos' else platform.release()
+    # release() is a marketing label on Windows Server (e.g. 2022Server),
+    # whereas compatibility requires the NT kernel version. Linux kernels
+    # can carry distribution suffixes which are not package-version syntax.
+    version = (platform.mac_ver()[0] if name == 'macos' else
+               platform.version() if name == 'windows' else platform.release())
+    numeric = re.match(r'^\d+(?:\.\d+)*', version)
+    version = numeric.group() if numeric else '0'  # unknown OS fails minimum-version checks
     return {'os': name, 'arch': arch, 'os_version': version}
 
 
@@ -149,8 +155,12 @@ def runtime_command(folder, receipt):
 
 def choose_bundle(catalog, component, app_version, *, channel='stable', target=None, languages=()):
     from packaging.specifiers import SpecifierSet
-    from packaging.version import Version
+    from packaging.version import Version, InvalidVersion
     target = target or current_platform()
+    try:
+        os_version = Version(target['os_version'])
+    except InvalidVersion as error:
+        raise ComponentError('no_compatible_update', 'unknown operating system version') from error
     candidates = []
     for bundle in catalog['bundles']:
         if bundle['component'] != component or bundle.get('revoked') or bundle['contract'] != CONTRACT:
@@ -159,7 +169,7 @@ def choose_bundle(catalog, component, app_version, *, channel='stable', target=N
             continue
         if Version(app_version) not in SpecifierSet(bundle['app']):
             continue
-        if bundle['min_os'] and Version(target['os_version']) < Version(bundle['min_os']):
+        if bundle['min_os'] and os_version < Version(bundle['min_os']):
             continue
         if not set(languages).issubset(bundle['languages']):
             continue
