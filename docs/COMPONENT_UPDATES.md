@@ -5,9 +5,9 @@ Application releases and their `/releases/latest` feed are unchanged.
 
 ## Current rollout
 
-The first published managed profile is Windows x64 CPython 3.12 + RapidOCR 3.10.0 with explicit PP-OCRv5 models. It is **preview**: the source application and standalone runtime are tested, but a frozen application with the new client has not been built. The stable channel deliberately has no approved profile yet. Windows Tesseract 5.5.3, Argos 1.11.0, native Hy-MT and CPU EasyOCR 1.7.2 are integrated with the store as **local candidates**, not public catalog approvals. macOS/Linux retain their existing installation paths until their managed profiles pass native validation. Android needs its own installer and executable-code policy.
+The first published managed profile is Windows x64 CPython 3.12 + RapidOCR 3.10.0 with explicit PP-OCRv5 models. It is **preview**: the source application and standalone runtime are tested, but a frozen application with the new client has not been built. The stable channel deliberately has no approved profile yet. RapidOCR, Tesseract 5.5.3, Argos 1.11.0, native Hy-MT and CPU EasyOCR 1.7.2 are integrated with the store on Windows x64, Linux x64 and macOS Intel/Apple Silicon as **candidates**. The POSIX profiles have native CI validation; they are not approved public catalog entries. Android needs its own installer and executable-code policy.
 
-Select preview only for local QA with `CLICKNTRANSLATE_COMPONENT_CHANNEL=preview`. Isolate QA files with `CLICKNTRANSLATE_COMPONENTS_DIR`; this is separate from the user's normal engine directory. No unsigned catalog fallback or on-the-fly dependency resolution is permitted in the managed Windows RapidOCR flow.
+Select preview only for local QA with `CLICKNTRANSLATE_COMPONENT_CHANNEL=preview`. Isolate QA files with `CLICKNTRANSLATE_COMPONENTS_DIR`; this is separate from the user's normal engine directory. Managed installation requires authenticated metadata and exact artifacts. It never resolves dependencies on the user's machine or falls back to an unsigned catalog.
 
 ## Native Tesseract candidate
 
@@ -48,18 +48,43 @@ Select preview only for local QA with `CLICKNTRANSLATE_COMPONENT_CHANNEL=preview
 - The initial candidate compares the existing b9048 runner with b11899 on the same model and EN/RU/AR samples, plus Chinese→Indonesian. This is an inference/lifecycle comparison, not an accuracy score or a clean/frozen Windows qualification.
 - Managed inference passes UTF-8 prompt files to a native child, limits CPU threads, removes inherited LLAMA_ARG overrides and does not load a Python LLM SDK into Qt. Cancellation kills and waits for the child. A long request leases one generation across all its chunks; updating/removing another generation cannot break it midway.
 - Translation cache identities include the approved runtime/model plan. Reinstalling identical bytes or rolling back can reuse their matching cache, while new bytes do not reuse output from an older model/runtime.
-- Explicit managed removal leaves preserved legacy files intact but disables their automatic fallback, so an uninstall does not unexpectedly resurrect an old engine. Windows Install/Update uses the trusted profile; macOS/Linux retain their prior flows.
+- Explicit managed removal leaves preserved legacy files intact but disables their automatic fallback, so an uninstall does not unexpectedly resurrect an old engine. Install/Update uses the trusted profile on supported Windows/macOS/Linux targets. An existing legacy installation continues to work until explicit migration.
 - `tools/prepare_hymt_component.py` selects the CLI's native dependencies and every upstream CPU backend, retains upstream notices, bundles the pinned Microsoft runtime and audits imports. `tools/qa_hymt_components.py` exercises actual update/rollback, cancellation, invalid GGUF rejection, offline removal and loaded private DLL paths. No new Hy-MT artifact is approved for the public catalog by these commands.
 
 ### CPU EasyOCR candidate
 
-- Windows Install/Update uses one embedded CPU-only runtime, with exact vendor Torch/torchvision wheels and a complete hash lock. The GUI never imports Torch, torchvision, OpenCV or EasyOCR. Model selection follows the SDK's 14 script families; languages sharing a recognizer share its download. Indonesian uses the Latin recognizer, rather than the English-only network.
+- Install/Update uses a private CPU runtime with exact vendor Torch/torchvision wheels and a complete hash lock. The GUI never imports Torch, torchvision, OpenCV or EasyOCR. Model selection follows the SDK's 14 script families; languages sharing a recognizer share its download. Indonesian uses the Latin recognizer, rather than the English-only network.
 - The catalog pins the original detector and model ZIPs on EasyOCR's upstream Releases. Contract 2 adds a declared `zip_member` operation so these archives need not be mirrored or repacked. The complete archive still passes SHA-256, size, path, link and expansion-limit checks before the declared model is installed. Contract 1 profiles remain usable, and older clients skip the new profile.
 - Every selected family executes real recognition before activation, including the compiled torchvision operator ABI. The worker disables SDK downloads and uses temporary user-network/cache directories. Pure model deletion is offline, removing every recognizer preserves an empty selection, and removal disables automatic legacy fallback without deleting legacy originals.
 - The upstream 1.7.2 Tamil alphabet does not match its unchanged checkpoint. The adapter uses the corresponding alphabet from released EasyOCR v1.3 (exact source commit/hash and model MD5 recorded in the recipe). This narrowly scoped correction occurs in the managed child only and does not alter the original wheel or model.
 - The Windows store uses extended paths for deeply nested native-package licenses, extraction and cleanup, without changing the registry. A damaged interpreter retains its saved language selection; repairing the same approved model/runtime uses verified cached archives and does not retain a known-broken rollback generation.
 - Update buttons refresh an engine without changing the user's selected OCR/translation provider. Ordinary Install retains its existing selection behavior. Labels and explanations use the same localized component controls as the other engines.
 - `tools/qa_easyocr_components.py` checks all families, EN/RU/AR/Tamil recognition, controlled revision changes, rollback, real child cancellation, invalid model rejection, offline removal and generation leases. A controlled revision with identical SDK bytes demonstrates lifecycle behavior, not an upstream accuracy improvement.
+
+## Linux and macOS candidates
+
+All five engines use the same authenticated catalog, object cache, transactional generations, selection preservation, cancellation and rollback as Windows. Language packages shows the shared Install/Update controls on supported targets. A failed install restores the previously selected OCR/translation provider; an update never switches the provider. Existing system engines and their data are preserved.
+
+| Profile | Candidate baseline | Native CI host |
+| --- | --- | --- |
+| Linux x64 | glibc 2.35+, kernel 5.15+ | Ubuntu 22.04 x64 |
+| macOS Apple Silicon | macOS 14+ | macOS 14 ARM64 |
+| macOS Intel | macOS 13+ | macOS 15 Intel |
+
+The lower macOS version bounds are compatibility declarations, not a claim that every older macOS version was tested. Linux ARM64 and musl do not have approved candidate recipes in this rollout. Incompatible ABI/architecture/OS versions are rejected before downloading. Installed contract-3 generations are checked again before use.
+
+- Contract 3 adds explicit libc constraints and isolated Python execution. Older clients skip these profiles while retaining their older compatible Windows entries. Python-based engines use pinned Python Build Standalone archives, not copied development virtual environments. Workers run with `python -I`; adapters and SDKs live in that interpreter's private site-packages. Host Python paths and inherited dynamic-loader overrides are removed.
+- Linux Python runtimes include pinned private zlib, which is loaded and its actual origin checked before SDK imports. Native import audits reject undeclared shared-library dependencies. Optional Tk/crypt extensions and unused terminal aliases are removed during preparation; archive path, case-collision and symlink checks remain strict.
+- POSIX Tesseract is compiled from pinned Tesseract/Leptonica/libpng/zlib sources into a native PNG-capable CPU executable. The app supplies PNG input. It does not require a system Tesseract, Homebrew or apt installation. Original language models remain separate selected objects.
+- Hy-MT uses pinned llama.cpp b11899 and the same authenticated GGUF model. The native CPU runner disables host-specific instruction tuning and optional GPU backends. It does not start an HTTP server. Models are reused when only the runner changes.
+- EasyOCR uses vendor CPU wheels. Apple Silicon uses Torch 2.14.1; Intel macOS remains pinned to the last supported Intel Torch 2.2.2/torchvision 0.17.2 pair and compatible NumPy/OpenCV wheels. Its recipe explicitly selects float CPU recognition (`quantize: false`). All 14 recognizer families must execute native inference before activation. This compatibility profile is distinct from the newer Windows/Linux CPU wheels.
+- Argos writes temporary caches inside its isolated worker directory and never initializes the application's macOS data directory. Runtime inference does not download models or modify original package directories.
+
+`tools/prepare_posix_component.py` prepares a runtime from `components/recipes/posix/`, locks wheel hashes, audits libraries, tests relocation to a path with spaces, and produces a candidate archive. `tools/prepare_posix_catalog.py` combines it with the pinned upstream model plans. Neither command signs or publishes a catalog. Client machines never compile sources or run pip.
+
+`tools/qa_posix_components.py` performs native installation/inference, a controlled revision update without model downloads, rollback, cancellation after a real child starts, child reaping, corrupt-model rejection, offline model removal and generation-lease cleanup. Its synthetic `TEST 123` recognition probes establish runtime/model viability; they are not an Arabic/Russian accuracy benchmark. Full EasyOCR family initialization and real translation samples are recorded separately in its report. Native CI artifacts retain the exact archive hashes, locks and verification results. A lifecycle revision with identical SDK bytes is not a comparison between upstream releases.
+
+The component repository's `verification/all-engines-posix-20261026.json` records successful jobs individually, including their exact application and recipe commits. Results span corrective CI runs; a matrix run containing failed preliminary candidates is not described as entirely successful. These headless native checks do not validate frozen application loading, macOS Gatekeeper/signatures, or interactive Qt/Cocoa behavior. This work does not modify a user's Mac working copy, build application packages, publish Release assets, or promote the stable catalog.
 
 ## Publication
 
@@ -75,4 +100,4 @@ Signed targets must retain exact bytes across Windows/Linux checkouts. The compo
 
 ## Required next gate
 
-Before promoting to stable: build a new application only when authorized, check the frozen client without developer Python, then exercise installed/portable paths and another controlled component revision. A source-mode success is not a frozen-app or macOS/Linux success. Component archives are not ClicknTranslate application releases.
+Before promoting to stable: finish redistribution review, build a new application only when authorized, check the frozen client without developer Python on each target, then exercise installed/portable paths and another controlled component revision. Native component success is not frozen-application qualification. Component archives are not ClicknTranslate application releases.
