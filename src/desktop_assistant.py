@@ -84,6 +84,13 @@ class AssistantAnchor(QtWidgets.QWidget):
         self._animation.setInterval(16)
         self._animation.timeout.connect(self._advance)
         self.motion = PetMotion(self.mascot)
+        self._layer_guard = QtCore.QTimer(self)
+        self._layer_guard.setTimerType(QtCore.Qt.CoarseTimer)
+        self._layer_guard.setInterval(2000)
+        self._layer_guard.timeout.connect(self._sync_window_layer)
+        app = QtWidgets.QApplication.instance()
+        if app is not None:
+            app.applicationStateChanged.connect(self._sync_window_layer)
 
     def set_mascot(self, mascot):
         mascot = mascot_id(mascot)
@@ -131,6 +138,34 @@ class AssistantAnchor(QtWidgets.QWidget):
     def showEvent(self, event):
         super().showEvent(event)
         self._sync_motion()
+        self._sync_window_layer()
+
+    def event(self, event):
+        result = super().event(event)
+        if (event.type() == QtCore.QEvent.WinIdChange
+                and getattr(self, '_layer_guard', None) is not None):
+            QtCore.QTimer.singleShot(0, self._sync_window_layer)
+        return result
+
+    def _sync_window_layer(self, *_):
+        if sip.isdeleted(self):
+            return
+        app = QtWidgets.QApplication.instance()
+        native_windows = (sys.platform == 'win32' and app is not None
+                          and app.platformName().split(':')[0] == 'windows')
+        enabled = bool(self.windowFlags() & QtCore.Qt.WindowStaysOnTopHint)
+        if not native_windows or not self.isVisible():
+            self._layer_guard.stop()
+            return
+        if enabled:
+            if not self._layer_guard.isActive():
+                self._layer_guard.start()
+        else:
+            self._layer_guard.stop()
+        handle = self.windowHandle()
+        if handle is not None:
+            from window_layer import synchronize_topmost
+            synchronize_topmost(int(handle.winId()), enabled)
 
     def _sync_motion(self):
         active = ((self.appearance in ('animated', 'walking') or self._explicit_reaction()) and self.isVisible()
@@ -161,6 +196,7 @@ class AssistantAnchor(QtWidgets.QWidget):
         self.update()
 
     def hideEvent(self, event):
+        self._layer_guard.stop()
         self._animation.stop()
         self._press = None
         self._hover = False
@@ -477,6 +513,7 @@ class DesktopAssistant(QtCore.QObject):
         visible = (self.owner.config.get('desktop_assistant_enabled') is True
                    and not self._dispatching and mode_coordinator.active_mode() is None)
         self.anchor.setVisible(visible)
+        self.anchor._sync_window_layer()
         self.anchor._sync_motion()
         if not visible and self.menu is not None:
             self.menu.hide()
