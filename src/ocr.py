@@ -1456,6 +1456,7 @@ def _rapidocr_local_candidate_paths(root_dir=None):
     root_dir = root_dir or _rapidocr_local_root()
     candidates = [
         root_dir,
+        os.path.join(root_dir, 'runtime/python/lib/python3.12/site-packages'),
         os.path.join(root_dir, 'runtime', 'site-packages'),
         os.path.join(root_dir, "site-packages"),
         os.path.join(root_dir, "Lib", "site-packages"),
@@ -1744,6 +1745,7 @@ def _easyocr_local_candidate_paths(root_dir=None):
     root_dir = root_dir or _easyocr_local_root()
     candidates = [
         root_dir,
+        os.path.join(root_dir, 'runtime/python/lib/python3.12/site-packages'),
         os.path.join(root_dir, "site-packages"),
         os.path.join(root_dir, "Lib", "site-packages"),
         os.path.join(root_dir, "lib", "site-packages"),

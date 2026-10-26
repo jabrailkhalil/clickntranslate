@@ -47,6 +47,9 @@ def audit(root):
         if sys.platform=='darwin' and magic in (b'\xcf\xfa\xed\xfe',b'\xfe\xed\xfa\xcf',b'\xca\xfe\xba\xbe',b'\xca\xfe\xba\xbf'):
             result=subprocess.run(['otool','-L',str(path)],capture_output=True,text=True,check=True)
             dependencies=[line.strip().split(' (',1)[0] for line in result.stdout.splitlines()[1:]]
+            identity=subprocess.run(['otool','-D',str(path)],capture_output=True,text=True)
+            own_ids={line.strip() for line in identity.stdout.splitlines()[1:]}
+            dependencies=[dep for dep in dependencies if dep not in own_ids]
             for dep in dependencies:
                 if dep.startswith('/') and not dep.startswith(('/usr/lib/','/System/Library/')):
                     raise RuntimeError('External Mach-O dependency: '+relative+' -> '+dep)
@@ -86,6 +89,9 @@ def native(output,runtime,recipe):
         subprocess.run(['cmake','--build',str(folder),'--parallel','4','--target',target],check=True,env=environment)
         return folder
     if recipe['engine']=='tesseract':
+        if sys.platform=='darwin':
+            flags+=['-DPNG_FRAMEWORK=OFF','-DPNG_STATIC=ON','-DCMAKE_FIND_FRAMEWORK=NEVER',
+                    '-DZLIB_LIBRARY='+str(prefix/'lib/libz.a'),'-DPNG_LIBRARY='+str(prefix/'lib/libpng16.a')]
         build('zlib',['-DZLIB_BUILD_EXAMPLES=OFF'])
         build('libpng',['-DPNG_SHARED=OFF','-DPNG_TESTS=OFF','-DPNG_TOOLS=OFF'])
         build('leptonica',['-DBUILD_PROG=OFF','-DENABLE_GIF=OFF','-DENABLE_JPEG=OFF','-DENABLE_TIFF=OFF',
@@ -102,7 +108,8 @@ def native(output,runtime,recipe):
         info.write_text(text.replace('set(BUILD_NUMBER 0)','set(BUILD_NUMBER '+recipe['version'].removeprefix('b')+')'))
         folder=build('llama',['-DGGML_NATIVE=OFF','-DGGML_METAL=OFF','-DGGML_OPENMP=OFF','-DGGML_CUDA=OFF',
             '-DGGML_AVX=OFF','-DGGML_AVX2=OFF','-DGGML_AVX512=OFF','-DGGML_FMA=OFF','-DGGML_F16C=OFF',
-            '-DLLAMA_CURL=OFF','-DLLAMA_BUILD_TESTS=OFF','-DLLAMA_BUILD_SERVER=OFF'],target='llama-cli')
+            '-DLLAMA_CURL=OFF','-DLLAMA_OPENSSL=OFF','-DLLAMA_BUILD_TESTS=OFF','-DLLAMA_BUILD_SERVER=ON',
+            '-DLLAMA_BUILD_UI=OFF','-DLLAMA_BUILD_APP=OFF'],target='llama-cli')
         executable=folder/'bin/llama-cli'
     (runtime/'bin').mkdir(parents=True)
     shutil.copy2(executable,runtime/'bin'/executable.name)
@@ -117,6 +124,12 @@ def native(output,runtime,recipe):
 def python_runtime(output,runtime,recipe):
     source=output/'python.tar.gz';fetch(recipe['python_source'],source)
     unpack(source,runtime)
+    # Optional GUI/password modules are not used by these workers and would
+    # introduce distro Tk/X11/libcrypt dependencies into an otherwise private SDK.
+    extensions=runtime/'python/lib/python3.12/lib-dynload'
+    for pattern in ('_tkinter*','_crypt*'):
+        for path in extensions.glob(pattern):
+            if path.is_file():path.unlink()
     interpreter=runtime/'python/bin/python3.12'
     wheels=output/'wheelhouse';wheels.mkdir()
     for wheel in recipe.get('source_wheels',[]):fetch(wheel,wheels/wheel['filename'])

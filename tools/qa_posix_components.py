@@ -33,7 +33,9 @@ def run(prepared,catalog_path,output):
     def download(url,path):
         downloads.append(url)
         if url.endswith(description['filename']):shutil.copyfile(prepared/description['filename'],path)
-        else:ComponentDownloader()(url,path)
+        else:
+            specification=next(item for item in catalog['artifacts'].values() if url in item['urls'])
+            ComponentDownloader().artifact(url,path,specification)
     common=dict(root=store.root,channel='preview',catalog_loader=lambda _:catalog)
     def install(**kwargs):
         if engine=='rapidocr':return runtime.install_rapidocr(download,**common,**kwargs)

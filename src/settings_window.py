@@ -14770,6 +14770,10 @@ finally {
         return ""
 
     def _find_local_tesseract_exe(self):
+        from component_runtime import managed_runtime
+        runtime = managed_runtime('tesseract')
+        if runtime:
+            return runtime['command'][0]
         return self._find_tesseract_exe_under(self._local_tesseract_dir())
 
     def _find_available_tesseract_exe(self):
@@ -14793,6 +14797,7 @@ finally {
     def _rapidocr_candidate_paths_under(self, root_dir):
         candidates = [
             root_dir,
+            os.path.join(root_dir, 'runtime/python/lib/python3.12/site-packages'),
             os.path.join(root_dir, 'runtime', 'site-packages'),
             os.path.join(root_dir, "site-packages"),
             os.path.join(root_dir, "Lib", "site-packages"),
@@ -14991,7 +14996,7 @@ finally {
             return
 
         lang = self.parent.current_interface_language
-        if platform_support.IS_LINUX:
+        if platform_support.IS_LINUX and not managed_install_supported():
             # Linux distributions package Tesseract, so the app points at the
             # package manager instead of downloading an installer.
             self._show_linux_tesseract_hint(lang)
