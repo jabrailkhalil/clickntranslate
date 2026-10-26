@@ -15,8 +15,8 @@ TEXT = {
 }
 
 
-def update_label(language):
-    return TEXT.get(language, TEXT['en'])[0]
+def update_label(language, engine='RapidOCR'):
+    return TEXT.get(language, TEXT['en'])[0].replace('RapidOCR', engine)
 
 
 UPDATE_HINTS = {
@@ -33,6 +33,10 @@ UPDATE_HINTS = {
  'hi': 'RapidOCR का नवीनतम जाँचा हुआ संगत संस्करण डाउनलोड और स्थापित करें। विफल होने पर काम करने वाला संस्करण सुरक्षित रहेगा।',
  'id': 'Unduh dan pasang versi RapidOCR kompatibel terbaru yang telah diuji. Jika gagal, versi yang berfungsi tetap disimpan.',
 }
+
+
+def update_hint(language, engine='RapidOCR'):
+    return UPDATE_HINTS.get(language, UPDATE_HINTS['en']).replace('RapidOCR', engine)
 
 
 def error_text(language, error):

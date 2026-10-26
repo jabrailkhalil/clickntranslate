@@ -6558,6 +6558,8 @@ class OcrLanguageManagerDialog(QDialog):
             [
                 (language_manager_text(self.lang, "install_selected"), self._install_selected_tesseract, "primary"),
                 (language_manager_text(self.lang, "remove_highlighted"), self._remove_selected_tesseract, "danger"),
+                *(([(component_update_label(self.lang, 'Tesseract'),
+                     self._update_tesseract_engine, 'secondary')]) if platform_support.IS_WINDOWS else []),
             ],
             missing_engine="Tesseract",
             install_engine_callback=self._install_tesseract_engine,
@@ -6594,6 +6596,10 @@ class OcrLanguageManagerDialog(QDialog):
             remove_engine_callback=self._remove_rapidocr_engine,
         )
         self.rapidocr_table.setColumnHidden(0, True)
+        from component_texts import update_hint
+        for button in self.tesseract_table._package_action_buttons:
+            if button.text() == component_update_label(self.lang, 'Tesseract'):
+                button.setToolTip(update_hint(self.lang, 'Tesseract'))
         from component_texts import UPDATE_HINTS
         for button in self.rapidocr_table._package_action_buttons:
             button.setToolTip(UPDATE_HINTS.get(self.lang, UPDATE_HINTS['en']))
@@ -7694,6 +7700,10 @@ class OcrLanguageManagerDialog(QDialog):
         self.owner.start_rapidocr_install(progress_owner=self)
         QtCore.QTimer.singleShot(750, lambda: self._refresh_after_owner_install('_rapidocr_install_in_progress'))
 
+    def _update_tesseract_engine(self):
+        self.owner.start_tesseract_install(progress_owner=self)
+        QtCore.QTimer.singleShot(750, lambda: self._refresh_after_owner_install('_tesseract_install_in_progress'))
+
     def _windows_ocr_capability_name(self, language_code):
         return f"Language.OCR~~~{windows_ocr_tag(language_code)}~0.0.1.0"
 
@@ -8354,6 +8364,10 @@ class OcrLanguageManagerDialog(QDialog):
 
     def _install_tesseract_worker(self, codes):
         try:
+            if platform_support.IS_WINDOWS:
+                self._change_managed_tesseract_languages(codes)
+                self._finish_language_task('Tesseract')
+                return
             import ocr
             tess_cmd = self.owner._find_available_tesseract_exe()
             tess_codes = []
@@ -8386,6 +8400,30 @@ class OcrLanguageManagerDialog(QDialog):
                 self._finish_language_task("Tesseract", canceled=True)
             else:
                 self._finish_language_task("Tesseract", str(exc))
+
+    def _change_managed_tesseract_languages(self, codes, remove=False):
+        from component_runtime import install_tesseract
+        from component_catalog import ComponentError
+        from component_texts import error_text
+        tess_codes = [tesseract_language_code(code) for code in codes]
+        _command, data_dirs = self._tesseract_data_dirs()
+
+        def check_cancel():
+            if self._cancel_requested.is_set():
+                raise UpdateCancelledError('Tesseract language operation canceled')
+
+        try:
+            install_tesseract(
+                lambda url, destination: self.owner._download_file(url, destination,
+                    timeout=180, cancel_callback=lambda: self._cancel_requested.is_set()),
+                languages=() if remove else tess_codes,
+                remove_languages=tess_codes if remove else (), legacy_data_dirs=data_dirs,
+                check_cancel=check_cancel,
+                progress=lambda index, total: self._emit_language_progress(
+                    engine_text(self.lang, 'preparing', engine='Tesseract'), int(90 * index / total), True))
+        except ComponentError as error:
+            raise RuntimeError(error_text(self.lang, error)) from error
+        self.owner._reset_tesseract_runtime_cache()
 
     @staticmethod
     def _powershell_literal(value):
@@ -9308,6 +9346,11 @@ try {{
 
     def _remove_tesseract_worker(self, codes):
         try:
+            from component_runtime import managed_runtime
+            if platform_support.IS_WINDOWS and managed_runtime('tesseract'):
+                self._change_managed_tesseract_languages(codes, remove=True)
+                self._finish_language_task('Tesseract')
+                return
             _tess_cmd, data_dirs = self._tesseract_data_dirs()
             if not data_dirs:
                 raise RuntimeError("Tesseract tessdata folder was not found")
@@ -9341,7 +9384,8 @@ try {{
                     raise RuntimeError(f"Could not remove {filename}")
             self._finish_language_task("Tesseract")
         except Exception as exc:
-            self._finish_language_task("Tesseract", str(exc))
+            self._finish_language_task('Tesseract', '' if self._cancel_requested.is_set() else str(exc),
+                                       canceled=self._cancel_requested.is_set())
 
     def _remove_easyocr_worker(self, codes):
         try:
@@ -14637,6 +14681,10 @@ finally {
         return _portable_base_dir()
 
     def _local_tesseract_dir(self):
+        from component_runtime import managed_runtime
+        runtime = managed_runtime('tesseract')
+        if runtime:
+            return str(Path(runtime['command'][0]).parent)
         return os.path.join(self._portable_app_dir(), "ocr", "tesseract")
 
     def _local_rapidocr_dir(self):
@@ -14965,11 +15013,16 @@ finally {
         self.save_ocr_engine(self.previous_ocr_engine or platform_support.default_ocr_engine())
 
     def _delete_local_tesseract_dir(self):
-        tesseract_dir = self._local_tesseract_dir()
-        if not os.path.isdir(tesseract_dir):
-            return True, ""
         try:
-            shutil.rmtree(tesseract_dir, ignore_errors=False)
+            from component_catalog import component_store_path
+            from component_store import ComponentStore
+            ComponentStore(component_store_path()).remove('ocr.tesseract')
+            # A migrated portable install remains as a recovery copy until the
+            # user explicitly removes the engine. Never delete a generation
+            # directly: an OCR child may still hold its lease.
+            tesseract_dir = os.path.join(self._portable_app_dir(), 'ocr', 'tesseract')
+            if os.path.isdir(tesseract_dir):
+                shutil.rmtree(tesseract_dir, ignore_errors=False)
             self._reset_tesseract_runtime_cache()
             return True, ""
         except Exception as e:
@@ -15216,121 +15269,31 @@ finally {
             raise TesseractInstallCancelledError("Tesseract installation canceled by user.")
 
     def _install_tesseract_worker(self):
-        temp_dir = ""
-        final_dir = self._local_tesseract_dir()
         try:
             lang = getattr(getattr(self, "parent", None), "current_interface_language", "en")
-            machine = platform.machine().lower()
-            is_x64 = machine in ("amd64", "x86_64")
-            bundle_url = self._get_tesseract_bundle_url(is_x64)
-            temp_dir = tempfile.mkdtemp(prefix="clickntranslate_tesseract_")
-            self._tesseract_temp_dir = temp_dir
-            bundle_path = os.path.join(temp_dir, TESSERACT_BUNDLE_NAME_WIN64)
-            extract_dir = os.path.join(temp_dir, "extract")
-            os.makedirs(extract_dir, exist_ok=True)
-
-            download_text = engine_text(lang, "downloading_engine", engine="Tesseract")
-            self._tesseract_install_phase = "downloading"
-            self._emit_tesseract_progress(download_text, 1)
-
-            def download_progress(done, total):
-                if total > 0:
-                    percent = 1 + int((done * 72) / total)
-                else:
-                    percent = 6
-                self._emit_tesseract_progress(download_text, percent)
-
-            self._download_file(
-                bundle_url,
-                bundle_path,
-                timeout=180,
-                progress_callback=download_progress,
-                cancel_callback=lambda: self._tesseract_cancel_requested.is_set(),
-            )
-            self._check_tesseract_cancel_requested()
-            self._verify_file_sha256(bundle_path, TESSERACT_BUNDLE_SHA256_WIN64, TESSERACT_BUNDLE_NAME_WIN64)
-            if not zipfile.is_zipfile(bundle_path):
-                raise RuntimeError("Downloaded Tesseract bundle is not a zip archive.")
-
-            extract_text = engine_text(lang, "extracting_engine", engine="Tesseract")
-            self._tesseract_install_phase = "extracting"
-            self._emit_tesseract_progress(extract_text, 74)
-            with zipfile.ZipFile(bundle_path, "r") as zip_ref:
-                zip_ref.extractall(extract_dir)
-            self._check_tesseract_cancel_requested()
-
-            tess_exe = self._find_tesseract_exe_under(extract_dir)
-            if not tess_exe:
-                raise RuntimeError("tesseract.exe not found in Tesseract bundle")
-
-            install_dir = os.path.dirname(tess_exe)
-
-            tessdata_dir = os.path.join(os.path.dirname(tess_exe), "tessdata")
-            os.makedirs(tessdata_dir, exist_ok=True)
-
-            models = [
-                ("eng", "https://github.com/tesseract-ocr/tessdata/raw/main/eng.traineddata"),
-                ("rus", "https://github.com/tesseract-ocr/tessdata/raw/main/rus.traineddata"),
-            ]
-            for index, (name, url) in enumerate(models):
-                model_path = os.path.join(tessdata_dir, f"{name}.traineddata")
-                if os.path.isfile(model_path) and os.path.getsize(model_path) > 1024:
-                    continue
-                self._check_tesseract_cancel_requested()
-                model_text = engine_text(lang, "downloading_language", name=name)
-                start = 82 + index * 6
-
-                def model_progress(done, total, base=start, label=model_text):
-                    if total > 0:
-                        percent = base + int((done * 5) / total)
-                    else:
-                        percent = base
-                    self._emit_tesseract_progress(label, percent)
-
-                self._download_file(
-                    url,
-                    model_path,
-                    timeout=180,
-                    progress_callback=model_progress,
-                    cancel_callback=lambda: self._tesseract_cancel_requested.is_set(),
-                )
-
-            self._check_tesseract_cancel_requested()
-            self._tesseract_install_phase = "applying"
-            self._emit_tesseract_progress(engine_text(lang, "applying"), 96)
-            def validate_tesseract(path):
-                exe = self._find_tesseract_exe_under(path)
-                if not exe:
-                    raise RuntimeError("tesseract.exe not found after applying install")
-                subprocess.run(
-                    [exe, "--version"], check=True, capture_output=True, timeout=30,
-                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-                )
-
-            install_directory(install_dir, final_dir, validate_tesseract, preserve=("tessdata",),
-                              check_cancel=self._check_tesseract_cancel_requested)
-            final_exe = self._find_tesseract_exe_under(final_dir)
-
-            self._emit_tesseract_progress(engine_text(lang, "done"), 100)
-            QMetaObject.invokeMethod(
-                self,
-                "_on_tesseract_install_ready",
-                Qt.QueuedConnection,
-                QtCore.Q_ARG(str, final_exe)
-            )
+            from component_runtime import install_tesseract
+            from component_catalog import ComponentError
+            from component_texts import error_text
+            import ocr
+            previous = self._find_available_tesseract_exe()
+            try:
+                runtime = install_tesseract(
+                    lambda url, destination: self._download_file(url, destination, timeout=180,
+                        cancel_callback=lambda: self._tesseract_cancel_requested.is_set()),
+                    legacy_data_dirs=ocr._tesseract_data_directories(previous) if previous else (),
+                    check_cancel=self._check_tesseract_cancel_requested,
+                    progress=lambda index, total: self._emit_tesseract_progress(
+                        engine_text(lang, 'preparing', engine='Tesseract'), int(90 * index / total)))
+            except ComponentError as error:
+                raise RuntimeError(error_text(lang, error)) from error
+            self._emit_tesseract_progress(engine_text(lang, 'done'), 100)
+            QMetaObject.invokeMethod(self, '_on_tesseract_install_ready', Qt.QueuedConnection,
+                                     QtCore.Q_ARG(str, runtime['command'][0]))
         except (TesseractInstallCancelledError, UpdateCancelledError):
             QMetaObject.invokeMethod(self, "_on_tesseract_install_cancelled", Qt.QueuedConnection)
-        except Exception as e:
-            QMetaObject.invokeMethod(
-                self,
-                "_on_tesseract_install_failed",
-                Qt.QueuedConnection,
-                QtCore.Q_ARG(str, str(e))
-            )
-        finally:
-            if temp_dir and os.path.isdir(temp_dir):
-                shutil.rmtree(temp_dir, ignore_errors=True)
-            self._tesseract_temp_dir = ""
+        except Exception as error:
+            QMetaObject.invokeMethod(self, "_on_tesseract_install_failed", Qt.QueuedConnection,
+                                     QtCore.Q_ARG(str, str(error)))
 
     def _show_tesseract_progress(self, text, percent=0, determinate=True):
         lang = self.parent.current_interface_language
@@ -15404,7 +15367,8 @@ finally {
         self._hide_tesseract_progress()
         self._restore_settings_view()
         tessdata_dir = os.path.join(os.path.dirname(tesseract_path), "tessdata")
-        if os.path.isdir(tessdata_dir):
+        from component_runtime import tesseract_generation
+        if os.path.isdir(tessdata_dir) and not tesseract_generation(tesseract_path):
             os.environ["TESSDATA_PREFIX"] = tessdata_dir
         self._reset_tesseract_runtime_cache()
         self._set_ocr_combo_silently("Tesseract")

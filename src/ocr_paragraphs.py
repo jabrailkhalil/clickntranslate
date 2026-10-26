@@ -182,12 +182,38 @@ def paragraph_text(rows):
 
 
 def tesseract_items(data):
-    """Keep word boxes so even PSM 6 cannot mix two distant columns into a row."""
+    """Retain native lines without bridging two distant PSM 6 columns.
+
+    Tesseract already knows which short Arabic words share a baseline. Treating
+    each word as an independent box can misread wide word spaces as columns.
+    Preserve that line identity and its logical word order, splitting only a
+    genuine gutter before passing the chunks to the paragraph reader.
+    """
     items=[]
+    lines={}
+    line_columns = ('page_num', 'block_num', 'par_num', 'line_num')
+    has_lines = all(len(data.get(name, [])) == len(data.get('text', [])) for name in line_columns)
     for i,value in enumerate(data.get('text', [])):
         text=str(value or '').strip()
         if not text:
             continue
         x,y,w,h=(float(data[name][i]) for name in ('left','top','width','height'))
-        items.append(([[x,y],[x+w,y],[x+w,y+h],[x,y+h]],text,0.0))
+        if has_lines:
+            key=tuple(data[name][i] for name in line_columns)
+            lines.setdefault(key, []).append((x,y,w,h,text,i))
+        else:
+            items.append(([[x,y],[x+w,y],[x+w,y+h],[x,y+h]],text,0.0))
+    for words in lines.values():
+        line_height=max(row[1]+row[3] for row in words)-min(row[1] for row in words)
+        chunks=[]
+        edge=None
+        for word in sorted(words, key=lambda row:row[0]):
+            if edge is None or word[0]-edge > 2*line_height:
+                chunks.append([])
+            chunks[-1].append(word)
+            edge=max(edge if edge is not None else word[0],word[0]+word[2])
+        for chunk in chunks:
+            text=' '.join(word[4] for word in sorted(chunk,key=lambda row:row[5]))
+            x,y,w,h,_text=_union(chunk,text)
+            items.append(([[x,y],[x+w,y],[x+w,y+h],[x,y+h]],text,0.0))
     return items

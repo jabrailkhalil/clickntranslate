@@ -5,9 +5,19 @@ Application releases and their `/releases/latest` feed are unchanged.
 
 ## Current rollout
 
-The first managed profile is Windows x64 CPython 3.12 + RapidOCR 3.10.0 with explicit PP-OCRv5 models. It is **preview**: the source application and standalone runtime are tested, but a frozen application with the new client has not been built. The stable channel deliberately has no approved profile yet. macOS/Linux retain their existing installation paths until their managed profiles pass native validation. Tesseract, EasyOCR, Argos and Hy-MT have not been migrated to the new store. Android needs its own installer and executable-code policy.
+The first published managed profile is Windows x64 CPython 3.12 + RapidOCR 3.10.0 with explicit PP-OCRv5 models. It is **preview**: the source application and standalone runtime are tested, but a frozen application with the new client has not been built. The stable channel deliberately has no approved profile yet. Windows Tesseract 5.5.3 is integrated with the store and tested as a **local candidate**, not a public catalog approval. macOS/Linux retain their existing installation paths until their managed profiles pass native validation. EasyOCR, Argos and Hy-MT have not been migrated to the new store. Android needs its own installer and executable-code policy.
 
 Select preview only for local QA with `CLICKNTRANSLATE_COMPONENT_CHANNEL=preview`. Isolate QA files with `CLICKNTRANSLATE_COMPONENTS_DIR`; this is separate from the user's normal engine directory. No unsigned catalog fallback or on-the-fly dependency resolution is permitted in the managed Windows RapidOCR flow.
+
+## Native Tesseract candidate
+
+- A native bundle uses `runtime: native` and an executable path, without a Python interpreter. Optional `language_files` are materialized for the selected language set before staging. The receipt records the actual installed set, not every language the engine supports.
+- Adding/removing languages creates a generation even when the engine bundle id is unchanged. Updates preserve the selected languages, including an intentionally empty set. Unchanged files use the verified object cache. A previous language set can be rolled back along with its engine.
+- Portable/system legacy installations remain intact during migration. If a custom installed model is not covered by the approved catalog, migration stops rather than silently dropping it. The `osd` orientation model is not advertised as a recognition language.
+- OCR and fullscreen layout calls pass native argv entries and a generation-specific data directory. They do not rely on pytesseract's Windows config-string quoting or a mutable global `TESSDATA_PREFIX`. Active OCR holds a shared generation lease.
+- `tools/prepare_tesseract_component.py` prepares a candidate from a pinned, extracted upstream installer and tessdata_fast commit. The NSIS installer is never executed. Source-archive aliases such as `frk` are excluded; the canonical `deu_latf` model is available.
+- `tools/qa_tesseract_components.py` tests actual native OCR, language selection, reuse, rollback, and rejection of invalid traineddata in an explicitly isolated QA directory. It uses real pinned HTTPS model URLs; the unpublished runtime candidate is copied locally.
+- Publishing the repackaged Windows runtime additionally requires a complete license/source inventory for its bundled third-party DLLs. Candidate preparation deliberately records `redistribution_review: false` and does not publish it. No stable or public Tesseract profile is implied by source-mode success.
 
 ## Client
 

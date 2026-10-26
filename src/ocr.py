@@ -839,6 +839,10 @@ def _tesseract_managed_data_dir(tess_cmd):
 
 
 def _tesseract_data_directories(tess_cmd):
+    from component_runtime import tesseract_generation
+    generation = tesseract_generation(tess_cmd) if tess_cmd else None
+    if generation:
+        return [str(generation[1] / 'runtime/tessdata')]
     tess_dir = os.path.dirname(tess_cmd)
     candidates = [
         _tesseract_managed_data_dir(tess_cmd),
@@ -858,6 +862,14 @@ def _prepare_tesseract_data(
     cancel_check=None,
     raise_on_error=False,
 ):
+    from component_runtime import tesseract_generation
+    if tesseract_generation(tess_cmd):
+        # Managed generations are immutable. Downloads/language changes go
+        # through the component transaction in the package manager instead.
+        data = _configure_installed_tesseract_data(tess_cmd, tess_lang)
+        if data:
+            return [os.path.join(data, f'{code}.traineddata') for code in tess_lang.split('+') if code]
+        raise RuntimeError('Install the required Tesseract language in Language packages.')
     tessdata_dir = _tesseract_managed_data_dir(tess_cmd)
     if tessdata_dir:
         os.makedirs(tessdata_dir, exist_ok=True)
@@ -1016,6 +1028,11 @@ def _system_tessdata_dirs():
 def _configure_installed_tesseract_data(tess_cmd, tess_lang):
     required = [f"{code}.traineddata" for code in str(tess_lang or "").split("+") if code]
     tess_dir = os.path.dirname(tess_cmd or "")
+    from component_runtime import tesseract_generation
+    generation = tesseract_generation(tess_cmd) if tess_cmd else None
+    if generation:
+        data = generation[1] / 'runtime/tessdata'
+        return str(data) if required and all((data / name).is_file() for name in required) else ''
     candidate_dirs = [
         os.environ.get("TESSDATA_PREFIX", ""),
         *_tesseract_data_directories(tess_cmd),
@@ -1089,9 +1106,19 @@ def _configure_pytesseract_system_environment(pytesseract):
     module.subprocess_args = subprocess_args
 
 def _run_tesseract_ocr_image_with_cmd(pil_image, tess_cmd, tess_lang, context, session_id, cancel_check=None, join_paragraphs=False):
-    import pytesseract
+    from component_runtime import tesseract_lease
+    with tesseract_lease(tess_cmd):
+        return _run_tesseract_ocr_image_leased(pil_image, tess_cmd, tess_lang, context, session_id,
+                                             cancel_check, join_paragraphs)
 
-    _configure_pytesseract_system_environment(pytesseract)
+
+def _run_tesseract_ocr_image_leased(pil_image, tess_cmd, tess_lang, context, session_id, cancel_check=None, join_paragraphs=False):
+    from component_runtime import tesseract_generation, recognize_tesseract
+    generation = tesseract_generation(tess_cmd)
+    if not generation:
+        import pytesseract
+        _configure_pytesseract_system_environment(pytesseract)
+        pytesseract.pytesseract.tesseract_cmd = tess_cmd
 
     if pil_image is None:
         return ""
@@ -1101,7 +1128,6 @@ def _run_tesseract_ocr_image_with_cmd(pil_image, tess_cmd, tess_lang, context, s
         logging.warning(f"[OCR:{session_id}] Tesseract skipped for empty image in {context}")
         return ""
 
-    pytesseract.pytesseract.tesseract_cmd = tess_cmd
     best_text = ""
     best_score = float("-inf")
     for psm in _tesseract_psm_order(width, height):
@@ -1113,11 +1139,16 @@ def _run_tesseract_ocr_image_with_cmd(pil_image, tess_cmd, tess_lang, context, s
             started = time.perf_counter()
             if join_paragraphs:
                 from ocr_paragraphs import tesseract_items
-                data = pytesseract.image_to_data(pil_image, lang=tess_lang, config=tess_config,
-                                                 output_type=pytesseract.Output.DICT)
+                if generation:
+                    data = recognize_tesseract(pil_image, tess_cmd, generation[1] / 'runtime/tessdata',
+                                               tess_lang, psm, positions=True)
+                else:
+                    data = pytesseract.image_to_data(pil_image, lang=tess_lang, config=tess_config,
+                                                     output_type=pytesseract.Output.DICT)
                 text = ocr_text_from_items(tesseract_items(data), join_paragraphs=True)
             else:
-                text = pytesseract.image_to_string(pil_image, lang=tess_lang, config=tess_config)
+                text = (recognize_tesseract(pil_image, tess_cmd, generation[1] / 'runtime/tessdata', tess_lang, psm)
+                        if generation else pytesseract.image_to_string(pil_image, lang=tess_lang, config=tess_config))
             elapsed_ms = (time.perf_counter() - started) * 1000.0
             stripped = text.strip()
             score = _score_recognized_text(stripped)
@@ -2100,6 +2131,11 @@ def _tesseract_reported_languages(tess_cmd):
     """
     if not tess_cmd:
         return set()
+    from component_runtime import tesseract_generation
+    generation = tesseract_generation(tess_cmd)
+    if generation:
+        return {code for code in generation[2]['languages']
+                if (generation[1] / f'runtime/tessdata/{code}.traineddata').is_file()}
     try:
         completed = subprocess.run(
             [tess_cmd, "--list-langs"],
@@ -2127,10 +2163,10 @@ def _tesseract_installed_language_codes():
     if not tess_cmd or not os.path.isfile(tess_cmd):
         return []
     reported = _tesseract_reported_languages(tess_cmd)
-    data_dirs = [
-        os.environ.get("TESSDATA_PREFIX", ""),
-        *_tesseract_data_directories(tess_cmd),
-    ]
+    from component_runtime import tesseract_generation
+    data_dirs = _tesseract_data_directories(tess_cmd)
+    if not tesseract_generation(tess_cmd):
+        data_dirs.insert(0, os.environ.get('TESSDATA_PREFIX', ''))
     result = []
     for language in APP_LANGUAGES:
         code = tesseract_language_code(language.code)
@@ -4976,6 +5012,10 @@ class ScreenCaptureOverlay(QWidget):
 
     @classmethod
     def get_tesseract_cmd(cls):
+        from component_runtime import managed_runtime
+        runtime = managed_runtime('tesseract')
+        if runtime:
+            return runtime['command'][0]
         if cls._tesseract_cmd_cache is not None:
             return cls._tesseract_cmd_cache
 
@@ -6239,16 +6279,23 @@ def _recognize_image_layout(image, engine, language_code):
         from macos_ocr import recognize_image
         items = recognize_image(image, language_code)
     elif engine == "tesseract":
-        import pytesseract
         command = ScreenCaptureOverlay.get_tesseract_cmd()
         if not command:
             raise RuntimeError("Tesseract is not installed.")
-        pytesseract.pytesseract.tesseract_cmd = command
         language = tesseract_language_code(language_code)
-        _configure_pytesseract_system_environment(pytesseract)
         if not _configure_installed_tesseract_data(command, language):
             raise RuntimeError(f"Tesseract language is not installed: {language}")
-        data = pytesseract.image_to_data(image, lang=language, output_type=pytesseract.Output.DICT, timeout=60)
+        from component_runtime import tesseract_generation, tesseract_lease, recognize_tesseract
+        generation = tesseract_generation(command)
+        if generation:
+            with tesseract_lease(command):
+                data = recognize_tesseract(image, command, generation[1] / 'runtime/tessdata',
+                                           language, 3, positions=True)
+        else:
+            import pytesseract
+            pytesseract.pytesseract.tesseract_cmd = command
+            _configure_pytesseract_system_environment(pytesseract)
+            data = pytesseract.image_to_data(image, lang=language, output_type=pytesseract.Output.DICT, timeout=60)
         groups = {}
         for index, text in enumerate(data["text"]):
             if not str(text).strip():

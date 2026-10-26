@@ -11,7 +11,7 @@ import time
 import uuid
 import zipfile
 
-from component_catalog import ComponentError, SAFE_ID, safe_relative
+from component_catalog import ComponentError, SAFE_ID, safe_relative, runtime_command
 
 
 @contextmanager
@@ -161,11 +161,7 @@ class ComponentStore:
             receipt = json.loads((folder / 'receipt.json').read_text(encoding='utf-8'))
             if receipt['component'] != component or receipt['generation'] != row[0]:
                 raise ValueError('receipt mismatch')
-            python = folder / safe_relative(receipt['python'])
-            worker = folder / safe_relative(receipt['worker'])
-            if not python.is_file() or not worker.is_file():
-                raise ValueError('incomplete runtime')
-            return {'folder': folder, 'command': [str(python), str(worker)], 'receipt': receipt}
+            return {'folder': folder, 'command': runtime_command(folder, receipt), 'receipt': receipt}
         except (OSError, ValueError, KeyError) as exc:
             raise ComponentError('installed_component_damaged', component) from exc
 
@@ -253,7 +249,9 @@ class ComponentStore:
             old = self.active(bundle['component'])
         except ComponentError:
             old = None
-        if old and old['receipt']['bundle'] == bundle['id']:
+        if (old and old['receipt']['bundle'] == bundle['id']
+                and old['receipt']['files'] == bundle['files']
+                and old['receipt']['languages'] == bundle['languages']):
             validate(old['folder'], old['receipt'])
             return old
         expanded = sum(catalog['artifacts'][f['sha256']].get('unpacked_size', catalog['artifacts'][f['sha256']]['size']) for f in bundle['files'])

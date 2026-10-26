@@ -916,7 +916,7 @@ class LanguagePackageDialogTest(unittest.TestCase):
     def test_all_manager_buttons_are_connected_and_safe_to_click(self):
         expected_action_counts = {
             "windows_table": 3,
-            "tesseract_table": 2,
+            "tesseract_table": 3 if platform_support.IS_WINDOWS else 2,
             "easyocr_table": 2,
             "rapidocr_table": 1,
             "argos_table": 2,

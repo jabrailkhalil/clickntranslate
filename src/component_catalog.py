@@ -67,6 +67,8 @@ def parse_catalog(data):
                 raise ComponentError('invalid_catalog', 'HTTPS sources required')
     seen = set()
     for bundle in bundles:
+        if not isinstance(bundle, dict):
+            raise ComponentError('invalid_catalog', 'bundle')
         for key in ('id', 'component'):
             if not SAFE_ID.fullmatch(str(bundle.get(key, ''))):
                 raise ComponentError('invalid_catalog', key)
@@ -80,24 +82,64 @@ def parse_catalog(data):
         for key in ('os', 'arch', 'min_os', 'app'):
             if not isinstance(bundle.get(key), str):
                 raise ComponentError('invalid_catalog', key)
-        safe_relative(bundle['python'])
-        safe_relative(bundle['worker'])
+        if bundle.get('runtime', 'python') == 'python':
+            safe_relative(bundle.get('python'))
+            safe_relative(bundle.get('worker'))
+        elif bundle['runtime'] == 'native':
+            safe_relative(bundle.get('executable'))
+        else:
+            raise ComponentError('invalid_catalog', 'runtime kind')
         if not isinstance(bundle.get('files'), list) or not bundle['files']:
             raise ComponentError('invalid_catalog', 'bundle files')
         destinations = set()
-        for item in bundle['files']:
+        language_files = bundle.get('language_files', {})
+        if not isinstance(language_files, dict):
+            raise ComponentError('invalid_catalog', 'language files')
+        for language, items in language_files.items():
+            if not SAFE_ID.fullmatch(language) or not isinstance(items, list) or not items:
+                raise ComponentError('invalid_catalog', 'language files')
+        for item in [*bundle['files'], *(item for items in language_files.values() for item in items)]:
+            if not isinstance(item, dict):
+                raise ComponentError('invalid_catalog', 'file')
             digest = item.get('sha256')
             if digest not in artifacts or item.get('kind') not in ('zip', 'file'):
                 raise ComponentError('invalid_catalog', 'unknown artifact')
             if item['kind'] == 'zip' and 'unpacked_size' not in artifacts[digest]:
                 raise ComponentError('invalid_catalog', 'archive expansion limit')
-            destination = safe_relative(item['destination'])
+            destination = safe_relative(item.get('destination'))
             if destination.casefold() in destinations:
                 raise ComponentError('invalid_catalog', 'duplicate destination')
             destinations.add(destination.casefold())
         if not isinstance(bundle.get('languages'), list):
             raise ComponentError('invalid_catalog', 'languages')
+        if any(not isinstance(code, str) or not SAFE_ID.fullmatch(code) for code in bundle['languages']):
+            raise ComponentError('invalid_catalog', 'language code')
+        if language_files and set(bundle['languages']) != set(language_files):
+            raise ComponentError('invalid_catalog', 'language capability mismatch')
     return catalog
+
+
+def materialize_bundle(bundle, languages):
+    """Choose language artifacts without changing the signed catalog description."""
+    selected = sorted(set(languages))
+    if not set(selected).issubset(bundle['languages']):
+        raise ComponentError('no_compatible_update', 'installed languages')
+    if not bundle.get('language_files'):
+        return dict(bundle)
+    files = [*bundle['files']]
+    for code in selected:
+        files.extend(bundle['language_files'][code])
+    return {key: value for key, value in dict(bundle, files=files, languages=selected).items()
+            if key != 'language_files'}
+
+
+def runtime_command(folder, receipt):
+    paths = ([receipt['executable']] if receipt.get('runtime') == 'native'
+             else [receipt['python'], receipt['worker']])
+    command = [folder / safe_relative(path) for path in paths]
+    if any(not path.is_file() for path in command):
+        raise ComponentError('installed_component_damaged', 'incomplete runtime')
+    return [str(path) for path in command]
 
 
 def choose_bundle(catalog, component, app_version, *, channel='stable', target=None, languages=()):
