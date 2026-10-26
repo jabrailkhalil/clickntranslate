@@ -1177,6 +1177,18 @@ class EngineRemovalPlacementTest(unittest.TestCase):
         self.dialog._install_hymt_engine()
         self.assertEqual(self.owner.hymt_installs, 1)
 
+    @unittest.skipUnless(platform_support.IS_WINDOWS, 'Windows component candidate')
+    def test_updating_hymt_has_a_localized_button_and_reuses_the_owner_progress(self):
+        from component_texts import update_label, update_hint
+        button=self.dialog.hymt_table._package_action_buttons[0]
+        self.assertEqual(button.text(),update_label('en','Hy-MT'))
+        self.assertEqual(button.toolTip(),update_hint('en','Hy-MT'))
+        self.owner.hymt_present=True
+        self.dialog._populate_hymt_table(self.dialog.hymt_table)
+        button.click()
+        self.assertEqual(self.owner.hymt_installs,1)
+        self.assertIs(self.owner.last_progress_owner,self.dialog)
+
 
 class _SettingsParent(QWidget):
     def set_main_assistant_visible(self, visible):

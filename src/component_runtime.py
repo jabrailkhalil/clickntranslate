@@ -14,7 +14,8 @@ from component_store import ComponentStore
 
 
 def managed_runtime(engine='rapidocr'):
-    components = {'rapidocr':'ocr.rapidocr', 'tesseract':'ocr.tesseract', 'argos':'translation.argos'}
+    components = {'rapidocr':'ocr.rapidocr', 'tesseract':'ocr.tesseract', 'argos':'translation.argos',
+                  'hymt':'translation.hymt'}
     if engine not in components:
         return None
     try:

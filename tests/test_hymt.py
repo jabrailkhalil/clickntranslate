@@ -111,7 +111,7 @@ class TestHyMTInstallerHelpers(unittest.TestCase):
                 return True
 
             with mock.patch.object(sw.QMetaObject, "invokeMethod", side_effect=fake_invoke):
-                sw.SettingsWindow._install_hymt_worker(dummy)
+                sw.SettingsWindow._install_hymt_legacy_worker(dummy)
 
             self.assertTrue(os.path.isfile(os.path.join(final_dir, sw.HYMT_MODEL_FILE)))
             self.assertTrue(

@@ -8,10 +8,10 @@ powrprof propsys psapi rpcrt4 secur32 setupapi shell32 shlwapi user32 userenv us
 version winhttp wininet winmm winspool wintrust wldap32 ws2_32 wtsapi32 ucrtbase'''.split())
 
 
-def audit(runtime):
+def audit(runtime, entry_point='python.exe'):
     import pefile
     runtime = Path(runtime)
-    binaries = sorted([*runtime.rglob('*.dll'), *runtime.rglob('*.pyd'), runtime / 'python.exe'])
+    binaries = sorted([*runtime.rglob('*.dll'), *runtime.rglob('*.pyd'), runtime / entry_point])
     paths = {path.name.lower():path for path in binaries}
     exports = {}
     imports = []

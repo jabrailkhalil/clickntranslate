@@ -140,8 +140,8 @@ HYMT_RUNTIME_URL_WIN64 = (
     f"{HYMT_RUNTIME_ARCHIVE_NAME_WIN64}"
 )
 HYMT_RUNTIME_SHA256 = "7412d3b73de94b9d29d3a7f9f971c68f35bac3cc47c1a45fc60b01b962663938"
-HYMT_LICENSE_URL = "https://huggingface.co/tencent/HY-MT1.5-1.8B-GGUF/resolve/main/License.txt?download=true"
-HYMT_README_URL = "https://huggingface.co/tencent/HY-MT1.5-1.8B-GGUF/resolve/main/README.md?download=true"
+HYMT_LICENSE_URL = f"https://huggingface.co/tencent/HY-MT1.5-1.8B-GGUF/resolve/{HYMT_MODEL_REVISION}/License.txt?download=true"
+HYMT_README_URL = f"https://huggingface.co/tencent/HY-MT1.5-1.8B-GGUF/resolve/{HYMT_MODEL_REVISION}/README.md?download=true"
 HYMT_NOTICE_TEXT = (
     "Tencent HY is licensed under the Tencent HY Community License Agreement, "
     "Copyright (c) 2025 Tencent. All Rights Reserved. The trademark rights of "
@@ -6609,7 +6609,8 @@ class OcrLanguageManagerDialog(QDialog):
             HYMT_ENGINE_DISPLAY,
             language_manager_text(self.lang, "hymt_note"),
             self._populate_hymt_table,
-            [],
+            [(component_update_label(self.lang, 'Hy-MT'), self._update_hymt_engine, 'secondary')]
+            if platform_support.IS_WINDOWS else [],
             header_labels=[
                 "",
                 language_manager_text(self.lang, "component"),
@@ -6621,6 +6622,9 @@ class OcrLanguageManagerDialog(QDialog):
             remove_engine_callback=self._remove_hymt_engine,
         )
         self.hymt_table.setColumnHidden(0, True)
+        from component_texts import update_hint
+        for button in self.hymt_table._package_action_buttons:
+            button.setToolTip(update_hint(self.lang, 'Hy-MT'))
 
         self.argos_table = self._add_engine_tab(
             self.translation_tabs,
@@ -7404,12 +7408,15 @@ class OcrLanguageManagerDialog(QDialog):
             table._pending_package_codes.clear()
             return
         status = self._status_installed()
+        from component_runtime import managed_runtime
+        managed = managed_runtime('hymt')
+        receipt = managed['receipt'] if managed else {}
         rows = [
             {
                 "code": "hymt-engine",
                 "icon": "",
                 "name": language_manager_text(self.lang, "translation_engine"),
-                "package": "Hy-MT",
+                "package": ('llama.cpp b' + receipt['runner_build']) if receipt else 'Hy-MT',
                 "status": status,
                 "checked": True,
                 "selectable": False,
@@ -7419,7 +7426,7 @@ class OcrLanguageManagerDialog(QDialog):
                 "code": "hymt-model",
                 "icon": "",
                 "name": language_manager_text(self.lang, "local_model"),
-                "package": self._hymt_package_name(),
+                "package": os.path.basename(receipt['model']) if receipt else self._hymt_package_name(),
                 "status": status,
                 "checked": True,
                 "selectable": False,
@@ -7711,6 +7718,10 @@ class OcrLanguageManagerDialog(QDialog):
     def _update_tesseract_engine(self):
         self.owner.start_tesseract_install(progress_owner=self)
         QtCore.QTimer.singleShot(750, lambda: self._refresh_after_owner_install('_tesseract_install_in_progress'))
+
+    def _update_hymt_engine(self):
+        self.owner.start_hymt_install(progress_owner=self)
+        QtCore.QTimer.singleShot(750, lambda: self._refresh_after_owner_install('_hymt_install_in_progress'))
 
     def _windows_ocr_capability_name(self, language_code):
         return f"Language.OCR~~~{windows_ocr_tag(language_code)}~0.0.1.0"
@@ -15088,6 +15099,15 @@ finally {
         return os.path.join(self._portable_app_dir(), "translators", "hymt")
 
     def _delete_local_hymt_dir(self):
+        from component_runtime import managed_runtime
+        if managed_runtime('hymt'):
+            from component_hymt import remove
+            try:
+                remove()
+                self._reset_hymt_runtime_cache()
+                return True, ''
+            except Exception as error:
+                return False, str(error)
         hymt_dir = self._local_hymt_dir()
         if not os.path.isdir(hymt_dir):
             return True, ""
@@ -15132,8 +15152,8 @@ finally {
         return ""
 
     def _hymt_installed(self):
-        root_dir = self._local_hymt_dir()
-        return bool(self._find_hymt_model_under(root_dir) and self._find_hymt_runner_under(root_dir))
+        import translater
+        return translater.hymt_installed()
 
     def _reset_hymt_runtime_cache(self):
         try:
@@ -16354,6 +16374,34 @@ finally {
             raise HyMTInstallCancelledError("Hy-MT installation canceled by user.")
 
     def _install_hymt_worker(self):
+        if not platform_support.IS_WINDOWS:
+            return self._install_hymt_legacy_worker()
+        try:
+            from component_hymt import install
+            from component_download import ComponentDownloader
+            lang = self.parent.current_interface_language
+            def progress(url, done, total):
+                label = engine_text(lang, 'hymt_model' if '.gguf' in url else 'hymt_runtime')
+                self._emit_hymt_progress(f'{label}: {done//(1024*1024)} / {max(1,total//(1024*1024))} MB',
+                                         int(90*done/total), True)
+            self._hymt_install_phase = 'downloading'
+            install(ComponentDownloader(self._check_hymt_cancel_requested, progress),
+                legacy_model=self._find_hymt_model_under(self._local_hymt_dir()) or None,
+                check_cancel=self._check_hymt_cancel_requested,
+                progress=lambda index, total:self._emit_hymt_progress(
+                    engine_text(lang, 'preparing', engine='Hy-MT'),int(90*index/total),True))
+            self._reset_hymt_runtime_cache()
+            self._emit_hymt_progress(engine_text(lang, 'done'),100)
+            QMetaObject.invokeMethod(self,'_on_hymt_install_ready',Qt.QueuedConnection)
+        except (HyMTInstallCancelledError, UpdateCancelledError):
+            QMetaObject.invokeMethod(self,'_on_hymt_install_cancelled',Qt.QueuedConnection)
+        except Exception as error:
+            from component_catalog import ComponentError
+            from component_texts import error_text
+            message = error_text(self.parent.current_interface_language,error) if isinstance(error,ComponentError) else str(error)
+            QMetaObject.invokeMethod(self,'_on_hymt_install_failed',Qt.QueuedConnection,QtCore.Q_ARG(str,message))
+
+    def _install_hymt_legacy_worker(self):
         temp_dir = ""
         final_dir = self._local_hymt_dir()
         try:
@@ -16635,7 +16683,8 @@ finally {
             self._request_hymt_install_cancel()
             return
         hymt_dir = self._local_hymt_dir()
-        if not os.path.isdir(hymt_dir):
+        from component_runtime import managed_runtime
+        if not os.path.isdir(hymt_dir) and not managed_runtime('hymt'):
             return
         confirm = QMessageBox(self)
         confirm.setWindowTitle(engine_text(lang, "remove_title", engine="Hy-MT"))

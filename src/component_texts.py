@@ -39,8 +39,26 @@ def update_hint(language, engine='RapidOCR'):
     return UPDATE_HINTS.get(language, UPDATE_HINTS['en']).replace('RapidOCR', engine)
 
 
+CUSTOM_MODEL = {
+ 'en': 'The local Hy-MT model differs from the approved package. Migration was stopped; your existing model and files are unchanged.',
+ 'ru': 'Установленная модель Hy-MT отличается от проверенного пакета. Автоматический переход остановлен; исходная модель и её файлы сохранены.',
+ 'es': 'El modelo local de Hy-MT difiere del paquete verificado. Se detuvo la migración; el modelo y los archivos existentes no han cambiado.',
+ 'de': 'Das lokale Hy-MT-Modell unterscheidet sich vom geprüften Paket. Die Migration wurde gestoppt; das vorhandene Modell und seine Dateien bleiben unverändert.',
+ 'fr': 'Le modèle Hy-MT local diffère du paquet vérifié. La migration a été arrêtée ; le modèle et les fichiers existants restent inchangés.',
+ 'zh': '本地 Hy-MT 模型与已验证的软件包不同。已停止迁移，原有模型和文件保持不变。',
+ 'pt': 'O modelo local do Hy-MT difere do pacote verificado. A migração foi interrompida; o modelo e os arquivos existentes permanecem inalterados.',
+ 'it': 'Il modello Hy-MT locale è diverso dal pacchetto verificato. La migrazione è stata interrotta; il modello e i file esistenti restano invariati.',
+ 'ar': 'يختلف نموذج Hy-MT المحلي عن الحزمة التي تم التحقق منها. أُوقفت عملية النقل، ولم يتغير النموذج الحالي أو ملفاته.',
+ 'tr': 'Yerel Hy-MT modeli doğrulanmış paketten farklı. Geçiş durduruldu; mevcut model ve dosyalar değiştirilmedi.',
+ 'hi': 'स्थानीय Hy-MT मॉडल सत्यापित पैकेज से अलग है। स्थानांतरण रोक दिया गया है; मौजूदा मॉडल और फ़ाइलें अपरिवर्तित हैं।',
+ 'id': 'Model Hy-MT lokal berbeda dari paket terverifikasi. Migrasi dihentikan; model dan berkas yang ada tidak berubah.',
+}
+
+
 def error_text(language, error):
     values = TEXT.get(language, TEXT['en'])
     code = getattr(error, 'code', '')
+    if code == 'custom_model_not_approved':
+        return CUSTOM_MODEL.get(language, CUSTOM_MODEL['en'])
     index = 1 if code == 'no_compatible_update' else 2 if code in ('catalog_unavailable', 'update_client_missing') else 3
     return values[index] + (f' [{code}]' if code else '')

@@ -344,6 +344,19 @@ def _find_hymt_runner_under(root_dir):
 
 def _get_hymt_runtime():
     global _hymt_runtime_cache
+    from component_runtime import managed_runtime
+    managed = managed_runtime('hymt')
+    if managed:
+        from component_hymt import runtime_info
+        from component_catalog import ComponentError
+        try:
+            return runtime_info(managed['folder'], managed['receipt'])
+        except ComponentError:
+            return {'root':str(managed['folder']), 'model':'', 'runner':''}
+    if platform_support.IS_WINDOWS:
+        from component_hymt import legacy_disabled
+        if legacy_disabled():
+            return {'root':_local_hymt_dir(), 'model':'', 'runner':''}
     if _hymt_runtime_cache is not None:
         return _hymt_runtime_cache
     root_dir = _local_hymt_dir()
@@ -368,7 +381,7 @@ _HYMT_CHINESE_LANGUAGE_NAMES = {
     "uk": "乌克兰语", "tr": "土耳其语", "nl": "荷兰语", "zh": "中文",
     "ja": "日语", "ko": "韩语", "ar": "阿拉伯语", "hi": "印地语",
 
-    'id': '英语',
+    'id': '印尼语',
 }
 
 
@@ -453,6 +466,22 @@ def _clean_hymt_output(output, prompt):
 
 
 def hymt_translate(text, source_code, target_code, status_callback=None, *, cancel_callback=None, _cache=None, partial_callback=None):
+    from component_runtime import managed_runtime
+    managed = managed_runtime('hymt')
+    if managed:
+        from component_hymt import translate, cache_identity
+        from component_catalog import component_store_path
+        from component_store import ComponentStore
+        if _cache is not None:
+            _cache._bound_identities['hymt'] = cache_identity(managed['receipt'])
+        def check_cancel():
+            _check_translation_cancelled(cancel_callback)
+        with ComponentStore(component_store_path()).lease(managed['receipt']['generation']):
+            _emit_status(status_callback, HYMT_DISPLAY_NAME)
+            return _translate_chunks(text, 1000, lambda chunk: translate(
+                managed['folder'], managed['receipt'], chunk, source_code, target_code,
+                check_cancel=check_cancel), cache=_cache, engine='hymt',
+                cancel_callback=cancel_callback, partial_callback=partial_callback)
     # Bound each generation as well as its prompt; otherwise a long input can
     # silently hit the output-token cap and return an incomplete translation.
     return _translate_chunks(text, 1000, lambda chunk: _hymt_translate_chunk(
@@ -1512,7 +1541,13 @@ class _TranslationCache:
                                     api_key=api_key)
         if engine == 'hymt':
             # Ignore translations produced with the old, duplicated template.
-            engine = 'hymt:prompt-v2'
+            from component_runtime import managed_runtime
+            managed = managed_runtime('hymt')
+            if managed:
+                from component_hymt import cache_identity
+                engine = cache_identity(managed['receipt'])
+            else:
+                engine = 'hymt:prompt-v2'
         if engine == 'libretranslate':
             # A custom LibreTranslate server may use different models.
             url, key = _libretranslate_server()
@@ -1526,6 +1561,10 @@ class _TranslationCache:
         return self._api_keys[engine]
 
     def _bound_engine_key(self, engine, segment=False):
+        if engine == 'hymt':
+            if engine not in self._bound_identities:
+                self._bound_identities[engine] = self._engine_key(engine)
+            return ('segment-v2:' if segment else '') + self._bound_identities[engine]
         if engine not in {'openai', 'openai-compatible', 'gemini', 'anthropic', 'deepl'}:
             return self._engine_key(engine, segment)
         if engine not in self._bound_identities:

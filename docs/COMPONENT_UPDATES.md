@@ -5,7 +5,7 @@ Application releases and their `/releases/latest` feed are unchanged.
 
 ## Current rollout
 
-The first published managed profile is Windows x64 CPython 3.12 + RapidOCR 3.10.0 with explicit PP-OCRv5 models. It is **preview**: the source application and standalone runtime are tested, but a frozen application with the new client has not been built. The stable channel deliberately has no approved profile yet. Windows Tesseract 5.5.3 and Argos 1.11.0 are integrated with the store and tested as **local candidates**, not public catalog approvals. macOS/Linux retain their existing installation paths until their managed profiles pass native validation. EasyOCR and Hy-MT have not been migrated to the new store. Android needs its own installer and executable-code policy.
+The first published managed profile is Windows x64 CPython 3.12 + RapidOCR 3.10.0 with explicit PP-OCRv5 models. It is **preview**: the source application and standalone runtime are tested, but a frozen application with the new client has not been built. The stable channel deliberately has no approved profile yet. Windows Tesseract 5.5.3, Argos 1.11.0 and native Hy-MT are integrated with the store and tested as **local candidates**, not public catalog approvals. macOS/Linux retain their existing installation paths until their managed profiles pass native validation. EasyOCR has not been migrated to the new store. Android needs its own installer and executable-code policy.
 
 Select preview only for local QA with `CLICKNTRANSLATE_COMPONENT_CHANNEL=preview`. Isolate QA files with `CLICKNTRANSLATE_COMPONENTS_DIR`; this is separate from the user's normal engine directory. No unsigned catalog fallback or on-the-fly dependency resolution is permitted in the managed Windows RapidOCR flow.
 
@@ -43,6 +43,15 @@ Select preview only for local QA with `CLICKNTRANSLATE_COMPONENT_CHANNEL=preview
 - Recipes preserve original licenses/notices. The Microsoft runtime description records `redistribution_review: false` until checked for publication. The Tesseract third-party DLL inventory is a separate gate.
 
 ## Publication
+
+### Native Hy-MT candidate
+
+- The profile pins the HY-MT1.5-1.8B Q4_K_M GGUF, its matching model documentation/license revision, and a Windows CPU llama.cpp runtime. Models and runner archives are separate objects, so updating llama.cpp does not download the 1.13 GB model again. Existing verified legacy models can seed the cache without changing the originals; custom models outside the approved plan stop automatic migration with a localized explanation.
+- The initial candidate compares the existing b9048 runner with b11899 on the same model and EN/RU/AR samples, plus Chinese→Indonesian. This is an inference/lifecycle comparison, not an accuracy score or a clean/frozen Windows qualification.
+- Managed inference passes UTF-8 prompt files to a native child, limits CPU threads, removes inherited LLAMA_ARG overrides and does not load a Python LLM SDK into Qt. Cancellation kills and waits for the child. A long request leases one generation across all its chunks; updating/removing another generation cannot break it midway.
+- Translation cache identities include the approved runtime/model plan. Reinstalling identical bytes or rolling back can reuse their matching cache, while new bytes do not reuse output from an older model/runtime.
+- Explicit managed removal leaves preserved legacy files intact but disables their automatic fallback, so an uninstall does not unexpectedly resurrect an old engine. Windows Install/Update uses the trusted profile; macOS/Linux retain their prior flows.
+- `tools/prepare_hymt_component.py` selects the CLI's native dependencies and every upstream CPU backend, retains upstream notices, bundles the pinned Microsoft runtime and audits imports. `tools/qa_hymt_components.py` exercises actual update/rollback, cancellation, invalid GGUF rejection, offline removal and loaded private DLL paths. No new Hy-MT artifact is approved for the public catalog by these commands.
 
 The component repository contains recipes, locks, publisher scripts, and public metadata. Runtime ZIPs are Release assets. Models currently retain pinned ModelScope URLs and SHA-256 rather than being silently selected by the library. Large future models may use other exact-revision sources.
 
