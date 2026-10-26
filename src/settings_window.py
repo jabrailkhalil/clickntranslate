@@ -30,6 +30,7 @@ import importlib.util
 from pathlib import Path
 from package_installation import install_directory
 from rapidocr_models import RAPIDOCR_VERSION
+from component_texts import update_label as component_update_label
 from urllib.parse import urlparse
 try:
     import winreg
@@ -6580,7 +6581,8 @@ class OcrLanguageManagerDialog(QDialog):
             "RapidOCR",
             language_manager_text(self.lang, "rapidocr_note"),
             self._populate_rapidocr_table,
-            [],
+            [(component_update_label(self.lang),
+               self._update_rapidocr_engine, 'secondary')],
             header_labels=[
                 "",
                 language_manager_text(self.lang, "component"),
@@ -6592,6 +6594,9 @@ class OcrLanguageManagerDialog(QDialog):
             remove_engine_callback=self._remove_rapidocr_engine,
         )
         self.rapidocr_table.setColumnHidden(0, True)
+        from component_texts import UPDATE_HINTS
+        for button in self.rapidocr_table._package_action_buttons:
+            button.setToolTip(UPDATE_HINTS.get(self.lang, UPDATE_HINTS['en']))
 
         self.hymt_table = self._add_engine_tab(
             self.translation_tabs,
@@ -7684,6 +7689,10 @@ class OcrLanguageManagerDialog(QDialog):
             return
         self.owner.start_rapidocr_install(progress_owner=self)
         QtCore.QTimer.singleShot(750, lambda: self._refresh_after_owner_install("_rapidocr_install_in_progress"))
+
+    def _update_rapidocr_engine(self):
+        self.owner.start_rapidocr_install(progress_owner=self)
+        QtCore.QTimer.singleShot(750, lambda: self._refresh_after_owner_install('_rapidocr_install_in_progress'))
 
     def _windows_ocr_capability_name(self, language_code):
         return f"Language.OCR~~~{windows_ocr_tag(language_code)}~0.0.1.0"
@@ -14631,6 +14640,10 @@ finally {
         return os.path.join(self._portable_app_dir(), "ocr", "tesseract")
 
     def _local_rapidocr_dir(self):
+        from component_runtime import managed_runtime
+        runtime = managed_runtime()
+        if runtime:
+            return str(runtime['folder'])
         return os.path.join(self._portable_app_dir(), "ocr", "rapidocr")
 
     def _local_easyocr_dir(self):
@@ -14675,6 +14688,7 @@ finally {
     def _rapidocr_candidate_paths_under(self, root_dir):
         candidates = [
             root_dir,
+            os.path.join(root_dir, 'runtime', 'site-packages'),
             os.path.join(root_dir, "site-packages"),
             os.path.join(root_dir, "Lib", "site-packages"),
             os.path.join(root_dir, "lib", "site-packages"),
@@ -14962,6 +14976,13 @@ finally {
             return False, str(e)
 
     def _delete_local_rapidocr_dir(self):
+        from component_runtime import managed_runtime
+        if managed_runtime():
+            from component_catalog import component_store_path
+            from component_store import ComponentStore
+            ComponentStore(component_store_path()).remove('ocr.rapidocr')
+            self._reset_rapidocr_runtime_cache(clear_modules=True)
+            return True, ''
         rapidocr_dir = self._local_rapidocr_dir()
         if not os.path.isdir(rapidocr_dir):
             return True, ""
@@ -15714,6 +15735,23 @@ finally {
         final_dir = self._local_rapidocr_dir()
         try:
             lang = getattr(getattr(self, "parent", None), "current_interface_language", "en")
+            if platform_support.IS_WINDOWS:
+                from component_runtime import install_rapidocr
+                from component_catalog import ComponentError
+                from component_texts import error_text
+                try:
+                    install_rapidocr(
+                        lambda url, destination: self._download_file(url, destination,
+                            cancel_callback=lambda: self._rapidocr_cancel_requested.is_set()),
+                        check_cancel=self._check_rapidocr_cancel_requested,
+                        progress=lambda index, total: self._emit_rapidocr_progress(
+                            engine_text(lang, 'preparing', engine='RapidOCR'), int(90 * index / total)))
+                except ComponentError as error:
+                    raise RuntimeError(error_text(lang, error)) from error
+                self._reset_rapidocr_runtime_cache(clear_modules=True)
+                self._emit_rapidocr_progress(engine_text(lang, 'done'), 100)
+                QMetaObject.invokeMethod(self, '_on_rapidocr_install_ready', Qt.QueuedConnection)
+                return
             temp_dir = tempfile.mkdtemp(prefix="clickntranslate_rapidocr_")
             self._rapidocr_temp_dir = temp_dir
             package_root = os.path.join(temp_dir, "site-packages")

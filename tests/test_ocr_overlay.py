@@ -1152,7 +1152,11 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
             rapid_package = rapid_root / "site-packages" / "rapidocr_onnxruntime"
             rapid_package.mkdir(parents=True)
             rapid_package.joinpath("__init__.py").write_text("", encoding="utf-8")
-            with mock.patch.object(ocr, "_rapidocr_local_root", return_value=str(rapid_root)):
+            # This fixture represents a legacy installation, independent of
+            # whether the developer's interpreter also has modern RapidOCR.
+            source_root = Path(__file__).resolve().parents[1]
+            with mock.patch.object(ocr, "_rapidocr_local_root", return_value=str(rapid_root)), \
+                 mock.patch.object(ocr.sys, 'path', [str(source_root), str(source_root / 'src')]):
                 self.assertEqual(
                     ocr.installed_ocr_language_codes("RapidOCR", {}),
                     ["en", "zh"],
@@ -1181,7 +1185,9 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
             internal.mkdir()
             internal.joinpath(platform_support.executable_name("OcrWorker")).write_bytes(b"worker")
             with mock.patch.object(ocr.sys, "frozen", True, create=True):
-                with mock.patch.object(ocr.sys, "executable", str(app_exe)):
+                source_root = Path(__file__).resolve().parents[1]
+                with mock.patch.object(ocr.sys, "executable", str(app_exe)), \
+                     mock.patch.object(ocr.sys, 'path', [str(source_root), str(source_root / 'src')]):
                     self.assertEqual(
                         ocr.installed_ocr_language_codes("RapidOCR", {}),
                         ["en", "zh"],

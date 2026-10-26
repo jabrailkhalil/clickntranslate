@@ -42,8 +42,10 @@ if _engine_python:
 
 
 gui_datas = [(str(_SOURCE_ROOT / 'icons'), 'icons')]
+gui_datas += [(str(_SOURCE_ROOT / 'component_root.json'), '.')]
 gui_binaries = []
 gui_hiddenimports = [
+    'tuf.ngclient', 'securesystemslib.signer._crypto_signer',
     'winrt.windows.media.ocr',
     'winrt.windows.globalization',
     'winrt.windows.graphics.imaging',

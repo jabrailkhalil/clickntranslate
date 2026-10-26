@@ -31,3 +31,5 @@ packaging
 rapidocr[rtl]==3.10.0
 onnxruntime==1.30.0
 keyring
+tuf==6.0.0
+securesystemslib[crypto]==1.6.0

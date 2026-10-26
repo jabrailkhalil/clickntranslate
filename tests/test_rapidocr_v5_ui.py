@@ -41,6 +41,9 @@ def test_rapidocr_v5_notes_and_model_table_render_in_supported_locales(locale, t
             assert note.isVisible()
             assert note.height() >= note.heightForWidth(note.width())
             assert dialog.rapidocr_table.viewport().height() >= 80
+            update = dialog.rapidocr_table._package_action_buttons[0]
+            assert update.isVisible() and update.toolTip().strip()
+            assert update.fontMetrics().horizontalAdvance(update.text()) + 16 < update.width()
             packages = [dialog.rapidocr_table.item(row, 2).text() for row in range(dialog.rapidocr_table.rowCount())]
             assert packages.count('PP-OCRv5 mobile') == 2
             capture = os.environ.get('CNT_RAPID_QA_CAPTURES')

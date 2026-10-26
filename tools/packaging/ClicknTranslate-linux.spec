@@ -84,6 +84,7 @@ def _xcb_platform_libraries():
 
 
 gui_datas = [(str(_SOURCE_ROOT / 'icons'), 'icons')]
+gui_datas += [(str(_SOURCE_ROOT / 'component_root.json'), '.')]
 gui_binaries = _xcb_platform_libraries()
 gui_hiddenimports = ['pypdf']
 

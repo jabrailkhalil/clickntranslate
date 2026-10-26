@@ -23,3 +23,6 @@ setuptools<81
 psutil
 pypdf
 keyring
+tuf==6.0.0
+securesystemslib[crypto]==1.6.0
+packaging

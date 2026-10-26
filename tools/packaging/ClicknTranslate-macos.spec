@@ -35,12 +35,13 @@ common_excludes = ['tkinter', 'pytest', 'IPython', 'jupyter', 'tensorflow', 'ker
 optional = ['easyocr', 'torch', 'torchvision', 'skimage']
 native_bridges = ['Vision', 'Quartz', 'AppKit', 'Foundation', 'CoreFoundation', 'ApplicationServices',
                   'CoreMedia', 'ScreenCaptureKit', 'objc']
-gui_hidden = ['pypdf']
+gui_hidden = ['pypdf', 'tuf.ngclient', 'securesystemslib.signer._crypto_signer']
 for module in native_bridges:
     gui_hidden += collect_submodules(module)
 
 gui = Analysis([str(_PROJECT_ROOT / 'main.py')], pathex=[str(_PROJECT_ROOT), str(_SOURCE_ROOT)],
-               datas=[(str(_SOURCE_ROOT / 'icons'), 'icons')], binaries=[], hiddenimports=gui_hidden,
+               datas=[(str(_SOURCE_ROOT / 'icons'), 'icons'),
+                      (str(_SOURCE_ROOT / 'component_root.json'), '.')], binaries=[], hiddenimports=gui_hidden,
                excludes=[*common_excludes, *optional, 'argostranslate', 'ctranslate2',
                          'sentencepiece', 'onnxruntime', 'rapidocr', 'rapidocr_onnxruntime', 'cv2'],
                noarchive=False)

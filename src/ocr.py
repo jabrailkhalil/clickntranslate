@@ -1219,6 +1219,9 @@ def _serialized_native_ocr_runtime(function):
 
 
 def _native_ocr_worker_enabled():
+    from component_runtime import managed_runtime
+    if managed_runtime():
+        return True
     if not (platform_support.IS_WINDOWS or platform_support.IS_MAC):
         return False
     # Re-importing Torch after removing/reinstalling an engine can fail in its
@@ -1251,7 +1254,12 @@ def _native_ocr_worker_command():
 
 
 def _call_native_ocr_worker(request, pil_variants=None, timeout=1800):
-    command = _native_ocr_worker_command()
+    from contextlib import nullcontext
+    from component_runtime import managed_runtime, worker_environment
+    from component_catalog import component_store_path
+    from component_store import ComponentStore
+    runtime = managed_runtime(request.get('engine'))
+    command = runtime['command'] if runtime else _native_ocr_worker_command()
     if not command:
         raise RuntimeError("Native OCR worker is missing from this build.")
 
@@ -1263,6 +1271,8 @@ def _call_native_ocr_worker(request, pil_variants=None, timeout=1800):
             image.save(image_path, format="PNG")
             images.append({"label": str(label), "path": image_path})
         payload = dict(request)
+        if runtime:
+            payload['root_dir'] = str(runtime['folder'])
         payload["images"] = images
         request_path = os.path.join(temp_dir, "request.json")
         with open(request_path, "w", encoding="utf-8") as request_file:
@@ -1274,16 +1284,19 @@ def _call_native_ocr_worker(request, pil_variants=None, timeout=1800):
             creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
             startupinfo = subprocess.STARTUPINFO()
             startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-        completed = subprocess.run(
-            [*command, request_path],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=timeout,
-            startupinfo=startupinfo,
-            creationflags=creationflags,
-        )
+        lease = ComponentStore(component_store_path()).lease(runtime['receipt']['generation']) if runtime else nullcontext()
+        with lease:
+            completed = subprocess.run(
+                [*command, request_path],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=timeout,
+                startupinfo=startupinfo,
+                creationflags=creationflags,
+                **({'env': worker_environment()} if runtime else {}),
+            )
         output = (completed.stdout or "").strip()
         if completed.returncode != 0:
             detail = (completed.stderr or output or f"exit code {completed.returncode}").strip()
@@ -1396,6 +1409,10 @@ def _recognize_with_native_ocr_worker(
 
 
 def _rapidocr_local_root():
+    from component_runtime import managed_runtime
+    runtime = managed_runtime()
+    if runtime:
+        return str(runtime['folder'])
     return (
         os.environ.get("CLICKNTRANSLATE_RAPIDOCR_DIR")
         or os.path.join(get_portable_dir(), "ocr", "rapidocr")
@@ -1406,6 +1423,7 @@ def _rapidocr_local_candidate_paths(root_dir=None):
     root_dir = root_dir or _rapidocr_local_root()
     candidates = [
         root_dir,
+        os.path.join(root_dir, 'runtime', 'site-packages'),
         os.path.join(root_dir, "site-packages"),
         os.path.join(root_dir, "Lib", "site-packages"),
         os.path.join(root_dir, "lib", "site-packages"),

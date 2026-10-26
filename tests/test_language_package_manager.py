@@ -918,7 +918,7 @@ class LanguagePackageDialogTest(unittest.TestCase):
             "windows_table": 3,
             "tesseract_table": 2,
             "easyocr_table": 2,
-            "rapidocr_table": 0,
+            "rapidocr_table": 1,
             "argos_table": 2,
         }
         for name, expected_count in expected_action_counts.items():
