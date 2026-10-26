@@ -5,6 +5,7 @@ from functools import partial
 import hashlib
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import json
+import os
 from pathlib import Path
 import shutil
 import sys
@@ -77,7 +78,7 @@ def test_future_adapter_contract_does_not_block_compatible_existing_updates(tmp_
     # Its layout is deliberately unknown to this client: it must not attempt to
     # parse or launch the future adapter as a Python worker.
     catalog['bundles'].append({'id':'future-rapidocr', 'component':'ocr.rapidocr',
-                              'contract':2, 'revision':100, 'channel':'preview',
+                              'contract':component_catalog.CONTRACT+1, 'revision':100, 'channel':'preview',
                               'future_runtime':{'opaque':'future schema'}})
     loaded = parse_catalog(json.dumps(catalog))
     selected = choose_bundle(loaded, 'ocr.rapidocr', '1.8.2', channel='preview',
@@ -106,6 +107,21 @@ def test_failed_install_keeps_previous_and_reuses_bytes(tmp_path):
     assert store.active('ocr.rapidocr')['receipt']['revision'] == 2
     store.rollback('ocr.rapidocr', validate, catalog)
     assert store.active('ocr.rapidocr')['receipt']['revision'] == 1
+
+
+@pytest.mark.skipif(os.name != 'nt', reason='Windows extended paths')
+def test_store_extracts_and_removes_deep_native_license_paths(tmp_path):
+    store = ComponentStore(tmp_path/'store')
+    path = tmp_path/'deep.zip'
+    name = '/'.join(['third_party']*26)+'/LICENSE.txt'
+    with zipfile.ZipFile(path,'w') as archive:
+        archive.writestr(name,'upstream notice')
+    target = store.root/'generations'/'deep-runtime'
+    store.extract(path,target,8192)
+    assert (target/name).read_text()=='upstream notice'
+    assert len(str(target/name))>260
+    shutil.rmtree(target)
+    assert not target.exists()
 
 
 def test_crash_recovery_removes_only_uncommitted_generation(tmp_path):

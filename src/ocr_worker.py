@@ -7,6 +7,9 @@ import os
 import sys
 import time
 import traceback
+import tempfile
+import gc
+from pathlib import Path
 
 from runtime_bootstrap import activate
 
@@ -17,6 +20,7 @@ from ocr_text_layout import order_ocr_items, ocr_text_from_items
 
 
 _DLL_HANDLES = []
+_EASYOCR_CPU_CONFIGURED = False
 
 
 def _candidate_paths(root_dir):
@@ -181,25 +185,63 @@ def _recognize_rapidocr(request):
 
 
 def _recognize_easyocr(request):
-    easyocr = importlib.import_module("easyocr")
+    with _easyocr_reader(request) as reader:
+        return _read_easyocr_images(reader, request.get('images') or [])
+
+
+@contextlib.contextmanager
+def _easyocr_reader(request, *, codes=None, recognizer=True):
     root_dir = request.get("root_dir") or ""
     model_dir = os.path.join(root_dir, "models")
-    user_network_dir = os.path.join(root_dir, "user_network")
-    os.makedirs(model_dir, exist_ok=True)
-    os.makedirs(user_network_dir, exist_ok=True)
-    reader = easyocr.Reader(
-        list(request.get("language_codes") or ["en"]),
-        gpu=False,
-        model_storage_directory=model_dir,
-        user_network_directory=user_network_dir,
-        # Missing flags are intentionally safe: models may be downloaded only
-        # by the explicit Language packages installation flow.
-        download_enabled=bool(request.get("allow_download", False)),
-        verbose=False,
-    )
+    marker = Path(root_dir) / 'runtime/COMPONENT.json'
+    managed = marker.is_file() and json.loads(marker.read_bytes()).get('component') == 'ocr.easyocr'
+    if managed:
+        _configure_easyocr_cpu()
+        receipt_path = Path(root_dir)/'receipt.json'
+        if receipt_path.is_file():
+            aliases = json.loads(receipt_path.read_bytes()).get('sdk_codes',{})
+            codes = [aliases.get(code,code) for code in (codes or request.get('language_codes') or ['en'])]
+    easyocr = importlib.import_module('easyocr')
+    if managed and getattr(easyocr,'__version__','') == '1.7.2':
+        from easyocr_models import TAMIL_ALPHABET_FIX
+        config = importlib.import_module('easyocr.config')
+        tamil = config.recognition_models['gen1']['tamil_g1']
+        if tamil['md5sum'] != TAMIL_ALPHABET_FIX['model_md5']:
+            raise RuntimeError('Tamil model changed; review its alphabet before approval')
+        tamil['characters'] = TAMIL_ALPHABET_FIX['characters']
+    with tempfile.TemporaryDirectory(prefix='clickntranslate_easyocr_', dir=request.get('work_dir')) as work:
+        if managed:
+            user_network_dir = str(Path(work)/'user_network')
+            os.environ['TORCH_HOME'] = str(Path(work)/'torch')
+        else:
+            user_network_dir = os.path.join(root_dir, 'user_network')
+        os.makedirs(model_dir, exist_ok=True)
+        os.makedirs(user_network_dir, exist_ok=True)
+        reader = easyocr.Reader(list(codes or request.get('language_codes') or ['en']),
+            gpu=False, model_storage_directory=model_dir, user_network_directory=user_network_dir,
+            download_enabled=False if managed else bool(request.get('allow_download', False)),
+            recognizer=recognizer, verbose=False)
+        try:
+            yield reader
+        finally:
+            del reader
+            gc.collect()
+
+
+def _configure_easyocr_cpu():
+    global _EASYOCR_CPU_CONFIGURED
+    torch = importlib.import_module('torch')
+    if not _EASYOCR_CPU_CONFIGURED:
+        torch.set_num_threads(min(4, os.cpu_count() or 1))
+        torch.set_num_interop_threads(1)
+        _EASYOCR_CPU_CONFIGURED = True
+    return torch
+
+
+def _read_easyocr_images(reader, images):
     numpy = importlib.import_module("numpy")
     results = []
-    for image_request in request.get("images") or []:
+    for image_request in images:
         label = str(image_request.get("label") or "image")
         try:
             with Image.open(image_request["path"]) as opened:
@@ -212,6 +254,42 @@ def _recognize_easyocr(request):
         except Exception as exc:
             results.append({"label": label, "text": "", "error": f"{type(exc).__name__}: {exc}"})
     return results
+
+
+def _validate_easyocr(request):
+    from easyocr_models import PROBE_CODES, MODEL_FILES
+    torch = _configure_easyocr_cpu()
+    torchvision = importlib.import_module('torchvision')
+    if torch.version.cuda is not None or '+cpu' not in torch.__version__:
+        raise RuntimeError('Managed EasyOCR requires the declared CPU-only Torch runtime')
+    # Loading torchvision alone does not verify its compiled operator ABI.
+    torchvision.ops.nms(torch.tensor([[0.,0.,10.,10.]]), torch.tensor([1.]), .5)
+    groups = request.get('groups', [])
+    root = Path(request['root_dir'])/'models'
+    expected = {'craft_mlt_25k.pth', *(MODEL_FILES[group] for group in groups)}
+    if {p.name for p in root.glob('*.pth')} != expected:
+        raise RuntimeError('EasyOCR models differ from the selected plan')
+    with tempfile.TemporaryDirectory(prefix='clickntranslate_easyocr_probe_', dir=request.get('work_dir')) as work:
+        path = Path(work)/'probe.png'
+        probe = Image.new('RGB',(500,100),'white')
+        ImageDraw.Draw(probe).text((20,20),'TEST 123',fill='black',font_size=40)
+        probe.save(path)
+        for group in groups:
+            codes = [PROBE_CODES[group]]
+            if codes != ['en']:
+                codes.append('en')
+            try:
+                with _easyocr_reader(request,codes=codes) as reader:
+                    result = _read_easyocr_images(reader,[{'path':str(path),'label':group}])[0]
+                    if result.get('error') or not result.get('text'):
+                        raise RuntimeError('empty or invalid OCR result')
+            except Exception as error:
+                raise RuntimeError(f'EasyOCR {group}: {error}') from error
+        if not groups:
+            with _easyocr_reader(request,codes=['en'],recognizer=False) as reader:
+                reader.detect(importlib.import_module('numpy').array(probe))
+    return {'validated':groups, 'torch':torch.__version__, 'cuda':torch.version.cuda,
+            'dll_runtime':_PRIVATE_DLL_RUNTIME, 'error':''}
 
 
 def run_request(request):
@@ -237,6 +315,8 @@ def run_request(request):
             instance(probe, use_det=False)
             instance(probe)
         return {'available': True, 'error': '', 'dll_runtime': _PRIVATE_DLL_RUNTIME}
+    if action == 'validate' and engine == 'easyocr':
+        return _validate_easyocr(request)
     if engine == "rapidocr":
         return {"results": _recognize_rapidocr(request), "error": ""}
     if engine == "easyocr":

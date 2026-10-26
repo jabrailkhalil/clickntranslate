@@ -76,7 +76,7 @@ def install(download, *, pairs=(), remove_pairs=(), legacy_pairs=(), root=None,
         try:
             old = store.active(COMPONENT)
         except ComponentError:
-            old = None
+            old = store.describe(COMPONENT)
         if old and remove_pairs and not pairs:
             return store.remove_languages(COMPONENT, [direction_id(pair) for pair in remove_pairs],
                 lambda folder, receipt: validate(folder, receipt, check_cancel), check_cancel, progress)

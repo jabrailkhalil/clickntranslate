@@ -64,7 +64,7 @@ class _ManagerOwner(QWidget):
     def _local_hymt_dir(self):
         return str(ROOT / "translators" / "hymt")
 
-    def start_hymt_install(self, progress_owner=None):
+    def start_hymt_install(self, progress_owner=None, *, select_on_success=True):
         self.hymt_installs += 1
         self.last_progress_owner = progress_owner
 
@@ -86,15 +86,15 @@ class _ManagerOwner(QWidget):
     def _local_easyocr_dir(self):
         return str(ROOT / "ocr" / "easyocr")
 
-    def start_tesseract_install(self, progress_owner=None):
+    def start_tesseract_install(self, progress_owner=None, *, select_on_success=True):
         self.tesseract_installs += 1
         self.last_progress_owner = progress_owner
 
-    def start_easyocr_install(self, progress_owner=None):
+    def start_easyocr_install(self, progress_owner=None, *, select_on_success=True):
         self.easyocr_installs += 1
         self.last_progress_owner = progress_owner
 
-    def start_rapidocr_install(self, progress_owner=None):
+    def start_rapidocr_install(self, progress_owner=None, *, select_on_success=True):
         self.rapidocr_installs += 1
         self.last_progress_owner = progress_owner
 
@@ -917,7 +917,7 @@ class LanguagePackageDialogTest(unittest.TestCase):
         expected_action_counts = {
             "windows_table": 3,
             "tesseract_table": 3 if platform_support.IS_WINDOWS else 2,
-            "easyocr_table": 2,
+            "easyocr_table": 3 if platform_support.IS_WINDOWS else 2,
             "rapidocr_table": 1,
             "argos_table": 3 if platform_support.IS_WINDOWS else 2,
         }

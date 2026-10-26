@@ -9,7 +9,7 @@ from urllib.parse import urlparse
 
 CATALOG_URL = 'https://jabrailkhalil.github.io/clickntranslate-components/metadata/'
 TARGET_URL = 'https://jabrailkhalil.github.io/clickntranslate-components/targets/'
-CONTRACT = 1
+CONTRACT = 2
 SAFE_ID = re.compile(r'^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$')
 SHA256 = re.compile(r'^[0-9a-f]{64}$')
 
@@ -112,10 +112,14 @@ def parse_catalog(data):
             if not isinstance(item, dict):
                 raise ComponentError('invalid_catalog', 'file')
             digest = item.get('sha256')
-            if digest not in artifacts or item.get('kind') not in ('zip', 'file'):
+            if digest not in artifacts or item.get('kind') not in ('zip', 'file', 'zip_member'):
                 raise ComponentError('invalid_catalog', 'unknown artifact')
-            if item['kind'] == 'zip' and 'unpacked_size' not in artifacts[digest]:
+            if item['kind'] in ('zip', 'zip_member') and 'unpacked_size' not in artifacts[digest]:
                 raise ComponentError('invalid_catalog', 'archive expansion limit')
+            if item['kind'] == 'zip_member':
+                if bundle['contract'] < 2:
+                    raise ComponentError('invalid_catalog', 'archive member requires contract 2')
+                safe_relative(item.get('member'))
             destination = safe_relative(item.get('destination'))
             if destination.casefold() in destinations:
                 raise ComponentError('invalid_catalog', 'duplicate destination')
@@ -163,7 +167,7 @@ def choose_bundle(catalog, component, app_version, *, channel='stable', target=N
         raise ComponentError('no_compatible_update', 'unknown operating system version') from error
     candidates = []
     for bundle in catalog['bundles']:
-        if bundle['component'] != component or bundle.get('revoked') or bundle['contract'] != CONTRACT:
+        if bundle['component'] != component or bundle.get('revoked') or bundle['contract'] > CONTRACT:
             continue
         if bundle['channel'] != channel or bundle['os'] != target['os'] or bundle['arch'] != target['arch']:
             continue

@@ -34,8 +34,20 @@ def prepare(output, recipe_path=None):
         raise RuntimeError('CPython archive checksum mismatch')
     wheels = output / 'wheelhouse'
     wheels.mkdir(exist_ok=True)
+    # Exact CPU wheels come from the vendor's own index. Download their pinned
+    # bytes first; do not mix a second live dependency index into resolution.
+    from component_download import ComponentDownloader
+    for wheel in recipe.get('source_wheels', ()):
+        name = safe_relative(wheel['filename'])
+        if Path(name).name != name:
+            raise RuntimeError('Wheel filename must be flat')
+        path = wheels / name
+        if not path.exists():
+            ComponentDownloader().artifact(wheel['url'], path, wheel)
+        if path.stat().st_size != wheel['size'] or file_digest(path) != wheel['sha256']:
+            raise RuntimeError('Vendor wheel checksum mismatch: ' + name)
     subprocess.run([sys.executable, '-m', 'pip', 'download', '--only-binary=:all:',
-        '--dest', str(wheels), *recipe['requirements']], check=True)
+        '--find-links', str(wheels), '--dest', str(wheels), *recipe['requirements']], check=True)
     if recipe.get('requirements_no_deps'):
         subprocess.run([sys.executable, '-m', 'pip', 'download', '--only-binary=:all:',
             '--no-deps', '--dest', str(wheels), *recipe['requirements_no_deps']], check=True)

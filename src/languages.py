@@ -286,9 +286,8 @@ def easyocr_language_code(code):
         return "en"
     if language.easyocr_code:
         return language.easyocr_code
-    if language.code == "zh":
-        return "ch_sim"
-    return language.code
+    from easyocr_models import SDK_ALIASES
+    return SDK_ALIASES.get(language.code, language.code)
 
 
 def easyocr_language_codes(code, include_english=True):

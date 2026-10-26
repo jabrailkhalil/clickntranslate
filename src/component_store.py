@@ -7,6 +7,7 @@ from pathlib import Path
 import shutil
 import sqlite3
 import stat
+import tempfile
 import time
 import uuid
 import zipfile
@@ -64,6 +65,12 @@ def file_digest(path):
 class ComponentStore:
     def __init__(self, root):
         self.root = Path(root).resolve()
+        # Torch ships deeply nested license directories. Use extended Win32
+        # paths for the complete store, including extraction, SQLite and GC,
+        # without requiring a machine-wide LongPathsEnabled registry change.
+        if os.name == 'nt' and not str(self.root).startswith('\\\\?\\'):
+            value = str(self.root)
+            self.root = Path('\\\\?\\UNC\\'+value[2:] if value.startswith('\\\\') else '\\\\?\\'+value)
 
     @contextmanager
     def lock(self):
@@ -151,6 +158,13 @@ class ComponentStore:
             marker.unlink(missing_ok=True)
 
     def active(self, component):
+        description = self.describe(component)
+        if description:
+            return dict(description, command=runtime_command(description['folder'], description['receipt']))
+        return None
+
+    def describe(self, component):
+        """Read the saved selection even if its interpreter needs repair."""
         if not (self.root / 'state.sqlite').is_file():
             return None
         with self.database() as db:
@@ -162,7 +176,7 @@ class ComponentStore:
             receipt = json.loads((folder / 'receipt.json').read_text(encoding='utf-8'))
             if receipt['component'] != component or receipt['generation'] != row[0]:
                 raise ValueError('receipt mismatch')
-            return {'folder': folder, 'command': runtime_command(folder, receipt), 'receipt': receipt}
+            return {'folder': folder, 'receipt': receipt}
         except (OSError, ValueError, KeyError) as exc:
             raise ComponentError('installed_component_damaged', component) from exc
 
@@ -273,8 +287,16 @@ class ComponentStore:
         if (old and old['receipt']['bundle'] == bundle['id']
                 and old['receipt']['files'] == bundle['files']
                 and old['receipt']['languages'] == bundle['languages']):
-            validate(old['folder'], old['receipt'])
-            return old
+            try:
+                validate(old['folder'], old['receipt'])
+                return old
+            except ComponentError as error:
+                if error.code not in ('validation_failed','installed_component_damaged','inference_failed'):
+                    raise
+                # Repair an identical but damaged installation from verified
+                # objects. Do not retain this known-broken generation as rollback.
+                # If rebuilding fails, its active pointer is still untouched.
+                old = None
         expanded = sum(catalog['artifacts'][f['sha256']].get('unpacked_size', catalog['artifacts'][f['sha256']]['size']) for f in bundle['files'])
         compressed = sum(catalog['artifacts'][f['sha256']]['size'] for f in bundle['files'] if not self.object_path(f['sha256']).exists())
         if shutil.disk_usage(self.root).free < expanded + compressed + 64 * 1024**2:
@@ -296,6 +318,19 @@ class ComponentStore:
                 target = folder / safe_relative(item['destination'])
                 if item['kind'] == 'zip':
                     self.extract(source, target, artifact['unpacked_size'], check_cancel)
+                elif item['kind'] == 'zip_member':
+                    # Preserve the original authenticated upstream ZIP while
+                    # installing one declared member into the shared model dir.
+                    # The normal extractor validates all paths, links and limits.
+                    with tempfile.TemporaryDirectory(prefix='.unpack_', dir=folder) as temporary:
+                        unpacked = Path(temporary)
+                        self.extract(source, unpacked, artifact['unpacked_size'], check_cancel)
+                        member = unpacked / safe_relative(item['member'])
+                        if not member.is_file():
+                            raise ComponentError('unsafe_archive', 'declared member is missing')
+                        check_cancel()
+                        target.parent.mkdir(parents=True, exist_ok=True)
+                        os.replace(member, target)
                 else:
                     target.parent.mkdir(parents=True, exist_ok=True)
                     with open(source, 'rb') as original, open(target, 'wb') as output:

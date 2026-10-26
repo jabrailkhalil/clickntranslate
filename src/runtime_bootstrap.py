@@ -21,7 +21,7 @@ def activate():
         _INFO = {}
         return _INFO
     value = json.loads(marker.read_text(encoding='utf-8'))
-    if value.get('component') not in ('ocr.rapidocr', 'translation.argos'):
+    if value.get('component') not in ('ocr.rapidocr', 'translation.argos', 'ocr.easyocr'):
         _INFO = {}
         return _INFO
     import ctypes

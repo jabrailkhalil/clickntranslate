@@ -4967,38 +4967,8 @@ def ensure_json_file(filepath, default_content):
             json.dump(default_content, f, ensure_ascii=False, indent=4)
 
 
-EASYOCR_MODEL_GROUP_BY_LANGUAGE = {
-    "en": "english_g2",
-    "ru": "cyrillic_g2",
-    "uk": "cyrillic_g2",
-    "de": "latin_g2",
-    "fr": "latin_g2",
-    "es": "latin_g2",
-    "it": "latin_g2",
-    "pt": "latin_g2",
-    "pl": "latin_g2",
-    "tr": "latin_g2",
-    "nl": "latin_g2",
-    "zh": "zh_sim_g2",
-    "ch_sim": "zh_sim_g2",
-    "ja": "japanese_g2",
-    "ko": "korean_g2",
-    "ar": "arabic",
-    "hi": "devanagari",
-
-    'id': 'english_g2',
-}
-
-EASYOCR_MODEL_FILE_VARIANTS = {
-    "english_g2": ("english_g2.pth",),
-    "cyrillic_g2": ("cyrillic_g2.pth", "cyrillic.pth"),
-    "latin_g2": ("latin_g2.pth", "latin.pth"),
-    "zh_sim_g2": ("zh_sim_g2.pth", "chinese_sim.pth"),
-    "japanese_g2": ("japanese_g2.pth", "japanese.pth"),
-    "korean_g2": ("korean_g2.pth", "korean.pth"),
-    "arabic": ("arabic.pth",),
-    "devanagari": ("devanagari.pth",),
-}
+from easyocr_models import (LANGUAGE_GROUPS as EASYOCR_MODEL_GROUP_BY_LANGUAGE,
+                            MODEL_FILE_VARIANTS as EASYOCR_MODEL_FILE_VARIANTS)
 
 
 LANGUAGE_MANAGER_TEXT = {
@@ -6573,11 +6543,17 @@ class OcrLanguageManagerDialog(QDialog):
             [
                 (language_manager_text(self.lang, "install_selected"), self._install_selected_easyocr, "primary"),
                 (language_manager_text(self.lang, "remove_highlighted"), self._remove_selected_easyocr, "danger"),
+                *([(component_update_label(self.lang, 'EasyOCR'), self._update_easyocr_engine, 'secondary')]
+                  if platform_support.IS_WINDOWS else []),
             ],
             missing_engine=EASYOCR_ENGINE_DISPLAY,
             install_engine_callback=self._install_easyocr_engine,
             remove_engine_callback=self._remove_easyocr_engine,
         )
+        from component_texts import update_hint
+        for button in self.easyocr_table._package_action_buttons:
+            if button.text() == component_update_label(self.lang,'EasyOCR'):
+                button.setToolTip(update_hint(self.lang,'EasyOCR'))
         self.rapidocr_table = self._add_engine_tab(
             self.ocr_tabs,
             "RapidOCR",
@@ -7242,6 +7218,10 @@ class OcrLanguageManagerDialog(QDialog):
         return os.path.join(self.owner._local_easyocr_dir(), "models")
 
     def _easyocr_model_groups_for_language(self, language_code):
+        manifest = getattr(self,'_easyocr_manifest',{})
+        if manifest:
+            group = manifest.get('language_groups',EASYOCR_MODEL_GROUP_BY_LANGUAGE).get(language_code)
+            return [group] if group in manifest.get('available_languages',manifest.get('languages',())) else []
         # EasyOCR adds English as a compatible language, but loads one
         # recognition network chosen by the primary script (for example,
         # cyrillic_g2 for ["ru", "en"] or zh_sim_g2 for ["ch_sim", "en"]).
@@ -7257,7 +7237,8 @@ class OcrLanguageManagerDialog(QDialog):
 
     def _easyocr_group_installed(self, group):
         model_dir = self._easyocr_model_dir()
-        variants = EASYOCR_MODEL_FILE_VARIANTS.get(group, (f"{group}.pth",))
+        filename = getattr(self,'_easyocr_manifest',{}).get('model_files',{}).get(group)
+        variants = (filename,) if filename else EASYOCR_MODEL_FILE_VARIANTS.get(group, (f"{group}.pth",))
         return any(os.path.isfile(os.path.join(model_dir, filename)) for filename in variants)
 
     def _easyocr_language_installed(self, language_code):
@@ -7268,6 +7249,9 @@ class OcrLanguageManagerDialog(QDialog):
         return bool(groups) and all(self._easyocr_group_installed(group) for group in groups)
 
     def _populate_easyocr_table(self, table):
+        from component_runtime import managed_runtime
+        runtime = managed_runtime('easyocr')
+        self._easyocr_manifest = runtime['receipt'] if runtime else {}
         checking = self._easyocr_status_cache is None
         engine_ready, _error = self._easyocr_status_cache or (False, "")
         self._set_engine_missing_state(
@@ -7712,16 +7696,20 @@ class OcrLanguageManagerDialog(QDialog):
         QtCore.QTimer.singleShot(750, lambda: self._refresh_after_owner_install("_rapidocr_install_in_progress"))
 
     def _update_rapidocr_engine(self):
-        self.owner.start_rapidocr_install(progress_owner=self)
+        self.owner.start_rapidocr_install(progress_owner=self, select_on_success=False)
         QtCore.QTimer.singleShot(750, lambda: self._refresh_after_owner_install('_rapidocr_install_in_progress'))
 
     def _update_tesseract_engine(self):
-        self.owner.start_tesseract_install(progress_owner=self)
+        self.owner.start_tesseract_install(progress_owner=self, select_on_success=False)
         QtCore.QTimer.singleShot(750, lambda: self._refresh_after_owner_install('_tesseract_install_in_progress'))
 
     def _update_hymt_engine(self):
-        self.owner.start_hymt_install(progress_owner=self)
+        self.owner.start_hymt_install(progress_owner=self, select_on_success=False)
         QtCore.QTimer.singleShot(750, lambda: self._refresh_after_owner_install('_hymt_install_in_progress'))
+
+    def _update_easyocr_engine(self):
+        self.owner.start_easyocr_install(progress_owner=self, select_on_success=False)
+        QtCore.QTimer.singleShot(750,lambda:self._refresh_after_owner_install('_easyocr_install_in_progress'))
 
     def _windows_ocr_capability_name(self, language_code):
         return f"Language.OCR~~~{windows_ocr_tag(language_code)}~0.0.1.0"
@@ -9409,6 +9397,11 @@ try {{
 
     def _remove_easyocr_worker(self, codes):
         try:
+            from component_runtime import managed_runtime
+            if managed_runtime('easyocr'):
+                self._change_managed_easyocr_models(codes,remove=True)
+                self._finish_language_task(EASYOCR_ENGINE_DISPLAY)
+                return
             groups = []
             for code in codes:
                 for group in self._easyocr_model_groups_for_language(code):
@@ -9441,6 +9434,11 @@ try {{
 
     def _install_easyocr_worker(self, codes):
         try:
+            from component_runtime import managed_runtime
+            if managed_runtime('easyocr'):
+                self._change_managed_easyocr_models(codes)
+                self._finish_language_task(EASYOCR_ENGINE_DISPLAY)
+                return
             import ocr
             total = max(1, len(codes))
             for index, code in enumerate(codes, 1):
@@ -9464,6 +9462,27 @@ try {{
                 self._finish_language_task("EasyOCR", canceled=True)
             else:
                 self._finish_language_task("EasyOCR", str(exc))
+
+    def _change_managed_easyocr_models(self, codes, remove=False):
+        from component_easyocr import install
+        from component_download import ComponentDownloader
+        from component_catalog import ComponentError
+        from component_texts import error_text
+        groups = {group for code in codes for group in self._easyocr_model_groups_for_language(code)}
+        if not groups:
+            raise RuntimeError('Unsupported EasyOCR language')
+        def check_cancel():
+            if self._cancel_requested.is_set():
+                raise UpdateCancelledError('EasyOCR model operation canceled')
+        try:
+            install(ComponentDownloader(check_cancel,lambda url,done,total:self._emit_language_progress(
+                f'EasyOCR: {done//(1024*1024)} / {max(1,total//(1024*1024))} MB',int(90*done/total),True)),
+                groups=() if remove else groups,remove_groups=groups if remove else (),
+                check_cancel=check_cancel,progress=lambda index,total:self._emit_language_progress(
+                    engine_text(self.lang,'preparing',engine='EasyOCR'),int(90*index/total),True))
+        except ComponentError as error:
+            raise RuntimeError(error_text(self.lang,error)) from error
+        self.owner._reset_easyocr_runtime_cache(clear_modules=True)
 
     def _parse_argos_codes(self, codes):
         pairs = []
@@ -14728,6 +14747,10 @@ finally {
         return os.path.join(self._portable_app_dir(), "ocr", "rapidocr")
 
     def _local_easyocr_dir(self):
+        from component_runtime import managed_runtime
+        runtime = managed_runtime('easyocr')
+        if runtime:
+            return str(runtime['folder'])
         return os.path.join(self._portable_app_dir(), "ocr", "easyocr")
 
     def _find_tesseract_exe_under(self, root_dir):
@@ -14856,9 +14879,19 @@ finally {
         return False
 
     def _local_easyocr_installed(self):
+        from component_runtime import managed_runtime
+        from component_easyocr import legacy_disabled
+        if managed_runtime('easyocr'):
+            return True
+        if platform_support.IS_WINDOWS and legacy_disabled():
+            return False
         return self._easyocr_package_present_under(self._local_easyocr_dir())
 
     def _easyocr_runtime_installed(self):
+        from component_easyocr import legacy_disabled
+        from component_runtime import managed_runtime
+        if platform_support.IS_WINDOWS and not managed_runtime('easyocr') and legacy_disabled():
+            return False
         if self._local_easyocr_installed():
             return True
         return self._module_available_without_import("easyocr")
@@ -15080,6 +15113,15 @@ finally {
             return False, str(e)
 
     def _delete_local_easyocr_dir(self):
+        from component_runtime import managed_runtime
+        if managed_runtime('easyocr'):
+            from component_easyocr import remove
+            try:
+                remove()
+                self._reset_easyocr_runtime_cache(clear_modules=True)
+                return True, ''
+            except Exception as error:
+                return False, str(error)
         easyocr_dir = self._local_easyocr_dir()
         if not os.path.isdir(easyocr_dir):
             return True, ""
@@ -15244,7 +15286,7 @@ finally {
     def start_download_thread(self):
         self.start_tesseract_install()
 
-    def start_tesseract_install(self, progress_owner=None):
+    def start_tesseract_install(self, progress_owner=None, *, select_on_success=True):
         if platform_support.IS_LINUX:
             self._show_linux_tesseract_hint(self.parent.current_interface_language)
             return
@@ -15261,6 +15303,7 @@ finally {
         self._tesseract_cancel_requested.clear()
         self._tesseract_temp_dir = ""
         self._tesseract_progress_owner = progress_owner
+        self._component_tesseract_select_on_success = bool(select_on_success)
         self.ocr_engine_combo.setEnabled(False)
         self._set_parent_topmost_for_tesseract_install(False)
         self._show_tesseract_progress(engine_text(lang, "preparing", engine="Tesseract"), 0)
@@ -15415,8 +15458,9 @@ finally {
         if os.path.isdir(tessdata_dir) and not tesseract_generation(tesseract_path):
             os.environ["TESSDATA_PREFIX"] = tessdata_dir
         self._reset_tesseract_runtime_cache()
-        self._set_ocr_combo_silently("Tesseract")
-        self.save_ocr_engine("Tesseract")
+        if getattr(self,'_component_tesseract_select_on_success',True):
+            self._set_ocr_combo_silently("Tesseract")
+            self.save_ocr_engine("Tesseract")
         lang = self.parent.current_interface_language
         QMessageBox.information(
             self,
@@ -15429,7 +15473,7 @@ finally {
         self._finish_tesseract_install_state()
         self._hide_tesseract_progress()
         self._restore_settings_view()
-        if not platform_support.IS_MAC:
+        if not platform_support.IS_MAC and getattr(self,'_component_tesseract_select_on_success',True):
             prev_engine = self.previous_ocr_engine or platform_support.default_ocr_engine()
             self._set_ocr_combo_silently(prev_engine)
             self.save_ocr_engine(prev_engine)
@@ -15445,9 +15489,10 @@ finally {
         self._finish_tesseract_install_state()
         self._hide_tesseract_progress()
         self._restore_settings_view()
-        prev_engine = self.previous_ocr_engine or platform_support.default_ocr_engine()
-        self._set_ocr_combo_silently(prev_engine)
-        self.save_ocr_engine(prev_engine)
+        if getattr(self,'_component_tesseract_select_on_success',True):
+            prev_engine = self.previous_ocr_engine or platform_support.default_ocr_engine()
+            self._set_ocr_combo_silently(prev_engine)
+            self.save_ocr_engine(prev_engine)
         lang = self.parent.current_interface_language
         QMessageBox.information(
             self,
@@ -15714,7 +15759,7 @@ finally {
         return prepare_pip_command(temp_dir, engine_name, download,
                                    check_cancel, progress_callback)
 
-    def start_rapidocr_install(self, progress_owner=None):
+    def start_rapidocr_install(self, progress_owner=None, *, select_on_success=True):
         if (
             self._rapidocr_install_in_progress
             or self._tesseract_install_in_progress
@@ -15729,6 +15774,7 @@ finally {
         self._rapidocr_temp_dir = ""
         self._rapidocr_install_process = None
         self._rapidocr_progress_owner = progress_owner
+        self._component_rapidocr_select_on_success = bool(select_on_success)
         self.ocr_engine_combo.setEnabled(False)
         self._set_parent_topmost_for_tesseract_install(False)
         self._show_rapidocr_progress(
@@ -15961,8 +16007,9 @@ finally {
         self._hide_rapidocr_progress()
         self._restore_settings_view()
         self._reset_rapidocr_runtime_cache(clear_modules=True)
-        self._set_ocr_combo_silently(RAPIDOCR_ENGINE_DISPLAY)
-        self.save_ocr_engine(RAPIDOCR_ENGINE_DISPLAY)
+        if getattr(self,'_component_rapidocr_select_on_success',True):
+            self._set_ocr_combo_silently(RAPIDOCR_ENGINE_DISPLAY)
+            self.save_ocr_engine(RAPIDOCR_ENGINE_DISPLAY)
         lang = self.parent.current_interface_language
         QMessageBox.information(
             self,
@@ -15975,7 +16022,7 @@ finally {
         self._finish_rapidocr_install_state()
         self._hide_rapidocr_progress()
         self._restore_settings_view()
-        if not platform_support.IS_MAC:
+        if not platform_support.IS_MAC and getattr(self,'_component_rapidocr_select_on_success',True):
             prev_engine = self.previous_ocr_engine or platform_support.default_ocr_engine()
             self._set_ocr_combo_silently(prev_engine)
             self.save_ocr_engine(prev_engine)
@@ -15991,9 +16038,10 @@ finally {
         self._finish_rapidocr_install_state()
         self._hide_rapidocr_progress()
         self._restore_settings_view()
-        prev_engine = self.previous_ocr_engine or platform_support.default_ocr_engine()
-        self._set_ocr_combo_silently(prev_engine)
-        self.save_ocr_engine(prev_engine)
+        if getattr(self,'_component_rapidocr_select_on_success',True):
+            prev_engine = self.previous_ocr_engine or platform_support.default_ocr_engine()
+            self._set_ocr_combo_silently(prev_engine)
+            self.save_ocr_engine(prev_engine)
         lang = self.parent.current_interface_language
         QMessageBox.information(
             self,
@@ -16015,7 +16063,7 @@ finally {
         if self._easyocr_cancel_requested.is_set():
             raise EasyOCRInstallCancelledError("EasyOCR installation canceled by user.")
 
-    def start_easyocr_install(self, progress_owner=None):
+    def start_easyocr_install(self, progress_owner=None, *, select_on_success=True):
         if (
             self._easyocr_install_in_progress
             or self._rapidocr_install_in_progress
@@ -16030,6 +16078,7 @@ finally {
         self._easyocr_temp_dir = ""
         self._easyocr_install_process = None
         self._easyocr_progress_owner = progress_owner
+        self._component_easyocr_select_on_success = bool(select_on_success)
         self.ocr_engine_combo.setEnabled(False)
         self._set_parent_topmost_for_tesseract_install(False)
         self._show_easyocr_progress(
@@ -16063,6 +16112,31 @@ finally {
         final_dir = self._local_easyocr_dir()
         try:
             lang = getattr(getattr(self, "parent", None), "current_interface_language", "en")
+            if platform_support.IS_WINDOWS:
+                from component_easyocr import install, COMPONENT
+                from component_download import ComponentDownloader
+                from component_catalog import component_store_path, ComponentError
+                from component_store import ComponentStore
+                from component_texts import error_text
+                from easyocr_models import group_for_language
+                legacy = os.path.join(self._portable_app_dir(),'ocr','easyocr')
+                previous = ComponentStore(component_store_path()).describe(COMPONENT)
+                config = getattr(self.parent,'config',{}) or {}
+                code = config.get('last_ocr_language') or config.get('ocr_language') or lang
+                groups = () if previous else {'english_g2', group_for_language(code) or 'english_g2'}
+                try:
+                    install(ComponentDownloader(self._check_easyocr_cancel_requested,
+                        lambda url,done,total:self._emit_easyocr_progress(
+                            f'EasyOCR: {done//(1024*1024)} / {max(1,total//(1024*1024))} MB',int(90*done/total),True)),
+                        groups=groups,legacy_dir=legacy,check_cancel=self._check_easyocr_cancel_requested,
+                        progress=lambda index,total:self._emit_easyocr_progress(
+                            engine_text(lang,'preparing',engine='EasyOCR'),int(90*index/total),True))
+                except ComponentError as error:
+                    raise RuntimeError(error_text(lang,error)) from error
+                self._reset_easyocr_runtime_cache(clear_modules=True)
+                self._emit_easyocr_progress(engine_text(lang,'done'),100)
+                QMetaObject.invokeMethod(self,'_on_easyocr_install_ready',Qt.QueuedConnection)
+                return
             temp_dir = tempfile.mkdtemp(prefix="clickntranslate_easyocr_")
             self._easyocr_temp_dir = temp_dir
             package_root = os.path.join(temp_dir, "site-packages")
@@ -16250,8 +16324,9 @@ finally {
         self._hide_easyocr_progress()
         self._restore_settings_view()
         self._reset_easyocr_runtime_cache(clear_modules=True)
-        self._set_ocr_combo_silently(EASYOCR_ENGINE_DISPLAY)
-        self.save_ocr_engine(EASYOCR_ENGINE_DISPLAY)
+        if getattr(self,'_component_easyocr_select_on_success',True):
+            self._set_ocr_combo_silently(EASYOCR_ENGINE_DISPLAY)
+            self.save_ocr_engine(EASYOCR_ENGINE_DISPLAY)
         lang = self.parent.current_interface_language
         QMessageBox.information(
             self,
@@ -16264,7 +16339,7 @@ finally {
         self._finish_easyocr_install_state()
         self._hide_easyocr_progress()
         self._restore_settings_view()
-        if not platform_support.IS_MAC:
+        if not platform_support.IS_MAC and getattr(self,'_component_easyocr_select_on_success',True):
             prev_engine = self.previous_ocr_engine or platform_support.default_ocr_engine()
             self._set_ocr_combo_silently(prev_engine)
             self.save_ocr_engine(prev_engine)
@@ -16280,9 +16355,10 @@ finally {
         self._finish_easyocr_install_state()
         self._hide_easyocr_progress()
         self._restore_settings_view()
-        prev_engine = self.previous_ocr_engine or platform_support.default_ocr_engine()
-        self._set_ocr_combo_silently(prev_engine)
-        self.save_ocr_engine(prev_engine)
+        if getattr(self,'_component_easyocr_select_on_success',True):
+            prev_engine = self.previous_ocr_engine or platform_support.default_ocr_engine()
+            self._set_ocr_combo_silently(prev_engine)
+            self.save_ocr_engine(prev_engine)
         lang = self.parent.current_interface_language
         QMessageBox.information(
             self,
@@ -16290,7 +16366,7 @@ finally {
             engine_text(lang, "install_cancelled", engine="EasyOCR"),
         )
 
-    def start_hymt_install(self, progress_owner=None):
+    def start_hymt_install(self, progress_owner=None, *, select_on_success=True):
         if platform_support.IS_LINUX:
             self._show_manual_hymt_hint(self.parent.current_interface_language)
             return
@@ -16307,6 +16383,7 @@ finally {
         self._hymt_cancel_requested.clear()
         self._hymt_temp_dir = ""
         self._hymt_progress_owner = progress_owner
+        self._component_hymt_select_on_success = bool(select_on_success)
         self.translator_combo.setEnabled(False)
         self._set_parent_topmost_for_tesseract_install(False)
         self._show_hymt_progress(
@@ -16637,8 +16714,9 @@ finally {
         self._hide_hymt_progress()
         self._restore_settings_view()
         self._reset_hymt_runtime_cache()
-        self._set_translator_combo_silently(HYMT_ENGINE_KEY)
-        self.auto_save_setting("translator_engine", HYMT_ENGINE_KEY)
+        if getattr(self,'_component_hymt_select_on_success',True):
+            self._set_translator_combo_silently(HYMT_ENGINE_KEY)
+            self.auto_save_setting("translator_engine", HYMT_ENGINE_KEY)
         lang = self.parent.current_interface_language
         QMessageBox.information(
             self,
@@ -16651,7 +16729,7 @@ finally {
         self._finish_hymt_install_state()
         self._hide_hymt_progress()
         self._restore_settings_view()
-        if not platform_support.IS_MAC:
+        if not platform_support.IS_MAC and getattr(self,'_component_hymt_select_on_success',True):
             prev_engine = self.previous_translator_engine or "google"
             self._set_translator_combo_silently(prev_engine)
             self.auto_save_setting("translator_engine", prev_engine)
@@ -16667,9 +16745,10 @@ finally {
         self._finish_hymt_install_state()
         self._hide_hymt_progress()
         self._restore_settings_view()
-        prev_engine = self.previous_translator_engine or "google"
-        self._set_translator_combo_silently(prev_engine)
-        self.auto_save_setting("translator_engine", prev_engine)
+        if getattr(self,'_component_hymt_select_on_success',True):
+            prev_engine = self.previous_translator_engine or "google"
+            self._set_translator_combo_silently(prev_engine)
+            self.auto_save_setting("translator_engine", prev_engine)
         lang = self.parent.current_interface_language
         QMessageBox.information(
             self,

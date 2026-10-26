@@ -131,7 +131,7 @@ def install(download, *, root=None, channel=None, legacy_model=None, check_cance
         try:
             old = store.active(COMPONENT)
         except ComponentError:
-            old = None
+            old = store.describe(COMPONENT)
         bundle = choose_bundle(catalog, COMPONENT, APP_VERSION,
             channel=channel or os.environ.get('CLICKNTRANSLATE_COMPONENT_CHANNEL','stable'),
             languages=old['receipt']['languages'] if old else ())

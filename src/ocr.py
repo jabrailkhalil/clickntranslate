@@ -1251,7 +1251,7 @@ def _serialized_native_ocr_runtime(function):
 
 def _native_ocr_worker_enabled():
     from component_runtime import managed_runtime
-    if managed_runtime():
+    if managed_runtime() or managed_runtime('easyocr'):
         return True
     if not (platform_support.IS_WINDOWS or platform_support.IS_MAC):
         return False
@@ -1304,6 +1304,8 @@ def _call_native_ocr_worker(request, pil_variants=None, timeout=1800):
         payload = dict(request)
         if runtime:
             payload['root_dir'] = str(runtime['folder'])
+            payload['work_dir'] = temp_dir
+            payload['allow_download'] = False
         payload["images"] = images
         request_path = os.path.join(temp_dir, "request.json")
         with open(request_path, "w", encoding="utf-8") as request_file:
@@ -1728,6 +1730,10 @@ _EASY_OCR_DLL_DIR_HANDLES = []
 
 
 def _easyocr_local_root():
+    from component_runtime import managed_runtime
+    runtime = managed_runtime('easyocr')
+    if runtime:
+        return str(runtime['folder'])
     return (
         os.environ.get("CLICKNTRANSLATE_EASYOCR_DIR")
         or os.path.join(get_portable_dir(), "ocr", "easyocr")
@@ -1832,6 +1838,10 @@ def reset_easyocr_runtime_cache(clear_modules=False):
 @_serialized_native_ocr_runtime
 def easyocr_importable():
     global _EASY_OCR_IMPORT_ERROR
+    from component_runtime import managed_runtime
+    from component_easyocr import legacy_disabled
+    if platform_support.IS_WINDOWS and not managed_runtime('easyocr') and legacy_disabled():
+        return False, 'EasyOCR is not installed'
     if _native_ocr_worker_enabled():
         available, error = _probe_native_ocr_worker("easyocr", _easyocr_local_root())
         _EASY_OCR_IMPORT_ERROR = None if available else error
@@ -1885,6 +1895,10 @@ def _get_easyocr_reader(language_code, download_enabled=False):
 
 def easyocr_available(language_code="en", download_enabled=False):
     global _EASY_OCR_IMPORT_ERROR
+    from component_runtime import managed_runtime
+    from component_easyocr import legacy_disabled
+    if platform_support.IS_WINDOWS and not managed_runtime('easyocr') and legacy_disabled():
+        return False
     if _native_ocr_worker_enabled():
         available, error = _probe_native_ocr_worker(
             "easyocr",
@@ -2090,25 +2104,8 @@ def _combo_data_to_translate_pair(data, config=None):
     return source, default_target_for_source(source, config.get("ocr_translate_target_language"))
 
 
-_EASYOCR_MODEL_GROUP_BY_LANGUAGE = {
-    "en": "english_g2", "ru": "cyrillic_g2", "uk": "cyrillic_g2",
-    "de": "latin_g2", "fr": "latin_g2", "es": "latin_g2", "it": "latin_g2",
-    "pt": "latin_g2", "pl": "latin_g2", "tr": "latin_g2", "nl": "latin_g2",
-    "zh": "zh_sim_g2", "ch_sim": "zh_sim_g2", "ja": "japanese_g2",
-    "ko": "korean_g2", "ar": "arabic", "hi": "devanagari",
-
-    'id': 'english_g2',
-}
-_EASYOCR_MODEL_FILE_VARIANTS = {
-    "english_g2": ("english_g2.pth",),
-    "cyrillic_g2": ("cyrillic_g2.pth", "cyrillic.pth"),
-    "latin_g2": ("latin_g2.pth", "latin.pth"),
-    "zh_sim_g2": ("zh_sim_g2.pth", "chinese_sim.pth"),
-    "japanese_g2": ("japanese_g2.pth", "japanese.pth"),
-    "korean_g2": ("korean_g2.pth", "korean.pth"),
-    "arabic": ("arabic.pth",),
-    "devanagari": ("devanagari.pth",),
-}
+from easyocr_models import (LANGUAGE_GROUPS as _EASYOCR_MODEL_GROUP_BY_LANGUAGE,
+                            MODEL_FILE_VARIANTS as _EASYOCR_MODEL_FILE_VARIANTS)
 
 
 def _python_package_file_present(candidate_paths, package_names):
@@ -2180,7 +2177,17 @@ def _tesseract_installed_language_codes():
 
 
 def _easyocr_installed_language_codes():
+    from component_runtime import managed_runtime
+    from component_easyocr import legacy_disabled
+    from easyocr_models import installed_languages
     root = _easyocr_local_root()
+    runtime = managed_runtime('easyocr')
+    if runtime:
+        receipt = runtime['receipt']
+        return installed_languages(root, [language.code for language in APP_LANGUAGES],
+            model_files=receipt.get('model_files'),language_groups=receipt.get('language_groups'))
+    if platform_support.IS_WINDOWS and legacy_disabled():
+        return []
     if not _python_package_file_present(_easyocr_local_candidate_paths(root), ("easyocr",)):
         return []
     model_dir = os.path.join(root, "models")

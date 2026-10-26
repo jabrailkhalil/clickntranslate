@@ -1,0 +1,81 @@
+{
+  "schema": 1,
+  "python_version": "3.12.10",
+  "python_url": "https://www.python.org/ftp/python/3.12.10/python-3.12.10-embed-amd64.zip",
+  "python_sha256": "4acbed6dd1c744b0376e3b1cf57ce906f9dc9e95e68824584c8099a63025a3c3",
+  "msvc": {
+    "url": "https://download.visualstudio.microsoft.com/download/pr/ebdab8e5-1d7b-4d9f-a11b-cbb1720c3b12/843068991DAAA1F73AD9F6239BCE4D0F6A07A51F18C37EA2A867E9BECA71295C/VC_redist.x64.exe",
+    "sha256": "843068991daaa1f73ad9f6239bce4d0f6a07a51f18c37ea2a867e9beca71295c",
+    "size": 18731856,
+    "version": "14.51.36247.0",
+    "container_offset": 630000,
+    "container_size": 18091661,
+    "cabinet": "a4",
+    "cabinet_sha256": "6e8ee73933678c55973e83366e48e948b394c7a36743a36b7224c95de979b13f",
+    "files": {
+      "concrt140.dll": "54716f0738af891f283d213b5c8d11b25896bb8ee3097d301eae718560cf974e",
+      "msvcp140.dll": "7c26614e1d733892c2deac7e245ce115504b1d80592dd0a01b08e3e5a55f89ca",
+      "msvcp140_1.dll": "206c931bf90fdad8816de3b5e2ef80b2bcaa9406c89ecc05fe6fddffe251e982",
+      "msvcp140_2.dll": "d50d7883f20d1dc6191768d3746f52dd9cac89c346ffaed5be1f110c2f34a838",
+      "msvcp140_atomic_wait.dll": "3d0cbfaa1bf3eecf5a3f4491d2960ee803cb994f30292c6adc4a07c498f60e2b",
+      "msvcp140_codecvt_ids.dll": "8a65c7596ef2e6938731f5a1058e7e40145b6d97967cc649231a076b9a608d78",
+      "vcamp140.dll": "dc283ffb87e9b82e687ed4e899ae062a209aa338207abfc9a89d61407d678bd4",
+      "vccorlib140.dll": "09f93d5ff96ae09767f3e1af3cdd43a5a58f2598654fc63089429bb6f9f4737f",
+      "vcomp140.dll": "95d4ce4a6802d1e18b5e0e1722cc30ea72ca7e033f83828f05c0b7b993fe7cbf",
+      "vcruntime140.dll": "d1f4225df2cd877dbf130d5668a021dce3f94118455ff5ec952061c30afc9ce7",
+      "vcruntime140_1.dll": "a7146c08f89fe5b04541ab507cdb59ff7b44534d4ba3c668a426c6450a03434e",
+      "vcruntime140_threads.dll": "40f39e8cee5f5a531b4010e18b807e8fe265b908dc58f959ecb7ebc6ea6cb11a"
+    },
+    "license_url": "https://aka.ms/vc14/license",
+    "redistribution_review": false
+  },
+  "min_os": "10",
+  "app": ">=1.8.2,<2",
+  "component": "ocr.easyocr",
+  "runtime": "windows-x86_64-cp312-cpu",
+  "channel": "preview",
+  "contract": 2,
+  "filename": "easyocr-windows-x64-cp312-cpu-runtime.zip",
+  "requirements": [
+    "easyocr==1.7.2",
+    "torch==2.14.1+cpu",
+    "torchvision==0.29.1+cpu",
+    "opencv-python-headless==5.0.0.93",
+    "Pillow==12.3.0",
+    "numpy<3",
+    "scikit-image<0.27"
+  ],
+  "adapter_files": [
+    "ocr_worker.py",
+    "rapidocr_models.py",
+    "easyocr_models.py",
+    "ocr_text_layout.py",
+    "ocr_paragraphs.py",
+    "runtime_bootstrap.py"
+  ],
+  "source_wheels": [
+    {
+      "filename": "torch-2.14.1+cpu-cp312-cp312-win_amd64.whl",
+      "url": "https://download-r2.pytorch.org/whl/cpu/torch-2.14.1%2Bcpu-cp312-cp312-win_amd64.whl",
+      "sha256": "c52adc3bd526ff7fc5bdcc58fc4a76e6214d09951b646ffe5256ebd7ba60cef1",
+      "size": 123996008
+    },
+    {
+      "filename": "torchvision-0.29.1+cpu-cp312-cp312-win_amd64.whl",
+      "url": "https://download-r2.pytorch.org/whl/cpu/torchvision-0.29.1%2Bcpu-cp312-cp312-win_amd64.whl",
+      "sha256": "361f943872f7763807912cc51d621f0172e8d481792f8c6f3fe1f63838a29e0c",
+      "size": 1376909
+    }
+  ],
+  "sdk_source_commit": "c4f3cd7225efd4f85451bd8b4a7646ae9a092420",
+  "adapter_fixes": {
+    "tamil_alphabet": {
+      "filename": "tamil.pth",
+      "url": "https://github.com/JaidedAI/EasyOCR/releases/download/v1.1.7/tamil.zip",
+      "source_commit": "11fa4b123786fbec78ce6fb70abd1d27705223af",
+      "source_sha256": "660713fac3c98a84949bc21d4baf8aa27aaac9225f42684e2f40b3e0dea701c0",
+      "source_url": "https://raw.githubusercontent.com/JaidedAI/EasyOCR/11fa4b123786fbec78ce6fb70abd1d27705223af/easyocr/config.py",
+      "model_md5": "4b93972fdacdcdabe6d57097025d4dc2"
+    }
+  }
+}

@@ -15,7 +15,7 @@ from component_store import ComponentStore
 
 def managed_runtime(engine='rapidocr'):
     components = {'rapidocr':'ocr.rapidocr', 'tesseract':'ocr.tesseract', 'argos':'translation.argos',
-                  'hymt':'translation.hymt'}
+                  'hymt':'translation.hymt', 'easyocr':'ocr.easyocr'}
     if engine not in components:
         return None
     try:
@@ -74,7 +74,7 @@ def install_rapidocr(download, *, check_cancel=lambda: None, progress=lambda *_:
         try:
             old = store.active('ocr.rapidocr')
         except ComponentError:
-            old = None  # allow Update to repair a damaged optional installation
+            old = store.describe('ocr.rapidocr')  # keep the saved selection while repairing a runtime
         bundle = choose_bundle(catalog, 'ocr.rapidocr', APP_VERSION,
             channel=channel or os.environ.get('CLICKNTRANSLATE_COMPONENT_CHANNEL', 'stable'),
             languages=old['receipt']['languages'] if old else ())
@@ -178,7 +178,7 @@ def install_tesseract(download, *, languages=(), remove_languages=(), legacy_dat
         try:
             old = store.active('ocr.tesseract')
         except ComponentError:
-            old = None
+            old = store.describe('ocr.tesseract')
         if old and remove_languages and not languages:
             return store.remove_languages('ocr.tesseract', remove_languages,
                 lambda folder, receipt: validate_tesseract(folder, receipt, check_cancel), check_cancel, progress)
