@@ -124,6 +124,13 @@ def native(output,runtime,recipe):
 def python_runtime(output,runtime,recipe):
     source=output/'python.tar.gz';fetch(recipe['python_source'],source)
     unpack(source,runtime)
+    # These non-interactive workers do not use a terminal database. Its Unix
+    # case aliases (Eterm/eterm, etc.) cannot go in a portable safe ZIP.
+    terminfo=runtime/'python/share/terminfo'
+    if terminfo.is_symlink():terminfo.unlink()
+    elif terminfo.exists():
+        if not terminfo.resolve().is_relative_to(runtime.resolve()):raise RuntimeError('Invalid terminal data path')
+        shutil.rmtree(terminfo)
     if recipe.get('zlib_source'):
         archive=output/'zlib-source.tar.gz';fetch(recipe['zlib_source'],archive)
         sources=output/'zlib-source';unpack(archive,sources)
@@ -178,12 +185,15 @@ def prepare(output,recipe_path):
     executable=moved/('bin/'+('tesseract' if recipe['engine']=='tesseract' else 'llama-cli') if recipe['engine'] in ('tesseract','hymt') else 'python/bin/python3.12')
     subprocess.run([str(executable),'--version'],check=True,cwd=moved)
     moved.rename(runtime)
-    archive=output/recipe['filename'];expanded=0
+    archive=output/recipe['filename'];expanded=0;names=set()
     with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED,compresslevel=6) as bundle:
         for path in sorted(runtime.rglob('*')):
             if not path.is_file() or '__pycache__' in path.parts or path.suffix=='.pyc':continue
             real=path.resolve()
             if not real.is_relative_to(runtime.resolve()):raise RuntimeError('Link escapes prepared runtime')
+            relative=path.relative_to(runtime).as_posix()
+            if relative.casefold() in names:raise RuntimeError('Case collision in prepared runtime: '+relative)
+            names.add(relative.casefold())
             expanded+=real.stat().st_size
             # Flatten internal symlinks; the client never installs archive links.
             info=zipfile.ZipInfo.from_file(real,arcname=path.relative_to(runtime).as_posix())
