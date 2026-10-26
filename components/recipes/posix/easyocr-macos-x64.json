@@ -34,7 +34,5 @@
     "Pillow==12.3.0",
     "numpy<2",
     "scikit-image<0.27"
-  ],
-  "easyocr_quantize": false,
-  "compatibility_notes": "Intel macOS uses CPU float inference; upstream PyTorch excludes flaky QNNPACK tests on macOS. All model families still require native inference."
+  ]
 }

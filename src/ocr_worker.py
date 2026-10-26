@@ -194,8 +194,7 @@ def _easyocr_reader(request, *, codes=None, recognizer=True):
     root_dir = request.get("root_dir") or ""
     model_dir = os.path.join(root_dir, "models")
     marker = Path(root_dir) / 'runtime/COMPONENT.json'
-    runtime_settings = json.loads(marker.read_bytes()) if marker.is_file() else {}
-    managed = runtime_settings.get('component') == 'ocr.easyocr'
+    managed = marker.is_file() and json.loads(marker.read_bytes()).get('component') == 'ocr.easyocr'
     if managed:
         _configure_easyocr_cpu()
         receipt_path = Path(root_dir)/'receipt.json'
@@ -221,8 +220,7 @@ def _easyocr_reader(request, *, codes=None, recognizer=True):
         reader = easyocr.Reader(list(codes or request.get('language_codes') or ['en']),
             gpu=False, model_storage_directory=model_dir, user_network_directory=user_network_dir,
             download_enabled=False if managed else bool(request.get('allow_download', False)),
-            recognizer=recognizer, verbose=False,
-            **({'quantize':False} if managed and runtime_settings.get('easyocr_quantize') is False else {}))
+            recognizer=recognizer, verbose=False)
         try:
             yield reader
         finally:
@@ -276,9 +274,7 @@ def _validate_easyocr(request):
         probe = Image.new('RGB',(500,100),'white')
         ImageDraw.Draw(probe).text((20,20),'TEST 123',fill='black',font_size=40)
         probe.save(path)
-        timings = {}
         for group in groups:
-            started = time.perf_counter()
             codes = [PROBE_CODES[group]]
             if codes != ['en']:
                 codes.append('en')
@@ -289,12 +285,11 @@ def _validate_easyocr(request):
                         raise RuntimeError('empty or invalid OCR result')
             except Exception as error:
                 raise RuntimeError(f'EasyOCR {group}: {error}') from error
-            timings[group] = round(time.perf_counter()-started,3)
         if not groups:
             with _easyocr_reader(request,codes=['en'],recognizer=False) as reader:
                 reader.detect(importlib.import_module('numpy').array(probe))
     return {'validated':groups, 'torch':torch.__version__, 'cuda':torch.version.cuda,
-            'dll_runtime':_PRIVATE_DLL_RUNTIME, 'family_seconds':timings, 'error':''}
+            'dll_runtime':_PRIVATE_DLL_RUNTIME, 'error':''}
 
 
 def run_request(request):

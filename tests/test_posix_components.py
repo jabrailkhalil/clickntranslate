@@ -4,7 +4,6 @@ import os
 from pathlib import Path
 import subprocess
 import sys
-from types import SimpleNamespace
 from unittest import mock
 import pytest
 
@@ -59,22 +58,3 @@ def test_cancellable_native_runner_reaps_a_real_child(monkeypatch):
         runtime.run_cancellable([sys.executable,'-c','import time; time.sleep(30)'],timeout=10,check_cancel=cancel,
             creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
     assert children and all(child.poll() is not None for child in children)
-
-
-@pytest.mark.parametrize('component,quantize,expected',[
-    ('ocr.easyocr',False,False),('ocr.easyocr',True,None),
-    ('ocr.easyocr',None,None),('legacy',False,None)])
-def test_easyocr_float_cpu_mode_is_scoped_to_its_managed_recipe(tmp_path,monkeypatch,component,quantize,expected):
-    import ocr_worker
-    marker=tmp_path/'runtime/COMPONENT.json';marker.parent.mkdir()
-    marker.write_text(json.dumps({'component':component,'easyocr_quantize':quantize}))
-    monkeypatch.setenv('TORCH_HOME',str(tmp_path/'torch'))
-    captured={}
-    def reader(_codes,**kwargs):captured.update(kwargs);return object()
-    monkeypatch.setattr(ocr_worker,'_configure_easyocr_cpu',lambda:None)
-    monkeypatch.setattr(ocr_worker.importlib,'import_module',lambda name:SimpleNamespace(Reader=reader))
-    with ocr_worker._easyocr_reader({'root_dir':str(tmp_path),'language_codes':['en'],'allow_download':True}):pass
-    assert captured.get('quantize') is expected
-    if expected is None:assert 'quantize' not in captured
-    assert captured['gpu'] is False
-    assert captured['download_enabled'] is (component!='ocr.easyocr')
