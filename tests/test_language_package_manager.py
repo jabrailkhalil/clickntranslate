@@ -340,7 +340,7 @@ class LanguagePackageDialogTest(unittest.TestCase):
         self.assertEqual(self.dialog.title_bar.objectName(), "languageManagerTitleBar")
         self.assertEqual(self.dialog.title_bar.height(), 38)
         self.assertEqual(self.dialog.title_close_btn.objectName(), "languageManagerTitleClose")
-        self.assertEqual(self.dialog.title_label.text(), "Language packages")
+        self.assertEqual(self.dialog.title_label.text(), "Languages and engines")
         self.assertIn("QFrame#languageManagerTitleBar { background:#1e1e1e", self.dialog.styleSheet())
         self.assertEqual(self.dialog.size().width(), 640)
         self.assertEqual(self.dialog.size().height(), 558)
@@ -488,7 +488,10 @@ class LanguagePackageDialogTest(unittest.TestCase):
         for table in self._package_tables():
             for button in table._package_action_buttons:
                 self.assertEqual(button.objectName(), "languagePackageAction")
-                self.assertGreaterEqual(button.minimumHeight(), 32)
+                if button.property('packageAction') in ('update', 'settings'):
+                    self.assertEqual(button.minimumHeight(), 30)
+                else:
+                    self.assertGreaterEqual(button.minimumHeight(), 32)
                 button.ensurePolished()
                 self.assertEqual(button.palette().button().color().name(),
                                  "#7a5fa1" if button.property("buttonRole") == "primary" else "#211d28")
@@ -509,7 +512,7 @@ class LanguagePackageDialogTest(unittest.TestCase):
         table.selectRow(0)
         table.setFocus()
         self.app.processEvents()
-        rect = table.visualItemRect(table.item(0, 2))
+        rect = table.visualItemRect(table.item(0, 3))
         point = rect.topRight() + QPoint(-4, 4)
         active = table.viewport().grab().toImage().pixelColor(point)
         table.clearFocus()
@@ -521,7 +524,7 @@ class LanguagePackageDialogTest(unittest.TestCase):
         from PyQt5.QtWidgets import QStyle, QStyleOptionViewItem
         option = QStyleOptionViewItem()
         option.state |= QStyle.State_HasFocus
-        table.itemDelegate().initStyleOption(option, table.model().index(0, 2))
+        table.itemDelegate().initStyleOption(option, table.model().index(0, 3))
         self.assertFalse(option.state & QStyle.State_HasFocus)
 
     def test_package_columns_fit_after_font_changes_and_preserve_long_values_in_tooltips(self):
@@ -1181,7 +1184,7 @@ class EngineRemovalPlacementTest(unittest.TestCase):
     def test_updating_hymt_has_a_localized_button_and_reuses_the_owner_progress(self):
         from component_texts import update_label, update_hint
         button=self.dialog.hymt_table._package_action_buttons[0]
-        self.assertEqual(button.text(),update_label('en','Hy-MT'))
+        self.assertEqual(button.accessibleName(),update_label('en','Hy-MT'))
         self.assertEqual(button.toolTip(),update_hint('en','Hy-MT'))
         self.owner.hymt_present=True
         self.dialog._populate_hymt_table(self.dialog.hymt_table)

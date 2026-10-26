@@ -2,6 +2,7 @@
 from unittest import mock
 import pytest
 from PyQt5.QtWidgets import QApplication
+from PyQt5.QtCore import QPoint, QRect
 
 from interface_language_picker import PICKER_TEXT
 from settings_window import OcrLanguageManagerDialog
@@ -25,14 +26,16 @@ def test_easyocr_update_fits_and_is_localized_in_both_themes(tmp_path,language,t
         dialog.ocr_tabs.setCurrentWidget(dialog.easyocr_table.parentWidget())
         dialog.show();app.processEvents()
         buttons=dialog.easyocr_table._package_action_buttons
-        update=next(button for button in buttons if button.text()==update_label(language,'EasyOCR'))
+        update=next(button for button in buttons if button.property('packageBaseText')==update_label(language,'EasyOCR'))
+        assert update.accessibleName()==update_label(language,'EasyOCR')
         assert update.toolTip()==update_hint(language,'EasyOCR') and update.toolTip().strip()
         for button in buttons:
             assert button.isVisible()
             assert button.width()>=button.minimumSizeHint().width()
             assert button.parentWidget().rect().contains(button.geometry())
         for index,button in enumerate(buttons):
-            assert not any(button.geometry().intersects(other.geometry()) for other in buttons[index+1:])
+            rect = QRect(button.mapTo(dialog, QPoint()), button.size())
+            assert not any(rect.intersects(QRect(other.mapTo(dialog, QPoint()), other.size())) for other in buttons[index+1:])
         assert dialog.grab().save(str(tmp_path/(language+'-'+('dark' if theme=='Темная' else 'light')+'.png')))
     finally:
         dialog.close();owner.close();parent.close();app.processEvents()

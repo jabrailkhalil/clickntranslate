@@ -62,8 +62,8 @@ def test_ocr_copy_delivers_localized_feedback_independently_of_history(
     assert result is True
     assert isolated_clipboard.text() == source
     owner.close.assert_called_once_with()
-    assert receiver.widget._copy_notice.isVisible() is (enabled is not False)
-    if enabled is not False:
+    assert receiver.widget._copy_notice.isVisible() is bool(enabled)
+    if enabled:
         assert main.TRANSLATION_RESULT_DIALOG_TEXT["ar"]["copied"] in receiver.widget._copy_notice.text()
 
 

@@ -731,13 +731,14 @@ class MainWindowScaleController(QObject):
         return self.view.mapFromScene(self.proxy.mapToScene(QPointF(local)))
 
 
-def combo_popup_geometry(anchor, desired, bounds, gap, margin=0):
+def combo_popup_geometry(anchor, desired, bounds, gap, margin=0, *, prefer_below=False):
     """Fit a list beside its field, in one coordinate system and on one screen."""
     bounds = bounds.adjusted(margin, margin, -margin, -margin)
     below = anchor.y() + anchor.height() + gap
     below_space = max(0, bounds.y() + bounds.height() - below)
     above_space = max(0, anchor.y() - gap - bounds.y())
-    open_below = desired.height() <= below_space or below_space >= above_space
+    open_below = (below_space >= min(desired.height(), 100) if prefer_below else
+                  desired.height() <= below_space or below_space >= above_space)
     room = below_space if open_below else above_space
     height = max(1, min(desired.height(), room or bounds.height()))
     width = max(1, min(desired.width(), bounds.width()))

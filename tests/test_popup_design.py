@@ -1,5 +1,6 @@
 """Dropdown cards fit their real labels, search chrome and monitor boundaries."""
 import pytest
+from unittest import mock
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtTest import QTest
 
@@ -66,7 +67,10 @@ def test_embedded_popup_corner_keeps_actual_owner_backdrop_instead_of_black(wind
         app.processEvents()
     backdrop = window.grab().toImage()
     combo = window.settings_window.ocr_engine_combo
-    combo.showPopup()
+    # Exercise the embedded fallback too; Windows normally bypasses the scene
+    # so its lists can extend below the fixed application window.
+    with mock.patch.object(combo, '_prepare_native_popup'):
+        combo.showPopup()
     for _ in range(8):
         app.processEvents()
     popup = combo.view().window()
@@ -161,16 +165,26 @@ def test_search_empty_state_is_localized_and_clearing_preserves_indexes(app, sho
     combo.set_capture_theme(True, locale)
     show_picker(combo)
     original = combo.findData('ru')
+    popup = combo.view().window()
+    geometry = QtCore.QRect(popup.geometry())
+    search_geometry = QtCore.QRect(combo._language_search.geometry())
     combo._language_search.setText('zzzz-no-language')
     app.processEvents()
     assert combo._language_empty.isVisible()
     assert combo._language_empty.text() == SEARCH_TEXT[locale][1]
-    assert combo.view().window().height() <= combo._language_search.height()+combo._language_empty.height()+30
+    # Filtering must not move the search field or flip an above-field popup
+    # below its anchor. The empty state uses the existing list footprint.
+    assert popup.geometry() == geometry
+    assert combo._language_search.geometry() == search_geometry
+    assert popup.rect().contains(combo._language_empty.geometry())
+    assert popup.rect().contains(combo._language_search.geometry())
+    assert combo._language_search.geometry().bottom() < combo._language_empty.geometry().top()
     assert all(combo.view().isRowHidden(i) for i in range(combo.count()))
     QTest.keyClick(combo._language_search, QtCore.Qt.Key_Return)
     assert combo.view().window().isVisible()
     combo._language_search.setText('Russian')
     app.processEvents()
+    assert popup.geometry() == geometry
     assert not combo._language_empty.isVisible()
     QTest.keyClick(combo._language_search, QtCore.Qt.Key_Return)
     assert combo.currentIndex() == original and combo.currentData() == 'ru'

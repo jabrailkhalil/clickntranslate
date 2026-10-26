@@ -13,7 +13,7 @@ FACTORY_FLAGS = {
     'restore_clipboard_after_selection': False,
     'close_result_window_on_outside_click': True, 'ocr_join_paragraphs': True,
     'keep_visible_on_ocr': False, 'freeze_screen_on_ocr': False,
-    'dim_screen_during_ocr': False, 'notifications': True,
+    'dim_screen_during_ocr': False, 'notifications': False,
     'remember_copy_area': False, 'remember_translate_area': False,
     'game_pause_when_inactive': True, 'game_show_toolbar': True,
     'game_manual_output': False, 'game_remember_template': False,

@@ -157,7 +157,7 @@ GUIDE_SETTING_STEPS = {
     "freeze_screen_on_ocr": ("freeze_screen_checkbox", PAGE_OCR, True),
     "dim_screen_during_ocr": ("dim_screen_during_ocr_checkbox", PAGE_OCR, True),
     "restore_clipboard_after_selection": ("restore_clipboard_checkbox", PAGE_TRANSLATION, True),
-    "notifications": ("copy_notification_checkbox", PAGE_OCR, True),
+    "notifications": ("copy_notification_checkbox", PAGE_OCR, False),
     "update_check_on_launch": ("update_check_on_launch_checkbox", PAGE_APPLICATION, True),
     "game_pause_when_inactive": ("game_pause_inactive_checkbox", PAGE_DYNAMIC, True),
 }

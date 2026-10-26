@@ -20,11 +20,12 @@ def _language_flag(code):
 
 
 def popup_scale(combo):
+    native = getattr(combo, '_popup_native_factor', 1.)
     explicit = getattr(combo, 'ui_factor', None)
     if isinstance(explicit, (int, float)):
-        return max(.5, min(3., explicit))
+        return max(.5, min(3., explicit)) * native
     pixels = combo.font().pixelSize()
-    return max(.75, min(3., pixels/14 if pixels > 0 else combo.fontMetrics().height()/18))
+    return max(.75, min(3., pixels/14 if pixels > 0 else combo.fontMetrics().height()/18)) * native
 
 
 def popup_palette(dark, surface=None):
@@ -33,6 +34,15 @@ def popup_palette(dark, surface=None):
                 muted=colors['muted'], border=colors['border'],
                 hover=colors['hover'], selected=colors['selected'],
                 accent=colors['accent_text'])
+
+
+def popup_font(combo):
+    font = QtGui.QFont(combo.font())
+    native = getattr(combo, '_popup_native_factor', 1.)
+    if native != 1.:
+        pixels = font.pixelSize() if font.pixelSize() > 0 else QtGui.QFontInfo(font).pixelSize()
+        font.setPixelSize(round(pixels * native))
+    return font
 
 
 class PopupRowDelegate(QtWidgets.QStyledItemDelegate):
@@ -72,7 +82,7 @@ class PopupRowDelegate(QtWidgets.QStyledItemDelegate):
         return QtGui.QIcon()
 
     def _font(self, index):
-        font = QtGui.QFont(self.combo.font())
+        font = popup_font(self.combo)
         font.setWeight(QtGui.QFont.Normal)
         if index.data(GROUP_HEADER_ROLE):
             font.setPixelSize(max(11, round(13*popup_scale(self.combo))))

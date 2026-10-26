@@ -1,5 +1,5 @@
 """Filter language popup rows in place, retaining the original item indexes."""
-from PyQt5.QtCore import Qt, QEvent, QObject
+from PyQt5.QtCore import Qt, QEvent, QObject, QSize
 from PyQt5.QtWidgets import QLineEdit, QLabel, QApplication
 from PyQt5.QtGui import QFont
 from languages import LANGUAGES, LOCALIZED_LANGUAGE_NAMES, AUTO_LANGUAGE_NAMES
@@ -35,6 +35,24 @@ for _language in LANGUAGES:
 
 def language_code_for_option_text(label):
     return _OPTION_CODES.get(str(label).strip().casefold())
+
+
+def stable_search_popup_size(combo, desired):
+    """Keep the search input stationary until this language picker closes.
+
+    Shrinking the list to a single match changed the side chosen by the common
+    placement helper: a menu opened above a low field jumped below it. Even
+    without a side change, an above-field search input moved under the pointer.
+    Keep the original footprint while filtering; a new opening measures afresh.
+    This applies only to language searches, not provider/category menus.
+    """
+    search = getattr(combo, '_language_search', None)
+    if search is None or search.isHidden():
+        return desired
+    previous = getattr(combo, '_language_popup_size', None)
+    size = desired.expandedTo(previous) if previous is not None else QSize(desired)
+    combo._language_popup_size = QSize(size)
+    return size
 
 
 class _SearchKeys(QObject):
@@ -112,7 +130,8 @@ def prepare_language_search(combo):
     search.setPlaceholderText(labels[0])
     search.setAccessibleName(labels[0])
     combo._language_empty.setText(labels[1])
-    font = QFont(combo.font())
+    from combo_popup import popup_font
+    font = popup_font(combo)
     font.setWeight(QFont.Normal)
     search.setFont(font)
     combo._language_empty.setFont(font)

@@ -359,7 +359,7 @@ def _populate_grouped_translator_combo(
     groups = TRANSLATOR_GROUP_TEXT.get(lang, TRANSLATOR_GROUP_TEXT["en"])
     installed = {str(engine).lower() for engine in (installed_engines or ())}
     engines_by_index = []
-    for kind in ("online", "offline", "api"):
+    for kind in ("offline", "online", "api"):
         combo.addItem(f"  {groups.get(kind, 'API')}", None)
         header_index = combo.count() - 1
         engines_by_index.append(None)
@@ -392,6 +392,8 @@ def _populate_grouped_translator_combo(
                 _translator_combo_tooltip(engine, name, option_kind, lang),
                 Qt.ToolTipRole,
             )
+    from provider_categories import configure_categories
+    configure_categories(combo, groups, ('offline', 'online', 'api'))
     return engines_by_index
 
 
@@ -595,8 +597,10 @@ class DropDownCombo(QComboBox):
         # Its native popup lives outside the dialog's font/scale traversal.
         self.ensurePolished()
         view = self.view()
-        if view.font() != self.font():
-            view.setFont(self.font())
+        from combo_popup import popup_font
+        font = popup_font(self)
+        if view.font() != font:
+            view.setFont(font)
         self._paint_popup_frame()
         popup = view.window()
         popup.ensurePolished()
@@ -621,10 +625,14 @@ class DropDownCombo(QComboBox):
         return popup
 
     def showPopup(self):
+        self._language_popup_size = None
         self.aboutToShowPopup.emit()
         self.ensurePolished()
+        self._prepare_native_popup()
         from language_search import prepare_language_search
         prepare_language_search(self)
+        from provider_categories import prepare_categories
+        prepare_categories(self)
         self._prepare_popup()
         animated = QtWidgets.QApplication.isEffectEnabled(Qt.UI_AnimateCombo)
         try:
@@ -642,7 +650,18 @@ class DropDownCombo(QComboBox):
 
     def hidePopup(self):
         self._popup_layout_timer.stop()
+        self._language_popup_size = None
         super().hidePopup()
+
+    def _prepare_native_popup(self):
+        # Scene popups cannot extend below the fixed application canvas.
+        # Native child popups can use the desktop space beneath lower fields.
+        popup = self.view().window()
+        if sys.platform == 'win32' and getattr(self.window(), '_ui_native_owner', None) is not None:
+            popup.setWindowFlag(Qt.BypassGraphicsProxyWidget, True)
+            self._popup_native_factor = widget_global_rect(self).width() / max(1, self.width())
+        else:
+            self._popup_native_factor = 1.
 
     def eventFilter(self, watched, event):
         if (getattr(self, '_popup_layout_timer', None) is not None
@@ -711,7 +730,10 @@ class DropDownCombo(QComboBox):
         from combo_popup import popup_scale
         search = getattr(self, '_language_search', None)
         search_width = round(240*popup_scale(self)) if search is not None and not search.isHidden() else 0
-        width = max(self.width(), search_width, widest + margins.left()+margins.right()+scrollbar)
+        chrome_width = max((widget.minimumSizeHint().width() for widget in extras), default=0)
+        control_width = round(self.width() * getattr(self, '_popup_native_factor', 1.))
+        width = max(control_width, search_width, chrome_width + margins.left()+margins.right(),
+                    widest + margins.left()+margins.right()+scrollbar)
         return QtCore.QSize(width, content_height + chrome)
 
     def _layout_open_popup(self):
@@ -721,11 +743,14 @@ class DropDownCombo(QComboBox):
         try:
             popup = self.view().window()
             desired = self._popup_content_size()
+            from language_search import stable_search_popup_size
+            desired = stable_search_popup_size(self, desired)
             popup.setMinimumSize(0, 0)
             if not position_embedded_combo_popup(self, popup, self.POPUP_GAP, desired):
                 anchor = widget_global_rect(self)
                 popup.setGeometry(combo_popup_geometry(anchor, desired,
-                                                       self._available_screen_rect(), self.POPUP_GAP))
+                                                       self._available_screen_rect(), self.POPUP_GAP,
+                                                       prefer_below=True))
             if popup.layout() is not None:
                 popup.layout().activate()
             self.view().scrollTo(self.view().currentIndex(), QtWidgets.QAbstractItemView.EnsureVisible)
@@ -1429,6 +1454,8 @@ def _populate_grouped_ocr_combo(
     for name in VISION_ENGINES:
         combo.addItem(name, name)
         combo.setItemData(combo.count() - 1, tooltip_text(provider_text(lang, 'help')), Qt.ToolTipRole)
+    from provider_categories import configure_categories
+    configure_categories(combo, groups, ('offline', 'api'))
 
 
 OCR_DETAIL_TEXT = {
@@ -6089,6 +6116,7 @@ def language_manager_text(lang, key, **values):
 
 class OcrLanguageManagerDialog(QDialog):
     _runtime_probe_ready = QtCore.pyqtSignal(object)
+    _package_sizes_ready = QtCore.pyqtSignal(object)
 
     def __init__(self, owner):
         super().__init__(native_window_parent(owner))
@@ -6122,10 +6150,13 @@ class OcrLanguageManagerDialog(QDialog):
         self._easyocr_status_cache = None
         self._rapidocr_status_cache = None
         self._runtime_probe_active = False
+        self._package_sizes = None
+        self._package_sizes_error = ''
         self._title_drag_offset = None
         self._centered_once = False
 
-        self.setWindowTitle(settings_text(self.lang, "ocr_language_packs"))
+        from package_presentation import text as package_text
+        self.setWindowTitle(package_text(self.lang, 'title'))
         self.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
         self.setObjectName("languageManagerDialog")
         self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
@@ -6149,7 +6180,7 @@ class OcrLanguageManagerDialog(QDialog):
         self.title_icon.setPixmap(QIcon(resource_path("icons/icon.ico")).pixmap(18, 18))
         title_layout.addWidget(self.title_icon, 0, Qt.AlignVCenter)
 
-        self.title_label = QLabel(settings_text(self.lang, "ocr_language_packs"))
+        self.title_label = QLabel(package_text(self.lang, 'title'))
         self.title_label.setObjectName("languageManagerTitleLabel")
         self.title_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         title_layout.addWidget(self.title_label, 1)
@@ -6177,16 +6208,19 @@ class OcrLanguageManagerDialog(QDialog):
         for drag_widget in self._title_drag_widgets:
             drag_widget.installEventFilter(self)
 
-        intro = QLabel(language_manager_text(self.lang, "intro"))
+        intro = QLabel(package_text(self.lang, 'intro'))
         self.intro_label = intro
         intro.setWordWrap(True)
         intro.setStyleSheet("font-size: 13px;")
+        intro.setMinimumHeight(32)
         layout.addWidget(intro)
 
         # Keep OCR engines and translation packages in two explicit visual
         # sections.  Nested tabs preserve the fixed window size while avoiding
         # one undifferentiated row of unrelated engines.
         self.tabs = QTabWidget(self)
+        from package_tabs import PackageTabBar
+        self.tabs.setTabBar(PackageTabBar(self.tabs, primary=True))
         self.tabs.setObjectName("languagePackageSections")
         self.ocr_section_page = QWidget(self.tabs)
         self.translation_section_page = QWidget(self.tabs)
@@ -6197,6 +6231,8 @@ class OcrLanguageManagerDialog(QDialog):
             section_layout.setSpacing(0)
         self.ocr_tabs = QTabWidget(self.ocr_section_page)
         self.translation_tabs = QTabWidget(self.translation_section_page)
+        self.ocr_tabs.setTabBar(PackageTabBar(self.ocr_tabs))
+        self.translation_tabs.setTabBar(PackageTabBar(self.translation_tabs))
         self.ocr_tabs.setObjectName("ocrPackageTabs")
         self.translation_tabs.setObjectName("translationPackageTabs")
         ocr_section_layout.addWidget(self.ocr_tabs)
@@ -6220,6 +6256,41 @@ class OcrLanguageManagerDialog(QDialog):
         self.hymt_table = None
         self.argos_table = None
         self._build_tabs()
+        self._engine_selectors = []
+        for inner, section_layout in ((self.ocr_tabs, ocr_section_layout),
+                                      (self.translation_tabs, translation_section_layout)):
+            row = QWidget(self)
+            form = QHBoxLayout(row)
+            form.setContentsMargins(8, 4, 8, 8)
+            form.setSpacing(10)
+            label = QLabel(package_text(self.lang, 'engine') + ':', row)
+            picker = DropDownCombo(row)
+            picker.setFixedHeight(30)
+            for index in range(inner.count()):
+                picker.addItem(inner.tabText(index), index)
+            picker.currentIndexChanged.connect(inner.setCurrentIndex)
+            inner.currentChanged.connect(picker.setCurrentIndex)
+            inner.tabBar().hide()
+            form.addWidget(label)
+            form.addWidget(picker, 1)
+            for index in range(inner.count()):
+                table = inner.widget(index).findChild(PackageTable)
+                if table is None:
+                    continue
+                for button in table._package_action_buttons:
+                    if button.property('packageAction') not in ('update', 'settings'):
+                        continue
+                    if button.property('packageAction') == 'update':
+                        button.setText('↻')
+                    form.addWidget(button)
+                    button.setVisible(index == inner.currentIndex() and not getattr(table, '_package_is_missing', False))
+                    inner.currentChanged.connect(
+                        lambda current, target=button, page_index=index, target_table=table:
+                        target.setVisible(current == page_index and not getattr(target_table, '_package_is_missing', False)))
+            section_layout.insertWidget(0, row)
+            self._engine_selectors.append(picker)
+        for inner in (self.tabs, self.ocr_tabs, self.translation_tabs):
+            inner.currentChanged.connect(self._on_tab_changed)
 
         bottom = QHBoxLayout()
         # Where a backgrounded install reports itself. Sending the progress
@@ -6253,6 +6324,7 @@ class OcrLanguageManagerDialog(QDialog):
             self.tesseract_table,
             self.easyocr_table,
             self.rapidocr_table,
+            self.hymt_table,
             self.argos_table,
         ):
             self._apply_missing_engine_card_style(package_table)
@@ -6263,6 +6335,7 @@ class OcrLanguageManagerDialog(QDialog):
         self.ocr_tabs.tabBar().setElideMode(Qt.ElideRight)
         self.translation_tabs.tabBar().setUsesScrollButtons(False)
         self._runtime_probe_ready.connect(self._on_runtime_probe_ready)
+        self._package_sizes_ready.connect(self._on_package_sizes_ready)
         # These callbacks belong to this dialog. A bare singleShot lambda can
         # outlive it when the app closes before the first event-loop turn.
         self._initial_probe_timer = QtCore.QTimer(self)
@@ -6295,6 +6368,7 @@ class OcrLanguageManagerDialog(QDialog):
             QDialog#languageManagerDialog {{ background:{c['background']}; color:{c['text']}; border:1px solid {c['border']}; font-family:'Segoe UI'; font-size:13px; }}
             QWidget#languageManagerContent {{ background:{c['background']}; }}
             QLabel {{ color:{c['text']}; font-size:13px; }}
+            QLabel#packageSizeSummary {{ color:{c['muted']}; font-size:12px; padding:2px 0; }}
             QFrame#languageManagerTitleBar {{ background:{c['header']}; border:0; border-bottom:1px solid {c['header_border']}; }}
             QLabel#languageManagerTitleIcon, QLabel#languageManagerTitleLabel {{ background:transparent; border:0; }}
             QLabel#languageManagerTitleLabel {{ font-size:13px; font-weight:600; }}
@@ -6322,7 +6396,9 @@ class OcrLanguageManagerDialog(QDialog):
             self.api_page = ProviderSettingsPage(self.owner, self.api_section_page)
             self.api_section_layout.addWidget(self.api_page)
         self.tabs.setCurrentWidget(self.api_section_page)
-        self.intro_label.hide()
+        from provider_settings import connection_text
+        self.intro_label.setText(connection_text(self.lang, 5))
+        self.intro_label.show()
         self.refresh_btn.hide()
         if provider is not None:
             index = self.api_page.service.findData(provider)
@@ -6332,54 +6408,21 @@ class OcrLanguageManagerDialog(QDialog):
         return self.api_page
 
     def _apply_package_tab_styles(self):
-        dark = self._is_dark_theme()
-        text = "#f4f6fb" if dark else "#202124"
-        muted = "#bcb5c8" if dark else "#625a6d"
-        base = "#1b1c22" if dark else "#f0edf5"
-        selected = "#7A5FA1"
-        # A tab bar measures its tabs with its own font but paints them with the
-        # stylesheet font. Declaring the font only in the stylesheet left every
-        # tab sized for a 6pt default and painted at 14px, so the labels ran
-        # over each other. Set the font on the bar and the two agree.
-        self._apply_tab_bar_font(self.tabs.tabBar(), 13, bold=False)
-        self.tabs.tabBar().setDrawBase(False)
-        for inner in (self.ocr_tabs, self.translation_tabs):
-            self._apply_tab_bar_font(inner.tabBar(), 13, bold=False)
-            inner.tabBar().setDrawBase(False)
-
-        self.tabs.tabBar().setStyleSheet(f"""
-            QTabBar::tab {{
-                background: transparent;
-                color: {muted};
-                border: none;
-                border-bottom:2px solid transparent;
-                padding: 6px 12px;
-                margin:0;
-            }}
-            QTabBar::tab:selected {{ color:{text}; border-bottom:2px solid {selected}; }}
-            QTabBar::tab:hover:!selected {{ color:{text}; }}
-        """)
-        # Weight stays put between states: a bolder selected tab would be wider
-        # than the space the bar measured for it, which is the same clipping in
-        # a smaller form.
-        inner_style = f"""
-            QTabBar::tab {{
-                background: transparent;
-                color: {muted};
-                border: none;
-                border-bottom: 2px solid transparent;
-                padding: 6px 10px;
-                margin: 0px;
-            }}
-            QTabBar::tab:selected {{
-                color: {text};
-                background: transparent;
-                border-bottom: 2px solid {selected};
-            }}
-            QTabBar::tab:hover:!selected {{ color: {text}; }}
-        """
-        self.ocr_tabs.tabBar().setStyleSheet(inner_style)
-        self.translation_tabs.tabBar().setStyleSheet(inner_style)
+        for tabs in (self.tabs, self.ocr_tabs, self.translation_tabs):
+            tabs.tabBar().setStyleSheet('')
+            tabs.tabBar().apply_theme(self._is_dark_theme())
+        for picker in self._engine_selectors:
+            picker.setStyleSheet(compact_combo_style(self._is_dark_theme()))
+            picker.set_popup_background('#17181d' if self._is_dark_theme() else '#e9e4ed')
+            picker.ensurePolished()
+            picker.setFixedHeight(30)
+        for table in (self.windows_table, self.tesseract_table, self.easyocr_table, self.rapidocr_table,
+                      self.hymt_table, self.argos_table):
+            if table is not None:
+                for button in table._package_action_buttons:
+                    if button.property('packageAction') in ('update', 'settings'):
+                        button.ensurePolished()
+                        button.setFixedHeight(30)
 
     @staticmethod
     def _apply_tab_bar_font(tab_bar, pixel_size, bold=False):
@@ -6419,8 +6462,11 @@ class OcrLanguageManagerDialog(QDialog):
                 font-family: 'Segoe UI';
                 font-size: 13px;
             }}
-
-        """ + standard_buttons(dark, compact=False))
+        """ + standard_buttons(dark, compact=False) + """
+            QFrame#languagePackageEmptyState QPushButton#languagePackageAction {
+                min-height:32px; padding:0 18px;
+            }
+        """)
 
     def eventFilter(self, obj, event):
         if obj in getattr(self, "_title_drag_widgets", ()):
@@ -6483,7 +6529,10 @@ class OcrLanguageManagerDialog(QDialog):
 
     def _on_tab_changed(self, _index):
         api = self.tabs.currentWidget() is self.api_section_page
-        self.intro_label.setVisible(not api)
+        from package_presentation import text as package_text
+        from provider_settings import connection_text
+        self.intro_label.setText(connection_text(self.lang, 5) if api else package_text(self.lang, 'intro'))
+        self.intro_label.show()
         self.refresh_btn.setVisible(not api)
         if api and self.api_page is None:
             self.show_api()
@@ -6673,6 +6722,13 @@ class OcrLanguageManagerDialog(QDialog):
             header_row.addWidget(remove_engine_button, 0, Qt.AlignTop | Qt.AlignRight)
         layout.addLayout(header_row)
 
+        from package_presentation import text as package_text
+        size_label = QLabel(package_text(self.lang, 'unknown'), page)
+        size_label.setObjectName('packageSizeSummary')
+        size_label.setWordWrap(True)
+        size_label.setToolTip(tooltip_text(package_text(self.lang, 'size_help')))
+        layout.addWidget(size_label)
+
         missing_frame = QFrame(page)
         missing_frame.setObjectName("languagePackageEmptyState")
         missing_layout = QVBoxLayout(missing_frame)
@@ -6684,6 +6740,8 @@ class OcrLanguageManagerDialog(QDialog):
         missing_title.setAlignment(Qt.AlignCenter)
         missing_layout.addWidget(missing_title)
         missing_body = QLabel(language_manager_text(self.lang, "engine_not_installed_body"))
+        if title in (HYMT_ENGINE_DISPLAY, RAPIDOCR_ENGINE_DISPLAY):
+            missing_body.setText(note)
         missing_body.setObjectName("languagePackageEmptyBody")
         missing_body.setAlignment(Qt.AlignCenter)
         missing_body.setWordWrap(True)
@@ -6691,7 +6749,7 @@ class OcrLanguageManagerDialog(QDialog):
         missing_install_button = QPushButton(language_manager_text(self.lang, "install_engine"))
         missing_install_button.setObjectName("languagePackageAction")
         missing_install_button.setMinimumHeight(34)
-        missing_install_button.setMaximumWidth(190)
+        missing_install_button.setMaximumWidth(480)
         if install_engine_callback is not None:
             missing_install_button.clicked.connect(install_engine_callback)
         else:
@@ -6709,13 +6767,13 @@ class OcrLanguageManagerDialog(QDialog):
             layout.addWidget(filter_edit)
 
         table = PackageTable(page)
-        table.setColumnCount(4)
-        table.setHorizontalHeaderLabels(header_labels or [
+        table.setColumnCount(5)
+        table.setHorizontalHeaderLabels((header_labels or [
             "",
             language_manager_text(self.lang, "language"),
             language_manager_text(self.lang, "package"),
             language_manager_text(self.lang, "status"),
-        ])
+        ]) + [package_text(self.lang, 'size')])
         table.verticalHeader().setVisible(False)
         # Missing packages are selected with checkboxes; installed packages
         # are selected as rows for removal.  NoSelection made the removal
@@ -6733,11 +6791,13 @@ class OcrLanguageManagerDialog(QDialog):
         header.setSectionResizeMode(1, QHeaderView.Stretch)
         header.setSectionResizeMode(2, QHeaderView.Fixed)
         header.setSectionResizeMode(3, QHeaderView.Fixed)
+        header.setSectionResizeMode(4, QHeaderView.Fixed)
         if self._is_dark_theme():
             header.setStyleSheet("QHeaderView::section { background-color: #24212e; color: #f4f6fb; border: 0; padding: 5px; }")
         else:
             header.setStyleSheet("QHeaderView::section { background-color: #f0eef7; color: #202124; border: 0; padding: 5px; }")
         table.setColumnWidth(0, 34)
+        table.setColumnHidden(2, True)
         table._package_filter_edit = filter_edit
         table._pending_package_codes = set()
         table.itemChanged.connect(
@@ -6751,19 +6811,31 @@ class OcrLanguageManagerDialog(QDialog):
         layout.addWidget(table)
 
         action_widget = QWidget(page)
-        action_row = QHBoxLayout(action_widget)
+        action_row = QGridLayout(action_widget)
         action_row.setContentsMargins(0, 0, 0, 0)
-        action_row.addStretch()
+        action_row.setSpacing(6)
+        action_row.setColumnStretch(0, 1)
+        action_row.setColumnStretch(1, 1)
         table._package_action_buttons = []
-        for text, callback, role in actions:
+        for index, (text, callback, role) in enumerate(actions):
             button = QPushButton(text)
             button.setObjectName("languagePackageAction")
             button.setMinimumHeight(32)
             button.setProperty("buttonRole", role)
+            button.setProperty('packageBaseText', text)
+            button.setAccessibleName(text)
+            action = ('install' if role == 'primary' else 'remove' if role == 'danger' else
+                      'update' if callback.__name__.startswith('_update_') else 'settings')
+            button.setProperty('packageAction', action)
+            if action == 'update':
+                button.setToolTip(tooltip_text(text))
             button.setStyleSheet(button_qss(self._is_dark_theme(), role))
             button.clicked.connect(callback)
             table._package_action_buttons.append(button)
-            action_row.addWidget(button)
+            if role == 'primary':
+                action_row.addWidget(button, 0, 0)
+            elif role == 'danger':
+                action_row.addWidget(button, 0, 1)
         layout.addWidget(action_widget)
 
         table._package_note_label = note_label
@@ -6774,12 +6846,17 @@ class OcrLanguageManagerDialog(QDialog):
         table._package_missing_body = missing_body
         table._package_missing_install_button = missing_install_button
         table._package_missing_engine = str(missing_engine or "")
+        table._package_target_tabs = target_tabs
+        table._package_engine = title.lower().replace('hy-mt', 'hymt')
+        table._package_size_label = size_label
         target_tabs.addTab(page, title)
         populate_func(table)
+        self._update_package_sizes(table)
         return table
 
     def _set_engine_missing_state(self, table, missing, engine_name=""):
         missing = bool(missing)
+        table._package_is_missing = missing
         engine_name = str(engine_name or getattr(table, "_package_missing_engine", ""))
         frame = getattr(table, "_package_missing_frame", None)
         if frame is None:
@@ -6800,6 +6877,10 @@ class OcrLanguageManagerDialog(QDialog):
         remove_engine = getattr(table, "_package_remove_engine_button", None)
         if remove_engine is not None:
             remove_engine.setVisible(not missing)
+        for button in getattr(table, '_package_action_buttons', ()):
+            if button.property('packageAction') in ('update', 'settings'):
+                target_tabs = table._package_target_tabs
+                button.setVisible(not missing and target_tabs.currentWidget() is table.parentWidget())
         title = getattr(table, "_package_missing_title", None)
         if title is not None:
             title.setText(
@@ -6955,6 +7036,7 @@ class OcrLanguageManagerDialog(QDialog):
             pending.add(code)
         else:
             pending.discard(code)
+        self._update_package_sizes(table)
 
     def _on_package_row_clicked(self, table, row, column):
         # Qt already toggles the actual checkbox. Let the rest of the row act
@@ -6999,6 +7081,7 @@ class OcrLanguageManagerDialog(QDialog):
             check_item = QTableWidgetItem()
             code = data["code"]
             check_item.setData(Qt.UserRole, code)
+            check_item.setData(Qt.UserRole + 1, bool(data.get('checked')))
             show_checkbox = data.get("show_checkbox", True)
             selectable = bool(data.get("selectable", False))
             if data.get("checked") or data.get("selection_invalid", False):
@@ -7013,6 +7096,7 @@ class OcrLanguageManagerDialog(QDialog):
             if show_checkbox and selectable:
                 flags |= Qt.ItemIsEnabled | Qt.ItemIsSelectable
             check_item.setFlags(flags)
+            check_item.setData(Qt.UserRole + 2, int(flags))
             check_item.setBackground(QBrush(bg))
             check_item.setForeground(QBrush(fg if selectable else muted_fg))
             table.setItem(row, 0, check_item)
@@ -7023,6 +7107,7 @@ class OcrLanguageManagerDialog(QDialog):
             lang_item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
             lang_item.setBackground(QBrush(bg))
             lang_item.setForeground(QBrush(fg))
+            lang_item.setToolTip(tooltip_text(data['name'] + '\n' + data['package']))
             table.setItem(row, 1, lang_item)
 
             package_item = QTableWidgetItem(data["package"])
@@ -7032,14 +7117,134 @@ class OcrLanguageManagerDialog(QDialog):
             table.setItem(row, 2, package_item)
 
             status_item = QTableWidgetItem(data["status"])
+            status_item.setData(Qt.UserRole, data['status'])
             status_item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
             status_item.setBackground(QBrush(bg))
             status_item.setForeground(QBrush(fg if data.get("checked") or data.get("selectable") else muted_fg))
             table.setItem(row, 3, status_item)
+            size_item = QTableWidgetItem('—')
+            size_item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+            size_item.setBackground(QBrush(bg))
+            size_item.setForeground(QBrush(fg))
+            size_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            from package_presentation import text as package_text
+            size_item.setToolTip(tooltip_text(package_text(self.lang, 'unknown')))
+            table.setItem(row, 4, size_item)
         table.resizeRowsToContents()
         table._schedule_fit()
         table._pending_package_codes = pending
         del signal_blocker
+        self._update_package_sizes(table)
+
+    @QtCore.pyqtSlot(object)
+    def _on_package_sizes_ready(self, catalog):
+        from package_presentation import PackageSizes
+        if isinstance(catalog, dict):
+            self._package_sizes = PackageSizes(catalog, channel=os.environ.get('CLICKNTRANSLATE_COMPONENT_CHANNEL', 'stable'))
+            self._package_sizes_error = ''
+        else:
+            self._package_sizes_error = str(catalog or '')
+        for table in (self.windows_table, self.tesseract_table, self.easyocr_table,
+                      self.rapidocr_table, self.hymt_table, self.argos_table):
+            if table is not None:
+                self._update_package_sizes(table)
+
+    def _package_model_codes(self, engine, code):
+        if engine == 'tesseract':
+            return [tesseract_language_code(code)]
+        if engine == 'easyocr':
+            return self._easyocr_model_groups_for_language(code)
+        return [code.replace('->', '__')] if engine == 'argos' else []
+
+    def _update_package_sizes(self, table):
+        from package_presentation import text as package_text, format_size
+        label = getattr(table, '_package_size_label', None)
+        if label is None:
+            return
+        engine = table._package_engine
+        sizes = self._package_sizes
+        pending_codes = set()
+        selected = set()
+        label.setVisible(not getattr(table, '_package_is_missing', False))
+        if engine in ('windows', 'apple vision'):
+            summary = package_text(self.lang, 'windows' if engine == 'windows' else 'included')
+        elif sizes is None:
+            summary = package_text(self.lang, 'unknown')
+        elif engine not in sizes.bundles:
+            summary = package_text(self.lang, 'unavailable')
+        else:
+            runtime, base_models = sizes.split_base(engine)
+            blocker = QtCore.QSignalBlocker(table)
+            for row in range(table.rowCount()):
+                check = table.item(row, 0)
+                size_item = table.item(row, 4)
+                if check is None or size_item is None:
+                    continue
+                code = str(check.data(Qt.UserRole) or '')
+                codes = self._package_model_codes(engine, code)
+                original_flags = check.data(Qt.UserRole + 2)
+                if original_flags is not None:
+                    check.setFlags(Qt.ItemFlags(original_flags))
+                status_item = table.item(row, 3)
+                if status_item.data(Qt.UserRole) is not None:
+                    status_item.setText(str(status_item.data(Qt.UserRole)))
+                size = sizes.size(engine, codes, base=False) if codes else None
+                if engine == 'hymt':
+                    size = base_models if code == 'hymt-model' else runtime
+                elif engine == 'rapidocr':
+                    files = sizes.bundles[engine]['files']
+                    if code == 'rapidocr-engine':
+                        size = runtime
+                    elif code in ('rapidocr-detector', 'rapidocr-recognition'):
+                        chosen = [f for f in files if f['destination'].startswith('models/')
+                                  and (('_rec_' in f['destination']) == (code == 'rapidocr-recognition'))]
+                        size = sum(sizes.catalog['artifacts'][digest]['size'] for digest in {f['sha256'] for f in chosen})
+                supported = not codes or all(c in sizes.bundles[engine].get('language_files', {}) for c in codes)
+                if check.checkState() == Qt.Checked and supported:
+                    selected.update(codes)
+                    if not check.data(Qt.UserRole + 1):
+                        pending_codes.update(codes)
+                value = format_size(size) if supported else '—'
+                if engine == 'rapidocr' and code == 'rapidocr-runtime':
+                    value = package_text(self.lang, 'included')
+                size_item.setText(value)
+                if not supported and not check.data(Qt.UserRole + 1):
+                    check.setCheckState(Qt.Unchecked)
+                    table._pending_package_codes.discard(code)
+                    check.setFlags(check.flags() & ~Qt.ItemIsEnabled)
+                    table.item(row, 3).setText(package_text(self.lang, 'unsupported'))
+                hint = (package_text(self.lang, 'bundled') if engine == 'rapidocr' and code == 'rapidocr-runtime'
+                        else package_text(self.lang, 'size_help'))
+                size_item.setToolTip(tooltip_text(hint if supported else package_text(self.lang, 'unsupported')))
+            del blocker
+            runtime, models = sizes.breakdown(engine, selected)
+            summary = (f"{package_text(self.lang, 'engine')}: {format_size(runtime)}"
+                       f"   ·   {package_text(self.lang, 'models')}: {format_size(models)}")
+            initial = {'tesseract': {'eng', 'rus'}, 'easyocr': {'english_g2'}}.get(engine, set())
+            initial.intersection_update(sizes.bundles[engine].get('language_files', {}))
+            install_size = sizes.size(engine, initial)
+            install_button = table._package_missing_install_button
+            install_button.setText(language_manager_text(self.lang, 'install_engine') + ' · ' + format_size(install_size))
+            install_button.setToolTip(tooltip_text(package_text(self.lang, 'size_help')))
+            for button in table._package_action_buttons:
+                action = button.property('packageAction')
+                base_text = str(button.property('packageBaseText'))
+                if action == 'install' and pending_codes:
+                    from component_runtime import managed_runtime
+                    include_base = engine == 'argos' and managed_runtime('argos') is None
+                    value = sizes.size(engine, pending_codes, base=include_base)
+                    button.setText(base_text + ' · ' + format_size(value))
+                elif action == 'update':
+                    value = format_size(sizes.size(engine, selected))
+                    button.setText('↻ · ' + value)
+                    button.setAccessibleName(base_text + ' · ' + value)
+                else:
+                    button.setText(base_text)
+                if action != 'update':
+                    button.setAccessibleName(button.text())
+        label.setText(summary)
+        label.setToolTip(tooltip_text(package_text(self.lang, 'size_help')))
+        table._schedule_fit()
 
     def _language_name(self, language):
         return language.display_name(self.lang)
@@ -7531,11 +7736,27 @@ class OcrLanguageManagerDialog(QDialog):
         packages = []
         try:
             import translater
-            packages = translater.argos_package_catalog(refresh=refresh)
+            if refresh and managed_install_supported():
+                from component_catalog import trusted_catalog, component_store_path
+                from component_store import ComponentStore
+                from component_argos import catalog_rows
+                store = ComponentStore(component_store_path())
+                with store.lock():
+                    catalog = trusted_catalog(store.root)
+                self._package_sizes_ready.emit(catalog)
+                # Reuse the authenticated bytes for Argos: opening one dialog
+                # must not make two separate metadata-refresh requests.
+                packages = catalog_rows(refresh=True, catalog_loader=lambda _root: catalog)
+            else:
+                packages = translater.argos_package_catalog(refresh=refresh)
         except Exception as exc:
             from component_catalog import ComponentError
             from component_texts import error_text
             error = error_text(self.lang, exc) if isinstance(exc, ComponentError) else str(exc)
+            try:
+                self._package_sizes_ready.emit(error)
+            except RuntimeError:
+                pass
             if refresh:
                 try:
                     packages = translater.argos_package_catalog(refresh=False)
@@ -10891,7 +11112,7 @@ class SettingsWindow(QWidget):
             settings_text(lang, "copy_notification"), self.settings_updates_page
         )
         self.copy_notification_checkbox.setChecked(
-            bool(self.parent.config.get("notifications", True))
+            bool(self.parent.config.get("notifications", False))
         )
         self.copy_notification_checkbox.setToolTip(
             tooltip_text(settings_text(lang, "copy_notification_tooltip"))

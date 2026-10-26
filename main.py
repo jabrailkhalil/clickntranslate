@@ -241,7 +241,7 @@ DEFAULT_CONFIG = {
     "hotkey_language_editor_mode": "selection",
     "copy_hotkey": "Ctrl+Alt+C",
     "translate_hotkey": "Ctrl+Alt+T",
-    "notifications": True,
+    "notifications": False,
     "button_tooltips_enabled": True,
     "history": True,
     "start_minimized": False,
@@ -1286,7 +1286,7 @@ def _save_copy_history_sync(text):
 def notify_copy_completed(config=None):
     """Queue the optional copy notification on the main Qt thread."""
     source = config if isinstance(config, dict) else get_cached_config()
-    if not bool(source.get("notifications", True)):
+    if not bool(source.get("notifications", False)):
         return False
     lang = normalize_interface_language(source.get("interface_language", "en"))
     from copy_feedback import emit_copy_feedback
@@ -9497,7 +9497,8 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self.provider_combo.blockSignals(True)
         self.provider_combo.clear()
         groups = PROVIDER_GROUP_TEXT.get(self.lang, PROVIDER_GROUP_TEXT["en"])
-        for kind in ("online", "offline", "api"):
+        visible_groups = []
+        for kind in ("offline", "online", "api"):
             options = [
                 option
                 for option in TRANSLATION_PROVIDER_OPTIONS
@@ -9505,10 +9506,14 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
             ]
             if not options:
                 continue
+            visible_groups.append(kind)
             self.provider_combo.addItem(f"  {groups.get(kind, 'API')}", None)
             self.provider_combo.set_group_header(self.provider_combo.count() - 1)
             for engine, _name, _kind in options:
                 self.provider_combo.addItem(provider_display_name(engine, self.lang), engine)
+
+        from provider_categories import configure_categories
+        configure_categories(self.provider_combo, groups, visible_groups)
 
         selected_index = self.provider_combo.findData(selected_engine)
         if selected_index < 0:
@@ -12936,7 +12941,7 @@ class DarkThemeApp(QMainWindow):
 
     @QtCore.pyqtSlot(str)
     def _show_copy_notification(self, language_code="", force=False):
-        if not force and not bool(self.config.get("notifications", True)):
+        if not force and not bool(self.config.get("notifications", False)):
             return
         lang = normalize_interface_language(
             language_code or self.current_interface_language
