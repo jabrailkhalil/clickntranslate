@@ -7,7 +7,7 @@ import tempfile
 import time
 
 from component_catalog import (ComponentError, SAFE_ID, choose_bundle, component_store_path,
-                               materialize_bundle, runtime_command, trusted_catalog)
+                               materialize_bundle, runtime_command, trusted_catalog, native_data_path)
 from component_runtime import worker_environment
 from component_store import ComponentStore
 
@@ -36,7 +36,7 @@ def validate(folder, receipt, check_cancel=lambda: None):
     with tempfile.TemporaryDirectory(prefix='clickntranslate_argos_probe_') as temporary:
         work = Path(temporary)
         request = work / 'request.json'
-        request.write_text(json.dumps({'root_dir':str(folder), 'action':'validate',
+        request.write_text(json.dumps({'root_dir':native_data_path(folder), 'action':'validate',
                                        'directions':receipt['languages'], 'work_dir':temporary}), encoding='utf-8')
         with (work / 'stdout.json').open('w', encoding='utf-8') as stdout, \
                 (work / 'stderr.txt').open('w', encoding='utf-8') as stderr:

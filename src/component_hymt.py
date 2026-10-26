@@ -7,7 +7,7 @@ import tempfile
 import time
 
 from component_catalog import (ComponentError, choose_bundle, component_store_path,
-                               runtime_command, safe_relative, trusted_catalog)
+                               runtime_command, safe_relative, trusted_catalog, native_data_path)
 from component_runtime import worker_environment
 from component_store import ComponentStore, file_digest
 
@@ -32,7 +32,7 @@ def runtime_info(folder, receipt):
     model = folder / safe_relative(receipt.get('model'))
     if not model.is_file():
         raise ComponentError('installed_component_damaged', 'Hy-MT model')
-    return {'root':str(folder), 'model':str(model), 'runner':runtime_command(folder, receipt)[0]}
+    return {'root':str(folder), 'model':native_data_path(model), 'runner':runtime_command(folder, receipt)[0]}
 
 
 def cache_identity(receipt):

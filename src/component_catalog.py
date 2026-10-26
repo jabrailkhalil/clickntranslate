@@ -148,6 +148,14 @@ def materialize_bundle(bundle, languages):
             if key != 'language_files'}
 
 
+def native_data_path(path):
+    """Native tools may append /filename, which extended Win32 paths forbid."""
+    value = str(path)
+    if value.startswith('\\\\?\\UNC\\'):
+        return '\\\\'+value[8:]
+    return value[4:] if value.startswith('\\\\?\\') else value
+
+
 def runtime_command(folder, receipt):
     paths = ([receipt['executable']] if receipt.get('runtime') == 'native'
              else [receipt['python'], receipt['worker']])

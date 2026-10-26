@@ -109,6 +109,13 @@ def test_failed_install_keeps_previous_and_reuses_bytes(tmp_path):
     assert store.active('ocr.rapidocr')['receipt']['revision'] == 1
 
 
+def test_native_data_arguments_do_not_use_device_paths_with_mixed_separators():
+    from component_catalog import native_data_path
+    assert native_data_path('\\\\?\\C:\\app\\models')=='C:\\app\\models'
+    assert native_data_path('\\\\?\\UNC\\server\\share\\models')=='\\\\server\\share\\models'
+    assert native_data_path('/opt/app/models')=='/opt/app/models'
+
+
 @pytest.mark.skipif(os.name != 'nt', reason='Windows extended paths')
 def test_store_extracts_and_removes_deep_native_license_paths(tmp_path):
     store = ComponentStore(tmp_path/'store')

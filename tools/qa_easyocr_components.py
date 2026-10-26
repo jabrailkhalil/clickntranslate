@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import subprocess
 import sys
 import time
 
@@ -23,7 +24,8 @@ def run(catalog_path, runtime, models, output):
     store = ComponentStore(output/'store')
     sources = json.loads((models/'model-artifacts.json').read_bytes())
     files = {item['sha256']:models/'archives'/(item['group']+'.zip') for item in sources['artifacts']}
-    runtime_hash = hashlib.file_digest(runtime.open('rb'), 'sha256').hexdigest()
+    with runtime.open('rb') as stream:
+        runtime_hash = hashlib.file_digest(stream, 'sha256').hexdigest()
     files[runtime_hash] = runtime
     downloads = []
     def download(url, destination):
@@ -46,7 +48,10 @@ def run(catalog_path, runtime, models, output):
     assert validation['cuda'] is None and '+cpu' in validation['torch']
     assert validation['dll_runtime'] == dict.fromkeys(
         ('msvcp140.dll','msvcp140_1.dll','msvcp140_2.dll'), 'bundled')
-    import ocr
+    from component_catalog import runtime_command
+    from component_runtime import worker_environment
+    from easyocr_models import installed_languages
+    from languages import LANGUAGES
     from languages import easyocr_language_codes
     from PIL import Image, ImageDraw, ImageFont, features
     # QA image generation handles both Pillow builds, including Windows builds
@@ -71,8 +76,16 @@ def run(catalog_path, runtime, models, output):
                 rendered=get_display(arabic_reshaper.reshape(text))
         draw.text((35,35),rendered,font=font,fill='black',**options)
         image.save(output/(code+'.png'))
-        result = ocr._call_native_ocr_worker({'engine':'easyocr',
-            'language_codes':easyocr_language_codes(code),'allow_download':True},[(code,image)])['results'][0]
+        request=output/'recognition-request.json'
+        request.write_text(json.dumps({'engine':'easyocr','root_dir':str(installed['folder']),
+            'language_codes':easyocr_language_codes(code),'allow_download':False,'work_dir':str(output),
+            'images':[{'path':str(output/(code+'.png')),'label':code}]}),encoding='utf-8')
+        child=subprocess.run([*runtime_command(installed['folder'],installed['receipt']),str(request)],
+            capture_output=True,text=True,encoding='utf-8',errors='replace',timeout=180,
+            env=worker_environment(),creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+        response=json.loads(child.stdout)
+        assert child.returncode==0 and not response.get('error'),response
+        result=response['results'][0]
         assert not result.get('error') and result.get('text') and result.get('items'), result
         if code=='en':assert 'hello' in result['text'].lower() and '123' in result['text']
         if code=='ru':assert 'привет' in result['text'].lower()
@@ -80,8 +93,8 @@ def run(catalog_path, runtime, models, output):
         if code=='ta':assert any('\u0b80'<=c<='\u0bff' for c in result['text'])
         recognition.append({'language':code,'source':text,'result':result['text'],
                             'boxes':result['boxes_count'],'confidence':result['confidence']})
-    print('EN/RU/AR/Tamil recognition through the application bridge passed.',flush=True)
-    assert {'ar','ru','en','ta','bn','id'}.issubset(ocr._easyocr_installed_language_codes())
+    print('EN/RU/AR/Tamil recognition through the private worker passed.',flush=True)
+    assert {'ar','ru','en','ta','bn','id'}.issubset(installed_languages(installed['folder'],[item.code for item in LANGUAGES]))
     native_in_parent = [name for name in ('torch','torchvision','easyocr','cv2') if name in sys.modules]
     assert not native_in_parent, native_in_parent
     # A controlled profile revision exercises updates; the SDK bytes remain identical.
@@ -130,7 +143,6 @@ def run(catalog_path, runtime, models, output):
         easy.remove(store.root)
         assert store.active(easy.COMPONENT) is None and active['folder'].exists()
     assert not active['folder'].exists() and easy.legacy_disabled(store.root)
-    assert not ocr.easyocr_available()
     report = {'runtime_sha256':runtime_hash,'all_model_groups':all_groups,
         'native_validation':validation,'recognition':recognition,
         'artifact_downloads':len(downloads),'update_additional_downloads':len(downloads)-16,

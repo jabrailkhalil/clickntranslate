@@ -1147,7 +1147,8 @@ def _run_argos_worker_request_inner(request, status_callback=None, progress_call
     try:
         request = dict(request or {})
         if runtime:
-            request['root_dir'] = str(runtime['folder'])
+            from component_catalog import native_data_path
+            request['root_dir'] = native_data_path(runtime['folder'])
             request['work_dir'] = request_dir
         request["event_path"] = event_path
         request["cancel_path"] = cancel_path

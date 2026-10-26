@@ -9,7 +9,7 @@ import io
 from contextlib import contextmanager, nullcontext
 
 from component_catalog import (ComponentError, choose_bundle, component_store_path,
-                               trusted_catalog, safe_relative, materialize_bundle, runtime_command)
+                               trusted_catalog, safe_relative, materialize_bundle, runtime_command, native_data_path)
 from component_store import ComponentStore
 
 
@@ -132,7 +132,7 @@ def validate_tesseract(folder, receipt, check_cancel=lambda: None):
         image.save(probe)
         for language in receipt['languages']:
             check_cancel()
-            result = subprocess.run([*command, str(probe), 'stdout', '--tessdata-dir', str(data),
+            result = subprocess.run([*command, str(probe), 'stdout', '--tessdata-dir', native_data_path(data),
                 '-l', language, '--oem', '1', '--psm', '6'], **kwargs)
             if result.returncode:
                 raise ComponentError('validation_failed', f'Tesseract {language}')
@@ -149,7 +149,7 @@ def recognize_tesseract(image, command, data_dir, language, psm, positions=False
         image.save(source)
         environment = worker_environment()
         environment.pop('TESSDATA_PREFIX', None)
-        result = subprocess.run([command, str(source), 'stdout', '--tessdata-dir', str(data_dir),
+        result = subprocess.run([command, str(source), 'stdout', '--tessdata-dir', native_data_path(data_dir),
             '-l', language, '--oem', '1', '--psm', str(psm), 'tsv' if positions else 'txt'],
             capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=45,
             creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0), env=environment)
