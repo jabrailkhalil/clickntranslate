@@ -6,7 +6,7 @@ if [[ "$(uname -s)" != Darwin ]]; then
 fi
 cd "$(dirname "$0")/.."
 PYTHON="${VENV:-.venv-macos}/bin/python"
-VERSION="$("$PYTHON" -c 'from app_version import APP_VERSION; print(APP_VERSION)')"
+VERSION="$("$PYTHON" -c 'import sys; sys.path.insert(0, "src"); from app_version import APP_VERSION; print(APP_VERSION)')"
 ARCH="$("$PYTHON" -c 'import platform; print(platform.machine())')"
 mkdir -p build/macos releases
 LOCAL_SIGNING=0

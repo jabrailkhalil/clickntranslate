@@ -158,7 +158,7 @@ Windows или Linux; платформенную границу исправля
 Запустить настоящий интерфейс Cocoa, без переменной `QT_QPA_PLATFORM=offscreen`:
 
 ```bash
-.venv-macos/bin/python main.py
+.venv-macos/bin/python src/main.py
 ```
 
 Обычный запуск использует реальные пользовательские настройки. Автоматический

@@ -19,6 +19,16 @@ INTERNAL_DIR_NAME = "_internal"
 LINUX_DATA_DIR_NAME = "clickntranslate"
 
 
+def _source_base_dir():
+    """Moving the entry into src/ must not move existing portable user data."""
+    from project_paths import repository_root, source_entry
+    entry = os.path.abspath(sys.argv[0])
+    if os.path.normcase(os.path.realpath(entry)) == os.path.normcase(os.path.realpath(source_entry())):
+        return str(repository_root())
+    # Tests and explicit QA scripts still control their own isolated directory.
+    return os.path.dirname(entry)
+
+
 def linux_user_data_dir():
     return os.path.join(platform_support.xdg_data_home(), LINUX_DATA_DIR_NAME)
 
@@ -42,7 +52,7 @@ def _linux_portable_base_dir():
         else:
             root = frozen_executable_dir()
         return root if _is_writable_dir(root) else linux_user_data_dir()
-    return os.path.dirname(os.path.abspath(sys.argv[0]))
+    return _source_base_dir()
 
 
 def frozen_executable_dir():
@@ -137,7 +147,7 @@ def portable_base_dir():
         if is_launcher_layout():
             return os.path.dirname(frozen_executable_dir())
         return frozen_executable_dir()
-    return os.path.dirname(os.path.abspath(sys.argv[0]))
+    return _source_base_dir()
 
 
 def public_executable_path():

@@ -21,8 +21,8 @@ WHEELS="$(mktemp -d "${TMPDIR:-/tmp}/cnt-macos-wheels.XXXXXX")"
 trap 'rm -rf "$WHEELS"' EXIT
 "$VENV/bin/python" -m pip download --only-binary=:all: \
   --platform "macosx_13_0_$ARCH" --dest "$WHEELS" \
-  -r requirements-macos.txt 'pyinstaller>=6.16,<7' pytest
+  -r tools/requirements/macos.txt 'pyinstaller>=6.16,<7' pytest
 "$VENV/bin/python" -m pip install --no-index --find-links "$WHEELS" --force-reinstall \
-  -r requirements-macos.txt 'pyinstaller>=6.16,<7' pytest
+  -r tools/requirements/macos.txt 'pyinstaller>=6.16,<7' pytest
 "$VENV/bin/python" -m pip install --no-deps 'argostranslate~=1.11.0'
-echo "Ready. Start with: $VENV/bin/python main.py"
+echo "Ready. Start with: $VENV/bin/python src/main.py"

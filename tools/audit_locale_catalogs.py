@@ -33,7 +33,7 @@ def strings(node, prefix=''):
 
 def audit(root):
     tables=[];messages={};issues=[]
-    paths=[root/'main.py',*sorted((root/'src').glob('*.py'))]
+    paths=sorted((root/'src').glob('*.py'))
     def check(table,source,rows):
         if not source:return
         tables.append(dict(id=table,source_messages=len(source)))

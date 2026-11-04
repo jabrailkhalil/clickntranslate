@@ -10,7 +10,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-$versionSource = Get-Content -LiteralPath (Join-Path $repoRoot 'app_version.py') -Raw
+$versionSource = Get-Content -LiteralPath (Join-Path $repoRoot 'src/app_version.py') -Raw
 if ($versionSource -notmatch 'APP_VERSION\s*=\s*"(\d+\.\d+\.\d+(?:\.\d+)?)"') {
     throw 'APP_VERSION could not be read.'
 }

@@ -20,7 +20,7 @@ def test_installer_and_platform_requirements_agree_on_the_backend_version():
     expected=f'rapidocr[rtl]=={models.RAPIDOCR_VERSION}'
     root=Path(__file__).resolve().parents[1]
     assert expected in RAPIDOCR_PIP_PACKAGES
-    for name in ('requirements.txt','requirements-linux.txt','requirements-macos.txt'):
+    for name in ('tools/requirements/windows.txt','tools/requirements/linux.txt','tools/requirements/macos.txt'):
         assert expected in (root/name).read_text(encoding='utf8').splitlines()
 
 

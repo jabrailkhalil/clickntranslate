@@ -221,7 +221,7 @@ ocr_worker_hiddenimports += [
 
 
 a = Analysis(
-    [str(_PROJECT_ROOT / 'main.py')],
+    [str(_SOURCE_ROOT / 'main.py')],
     pathex=[str(_PROJECT_ROOT), str(_SOURCE_ROOT)],
     binaries=gui_binaries,
     datas=gui_datas,

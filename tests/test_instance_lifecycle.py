@@ -91,7 +91,7 @@ def test_real_windows_instance_can_be_replaced_and_releases_mutex(tmp_path, lega
     root = str(Path(__file__).resolve().parents[1])
     script.write_text(f'''
 import os, sys
-sys.path.insert(0, {root!r})
+sys.path[:0] = [{root!r}, os.path.join({root!r}, 'src')]
 os.environ['QT_QPA_PLATFORM'] = 'windows'
 import main
 from instance_lifecycle import WindowsInstanceGuard

@@ -87,7 +87,7 @@
 
 在 **Settings → Translation and OCR → Language packages → API** 中配置自己的 OpenAI、Gemini、Claude、DeepL、LibreTranslate 或 Custom API 密钥。对于支持图片的模型，可明确启用图片输入，由同一服务完成识别与翻译。
 
-本地 OCR 在设备上处理图片。在线服务接收待翻译文本；启用的视觉 API 也会接收所选图片。服务商可能有独立的价格和限额。[隐私说明](../../PRIVACY.md)。
+本地 OCR 在设备上处理图片。在线服务接收待翻译文本；启用的视觉 API 也会接收所选图片。服务商可能有独立的价格和限额。[隐私说明](../PRIVACY.md)。
 
 ## 按你的习惯使用
 

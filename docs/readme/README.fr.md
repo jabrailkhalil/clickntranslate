@@ -87,7 +87,7 @@ Google, MyMemory, Lingva et LibreTranslate en ligne ; Argos Translate et Hy-MT h
 
 Dans **Settings → Translation and OCR → Language packages → API**, configurez votre clé OpenAI, Gemini, Claude, DeepL, LibreTranslate ou Custom API. Une entrée d’image explicitement activée permet aux modèles de vision compatibles de reconnaître et traduire avec un seul fournisseur.
 
-L’OCR local conserve les images sur l’appareil. Les services en ligne reçoivent le texte ; une API de vision activée reçoit aussi l’image choisie. Les tarifs et limites du fournisseur s’appliquent. [Confidentialité](../../PRIVACY.md).
+L’OCR local conserve les images sur l’appareil. Les services en ligne reçoivent le texte ; une API de vision activée reçoit aussi l’image choisie. Les tarifs et limites du fournisseur s’appliquent. [Confidentialité](../PRIVACY.md).
 
 ## À votre façon
 

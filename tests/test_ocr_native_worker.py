@@ -151,7 +151,7 @@ class NativeOcrWorkerPackagingTest(unittest.TestCase):
             self.assertIn(excluded, spec_text)
 
     def test_main_enables_worker_only_for_real_app_entrypoint(self):
-        main_text = (ROOT / "main.py").read_text(encoding="utf-8")
+        main_text = (ROOT / "src/main.py").read_text(encoding="utf-8")
         entrypoint = main_text.index('if __name__ == "__main__":')
         worker_flag = main_text.index('os.environ["CLICKNTRANSLATE_USE_OCR_WORKER"] = "1"')
         self.assertGreater(worker_flag, entrypoint)

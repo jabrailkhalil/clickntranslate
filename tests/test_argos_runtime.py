@@ -451,7 +451,7 @@ class ArgosPackagingTest(unittest.TestCase):
             self.assertIn(optional_ocr, spec_text)
 
     def test_main_preloads_argos_before_qt(self):
-        main_source = (ROOT / "main.py").read_text(encoding="utf-8")
+        main_source = (ROOT / "src/main.py").read_text(encoding="utf-8")
         preload_at = main_source.index("translater.preload_argos_runtime()")
         qt_at = main_source.index("from PyQt5 import QtCore")
         self.assertLess(preload_at, qt_at)

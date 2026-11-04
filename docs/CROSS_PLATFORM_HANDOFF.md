@@ -72,7 +72,7 @@ UI-строки поддерживают RU/EN/ES/DE/FR/ZH. Процент — �
 
 В `main` также сохранён Mac-порт. Cocoa, Carbon, Vision, ScreenCaptureKit,
 разрешения, подпись и LaunchAgent вызываются только на Mac; дополнительные
-PyObjC-зависимости находятся в `requirements-macos.txt` и Mac-spec.
+PyObjC-зависимости находятся в `tools/requirements/macos.txt` и Mac-spec.
 Windows и Linux используют собственные requirements и сборочные файлы.
 Приватные ключи, настройки пользователя, история и загруженные модели в Git
 не передавались. Компактная базовая геометрия Mac остаётся платформенной.

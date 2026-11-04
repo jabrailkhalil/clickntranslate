@@ -28,7 +28,7 @@ On Windows, use Python 3.12 and install the runtime plus test dependencies:
 ```powershell
 python -m venv .venv
 .venv\Scripts\python -m pip install --upgrade pip
-.venv\Scripts\python -m pip install -r requirements.txt pytest
+.venv\Scripts\python -m pip install -r tools/requirements/windows.txt pytest
 ```
 
 On Linux, follow `docs/LINUX.md`; it documents the system packages and the
@@ -37,7 +37,7 @@ project's isolated Python environment.
 Run the complete automated suite before opening a pull request:
 
 ```powershell
-python -m pytest -q
+python tools/run_regression_tests.py
 ```
 
 Platform-specific tests may be skipped when their native API is unavailable.

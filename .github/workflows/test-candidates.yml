@@ -27,7 +27,7 @@ jobs:
         with:
           python-version: '3.12'
           cache: pip
-          cache-dependency-path: requirements-linux.txt
+          cache-dependency-path: tools/requirements/linux.txt
       - name: Install build and native OCR dependencies
         run: |
           sudo apt-get update
@@ -37,7 +37,7 @@ jobs:
             libxcb-xinerama0 libxcb-util1 libxcb-cursor0 libxkbcommon-x11-0
           python -m venv "$VENV"
           "$VENV/bin/python" -m pip install --upgrade pip
-          "$VENV/bin/python" -m pip install -r requirements-linux.txt pytest pyinstaller
+          "$VENV/bin/python" -m pip install -r tools/requirements/linux.txt pytest pyinstaller
           "$VENV/bin/python" -m pip install --no-deps 'argostranslate~=1.11.0'
       - name: Verify source regressions
         run: |

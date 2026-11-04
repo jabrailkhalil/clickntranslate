@@ -85,7 +85,7 @@ Online: Google, MyMemory, Lingva e LibreTranslate. Offline: Argos Translate e Hy
 
 Configure suas chaves OpenAI, Gemini, Claude, DeepL, LibreTranslate ou Custom API em **Settings → Translation and OCR → Language packages → API**. Ao habilitar imagens explicitamente, modelos de visão compatíveis podem reconhecer e traduzir com um único provedor.
 
-O OCR local mantém as imagens no dispositivo. Serviços online recebem o texto; uma API de visão habilitada recebe também a imagem selecionada. Aplicam-se preços e limites do serviço. [Privacidade](../../PRIVACY.md).
+O OCR local mantém as imagens no dispositivo. Serviços online recebem o texto; uma API de visão habilitada recebe também a imagem selecionada. Aplicam-se preços e limites do serviço. [Privacidade](../PRIVACY.md).
 
 Doze idiomas de interface, incluindo português, italiano e árabe com layout da direita para a esquerda, com dicas e guia; temas claro e escuro; escala e tamanho do texto do resultado separados; atalhos personalizados; importação/exportação e históricos locais opcionais.
 

@@ -15,13 +15,13 @@ import single_instance
 class LinuxForwardingStartupTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.source = (ROOT / "main.py").read_text(encoding="utf-8")
+        cls.source = (ROOT / "src/main.py").read_text(encoding="utf-8")
         tree = ast.parse(cls.source)
         branch = next(n for n in ast.walk(tree) if isinstance(n, ast.If)
                       and isinstance(n.test, ast.BoolOp)
                       and ast.unparse(n.test) == "(platform_support.IS_LINUX or platform_support.IS_MAC) and (not LAYOUT_EDITOR_MODE)")
         module = ast.fix_missing_locations(ast.Module(body=[branch], type_ignores=[]))
-        cls.code = compile(module, str(ROOT / "main.py"), "exec")
+        cls.code = compile(module, str(ROOT / "src/main.py"), "exec")
 
     def launch(self, statuses, bind=True, action='ocr', autostart=False, replace=True):
         state = {"platform_support": mock.Mock(IS_LINUX=True), "LAYOUT_EDITOR_MODE": False,
@@ -108,7 +108,7 @@ class LinuxForwardingStartupTest(unittest.TestCase):
                         and any(isinstance(item, ast.Expr) and isinstance(item.value, ast.Call)
                                 and ast.unparse(item.value.func) == "app.exec_" for item in n.body))
         code = compile(ast.fix_missing_locations(ast.Module(body=shutdown, type_ignores=[])),
-                       str(ROOT / "main.py"), "exec")
+                       str(ROOT / "src/main.py"), "exec")
         server = mock.Mock()
         exec(code, {"_command_server": server, "platform_support": mock.Mock(IS_MAC=False)})
         self.assertEqual(server.mock_calls, [mock.call.stop(), mock.call.join(timeout=2.0)])

@@ -13,7 +13,7 @@ import json, sys
 from pathlib import Path
 root, result = Path(sys.argv[1]), Path(sys.argv[2])
 sys.path[:0] = [str(root), str(root / 'src')]
-sys.argv = [str(root / 'main.py'), '--candidate-smoke-test', str(result)]
+sys.argv = [str(root / 'src/main.py'), '--candidate-smoke-test', str(result)]
 import main
 import candidate_smoke
 import portable_paths

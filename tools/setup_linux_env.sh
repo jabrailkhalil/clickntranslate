@@ -7,7 +7,7 @@
 # pulls stanza (and therefore torch, ~2 GB) only for sentence boundary
 # detection, which src/translater.py replaces with its own splitter. The runtime
 # pieces Argos actually needs — ctranslate2 and sentencepiece — come from
-# requirements-linux.txt.
+# tools/requirements/linux.txt.
 
 set -euo pipefail
 
@@ -37,7 +37,7 @@ fi
 python3 -m venv "$VENV_DIR"
 "$VENV_DIR/bin/python" -m pip install --upgrade pip wheel >/dev/null
 
-"$VENV_DIR/bin/python" -m pip install -r "$REPO_DIR/requirements-linux.txt"
+"$VENV_DIR/bin/python" -m pip install -r "$REPO_DIR/tools/requirements/linux.txt"
 "$VENV_DIR/bin/python" -m pip install --no-deps argostranslate
 "$VENV_DIR/bin/python" -m pip install pytest pyinstaller
 

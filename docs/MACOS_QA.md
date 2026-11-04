@@ -1550,7 +1550,7 @@ Tesseract через UI также не выполнен; системные м�
 
 ```bash
 PYTHON=/path/to/native/python3.12 bash tools/setup_macos_env.sh
-.venv-macos/bin/python main.py
+.venv-macos/bin/python src/main.py
 QT_QPA_PLATFORM=cocoa .venv-macos/bin/python -m pytest -q
 bash tools/build_macos_release.sh
 # После копирования из DMG:

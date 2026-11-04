@@ -39,7 +39,7 @@ gui_hidden = ['pypdf', 'tuf.ngclient', 'securesystemslib.signer._crypto_signer']
 for module in native_bridges:
     gui_hidden += collect_submodules(module)
 
-gui = Analysis([str(_PROJECT_ROOT / 'main.py')], pathex=[str(_PROJECT_ROOT), str(_SOURCE_ROOT)],
+gui = Analysis([str(_SOURCE_ROOT / 'main.py')], pathex=[str(_PROJECT_ROOT), str(_SOURCE_ROOT)],
                datas=[(str(_SOURCE_ROOT / 'icons'), 'icons'),
                       (str(_SOURCE_ROOT / 'component_root.json'), '.')], binaries=[], hiddenimports=gui_hidden,
                excludes=[*common_excludes, *optional, 'argostranslate', 'ctranslate2',

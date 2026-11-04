@@ -28,7 +28,7 @@ for argument in "$@"; do
     esac
 done
 
-VERSION="$("$PYTHON" -c 'import sys; sys.path.insert(0, sys.argv[1]); from app_version import APP_VERSION; print(APP_VERSION)' "$REPO_DIR")"
+VERSION="$("$PYTHON" -c 'import sys; sys.path.insert(0, sys.argv[1]); from app_version import APP_VERSION; print(APP_VERSION)' "$REPO_DIR/src")"
 ARCH="$(uname -m)"
 DIST_DIR="$REPO_DIR/dist/clickntranslate"
 RELEASE_DIR="$REPO_DIR/releases"
