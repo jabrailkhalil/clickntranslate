@@ -35,7 +35,7 @@ on:
   pull_request:
     paths:
       - '**.py'
-      - 'requirements-macos.txt'
+      - 'tools/requirements/macos.txt'
       - 'tools/packaging/ClicknTranslate-macos.spec'
       - 'tools/packaging/macos/**'
       - 'tools/*macos*'
@@ -70,7 +70,7 @@ jobs:
         with:
           python-version: '3.12'
           cache: ${{ !inputs.signing_only && 'pip' || '' }}
-          cache-dependency-path: requirements-macos.txt
+          cache-dependency-path: tools/requirements/macos.txt
       - name: Restore permanent release signer
         if: github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/') || inputs.signing_only || inputs.prepare_release)
         env:

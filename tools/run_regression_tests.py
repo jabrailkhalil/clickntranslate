@@ -55,7 +55,7 @@ def run():
     configure_interface_style()
     ensure_layout_fonts(app)
     import pytest
-    code = pytest.main(['-q', '-ra', '--tb=short', '--disable-warnings',
+    code = pytest.main(['-c', str(root / 'tests/pytest.ini'), '--rootdir=' + str(root), '-q', '-ra', '--tb=short', '--disable-warnings',
                         '-o', 'faulthandler_timeout=90',
                         '-o', 'cache_dir=' + str(output / 'pytest-cache'),
                         '--junitxml=' + str(output / 'results.xml'), *(arguments or ['tests'])])

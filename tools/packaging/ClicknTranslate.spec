@@ -11,7 +11,7 @@ _PROJECT_ROOT = _Path(SPECPATH).resolve().parents[1]
 _SOURCE_ROOT = _PROJECT_ROOT / 'src'
 _spec_sys.path[:0] = [str(_PROJECT_ROOT), str(_SOURCE_ROOT)]
 
-_app_version = _runpy.run_path(str(_PROJECT_ROOT / 'app_version.py'))['APP_VERSION']
+_app_version = _runpy.run_path(str(_PROJECT_ROOT / 'src/app_version.py'))['APP_VERSION']
 _version_info = _runpy.run_path(str(_PROJECT_ROOT / 'tools/windows_version_info.py'))['make_version_info']
 
 
@@ -198,7 +198,7 @@ ocr_worker_hiddenimports += _stdlib_hiddenimports()
 
 
 a = Analysis(
-    [str(_PROJECT_ROOT / 'main.py')],
+    [str(_SOURCE_ROOT / 'main.py')],
     pathex=[str(_PROJECT_ROOT), str(_SOURCE_ROOT)],
     binaries=gui_binaries,
     datas=gui_datas,

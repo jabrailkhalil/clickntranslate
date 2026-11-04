@@ -144,14 +144,14 @@ class IconConversionTest(unittest.TestCase):
 
 class HighDpiTest(unittest.TestCase):
     def test_linux_enables_high_dpi_before_the_application_exists(self):
-        source = (ROOT / "main.py").read_text(encoding="utf-8")
+        source = (ROOT / "src/main.py").read_text(encoding="utf-8")
         scaling_at = source.index("AA_EnableHighDpiScaling")
         app_at = source.index("app = QApplication([])")
 
         self.assertLess(scaling_at, app_at)
 
     def test_desktop_file_name_is_set_for_the_dock_icon(self):
-        source = (ROOT / "main.py").read_text(encoding="utf-8")
+        source = (ROOT / "src/main.py").read_text(encoding="utf-8")
         self.assertIn("app.setDesktopFileName(", source)
 
 
@@ -179,7 +179,7 @@ class StartupOrderTest(unittest.TestCase):
     def test_desktop_entry_is_installed_before_the_window(self):
         """The first run opens a modal welcome dialog; the launcher entry must
         not wait for the user to dismiss it."""
-        source = (ROOT / "main.py").read_text(encoding="utf-8")
+        source = (ROOT / "src/main.py").read_text(encoding="utf-8")
         install_at = source.index("_install_linux_desktop_entry()")
         window_at = source.index("window = DarkThemeApp()")
 

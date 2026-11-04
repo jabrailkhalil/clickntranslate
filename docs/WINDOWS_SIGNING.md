@@ -51,7 +51,7 @@ onboarding. Optional marketing consent was left unchecked.
 | Maintainer account | jabrailkhalil |
 | Description | Windows and Linux desktop screen OCR and translation application, with local and online translation, global shortcuts, document translation and optional autostart. |
 | Requested artifacts | Windows launcher, main application, ArgosWorker, OcrWorker, updater, installer and uninstaller. |
-| Privacy information | [PRIVACY.md](../PRIVACY.md) |
+| Privacy information | [PRIVACY.md](PRIVACY.md) |
 | Contact and signing approvers | The maintainer's name, contact email and proposed approver role were included privately in the application. |
 
 Do not claim SignPath sponsorship, invent account identifiers, or publish its

@@ -1,6 +1,6 @@
 """Developer-only visual layout editor for Click'n'Translate.
 
-Run it through ``python main.py --layout-editor``.  The editor overlays the
+Run it through ``python src/main.py --layout-editor``.  The editor overlays the
 real application widgets, so language and theme changes exercise exactly the
 same fixed-size UI that ships to users.  It writes only ``ui_layout_draft.json``
 next to this module; normal application launches deliberately ignore the file.

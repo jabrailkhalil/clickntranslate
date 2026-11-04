@@ -10,7 +10,7 @@ def _read(relative_path):
 
 
 def test_release_version_is_synchronized_everywhere():
-    version_source = _read("app_version.py")
+    version_source = _read("src/app_version.py")
     match = re.search(r'APP_VERSION\s*=\s*"(\d+\.\d+\.\d+(?:\.\d+)?)"', version_source)
     assert match, "APP_VERSION must contain a three- or four-part numeric version"
     version = match.group(1)
@@ -33,7 +33,7 @@ def test_release_version_is_synchronized_everywhere():
 def test_readmes_link_to_current_release_assets():
     # Download links follow the published release, while APP_VERSION can
     # already describe the next unreleased version under development.
-    match = re.search(r'^version:\s*(\d+\.\d+\.\d+)\s*$', _read("CITATION.cff"), re.M)
+    match = re.search(r'^version:\s*(\d+\.\d+\.\d+)\s*$', _read("docs/CITATION.cff"), re.M)
     assert match
     version = match.group(1)
     for relative_path in (

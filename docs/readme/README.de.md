@@ -85,7 +85,7 @@ Online: Google, MyMemory, Lingva und LibreTranslate. Offline: Argos Translate un
 
 Eigene Schlüssel für OpenAI, Gemini, Claude, DeepL, LibreTranslate und Custom API werden unter **Settings → Translation and OCR → Language packages → API** eingerichtet. Aktivierte Bildeingabe erlaubt passenden Vision-Modellen Erkennung und Übersetzung mit einem Anbieter.
 
-Lokale OCR verarbeitet Bilder auf dem Gerät. Online-Dienste erhalten Text; eine aktivierte Vision-API erhält auch das ausgewählte Bild. Preise und Limits legt der Anbieter fest. [Datenschutz](../../PRIVACY.md).
+Lokale OCR verarbeitet Bilder auf dem Gerät. Online-Dienste erhalten Text; eine aktivierte Vision-API erhält auch das ausgewählte Bild. Preise und Limits legt der Anbieter fest. [Datenschutz](../PRIVACY.md).
 
 Acht Oberflächensprachen mit Hinweisen und Anleitung, helle und dunkle Themes, getrennte Skalierung und Ergebnis-Schriftgröße, anpassbare Tastenkürzel, Einstellungsimport/-export und optionale lokale Verläufe.
 

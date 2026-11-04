@@ -13,7 +13,7 @@ WINRT_PACKAGES = {
 
 
 def test_winrt_ocr_runtime_namespaces_are_required():
-    requirements = (ROOT / "requirements.txt").read_text(encoding="utf-8")
+    requirements = (ROOT / "tools/requirements/windows.txt").read_text(encoding="utf-8")
     normalized_requirements = {line.strip().lower() for line in requirements.splitlines() if line.strip()}
 
     for package_name in WINRT_PACKAGES:

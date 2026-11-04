@@ -1,39 +1,40 @@
 # Repository layout
 
-Desktop development lives in `main`. The Android application has its own Gradle
-project in the [android branch](https://github.com/jabrailkhalil/clickntranslate/tree/android);
-see the [Android guide](ANDROID.md) for installation and mobile features.
-Both editions publish downloads in the same GitHub Releases page.
-
-The repository has five top-level directories. Downloadable application packages
-are attached to GitHub Releases and retain their existing layout.
+The root contains at most five files: `README.md`, `LICENSE`, `AGENTS.md`,
+`.gitignore` and `.gitattributes`. Application code, developer tools and other
+documents live in the directories below.
 
 | Directory | Contents |
 | --- | --- |
-| `.github/` | Workflows, contribution guide and security policy |
-| `src/` | Python implementation, isolated OCR/translation workers and `icons/` |
-| `docs/` | Guides, README translations, demos, research paper, historical website sources, store and promotion materials |
-| `tests/` | Automated tests |
-| `tools/` | Build, signing and QA tools; `packaging/`, `installer/` and native `launcher/` sources |
+| `src/` | Python application, `main.py`, `app_version.py`, isolated workers and icons |
+| `tools/` | Build, signing and QA tools, native launchers, installers and packaging specs |
+| `tools/requirements/` | Python dependencies: `windows.txt`, `linux.txt` and `macos.txt` |
+| `tools/shortcuts/` | Windows CMD shortcuts for companion previews and development |
+| `tests/` | Automated checks and `pytest.ini` |
+| `docs/` | Guides, README translations, demos, privacy policy and citation metadata |
+| `components/` | Approved component recipes; generated downloads and runtime data remain ignored |
+| `.github/` | GitHub Actions, contribution guide and security policy |
 
 ## Run from source
 
-The entry point and version file stay in the root:
+Use Python 3.12 from the repository root:
 
 ```sh
-python main.py
+python -m pip install -r tools/requirements/windows.txt
+python src/main.py
 ```
 
-Install the dependencies from `requirements.txt`, `requirements-linux.txt`, or
-`requirements-macos.txt` for your platform. `main.py` adds `src/` to its import
-path. For standalone Python probes, add both the repository root and `src/` to
-`PYTHONPATH`. Tests obtain those paths from `pytest.ini`; the regression runner
-also passes them to its subprocesses.
+Linux and macOS use `tools/requirements/linux.txt` and
+`tools/requirements/macos.txt`. Their environment helpers keep the same paths:
+`tools/setup_linux_env.sh` and `tools/setup_macos_env.sh`.
 
-Source resources live under `src/icons/`. `project_paths.py` distinguishes source
-resources and the root entry point from the resources in a frozen build. Source
-user data still follows the existing root entry point; Mac and AppImage user
-data keep their existing system locations.
+Resources live in `src/icons/`. `project_paths.py` resolves both the source
+entry and resource directory independently of the current working directory.
+For standalone Python probes add `src/` to `PYTHONPATH`.
+
+Moving the entry into `src/` does not move existing source-mode user data:
+Windows and writable Linux checkouts still use the repository root. The Mac,
+AppImage, MSIX and packaged portable data policies remain unchanged.
 
 ## Build and check
 
@@ -43,27 +44,25 @@ data keep their existing system locations.
 - Mac: `bash tools/build_macos_release.sh` on the native architecture.
 - Isolated regression suite: `python tools/run_regression_tests.py`.
 - Bounded CI suite: `python tools/run_ci_tests.py`.
+- Direct test collection: `python -m pytest -c tests/pytest.ini`.
 
-The specs resolve inputs relative to the repository, independently of their
-own directory. Build output is still under `build/` and `dist/`; staging and
-release tools retain their existing output locations. Local output, downloaded
-models, credentials and user data are excluded from Git.
+The build specs resolve inputs from the repository, not from the shell's working
+directory. Output remains under `build/`, `dist/` and `releases/`.
+User data, credentials, environments and downloaded models are not source files.
 
-## Website
+## Documentation and Android
 
-The current product site is [translate.clickn.dev](https://translate.clickn.dev/).
-The author's project hub is [clickn.dev](https://clickn.dev/). The old
-`xynapse.online` addresses redirect to those sites. `docs/landing/` preserves
-the previous static site source; its historical hosting configuration describes
-the former deployment. See its [README](landing/README.md) before using it.
+The root README remains GitHub's project front page. Additional languages are
+under `docs/readme/`; [privacy](PRIVACY.md) and [citation metadata](CITATION.cff)
+are under `docs/`.
+
+Android has its own Gradle project in the
+[android branch](https://github.com/jabrailkhalil/clickntranslate/tree/android).
+See the [Android guide](ANDROID.md). This desktop source reorganization does
+not change the Android branch or publish an application release.
 
 ## Compatibility
 
-Keep the packaged executable names, Windows installer AppId, Mac bundle ID,
-signing identities, update acknowledgement protocol and user data directories
-stable. Windows packages still include `ClicknTranslate.exe`,
-`app/ClicknTranslateApp.exe`, private workers, and `program-files.sha256`.
-
-Changing source organization does not replace an existing release asset, create
-a new release, or change `APP_VERSION`. Published tags and their files retain
-the build inputs and downloads for their respective versions.
+Packaged executable names, signing identities, update protocols and user data
+locations stay unchanged. Published release tags and downloads are immutable;
+moving source files does not replace their assets or change `APP_VERSION`.

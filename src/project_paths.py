@@ -16,4 +16,4 @@ def resource_root() -> Path:
 
 
 def source_entry() -> Path:
-    return repository_root() / 'main.py'
+    return source_root() / 'main.py'

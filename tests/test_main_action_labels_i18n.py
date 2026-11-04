@@ -113,7 +113,7 @@ def test_document_language_change_refreshes_close_minimize_and_swap_hints(window
         dialog.deleteLater()
 
 
-@pytest.mark.parametrize('filename', ['main.py', 'src/settings_window.py'])
+@pytest.mark.parametrize('filename', ['src/main.py', 'src/settings_window.py'])
 def test_complete_six_language_dictionaries_preserve_format_fields(filename):
     root = Path(__file__).resolve().parents[1]
     tree = ast.parse((root / filename).read_text(encoding='utf-8-sig'))

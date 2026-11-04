@@ -22,9 +22,9 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            requirements: requirements.txt
+            requirements: tools/requirements/windows.txt
           - os: ubuntu-latest
-            requirements: requirements-linux.txt
+            requirements: tools/requirements/linux.txt
     runs-on: ${{ matrix.os }}
     timeout-minutes: 40
     env:

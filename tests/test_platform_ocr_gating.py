@@ -65,7 +65,7 @@ class DefaultEngineTest(unittest.TestCase):
 
     def test_no_module_hardcodes_a_windows_ocr_default(self):
         """A hardcoded "Windows" default would pick a nonexistent engine on Linux."""
-        for name in ("src/ocr.py", "main.py", "src/settings_window.py"):
+        for name in ("src/ocr.py", "src/main.py", "src/settings_window.py"):
             source = (ROOT / name).read_text(encoding="utf-8")
             self.assertNotIn('"ocr_engine", "Windows"', source, name)
             self.assertNotIn('"ocr_engine": "Windows"', source, name)

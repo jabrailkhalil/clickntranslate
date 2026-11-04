@@ -14,7 +14,7 @@ if not exist ".venv" (
 call .venv\Scripts\activate.bat
 python -m pip install --upgrade pip >nul 2>&1
 echo Installing dependencies...
-pip install -r requirements.txt >nul 2>&1
+pip install -r tools/requirements/windows.txt >nul 2>&1
 pip install pyinstaller >nul 2>&1
 
 echo [2/5] Cleaning previous build...

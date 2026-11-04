@@ -21,7 +21,7 @@ from test_desktop_ux import app,window
 
 
 def test_all_ui_catalogs_include_new_locales_and_keep_formatting():
-    result=audit(Path(main.__file__).resolve().parent)
+    result=audit(Path(main.__file__).resolve().parents[1])
     assert result['issues'] == []
     assert len(result['messages']) >= 1191
     assert set(main.INTERFACE_LANGUAGE_BY_CODE)==set(LOCALES)==set(DIALOG_LANGUAGES)==set(HINT_LANGUAGES)
@@ -67,7 +67,7 @@ def test_guides_hints_actions_and_names_are_localized(locale,close,resume,still)
         name=language_display_name(code,locale)
         assert language_code_from_name(name,locale)==code
     for option in main.INTERFACE_LANGUAGE_OPTIONS:
-        assert (Path(main.__file__).parent/'src'/option['icon']).is_file()
+        assert (Path(main.__file__).parent/option['icon']).is_file()
 
 
 @pytest.mark.parametrize('locale',['pt','it'])

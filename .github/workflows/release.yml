@@ -52,7 +52,7 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-          cache-dependency-path: requirements-linux.txt
+          cache-dependency-path: tools/requirements/linux.txt
       - name: Install Linux build dependencies
         run: |
           sudo apt-get update
@@ -61,11 +61,11 @@ jobs:
             libxcb-shape0 libxcb-xinerama0 libxcb-util1 libxkbcommon-x11-0
           python -m venv "$RUNNER_TEMP/clickntranslate-venv"
           "$RUNNER_TEMP/clickntranslate-venv/bin/python" -m pip install --upgrade pip
-          "$RUNNER_TEMP/clickntranslate-venv/bin/python" -m pip install -r requirements-linux.txt pytest pyinstaller
+          "$RUNNER_TEMP/clickntranslate-venv/bin/python" -m pip install -r tools/requirements/linux.txt pytest pyinstaller
           "$RUNNER_TEMP/clickntranslate-venv/bin/python" -m pip install --no-deps "argostranslate~=1.11.0"
       - name: Test Linux source
         run: |
-          "$RUNNER_TEMP/clickntranslate-venv/bin/python" -m pytest -q
+          "$RUNNER_TEMP/clickntranslate-venv/bin/python" tools/run_regression_tests.py
       - name: Build Linux release
         env:
           VENV: ${{ runner.temp }}/clickntranslate-venv

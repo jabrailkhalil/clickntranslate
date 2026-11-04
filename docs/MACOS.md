@@ -34,7 +34,7 @@ Install Python 3.12, then from the repository root:
 
 ```bash
 bash tools/setup_macos_env.sh
-.venv-macos/bin/python main.py
+.venv-macos/bin/python src/main.py
 ```
 
 For example, with an existing Homebrew installation, Python is available through

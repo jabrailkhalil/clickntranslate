@@ -87,7 +87,7 @@ Google, MyMemory, Lingva y LibreTranslate para traducción en línea; Argos Tran
 
 Configura OpenAI, Gemini, Claude, DeepL, LibreTranslate o una Custom API con tu propia clave en **Settings → Translation and OCR → Language packages → API**. Los modelos compatibles con imágenes pueden reconocer y traducir mediante un proveedor cuando habilitas la entrada de imágenes.
 
-El OCR local mantiene las imágenes en el dispositivo. Los servicios en línea reciben el texto; una API de visión habilitada también recibe la imagen elegida. Cada proveedor tiene sus tarifas y límites. [Privacidad](../../PRIVACY.md).
+El OCR local mantiene las imágenes en el dispositivo. Los servicios en línea reciben el texto; una API de visión habilitada también recibe la imagen elegida. Cada proveedor tiene sus tarifas y límites. [Privacidad](../PRIVACY.md).
 
 ## A tu manera
 

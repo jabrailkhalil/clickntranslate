@@ -39,7 +39,7 @@ gui_hidden = ['pypdf']
 for module in native_bridges:
     gui_hidden += collect_submodules(module)
 
-gui = Analysis([str(_PROJECT_ROOT / 'main.py')], pathex=[str(_PROJECT_ROOT), str(_SOURCE_ROOT)],
+gui = Analysis([str(_SOURCE_ROOT / 'main.py')], pathex=[str(_PROJECT_ROOT), str(_SOURCE_ROOT)],
                datas=[(str(_SOURCE_ROOT / 'icons'), 'icons')], binaries=[], hiddenimports=gui_hidden,
                excludes=[*common_excludes, *optional, 'argostranslate', 'ctranslate2',
                          'sentencepiece', 'onnxruntime', 'rapidocr_onnxruntime', 'cv2'],

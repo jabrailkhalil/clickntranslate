@@ -110,7 +110,7 @@ The desktop document workspace opens TXT, Markdown, DOCX, text-based PDF, HTML a
 
 Set up engines, models and API connections in **Settings → Translation and OCR → Language packages**. Choose **OCR**, **Translators** or **API**. Missing local components link directly to installation.
 
-Local OCR processes images on your device. Online services receive text; an enabled vision API also receives the selected image. Offline translation stays local after model downloads. Provider fees and limits apply. [Privacy](PRIVACY.md).
+Local OCR processes images on your device. Online services receive text; an enabled vision API also receives the selected image. Offline translation stays local after model downloads. Provider fees and limits apply. [Privacy](docs/PRIVACY.md).
 
 ## Make it comfortable
 

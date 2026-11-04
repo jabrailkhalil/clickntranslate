@@ -9,7 +9,7 @@
 git clone --branch codex/pets-mascots https://github.com/jabrailkhalil/clickntranslate.git
 cd clickntranslate
 python -m venv .venv
-.venv\Scripts\python.exe -m pip install -r requirements.txt pytest
+.venv\Scripts\python.exe -m pip install -r tools/requirements/windows.txt pytest
 ```
 
 Для Linux и macOS см. [LINUX.md](LINUX.md) и [MACOS.md](MACOS.md).

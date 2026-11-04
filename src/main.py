@@ -2,10 +2,10 @@ import os
 import sys
 from pathlib import Path
 
-# Keep the public source entry point stable while implementation modules live in src/.
+# Run directly from src/; frozen builds use the same implementation modules.
 # Frozen builds discover these modules through the explicit PyInstaller search path.
 if not getattr(sys, 'frozen', False):
-    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'src'))
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from button_styles import button_qss, standard_buttons
 import json
@@ -40,7 +40,7 @@ def _show_dependency_error():
     message = (
         "Click'n'Translate не запускается: не найдена библиотека PyQt5.\n\n"
         "Запустите в консоли:\n"
-        "  python -m pip install -r requirements.txt\n\n"
+        "  python -m pip install -r tools/requirements/windows.txt\n\n"
         "Или только Qt:\n"
         "  python -m pip install PyQt5"
     )

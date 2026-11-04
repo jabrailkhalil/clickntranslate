@@ -19,5 +19,5 @@
 
 Исходные атласы находятся в `src/icons/desktop-assistant/<персонаж>/pets-v2.png`.
 Промпты и результаты проверки сохранены в [pets-v18](pets-v18/).
-Ярлыки `compare-mascots.cmd`, `preview-orbit.cmd` и `preview-pancake-cycle.cmd`
+Ярлыки `tools/shortcuts/compare-mascots.cmd`, `tools/shortcuts/preview-orbit.cmd` и `tools/shortcuts/preview-pancake-cycle.cmd`
 открывают актуальный инструмент `tools/preview_mascots.py`.
