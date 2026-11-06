@@ -24,7 +24,9 @@
     "easyocr_models.py",
     "ocr_text_layout.py",
     "ocr_paragraphs.py",
-    "runtime_bootstrap.py"
+    "runtime_bootstrap.py",
+    "worker_lease.py",
+    "ocr_lifecycle.py"
   ],
   "requirements": [
     "easyocr==1.7.2",
@@ -34,5 +36,6 @@
     "Pillow==12.3.0",
     "numpy<3",
     "scikit-image<0.27"
-  ]
+  ],
+  "ocr_worker_protocol": 2
 }

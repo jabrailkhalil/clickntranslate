@@ -294,6 +294,13 @@ def _session():
     return _LOCAL.session
 
 
+def close_thread_session():
+    session = getattr(_LOCAL, 'session', None)
+    if session is not None:
+        del _LOCAL.session
+        session.close()
+
+
 @measure('api.request')
 def _post(url, headers, payload, cancel=None):
     from translater import _check_translation_cancelled

@@ -450,11 +450,9 @@ class LanguagePackageTabsTest(unittest.TestCase):
         return parent, settings, dialog
 
     def _bars(self, dialog):
-        return (
-            ("sections", dialog.tabs),
-            ("ocr", dialog.ocr_tabs),
-            ("translation", dialog.translation_tabs),
-        )
+        # OCR/translation engines use selectors; only the three sections are
+        # visible tabs. Hidden compatibility bars do not describe painted UI.
+        return (("sections", dialog.tabs),)
 
     def test_each_tab_is_wide_enough_for_its_own_label(self):
         for lang in ("en", "ru", "es", "de", "fr", "zh", "pt", "it"):
@@ -475,6 +473,15 @@ class LanguagePackageTabsTest(unittest.TestCase):
                     # fixed width, so that is what they have to fit inside.
                     total = sum(bar.tabRect(i).width() for i in range(bar.count()))
                     self.assertLessEqual(total, dialog.width() - 24, (lang, name))
+                for section, combo in enumerate(dialog._engine_selectors):
+                    dialog.tabs.setCurrentIndex(section)
+                    self.app.processEvents()
+                    self.assertTrue(combo.isVisible())
+                    metrics = QFontMetrics(combo.font())
+                    for index in range(combo.count()):
+                        self.assertGreaterEqual(combo.width() - 40,
+                                                metrics.horizontalAdvance(combo.itemText(index)),
+                                                (lang, section, combo.itemText(index)))
             finally:
                 dialog.close()
                 settings.close()
@@ -505,6 +512,11 @@ class LanguagePackageTabsTest(unittest.TestCase):
             table = dialog.windows_table or dialog.tesseract_table
             if table is None or table.rowCount() == 0:
                 self.skipTest("no package table on this platform")
+            dialog.tabs.setCurrentIndex(0)
+            dialog.ocr_tabs.setCurrentWidget(table.parentWidget())
+            for _ in range(3):
+                self.app.processEvents()
+            self.assertTrue(table.isVisible())
             inner = table.height() - table.horizontalHeader().height() - 2 * table.frameWidth()
             self.assertGreater(inner, 0)
             self.assertEqual(inner % table.rowHeight(0), 0)
@@ -524,11 +536,12 @@ class LanguagePackageTabsTest(unittest.TestCase):
         parent, settings, dialog = self._dialog()
         try:
             for name, tab_widget in self._bars(dialog):
-                style = tab_widget.tabBar().styleSheet()
-                selected = style.split("::tab:selected")[1].split("}")[0]
-                # A heavier selected tab would outgrow the width already
-                # measured for it.
-                self.assertNotIn("font-weight", selected, name)
+                bar = tab_widget.tabBar()
+                widths = [bar.tabRect(index).width() for index in range(bar.count())]
+                for index in range(bar.count()):
+                    tab_widget.setCurrentIndex(index)
+                    self.app.processEvents()
+                    self.assertEqual([bar.tabRect(row).width() for row in range(bar.count())], widths, name)
         finally:
             dialog.close()
             settings.close()

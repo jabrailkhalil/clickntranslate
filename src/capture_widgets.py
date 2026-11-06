@@ -58,6 +58,9 @@ class CaptureLanguageCombo(DropDownCombo):
     def set_capture_theme(self, dark, language='en', factor=1.0):
         self.ui_factor = factor
         self.interface_language = language
+        # The capture toolbar keeps its compact source/target order. Its lists
+        # still follow the interface reading direction like the other pickers.
+        self.setLayoutDirection(QtCore.Qt.RightToLeft if language == 'ar' else QtCore.Qt.LeftToRight)
         self.colors = popup_palette(dark)
         c = self.colors
         font = QtWidgets.QApplication.font()

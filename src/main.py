@@ -103,7 +103,7 @@ except Exception:
 from ui_scaling import (BASE_SCALE, DEFAULT_SCALE, MIN_SCALE, MAX_SCALE, ScaledIconButton,
                         configure_qt_platform, widget_global_point, widget_global_rect, widget_popup_geometry,
                         prepare_native_popup)
-from settings_sections import PAGE_APPLICATION, PAGE_TRANSLATION, PAGE_OCR, PAGE_DYNAMIC
+from settings_sections import PAGE_APPLICATION, PAGE_TRANSLATION, PAGE_OCR, PAGE_DYNAMIC, PAGE_COMPANION
 from header_icons import header_icon
 from control_hints import control_hint
 configure_qt_platform()
@@ -113,6 +113,7 @@ from guide_setup import (
     GUIDE_LINUX_BODIES,
     SetupGuideCard, setup_labels, setting_body,
 )
+from guide_scenarios import ORDER as ONBOARDING_ORDER, CHAT_STEPS, copy as onboarding_copy, steps as onboarding_steps
 from styled_dialogs import (
     CenteredFramelessDialog,
     NativeDialogFrameFilter,
@@ -371,8 +372,10 @@ TRANSLATION_PAIR_KEYS = (
 
 def fresh_config(interface_language='en'):
     """First-run/reset defaults; every mode translates into the UI language."""
+    from copy import deepcopy
     language = normalize_interface_language(interface_language)
-    config = dict(DEFAULT_CONFIG, interface_language=language, translation_defaults_language=language)
+    config = deepcopy(DEFAULT_CONFIG)
+    config.update(interface_language=language, translation_defaults_language=language)
     source = 'ru' if language == 'en' else 'en'
     for source_key, target_key in TRANSLATION_PAIR_KEYS:
         config[source_key], config[target_key] = source, language
@@ -1337,6 +1340,7 @@ def save_translation_history(original_text, translated_text, language):
 # Сигнал для уведомления об ошибке регистрации хоткея
 class _HotkeyErrorDispatcher(QtCore.QObject):
     registration_failed = QtCore.pyqtSignal(str)
+    registration_failed_owned = QtCore.pyqtSignal(object, str)
 
 hotkey_error_dispatcher = _HotkeyErrorDispatcher()
 
@@ -1365,7 +1369,7 @@ class HotkeyListenerThread(threading.Thread):
                     self.hotkey_str, lambda: hotkey_dispatcher.triggered.emit(self._invoke))
             except Exception:
                 logging.exception('Could not register double-tap shortcut')
-                hotkey_error_dispatcher.registration_failed.emit(self.hotkey_str)
+                hotkey_error_dispatcher.registration_failed_owned.emit(self._stop_event, self.hotkey_str)
             return
         if not platform_support.IS_MAC:
             return super().start()
@@ -1375,7 +1379,7 @@ class HotkeyListenerThread(threading.Thread):
                 self.hotkey_str, lambda: hotkey_dispatcher.triggered.emit(self._invoke))
         except Exception:
             logging.exception("Could not register macOS shortcut")
-            hotkey_error_dispatcher.registration_failed.emit(self.hotkey_str)
+            hotkey_error_dispatcher.registration_failed_owned.emit(self._stop_event, self.hotkey_str)
 
     def is_alive(self):
         if self._double_tap:
@@ -1414,6 +1418,8 @@ class HotkeyListenerThread(threading.Thread):
         self.callback()
 
     def parse_hotkey(self, hotkey_str):
+        if not isinstance(hotkey_str, str) or not hotkey_str.strip():
+            return 0, None
         if platform_support.IS_MAC:
             from macos_hotkeys import parse_hotkey
             try:
@@ -1440,14 +1446,23 @@ class HotkeyListenerThread(threading.Thread):
             'й': 'q', 'ц': 'w', 'у': 'e', 'к': 'r', 'е': 't', 'н': 'y', 'г': 'u', 'ш': 'i', 'щ': 'o', 'з': 'p',
             'ф': 'a', 'ы': 's', 'в': 'd', 'а': 'f', 'п': 'g', 'р': 'h', 'о': 'j', 'л': 'k', 'д': 'l',
             'я': 'z', 'ч': 'x', 'с': 'c', 'м': 'v', 'и': 'b', 'т': 'n', 'ь': 'm',
-            'х': '[', 'ъ': ']', 'ж': ';', 'э': "'", 'б': ',', 'ю': '.'
+            'х': '[', 'ъ': ']', 'ж': ';', 'э': "'", 'б': ',', 'ю': '.', 'ё': '`'
         }
-        parts = hotkey_str.split("+")
+        parts = [part.strip() for part in hotkey_str.split("+")]
+        if len(parts) >= 2 and parts[-2:] == ['', '']:
+            # QKeySequence.PortableText writes the plus key as e.g. Ctrl++.
+            parts = parts[:-2] + ['+']
         for part in parts:
-            token = part.strip().lower()
+            original = part.strip()
+            token = original.lower()
+            if len(original) == 1 and len(token) != 1:
+                token = original
             # Преобразуем кириллицу в латиницу для раскладко-независимости
             if len(token) == 1 and token in cyrillic_to_latin:
                 token = cyrillic_to_latin[token]
+                if token in special_vk:
+                    main_keys.append(special_vk[token])
+                    continue
             if token in ("ctrl", "control"):
                 modifiers |= MOD_CONTROL
             elif token == "alt":
@@ -1456,31 +1471,40 @@ class HotkeyListenerThread(threading.Thread):
                 modifiers |= MOD_SHIFT
             elif token in ("win", "meta", "super"):
                 modifiers |= MOD_WIN
-            elif token in special_vk:
+            elif token in special_vk and len(token) > 1:
                 main_keys.append(special_vk[token])
             elif token.startswith("f") and len(token) > 1 and token[1:].isdigit():
                 try:
                     fnum = int(token[1:])
-                    if 1 <= fnum <= 24:  # F1-F24
-                        main_keys.append(0x70 + fnum - 1)  # VK_F1 = 0x70
-                except:
-                    pass
+                except ValueError:
+                    return modifiers, None
+                if not 1 <= fnum <= 24:
+                    return modifiers, None
+                main_keys.append(0x70 + fnum - 1)  # VK_F1 = 0x70
             elif len(token) == 1:
                 ch = token.upper()
+                if len(ch) != 1:
+                    ch = token
                 # ASCII буквы/цифры — VK коды совпадают с ASCII
                 if ('A' <= ch <= 'Z') or ('0' <= ch <= '9'):
                     main_keys.append(ord(ch))
-                elif ch in special_vk:
-                    main_keys.append(special_vk[ch])
                 else:
                     # Пытаемся получить VK через WinAPI
                     try:
                         vk_scan = ctypes.windll.user32.VkKeyScanW(ord(ch))
                         if vk_scan != -1 and (vk_scan & 0xFF) != 0xFF:
                             main_keys.append(vk_scan & 0xFF)
+                            # Letter labels are conventionally uppercase in
+                            # QKeySequence; that case alone must not add Shift.
+                            for flag, modifier in ((1, MOD_SHIFT), (2, MOD_CONTROL), (4, MOD_ALT)):
+                                if (vk_scan >> 8) & flag and (flag != 1 or not ch.isalpha()):
+                                    modifiers |= modifier
+                        else:
+                            return modifiers, None
                     except Exception:
-                        pass
-            # иначе игнорируем
+                        return modifiers, None
+            else:
+                return modifiers, None
         if len(main_keys) == 0:
             print(f"Ошибка: не выбрана основная клавиша для хоткея: {hotkey_str}")
             return modifiers, None
@@ -1498,7 +1522,7 @@ class HotkeyListenerThread(threading.Thread):
             return
         if self.vk is None:
             print("VK is None, aborting hotkey registration.")
-            hotkey_error_dispatcher.registration_failed.emit(self.hotkey_str)
+            hotkey_error_dispatcher.registration_failed_owned.emit(self._stop_event, self.hotkey_str)
             return
         # Повышаем приоритет текущего потока хоткея для меньшей задержки
         try:
@@ -1508,7 +1532,7 @@ class HotkeyListenerThread(threading.Thread):
         if not ctypes.windll.user32.RegisterHotKey(None, self.hotkey_id, self.modifiers, self.vk):
             print(f"Failed to register hotkey: {self.hotkey_str}")
             # Эмитируем сигнал об ошибке для UI
-            hotkey_error_dispatcher.registration_failed.emit(self.hotkey_str)
+            hotkey_error_dispatcher.registration_failed_owned.emit(self._stop_event, self.hotkey_str)
             return
         else:
             print(f"Hotkey registered successfully: {self.hotkey_str}")
@@ -1530,7 +1554,7 @@ class HotkeyListenerThread(threading.Thread):
         except Exception:
             logging.exception("Hotkey listener stopped unexpectedly: %s", self.hotkey_str)
             if not self._stop_event.is_set():
-                hotkey_error_dispatcher.registration_failed.emit(self.hotkey_str)
+                hotkey_error_dispatcher.registration_failed_owned.emit(self._stop_event, self.hotkey_str)
         finally:
             if self._registered:
                 try:
@@ -8538,7 +8562,9 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
     _document_error_signal = QtCore.pyqtSignal(str)
     _document_progress_signal = QtCore.pyqtSignal(int, int, str)
     _document_partial_signal = QtCore.pyqtSignal(str, int, int)
+    _document_delta_signal = QtCore.pyqtSignal(str, int, int)
     _document_done_signal = QtCore.pyqtSignal(str, object)
+    _document_translation_signal = QtCore.pyqtSignal(int, str, object)
 
     def __init__(self, parent_app, initial_path=None):
         super().__init__(parent_app, drag_height=64)
@@ -8555,6 +8581,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self._document_loading = False
         self._initial_load_timer = None
         self._translation_cancel_event = None
+        self._document_translation_generation = 0
         self._active_translation_source_text = ""
         self._active_translation_target_code = ""
 
@@ -8563,7 +8590,9 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self._document_error_signal.connect(self._on_document_error)
         self._document_progress_signal.connect(self._on_translation_progress)
         self._document_partial_signal.connect(self._on_document_partial)
+        self._document_delta_signal.connect(self._on_document_delta)
         self._document_done_signal.connect(self._on_translation_done)
+        self._document_translation_signal.connect(self._deliver_document_translation)
 
         self.setWindowTitle(doc_text(self.lang, "title"))
         self.setObjectName("documentTranslationDialog")
@@ -8596,21 +8625,32 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         super().showEvent(event)
         self._apply_native_frame_theme()
 
-    def _request_translation_cancel(self):
-        if self.translation_running and self._translation_cancel_event is not None:
-            self._translation_cancel_event.set()
+    def _request_translation_cancel(self, *, retire=False):
+        if self.translation_running:
+            if self._translation_cancel_event is not None:
+                self._translation_cancel_event.set()
             notify_activity(self.parent_app, 'idle', f'document:{id(self)}')
-            self.translate_file_button.setEnabled(False)
-            self._set_status(doc_text(self.lang, 'canceling_translation'))
+            if retire:
+                # Dismissal ends this dialog's ownership immediately. A late
+                # worker error must not reopen it or complete a reused dialog.
+                self._document_translation_generation += 1
+                self.translation_running = False
+                self._translation_cancel_event = None
+                self.translated_text = self.translated_view.toPlainText()
+                self._set_busy(False)
+                self._set_status(doc_text(self.lang, 'translation_canceled'))
+            else:
+                self.translate_file_button.setEnabled(False)
+                self._set_status(doc_text(self.lang, 'canceling_translation'))
 
     def reject(self):
         self._invalidate_document_load()
-        self._request_translation_cancel()
+        self._request_translation_cancel(retire=True)
         super().reject()
 
     def closeEvent(self, event):
         self._invalidate_document_load()
-        self._request_translation_cancel()
+        self._request_translation_cancel(retire=True)
         super().closeEvent(event)
 
     def _build_ui(self):
@@ -9106,16 +9146,24 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         if self._document_loading or (self._initial_load_timer is not None and self._initial_load_timer.isActive()):
             # A new draft supersedes a parser result still on its way back.
             self._invalidate_document_load()
-        if self.current_document or self.session_payload or self.translation_running:
-            return
+        # Results belong to the source revision submitted to the worker. A
+        # new draft may be edited immediately, but queued events from that
+        # worker must never attach its old translation to the new source.
+        self._document_translation_generation += 1
+        if self._translation_cancel_event is not None:
+            self._translation_cancel_event.set()
+            self._translation_cancel_event = None
+        if self.translation_running:
+            notify_activity(self.parent_app, 'idle', f'document:{id(self)}')
+        self.translation_running = False
+        self.translated_text = ""
+        self.translation_results = []
+        self.translation_error_message_visible = False
+        self.translated_view.clear()
+        self.progress_bar.setValue(0)
         if self.original_view.toPlainText().strip():
             self._set_status(doc_text(self.lang, "loaded"))
         else:
-            self.translated_text = ""
-            self.translation_results = []
-            self.translation_error_message_visible = False
-            self.translated_view.clear()
-            self.progress_bar.setValue(0)
             self._set_status(doc_text(self.lang, "no_file"))
         self._set_busy(False)
 
@@ -9199,6 +9247,10 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self._on_document_error(message)
 
     def _on_document_error(self, message):
+        if (self.translation_running and self._translation_cancel_event is not None
+                and self._translation_cancel_event.is_set()):
+            self._on_translation_done(self.translated_view.toPlainText(), self.translation_results)
+            return
         from document_messages import localized_document_error
         message = localized_document_error(message, self.lang)
         if self.translation_running:
@@ -9267,6 +9319,8 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         notify_activity(self.parent_app, 'busy', f'document:{id(self)}')
         self._translation_cancel_event = threading.Event()
         cancel_event = self._translation_cancel_event
+        self._document_translation_generation += 1
+        generation = self._document_translation_generation
         self.translated_text = ""
         self.translation_results = []
         self.translation_error_message_visible = False
@@ -9281,9 +9335,16 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         provider_engine = self._provider_engine()
         self._active_translation_source_text = text
         self._active_translation_target_code = target_code
+        interface_language = self.lang
+
+        def emit(kind, *values):
+            try:
+                self._document_translation_signal.emit(generation, kind, values)
+            except RuntimeError:
+                pass  # The owning dialog may have been destroyed.
 
         def progress(done, total, message):
-            self._document_progress_signal.emit(int(done), int(total), str(message))
+            emit('progress', int(done), int(total), str(message))
 
         def worker():
             try:
@@ -9294,14 +9355,43 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
                     provider_engine=provider_engine,
                     progress_callback=progress,
                     cancel_event=cancel_event,
-                    partial_callback=self._document_partial_signal.emit,
-                    interface_language=self.lang,
+                    delta_callback=lambda *values: emit('delta', *values),
+                    interface_language=interface_language,
                 )
-                self._document_done_signal.emit(translated, results)
+                emit('done', translated, results)
             except Exception as exc:
-                self._document_error_signal.emit(str(exc))
+                emit('error', str(exc))
 
-        threading.Thread(target=worker, daemon=True).start()
+        try:
+            threading.Thread(target=worker, daemon=True).start()
+        except Exception as exc:
+            emit('error', str(exc))
+
+    @QtCore.pyqtSlot(int, str, object)
+    def _deliver_document_translation(self, generation, kind, values):
+        if generation != self._document_translation_generation or not self.translation_running:
+            return
+        handler = {'progress': self._on_translation_progress,
+                   'delta': self._on_document_delta,
+                   'done': self._on_translation_done,
+                   'error': self._on_document_error}.get(kind)
+        if handler is not None:
+            handler(*values)
+
+    def _on_document_delta(self, text, done, total):
+        if not self.translation_running or (self._translation_cancel_event is not None
+                                            and self._translation_cancel_event.is_set()):
+            return
+        # A delta contains only new completed chunks. Never read/copy the
+        # entire growing document just to append its next part.
+        editor = self.translated_view
+        scroll = editor.verticalScrollBar()
+        position, following_end = scroll.value(), scroll.value() >= scroll.maximum() - 2
+        with QtCore.QSignalBlocker(editor):
+            cursor = QtGui.QTextCursor(editor.document())
+            cursor.movePosition(QtGui.QTextCursor.End)
+            cursor.insertText(text)
+        scroll.setValue(scroll.maximum() if following_end else position)
 
     def _on_document_partial(self, text, done, total):
         if not self.translation_running or (self._translation_cancel_event is not None
@@ -9700,7 +9790,8 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
             "provider": self._provider_name(),
             "provider_engine": self._provider_engine(),
             "original_text": self.original_view.toPlainText(),
-            "translated_text": self.translated_text,
+            "translated_text": (self.translated_view.toPlainText()
+                                if self.translation_running else self.translated_text),
             "chunks": [
                 {
                     "index": result.index,
@@ -10749,6 +10840,11 @@ def _atomic_page_change(method):
 class DarkThemeApp(QMainWindow):
     # Signal to show translation dialog from background thread
     _show_selection_signal = QtCore.pyqtSignal(str, bool, str, str, str, str, str)
+    _selection_finished_signal = QtCore.pyqtSignal(bool)
+    _companion_selection_status_signal = QtCore.pyqtSignal(object, str)
+    _companion_selection_finished_signal = QtCore.pyqtSignal(object, bool)
+    _companion_selection_hide_status_signal = QtCore.pyqtSignal(object)
+    _companion_selection_result_signal = QtCore.pyqtSignal(object, object)
     _argos_status_signal = QtCore.pyqtSignal(str)
     _argos_progress_signal = QtCore.pyqtSignal(str, int, int)
     _main_translation_done_signal = QtCore.pyqtSignal(str)
@@ -10773,6 +10869,9 @@ class DarkThemeApp(QMainWindow):
         self._copy_notification_signal.connect(self._show_copy_notification, Qt.QueuedConnection)
         self._copy_failure_signal.connect(self._show_copy_failure, Qt.QueuedConnection)
         self._show_selection_signal.connect(self._show_selection_translation)
+        self._companion_selection_status_signal.connect(self._show_companion_selection_status)
+        self._companion_selection_hide_status_signal.connect(self._hide_companion_selection_status)
+        self._companion_selection_result_signal.connect(self._show_companion_selection_result)
         self._argos_status_signal.connect(self._on_argos_status)
         self._argos_progress_signal.connect(self._on_argos_progress)
         self._main_translation_done_signal.connect(self._on_main_translation_done)
@@ -10908,6 +11007,7 @@ class DarkThemeApp(QMainWindow):
         # Подписка на ошибки регистрации хоткеев
         try:
             hotkey_error_dispatcher.registration_failed.connect(self._on_hotkey_registration_failed)
+            hotkey_error_dispatcher.registration_failed_owned.connect(self._on_owned_hotkey_registration_failed)
         except Exception:
             pass
 
@@ -11514,10 +11614,14 @@ class DarkThemeApp(QMainWindow):
         if (source, target) not in self._available_hotkey_translation_pairs(mode):
             return False
         source_key, target_key = HOTKEY_LANGUAGE_CONFIG_KEYS[mode]
+        source_changed = self.config.get(source_key) != source
         self.config[source_key] = source
         self.config[target_key] = target
         self.config["hotkey_language_editor_mode"] = mode
         self.save_config()
+        if source_changed and mode in {'ocr', 'fullscreen', 'game'}:
+            from ocr_readiness import selected
+            selected(self.config, language=source)
         self._refresh_selection_pair_hint()
         return True
 
@@ -12339,7 +12443,13 @@ class DarkThemeApp(QMainWindow):
         self._guide_step_timer.start(max(0, int(delay_ms)))
 
     def _guide_steps(self):
-        return guide_text(self.current_interface_language)["steps"]
+        language = self.current_interface_language
+        reference = [*GUIDE_TEXT.get(language, GUIDE_TEXT['en'])["steps"],
+                     *guide_text(language)["steps"]]
+        steps = onboarding_steps(language, reference)
+        if platform_support.IS_LINUX:
+            steps = [step for step in steps if step[0] not in CHAT_STEPS]
+        return steps
 
     def _guide_current_action(self):
         steps = self._guide_steps()
@@ -12348,6 +12458,8 @@ class DarkThemeApp(QMainWindow):
         return steps[self._guide_step_index][0]
 
     def _guide_target_widget(self, action):
+        if action == 'chat_languages':
+            return getattr(self, 'hotkey_source_combo', None)
         if action == "language":
             return getattr(self, "flag_button", None)
         if action == "theme":
@@ -12362,7 +12474,7 @@ class DarkThemeApp(QMainWindow):
             key = action.removeprefix("shortcut_")
             return (getattr(self, "main_hotkey_references", None) or {}).get(key)
         if action == "document_translation":
-            return getattr(self, "document_button", None)
+            return getattr(self, "main_image_button", None)
         if action == "main_translate":
             return getattr(self, "translate_button", None)
         if action == "shadow_mode":
@@ -12373,6 +12485,8 @@ class DarkThemeApp(QMainWindow):
             return None
         if action in GUIDE_SETTING_STEPS:
             return getattr(settings_window, GUIDE_SETTING_STEPS[action][0], None)
+        if action == 'companion_settings':
+            return getattr(settings_window, 'desktop_assistant_checkbox', None)
         if action == "ocr_engine":
             return getattr(settings_window, "ocr_engine_combo", None)
         if action == "translator":
@@ -12421,7 +12535,9 @@ class DarkThemeApp(QMainWindow):
         changed = False
         try:
             settings = getattr(self, "settings_window", None)
-            main_action = action == "settings" or action.startswith("shortcut_") or action == "main_translate"
+            main_action = (action in {'settings', 'language', 'theme', 'chat_languages',
+                                     'document_translation', 'main_translate'}
+                           or action.startswith('shortcut_'))
             if main_action:
                 if settings is not None:
                     self.show_main_screen()
@@ -12432,14 +12548,18 @@ class DarkThemeApp(QMainWindow):
                     changed = True
                 settings = self.settings_window
                 page = GUIDE_SETTING_STEPS.get(action, (None, None, None))[1]
-                if action in {"translator", "language_packages", "api_connections", "result_behavior", "result_window"}:
+                if action in {"translator", "result_behavior", "result_window"}:
                     page = PAGE_TRANSLATION
+                elif action in {'language_packages', 'api_connections'}:
+                    page = PAGE_APPLICATION
                 elif action in {"ocr_engine", "ocr_behavior"}:
                     page = PAGE_OCR
                 elif action in {"hotkeys", "result_text", "selection_behavior"}:
                     page = PAGE_APPLICATION
                 elif action == "game_controls":
                     page = PAGE_DYNAMIC
+                elif action == 'companion_settings':
+                    page = PAGE_COMPANION
                 if page is not None and settings._settings_page_index != page:
                     settings._set_settings_page(page)
                     changed = True
@@ -12451,6 +12571,11 @@ class DarkThemeApp(QMainWindow):
                 if target is not None:
                     from settings_categories import reveal
                     reveal(settings, target)
+            if action == 'chat_languages':
+                combo = self.hotkey_mode_combo
+                index = combo.findData('replace')
+                if combo.currentIndex() != index and index >= 0:
+                    combo.setCurrentIndex(index)
             self.main_layout.activate()
             if getattr(self, "settings_window", None) is not None:
                 self.settings_window.layout().activate()
@@ -12514,11 +12639,25 @@ class DarkThemeApp(QMainWindow):
             self._finish_first_run_guide()
             return
         action, title, body = steps[self._guide_step_index]
+        from PyQt5 import sip
+        settings = getattr(self, 'settings_window', None)
+        manager = getattr(settings, '_language_manager_dialog', None)
+        if manager is not None and not sip.isdeleted(manager) and manager.isVisible():
+            self._hide_guide_bubble()
+            return
+        if getattr(self, '_interface_language_picker', None) is not None:
+            self._hide_guide_bubble()
+            return
         settings = getattr(self, "settings_window", None)
         if action == "back_home" and getattr(settings, "_secondary_view_kind", None) == "hotkeys":
             # Let the user finish editing shortcuts unobstructed. Home resumes
             # the tour through its normal completion signal.
             self._guide_waiting_action = action
+            self._hide_guide_bubble()
+            return
+        if action == 'shortcut_replace' and getattr(settings, '_secondary_view_kind', None) == 'hotkeys':
+            # Editing a shortcut is part of this task. Never rebuild the home
+            # page over the editor; returning from it restores the same card.
             self._hide_guide_bubble()
             return
         if self._prepare_guide_settings_page(action):
@@ -12534,16 +12673,26 @@ class DarkThemeApp(QMainWindow):
         self._ensure_guide_bubble()
         labels = setup_labels(self.current_interface_language)
         self._guide_bubble.set_dark(self.current_theme != "Светлая")
-        self._guide_bubble.chapter.setText(labels[GUIDE_CHAPTER_BY_ACTION[action]])
+        chapter = ('startup' if action in {'language', 'theme'} else
+                   'translation' if action in CHAT_STEPS else
+                   'capture' if action in {'shortcut_ocr', 'shortcut_fullscreen', 'shortcut_selection'} else
+                   'dynamic' if action == 'game_controls' else 'finish')
+        self._guide_bubble.chapter.setText(labels[chapter])
+        if action in {'language', 'theme'}:
+            from guide_scenarios import APPEARANCE_CHAPTER
+            self._guide_bubble.chapter.setText(APPEARANCE_CHAPTER[self.current_interface_language])
         self._guide_progress.setText(f"{self._guide_step_index + 1} / {len(steps)}")
         self._guide_bubble.progress_bar.setRange(0, len(steps))
         self._guide_bubble.progress_bar.setValue(self._guide_step_index + 1)
-        if action in GUIDE_SETTING_STEPS:
+        if action in GUIDE_SETTING_STEPS and action != 'replace_selection_select_all':
             title = target.text()
         if platform_support.IS_LINUX:
             bodies = GUIDE_LINUX_BODIES.get(self.current_interface_language, GUIDE_LINUX_BODIES["en"])
             body = bodies.get(action, body)
         self._guide_title.setText(title)
+        if action == 'shortcut_replace':
+            from guide_scenarios import chat_shortcut_body
+            body = chat_shortcut_body(self.current_interface_language)
         self._guide_body.setText(body)
         recommendation = action in GUIDE_SETTING_STEPS or action == "result_window"
         ready = self._guide_setting_ready(action)
@@ -12557,9 +12706,22 @@ class DarkThemeApp(QMainWindow):
             if action == "settings":
                 primary = GUIDE_SETUP_INTRO.get(self.current_interface_language, GUIDE_SETUP_INTRO["en"])[2]
         self._guide_hint.setText(hint)
+        if action == 'replace_selection_select_all':
+            self._guide_hint.setText(settings_text(self.current_interface_language, 'replace_select_all'))
+            primary = onboarding_copy(self.current_interface_language)[11]
+        elif action in {'language', 'theme', 'chat_languages', 'companion_settings'}:
+            self._guide_hint.setText(GUIDE_TEXT.get(self.current_interface_language, GUIDE_TEXT['en'])['click_hint'])
+        shortcut_keys = {'shortcut_replace': 'translate_replace_selection_hotkey',
+                         'shortcut_ocr': 'translate_hotkey',
+                         'shortcut_fullscreen': 'fullscreen_translate_hotkey',
+                         'shortcut_selection': 'translate_selection_hotkey',
+                         'game_controls': 'game_translate_hotkey'}
+        if action in shortcut_keys:
+            key = str(self.config.get(shortcut_keys[action], '') or '').strip()
+            self._guide_hint.setText(key or settings_text(self.current_interface_language, 'hotkeys'))
         self._guide_hint.show()
-        self._guide_skip_btn.setText(labels["later"])
-        self._guide_skip_btn.setVisible(recommendation)
+        self._guide_skip_btn.setText(onboarding_copy(self.current_interface_language)[12])
+        self._guide_skip_btn.setVisible(action == 'replace_selection_select_all')
         self._guide_skip_btn.setEnabled(True)
         self._guide_primary_btn.setText(primary)
         self._guide_primary_btn.setEnabled(True)
@@ -12573,6 +12735,7 @@ class DarkThemeApp(QMainWindow):
         if self._guide_bubble is not None:
             return
         self._guide_bubble = SetupGuideCard(getattr(self, 'ui_root', self))
+        self._guide_bubble.set_companion(QPixmap(resource_path('icons/onboarding/click-guide.png')))
         self._guide_progress = self._guide_bubble.progress
         self._guide_title = self._guide_bubble.title
         self._guide_body = self._guide_bubble.body
@@ -12587,6 +12750,13 @@ class DarkThemeApp(QMainWindow):
         self._guide_bubble.place(self._guide_target_rect(target))
 
     def _guide_target_rect(self, target):
+        if self._guide_current_action() == 'chat_languages':
+            root = getattr(self, 'ui_root', self)
+            rect = QtCore.QRect()
+            for widget in (self.hotkey_mode_combo, self.hotkey_source_combo,
+                           self.hotkey_target_combo, self.hotkey_language_swap):
+                rect = rect.united(QtCore.QRect(widget.mapTo(root, QtCore.QPoint()), widget.size()))
+            return rect
         size = target.size()
         if isinstance(target, QCheckBox):
             # A grid cell may span the whole window. Highlight the actual
@@ -12660,6 +12830,10 @@ class DarkThemeApp(QMainWindow):
         if button is not None and not button.isEnabled():
             return
         action = self._guide_current_action()
+        if action == 'replace_selection_select_all':
+            # Skip the whole chat scenario without changing a saved preference.
+            actions = [step[0] for step in self._guide_steps()]
+            self._guide_step_index = actions.index('shortcut_replace')
         self._advance_guide_step()
         self._guide_navigate(action)
 
@@ -12698,16 +12872,13 @@ class DarkThemeApp(QMainWindow):
         labels = setup_labels(self.current_interface_language)
         self._guide_bubble.set_dark(self.current_theme != "Светлая")
         self._guide_bubble.chapter.setText(labels["completed"])
-        actions = (*GUIDE_SETTING_STEPS, "result_window")
-        ready = sum(self._guide_setting_ready(action) for action in actions)
-        # This counter always measures tour steps. Settings are a separate
-        # result in the body, including when recommendations were skipped.
+        # Progress measures steps, not how many optional settings were enabled.
         step_count = len(self._guide_steps())
         self._guide_progress.setText(f"{step_count} / {step_count}")
         self._guide_bubble.progress_bar.setRange(0, step_count)
         self._guide_bubble.progress_bar.setValue(step_count)
         self._guide_title.setText(labels["done"])
-        self._guide_body.setText(labels["done_body"].format(ready=ready, total=len(actions)))
+        self._guide_body.setText(onboarding_copy(self.current_interface_language)[10])
         self._guide_hint.hide()
         self._guide_skip_btn.hide()
         self._guide_primary_btn.setText(labels["finish_button"])
@@ -12994,20 +13165,23 @@ class DarkThemeApp(QMainWindow):
                 continue
         return ""
 
-    def launch_translate_selection(self):
+    def launch_translate_selection(self, expected_target=None, *, _request_token=None):
         """Translate selected text without ever modifying the source application."""
-        return self._launch_translate_selection(replace_selection=False)
+        return self._launch_translate_selection(replace_selection=False, expected_target=expected_target,
+                                               **({'_request_token': _request_token} if _request_token is not None else {}))
 
-    def launch_translate_replace_selection(self):
+    def launch_translate_replace_selection(self, expected_target=None, *, _request_token=None):
         """Translate selected text and safely replace that exact selection on Windows."""
-        return self._launch_translate_selection(replace_selection=True)
+        return self._launch_translate_selection(replace_selection=True, expected_target=expected_target,
+                                               **({'_request_token': _request_token} if _request_token is not None else {}))
 
-    def _launch_translate_selection(self, replace_selection=False, preloaded_text=None):
+    def _launch_translate_selection(self, replace_selection=False, preloaded_text=None, expected_target=None,
+                                    *, _request_token=None):
         """Shared selected-text workflow used by the safe and replacement hotkeys."""
         if platform_support.IS_MAC and not (preloaded_text and str(preloaded_text).strip()):
             from macos_desktop import ensure_permission
             if not ensure_permission("accessibility", self, self.current_interface_language):
-                return
+                return False
         from mode_coordinator import cancel_deferred_mode_request
         cancel_deferred_mode_request()
         print("launch_translate_selection called")
@@ -13019,14 +13193,46 @@ class DarkThemeApp(QMainWindow):
         replace_selection = bool(replace_selection and (platform_support.IS_WINDOWS or platform_support.IS_MAC))
         # Capture this before translation starts. The worker verifies it again
         # immediately before pasting, after also re-copying the same selection.
-        selection_window = _windows_foreground_window() if replace_selection else 0
+        selection_window = (expected_target if expected_target is not None
+                            else _windows_foreground_window()) if replace_selection else 0
         if platform_support.IS_MAC and replace_selection:
             from macos_desktop import foreground_target
-            selection_window = foreground_target()
+            selection_window = expected_target if expected_target is not None else foreground_target()
 
         def _do_copy_and_translate():
+            from PyQt5 import sip
             lang = self.config.get("interface_language", "ru")
             clipboard_preservation = None
+            translation_received = False
+
+            def owner_deleted():
+                return isinstance(self, QtCore.QObject) and sip.isdeleted(self)
+
+            def request_cancelled():
+                return owner_deleted() or (_request_token is not None and _request_token.is_set())
+
+            def show_status(message):
+                if request_cancelled():
+                    return
+                if _request_token is not None:
+                    self._companion_selection_status_signal.emit(_request_token, message)
+                else:
+                    self._show_status_signal.emit(message)
+
+            def hide_status():
+                if not request_cancelled():
+                    if _request_token is not None:
+                        self._companion_selection_hide_status_signal.emit(_request_token)
+                    else:
+                        self._hide_status_signal.emit()
+
+            def show_result(*payload):
+                if request_cancelled():
+                    return
+                if _request_token is not None:
+                    self._companion_selection_result_signal.emit(_request_token, payload)
+                else:
+                    self._show_selection_signal.emit(*payload)
 
             def restore_captured_clipboard(force=False):
                 restore_enabled = bool(
@@ -13039,7 +13245,36 @@ class DarkThemeApp(QMainWindow):
                 ):
                     clipboard_preservation.restore()
 
+            def expected_target_is_active():
+                # Hotkeys retain their existing behavior. A companion action
+                # identifies its source before its own panel can take focus.
+                if request_cancelled():
+                    restore_captured_clipboard(force=True)
+                    return False
+                if expected_target is None:
+                    return True
+                try:
+                    if platform_support.IS_WINDOWS:
+                        matches = bool(expected_target) and _windows_foreground_window() == expected_target
+                    elif platform_support.IS_MAC:
+                        from macos_desktop import same_foreground_target
+                        matches = same_foreground_target(expected_target)
+                    else:
+                        return True  # Linux reads PRIMARY without simulating Ctrl+C.
+                except Exception:
+                    matches = False
+                if matches:
+                    return True
+                restore_captured_clipboard(force=True)
+                from assistant_text import assistant_text
+                show_status(assistant_text(lang, 'selection_focus_lost'))
+                time.sleep(1.5)
+                hide_status()
+                return False
+
             try:
+                if request_cancelled():
+                    return
                 preloaded = str(preloaded_text or "").strip()
                 if preloaded:
                     text = preloaded
@@ -13050,61 +13285,93 @@ class DarkThemeApp(QMainWindow):
                     text = self._read_primary_selection()
                 else:
                     # Release all modifier keys first
+                    if not expected_target_is_active():
+                        return
                     KEYEVENTF_KEYUP = 0x0002
                     for vk in ((0x11, 0x12, 0x10, 0x5B, 0x5C) if platform_support.IS_WINDOWS else ()):
                         ctypes.windll.user32.keybd_event(vk, 0, KEYEVENTF_KEYUP, 0)
                     time.sleep(0.35)
+                    if not expected_target_is_active():
+                        return
                     if (replace_selection and self.config.get("replace_selection_select_all") is True):
                         if not select_all_text_in_foreground(selection_window):
                             return
                         time.sleep(0.08)
+                        if not expected_target_is_active():
+                            return
                     from clipboard_preservation import ClipboardPreservation
                     clipboard_preservation = ClipboardPreservation(
                         pyperclip.paste, platform_support.copy_text, _clipboard_sequence_number)
                     # Clear clipboard, then Ctrl+C to capture selection
+                    if not expected_target_is_active():
+                        return
                     if platform_support.copy_text("") is False:
                         # A busy clipboard must never make an unrelated old
                         # value look like newly captured selected text.
                         notify_copy_failed(self.config)
                         return
                     clipboard_preservation.claim("")
+                    if not expected_target_is_active():
+                        return
                     simulate_copy()
+                    if not expected_target_is_active():
+                        return
                     time.sleep(0.25)
+                    if not expected_target_is_active():
+                        return
                     text = pyperclip.paste()
+                    if not expected_target_is_active():
+                        return
                     clipboard_preservation.claim(str(text or ""))
                 if not text or not text.strip():
                     time.sleep(0.3)
                     if preloaded:
                         text = preloaded
                     else:
+                        if not expected_target_is_active():
+                            return
                         text = (
                             self._read_primary_selection()
                             if platform_support.IS_LINUX
                             else pyperclip.paste()
                         )
+                        if not expected_target_is_active():
+                            return
                         if clipboard_preservation is not None:
                             clipboard_preservation.claim(str(text or ""))
                 if not text or not text.strip():
                     restore_captured_clipboard(force=True)
                     lang = self.config.get("interface_language", "ru")
-                    no_text = ui_text(lang, "no_text_selected")
-                    self._show_status_signal.emit(no_text)
+                    if expected_target is not None:
+                        from assistant_text import assistant_text
+                        no_text = assistant_text(lang, 'selection_empty')
+                    else:
+                        no_text = ui_text(lang, "no_text_selected")
+                    show_status(no_text)
                     time.sleep(1.5)
-                    self._hide_status_signal.emit()
+                    hide_status()
                     return
                 text = text.strip()
+                if request_cancelled():
+                    restore_captured_clipboard(force=True)
+                    return
                 # Show status
                 lang = self.config.get("interface_language", "ru")
                 status_msg = ui_text(lang, "translating")
-                self._show_status_signal.emit(status_msg)
+                show_status(status_msg)
                 print(f"[SEL] translating {source_code}->{target_code}, {len(text)} chars...")
                 from translater import translate_text
-                translated = translate_text(text, source_code, target_code)
-                self._hide_status_signal.emit()
-                print(f"[SEL] result: {len(translated) if translated else 0} chars")
-                if not translated:
+                translated = translate_text(text, source_code, target_code,
+                    **({'cancel_callback': request_cancelled} if _request_token is not None else {}))
+                if request_cancelled():
                     restore_captured_clipboard(force=True)
                     return
+                hide_status()
+                print(f"[SEL] result: {len(translated) if translated else 0} chars")
+                if not str(translated or "").strip():
+                    restore_captured_clipboard(force=True)
+                    return
+                translation_received = True
 
                 save_translation_history(text, translated, target_code)
 
@@ -13132,12 +13399,12 @@ class DarkThemeApp(QMainWindow):
                         time.sleep(0.08)
                         restore_captured_clipboard()
                     if not replacement_succeeded and not fallback_copied:
-                        self._show_status_signal.emit(TRANSLATION_RESULT_DIALOG_TEXT[lang]['copy_failed'])
-                        self._show_selection_signal.emit(
+                        show_status(TRANSLATION_RESULT_DIALOG_TEXT[lang]['copy_failed'])
+                        show_result(
                             translated, False, lang, self.config.get('theme', 'Темная'),
                             text, source_code, target_code)
                     else:
-                        self._show_status_signal.emit(ui_text(
+                        show_status(ui_text(
                             lang, 'selection_replaced' if replacement_succeeded
                             else 'selection_replace_fallback'))
 
@@ -13145,7 +13412,7 @@ class DarkThemeApp(QMainWindow):
                     # clipboard fallback succeeds. If both failed, the existing
                     # result window above keeps the finished text recoverable.
                     time.sleep(1.2)
-                    self._hide_status_signal.emit()
+                    hide_status()
                     return
 
                 if result_window_hidden_for(self.config, "selection"):
@@ -13153,32 +13420,65 @@ class DarkThemeApp(QMainWindow):
                     dialog_text = TRANSLATION_RESULT_DIALOG_TEXT.get(
                         lang, TRANSLATION_RESULT_DIALOG_TEXT["en"]
                     )
-                    self._show_status_signal.emit(dialog_text['copied'] if copied else dialog_text['copy_failed'])
+                    show_status(dialog_text['copied'] if copied else dialog_text['copy_failed'])
                     if not copied:
-                        self._show_selection_signal.emit(
+                        show_result(
                             translated, False, lang, self.config.get('theme', 'Темная'),
                             text, source_code, target_code)
                     time.sleep(1.2)
-                    self._hide_status_signal.emit()
+                    hide_status()
                     return
                 theme = self.config.get("theme", "Темная")
                 auto_copy = self.config.get("copy_translated_text", False)
                 if not auto_copy:
                     restore_captured_clipboard()
-                self._show_selection_signal.emit(
+                show_result(
                     translated, auto_copy, lang, theme, text, source_code, target_code
                 )
             except Exception as e:
                 restore_captured_clipboard(force=True)
+                if request_cancelled():
+                    return
                 err_msg = ui_text(lang, "translation_error")
-                self._show_status_signal.emit(f"{err_msg}: {e}")
+                show_status(f"{err_msg}: {e}")
                 print(f"Error in translate_selection: {e}")
                 import traceback
                 traceback.print_exc()
                 time.sleep(3)
-                self._hide_status_signal.emit()
+                hide_status()
+            finally:
+                # Only companion requests use this completion channel; an
+                # unrelated hotkey must not complete the panel's active job.
+                succeeded = translation_received and not request_cancelled()
+                try:
+                    if not owner_deleted():
+                        if _request_token is not None:
+                            self._companion_selection_finished_signal.emit(_request_token, succeeded)
+                        if expected_target is not None:
+                            finished = getattr(self, '_selection_finished_signal', None)
+                            if finished is not None:
+                                finished.emit(succeeded)
+                except RuntimeError:
+                    if not owner_deleted():
+                        raise
 
         threading.Thread(target=_do_copy_and_translate, daemon=True).start()
+        return True
+
+    @QtCore.pyqtSlot(object, str)
+    def _show_companion_selection_status(self, token, message):
+        if not token.is_set():
+            self._show_status_signal.emit(message)
+
+    @QtCore.pyqtSlot(object)
+    def _hide_companion_selection_status(self, token):
+        if not token.is_set():
+            self._hide_status_signal.emit()
+
+    @QtCore.pyqtSlot(object, object)
+    def _show_companion_selection_result(self, token, payload):
+        if not token.is_set():
+            self._show_selection_signal.emit(*payload)
 
     def _show_selection_translation(self, translated, auto_copy, lang, theme,
                                     source_text="", source_lang="", target_lang=""):
@@ -13210,6 +13510,12 @@ class DarkThemeApp(QMainWindow):
 
     def restart_all_hotkey_listeners(self):
         """Re-register every configurable global shortcut after an import."""
+        self._pending_hotkey_registration_errors = []
+        timer = getattr(self, '_hotkey_registration_error_timer', None)
+        if timer is not None:
+            from PyQt5 import sip
+            if not sip.isdeleted(timer):
+                timer.stop()
         bindings = (
             ("copy_hotkey_thread", "copy_hotkey", self.launch_copy, 1),
             ("translate_hotkey_thread", "translate_hotkey", self.launch_translate, 2),
@@ -13235,9 +13541,22 @@ class DarkThemeApp(QMainWindow):
             shortcut = str(self.config.get(key, "") or "").strip()
             if not shortcut:
                 continue
-            thread = listener_class(shortcut, callback, hotkey_id=hotkey_id)
+            thread = None
+            try:
+                thread = listener_class(shortcut, callback, hotkey_id=hotkey_id)
+                thread.start()
+            except Exception:
+                logging.exception("Could not start hotkey listener %s", attribute)
+                if thread is not None:
+                    try:
+                        thread.stop()
+                        if thread.is_alive():
+                            thread.join(timeout=0.5)
+                    except Exception:
+                        logging.exception("Could not retire failed hotkey listener %s", attribute)
+                hotkey_error_dispatcher.registration_failed.emit(shortcut)
+                continue
             setattr(self, attribute, thread)
-            thread.start()
 
     def apply_theme(self):
         if hasattr(self, 'config'):
@@ -13363,7 +13682,8 @@ class DarkThemeApp(QMainWindow):
             + f"QPushButton#mainShadowButton {{ background:{shadow_surface}; border-color:{shadow_border};"
             " min-height:28px; min-width:142px; }"
         )
-        self.setStyleSheet(style_sheet)
+        from styled_dialogs import set_widget_stylesheet
+        set_widget_stylesheet(self, style_sheet)
         picker = getattr(self, '_interface_language_picker', None)
         if picker is not None:
             picker.set_theme(is_dark)
@@ -13383,20 +13703,20 @@ class DarkThemeApp(QMainWindow):
         # only if it differs when returning home (two toggles need no work).
         if hasattr(self, "title_bar"):
             header_bg = window_header_color(self.current_theme != "Светлая")
-            self.title_bar.setStyleSheet(
+            set_widget_stylesheet(self.title_bar,
                 f"font-size: 18px; font-weight: bold; color: {theme['text_color']}; background-color: {header_bg};"
             )
 
         for name in ("flag_button", "theme_button", "document_button", "help_button", "settings_button"):
             control = getattr(self, name, None)
             if control is not None:
-                control.setStyleSheet(styled_transparent_button_qss(is_dark))
+                set_widget_stylesheet(control, styled_transparent_button_qss(is_dark))
         if picker is not None:
             self.update_interface_language_button()
 
         if hasattr(self, "minimize_button") and hasattr(self, "close_button"):
-            self.minimize_button.setStyleSheet(button_qss(is_dark, "quiet", icon=True))
-            self.close_button.setStyleSheet(button_qss(is_dark, "close", icon=True))
+            set_widget_stylesheet(self.minimize_button, button_qss(is_dark, "quiet", icon=True))
+            set_widget_stylesheet(self.close_button, button_qss(is_dark, "close", icon=True))
         # Обновить иконку кнопки помощи
         self.update_help_icon()
         self.update_theme_icon()
@@ -13718,6 +14038,8 @@ class DarkThemeApp(QMainWindow):
         if getattr(self, '_interface_language_picker', None) is not None:
             self._close_interface_language_picker()
             return
+        if getattr(self, '_guide_active', False):
+            self._hide_guide_bubble()
         from interface_language_picker import InterfaceLanguagePicker
         picker = InterfaceLanguagePicker(INTERFACE_LANGUAGE_OPTIONS, self.current_interface_language,
                                          resource_path, self.central_widget,
@@ -15449,14 +15771,59 @@ class DarkThemeApp(QMainWindow):
         except Exception:
             pass
 
-    def _on_hotkey_registration_failed(self, hotkey_str):
+    @QtCore.pyqtSlot(object, str)
+    def _on_owned_hotkey_registration_failed(self, cancelled, hotkey_str):
+        self._on_hotkey_registration_failed(hotkey_str, _cancelled=cancelled)
+
+    def _on_hotkey_registration_failed(self, hotkey_str, *, _cancelled=None):
         """Показать уведомление, когда хоткей занят другим приложением."""
+        from PyQt5 import sip
+        if sip.isdeleted(self) or getattr(self, 'force_quit', False):
+            return
+        if _cancelled is not None and _cancelled.is_set():
+            return
+        pending = getattr(self, '_pending_hotkey_registration_errors', None)
+        if pending is None:
+            pending = self._pending_hotkey_registration_errors = []
+        entry = (hotkey_str, _cancelled)
+        if entry not in pending:
+            pending.append(entry)
+        if getattr(self, '_hotkey_error_dialog_open', False):
+            return
+        timer = getattr(self, '_hotkey_registration_error_timer', None)
+        if timer is None or sip.isdeleted(timer):
+            timer = self._hotkey_registration_error_timer = QTimer(self)
+            timer.setSingleShot(True)
+            timer.timeout.connect(self._flush_hotkey_registration_errors)
+        if not timer.isActive():
+            timer.start(100)
+
+    def _flush_hotkey_registration_errors(self):
+        from PyQt5 import sip
+        if sip.isdeleted(self) or getattr(self, '_hotkey_error_dialog_open', False):
+            return
+        pending = list(dict.fromkeys(
+            text for text, cancelled in self._pending_hotkey_registration_errors
+            if cancelled is None or not cancelled.is_set()))
+        self._pending_hotkey_registration_errors = []
+        if not pending or getattr(self, 'force_quit', False):
+            return
+        from html import escape
         lang = self.current_interface_language
         title = hotkey_error_text(lang, "title")
-        msg = hotkey_error_text(lang, "message", hotkey=hotkey_str)
-
-        # Используем QTimer для показа в главном потоке
-        QTimer.singleShot(100, lambda: self._show_hotkey_error_dialog(title, msg))
+        msg = hotkey_error_text(lang, "message", hotkey=', '.join(escape(value) for value in pending))
+        self._hotkey_error_dialog_open = True
+        try:
+            self._show_hotkey_error_dialog(title, msg)
+        finally:
+            self._hotkey_error_dialog_open = False
+            if not sip.isdeleted(self):
+                if getattr(self, 'force_quit', False):
+                    self._pending_hotkey_registration_errors = []
+                elif self._pending_hotkey_registration_errors:
+                    timer = self._hotkey_registration_error_timer
+                    if not sip.isdeleted(timer):
+                        timer.start(100)
 
     def _show_hotkey_error_dialog(self, title, msg):
         """Показать диалог ошибки регистрации хоткея."""
@@ -15572,6 +15939,8 @@ class DarkThemeApp(QMainWindow):
             # A partially initialized optional OCR backend must never block the
             # ordinary application shutdown path.
             pass
+        from ocr_readiness import SERVICE
+        SERVICE.shutdown()
         self.save_config()
         tray_icon = getattr(self, "tray_icon", None)
         if tray_icon is not None:
@@ -16022,10 +16391,12 @@ def _prepare_ocr_overlays_on_gui_thread():
 
 
 def _warm_up_ocr_after_window_is_visible():
-    """Warm native OCR in the background, then queue all QWidget work to Qt."""
-    try:
-        from ocr import warm_up
+    """Log startup without loading models, probing engines or creating overlays.
 
+    The first explicit OCR action creates its own widgets and worker. Keeping
+    this hook preserves launch diagnostics without idle CPU/RAM warm-up.
+    """
+    try:
         config = get_cached_config()
         logging.info("=" * 50)
         logging.info("ClicknTranslate Started")
@@ -16033,14 +16404,8 @@ def _warm_up_ocr_after_window_is_visible():
         logging.info(f"Translator: {config.get('translator_engine', 'Google').upper()}")
         logging.info(f"OCR Language: {config.get('last_ocr_language', 'ru').upper()}")
         logging.info("=" * 50)
-        warm_up()
-
-        # Qt widgets are never safe to construct in a Python worker thread.
-        # The dispatcher receiver belongs to the main window, so AutoConnection
-        # queues this callback to QApplication's thread on every platform.
-        hotkey_dispatcher.triggered.emit(_prepare_ocr_overlays_on_gui_thread)
     except Exception:
-        logging.exception("Background OCR warm-up failed")
+        logging.exception("Startup diagnostics failed")
 
 
 if __name__ == "__main__":
@@ -16169,7 +16534,8 @@ if __name__ == "__main__":
             app.installNativeEventFilter(_single_instance_event_filter)
         except Exception:
             _single_instance_event_filter = None
-    # Повышаем приоритет процесса для уменьшения задержек
+    # Preserve the existing scheduling policy; performance changes below do
+    # not trade foreground responsiveness for a lower process priority.
     try:
         HIGH_PRIORITY_CLASS = 0x00000080
         ctypes.windll.kernel32.SetPriorityClass(ctypes.windll.kernel32.GetCurrentProcess(), HIGH_PRIORITY_CLASS)

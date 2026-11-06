@@ -9,6 +9,39 @@ from styled_dialogs import install_tooltip_style
 
 
 @pytest.mark.parametrize('dark', [True, False])
+def test_capture_popup_direction_follows_locale_inside_a_fixed_ltr_toolbar(dark):
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    toolbar = QtWidgets.QWidget()
+    toolbar.setLayoutDirection(QtCore.Qt.LeftToRight)
+    combo = CaptureLanguageCombo(toolbar)
+    for language in LANGUAGES:
+        combo.addItem(language.english_name, language.code)
+    toolbar.resize(400, 200)
+    toolbar.show()
+    try:
+        for locale, direction in (('en', QtCore.Qt.LeftToRight), ('ar', QtCore.Qt.RightToLeft),
+                                  ('ru', QtCore.Qt.LeftToRight)):
+            combo.set_capture_theme(dark, locale, 1.37)
+            combo.showPopup()
+            app.processEvents()
+            assert toolbar.layoutDirection() == QtCore.Qt.LeftToRight
+            assert combo.layoutDirection() == direction
+            assert combo.view().layoutDirection() == direction
+            search = combo._language_search
+            assert search.layoutDirection() == direction
+            search.setText('Vietnamese')
+            app.processEvents()
+            row = combo.findData('vi')
+            assert row >= 0 and not combo.view().isRowHidden(row)
+            combo.hidePopup()
+    finally:
+        combo.hidePopup()
+        toolbar.close()
+        toolbar.deleteLater()
+        app.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)
+
+
+@pytest.mark.parametrize('dark', [True, False])
 def test_capture_picker_keeps_codes_and_reopens_inside_screen(dark):
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     install_tooltip_style(app)

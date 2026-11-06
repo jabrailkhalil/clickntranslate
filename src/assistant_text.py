@@ -489,6 +489,68 @@ for _key, _values in _SECTIONS.items():
         ASSISTANT_TEXT[_language][_key] = _value
 
 
+_SELECTION_ACTIONS = {
+    'en': ('Translate selected text', 'Translate text selected in another app without changing it.'),
+    'ru': ('Перевести выделение', 'Перевести выделенный текст в другой программе, сохранив оригинал.'),
+    'es': ('Traducir selección', 'Traduce el texto seleccionado en otra aplicación sin modificarlo.'),
+    'de': ('Auswahl übersetzen', 'Markierten Text in einer anderen App übersetzen, ohne ihn zu verändern.'),
+    'fr': ('Traduire la sélection', 'Traduire le texte sélectionné dans une autre application sans le modifier.'),
+    'zh': ('翻译所选文字', '翻译其他应用中选中的文字，不修改原文。'),
+    'pt': ('Traduzir seleção', 'Traduza o texto selecionado em outro aplicativo sem alterá-lo.'),
+    'it': ('Traduci selezione', 'Traduci il testo selezionato in un’altra app senza modificarlo.'),
+    'ar': ('ترجمة النص المحدد', 'ترجمة النص المحدد في تطبيق آخر دون تغييره.'),
+    'tr': ('Seçimi çevir', 'Başka uygulamada seçilen metni değiştirmeden çevirin.'),
+    'hi': ('चयन का अनुवाद करें', 'दूसरे ऐप में चुने टेक्स्ट को बदले बिना उसका अनुवाद करें।'),
+    'id': ('Terjemahkan pilihan', 'Terjemahkan teks yang dipilih di aplikasi lain tanpa mengubahnya.'),
+}
+_REPLACE_ACTIONS = {
+    'en': ('Translate and replace', 'Replace editable text in the active app with its translation. Does not send the message.'),
+    'ru': ('Заменить переводом', 'Заменить редактируемый текст в активной программе его переводом. Сообщение не отправляется.'),
+    'es': ('Traducir y reemplazar', 'Reemplaza el texto editable de la aplicación activa por su traducción. No envía el mensaje.'),
+    'de': ('Übersetzen und ersetzen', 'Bearbeitbaren Text in der aktiven App durch die Übersetzung ersetzen. Sendet die Nachricht nicht.'),
+    'fr': ('Traduire et remplacer', 'Remplacer le texte modifiable de l’application active par sa traduction. N’envoie pas le message.'),
+    'zh': ('翻译并替换', '用译文替换当前应用中的可编辑文字。不会发送消息。'),
+    'pt': ('Traduzir e substituir', 'Substitua o texto editável do aplicativo ativo pela tradução. Não envia a mensagem.'),
+    'it': ('Traduci e sostituisci', 'Sostituisci il testo modificabile dell’app attiva con la traduzione. Non invia il messaggio.'),
+    'ar': ('الترجمة والاستبدال', 'استبدال النص القابل للتحرير في التطبيق النشط بترجمته. لا يرسل الرسالة.'),
+    'tr': ('Çevir ve değiştir', 'Etkin uygulamadaki düzenlenebilir metni çevirisiyle değiştirin. Mesajı göndermez.'),
+    'hi': ('अनुवाद करके बदलें', 'सक्रिय ऐप के संपादन योग्य टेक्स्ट को उसके अनुवाद से बदलें। संदेश नहीं भेजता।'),
+    'id': ('Terjemahkan dan ganti', 'Ganti teks yang dapat diedit pada aplikasi aktif dengan terjemahan. Tidak mengirim pesan.'),
+}
+_PANEL_MESSAGES = {
+    'en': ('Status', 'Reading selected text…', 'Select text in another app, then try again.',
+           'Return to the source app, select the text and try again.'),
+    'ru': ('Состояние', 'Читаю выделенный текст…', 'Выделите текст в другой программе и нажмите ещё раз.',
+           'Вернитесь в нужную программу, выделите текст и нажмите ещё раз.'),
+    'es': ('Estado', 'Leyendo el texto seleccionado…', 'Selecciona texto en otra aplicación y vuelve a intentarlo.',
+           'Vuelve a la aplicación de origen, selecciona el texto e inténtalo de nuevo.'),
+    'de': ('Status', 'Markierten Text lesen…', 'Text in einer anderen App markieren und erneut versuchen.',
+           'Zur Quell-App zurückkehren, den Text markieren und erneut versuchen.'),
+    'fr': ('État', 'Lecture du texte sélectionné…', 'Sélectionnez du texte dans une autre application, puis réessayez.',
+           'Revenez à l’application source, sélectionnez le texte et réessayez.'),
+    'zh': ('状态', '正在读取所选文字…', '请在其他应用中选中文字，然后重试。',
+           '请返回来源应用，选中文字后重试。'),
+    'pt': ('Estado', 'Lendo o texto selecionado…', 'Selecione texto em outro aplicativo e tente novamente.',
+           'Volte ao aplicativo de origem, selecione o texto e tente novamente.'),
+    'it': ('Stato', 'Lettura del testo selezionato…', 'Seleziona del testo in un’altra app e riprova.',
+           'Torna all’app di origine, seleziona il testo e riprova.'),
+    'ar': ('الحالة', 'جارٍ قراءة النص المحدد…', 'حدد نصًا في تطبيق آخر ثم حاول مجددًا.',
+           'عد إلى التطبيق الأصلي وحدد النص ثم حاول مجددًا.'),
+    'tr': ('Durum', 'Seçili metin okunuyor…', 'Başka bir uygulamada metin seçip yeniden deneyin.',
+           'Kaynak uygulamaya dönün, metni seçin ve yeniden deneyin.'),
+    'hi': ('स्थिति', 'चुना हुआ टेक्स्ट पढ़ा जा रहा है…', 'दूसरे ऐप में टेक्स्ट चुनें और फिर कोशिश करें।',
+           'मूल ऐप में वापस जाएँ, टेक्स्ट चुनें और फिर कोशिश करें।'),
+    'id': ('Status', 'Membaca teks yang dipilih…', 'Pilih teks di aplikasi lain, lalu coba lagi.',
+           'Kembali ke aplikasi sumber, pilih teks, lalu coba lagi.'),
+}
+for _locale in ASSISTANT_TEXT:
+    ASSISTANT_TEXT[_locale]['selection'] = _SELECTION_ACTIONS[_locale]
+    ASSISTANT_TEXT[_locale]['replace'] = _REPLACE_ACTIONS[_locale]
+    ASSISTANT_TEXT[_locale].update(zip(
+        ('panel_status', 'selection_reading', 'selection_empty', 'selection_focus_lost'),
+        _PANEL_MESSAGES[_locale]))
+
+
 def assistant_text(language, key):
     return ASSISTANT_TEXT.get(language, ASSISTANT_TEXT['en']).get(key, ASSISTANT_TEXT['en'].get(key, key))
 

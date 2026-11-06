@@ -34,6 +34,14 @@ class _NumberBox(QtWidgets.QSpinBox):
         self.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
         self.setAlignment(QtCore.Qt.AlignCenter)
 
+    def keyPressEvent(self, event):
+        if event.key() == QtCore.Qt.Key_Escape:
+            self.lineEdit().setText(self.prefix() + self.textFromValue(self.value()) + self.suffix())
+            self.lineEdit().deselect()
+            event.accept()
+            return
+        super().keyPressEvent(event)
+
     def wheelEvent(self, event):
         # Scrolling a settings page must not silently resize/fade a companion.
         if not self.hasFocus() and not self.lineEdit().hasFocus():
@@ -142,6 +150,10 @@ class ChoiceStepper(StepperFrame):
 
     def value(self):
         return self._choices[self._index][0]
+
+    def set_labels(self, labels):
+        self._choices = tuple((key, labels[key]) for key, _label in self._choices)
+        self._sync_choice()
 
     def setValue(self, value):
         index = tuple(key for key, _label in self._choices).index(value)

@@ -703,12 +703,13 @@ class MainWindowScaleController(QObject):
         return actual
 
     def apply_theme(self, stylesheet, background):
-        self.canvas.setStyleSheet(stylesheet)
+        from styled_dialogs import set_widget_stylesheet
+        set_widget_stylesheet(self.canvas, stylesheet)
         # The exposed backing surface must use the theme too, including the
         # newly exposed strips before Qt paints the resized canvas over them.
         color = QColor(background)
         # A palette alone is reset by Qt's stylesheet unpolish/polish cycle.
-        self.view.setStyleSheet(f'''
+        set_widget_stylesheet(self.view, f'''
             QGraphicsView#mainUiScaleView {{
                 border: 0; padding: 0; margin: 0; background-color: {color.name()};
             }}
@@ -719,7 +720,8 @@ class MainWindowScaleController(QObject):
             palette.setColor(QPalette.Window, color)
             if widget is not self.owner:
                 palette.setColor(QPalette.Base, color)
-            widget.setPalette(palette)
+            if widget.palette() != palette:
+                widget.setPalette(palette)
         self.view.viewport().setAutoFillBackground(True)
         self.view.setBackgroundBrush(color)
         self.scene.setBackgroundBrush(color)
@@ -748,13 +750,8 @@ def combo_popup_geometry(anchor, desired, bounds, gap, margin=0, *, prefer_below
     return QRect(x, y, width, height)
 
 
-def position_embedded_combo_popup(combo, popup, gap, desired_size=None):
-    """Fit scene-rendered lists to the canvas; native popups use screen bounds.
-
-    Qt can embed a popup on Windows too. Its native handle does not mean it is
-    drawn there: WA_DontShowOnScreen marks the proxy-rendered surface. Using
-    desktop coordinates for that surface clips long rows at the canvas edge.
-    """
+def is_embedded_combo_popup(combo, popup):
+    """Use the actual rendering host, even when a bypass flag was requested."""
     root = combo.window()
     reference = getattr(root, '_ui_native_owner', None)
     proxy = popup.graphicsProxyWidget()
@@ -762,6 +759,20 @@ def position_embedded_combo_popup(combo, popup, gap, desired_size=None):
         return False
     if sys.platform != 'darwin' and not popup.testAttribute(Qt.WA_DontShowOnScreen):
         return False
+    return True
+
+
+def position_embedded_combo_popup(combo, popup, gap, desired_size=None):
+    """Fit scene-rendered lists to the canvas; native popups use screen bounds.
+
+    Qt can retain a popup proxy on Windows after BypassGraphicsProxyWidget.
+    Its native handle does not mean it is drawn there: the scene supplies its
+    scale and coordinates while WA_DontShowOnScreen remains set.
+    """
+    if not is_embedded_combo_popup(combo, popup):
+        return False
+    root = combo.window()
+    proxy = popup.graphicsProxyWidget()
     anchor = QRect(combo.mapTo(root, QPoint()), combo.size())
     geometry = combo_popup_geometry(anchor, desired_size or popup.size(), root.rect(), gap, margin=4)
     popup.resize(geometry.size())

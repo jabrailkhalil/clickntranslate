@@ -88,7 +88,7 @@ def validated_area(value):
     if (not isinstance(size, list) or len(size) != 2
             or not all(type(n) is int and 0 < n < 100000 for n in size)
             or not isinstance(dpi, (int, float)) or isinstance(dpi, bool)
-            or not math.isfinite(dpi) or not 0 < dpi < 10000):
+            or not 0 < dpi < 10000 or not math.isfinite(dpi)):
         return None
     if (not isinstance(rect, list) or len(rect) != 4
             or not all(type(n) is int and 0 <= n < 100000 for n in rect)):
@@ -110,7 +110,7 @@ def resolve_area(value, screen):
     if screen is None or value is None:
         return None
     stored, current = value['screen'], screen_identity(screen)
-    if any(stored.get(key) != current.get(key) for key in current):
+    if stored != current:
         return None
     local = QtCore.QRect(*value['rect'])
     global_rect = local.translated(screen.geometry().topLeft())

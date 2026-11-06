@@ -264,6 +264,7 @@ class UiScalingTest(unittest.TestCase):
         self.assertEqual(self.window.config['ui_scale_percent'], 126)
 
     def test_scaled_popup_stays_inside_viewport_and_selection_works(self):
+        from ui_scaling import widget_global_rect
         self.window.set_ui_scale_percent(200)
         self.window.show_settings()
         self.window.settings_window._set_settings_page(1)
@@ -272,9 +273,13 @@ class UiScalingTest(unittest.TestCase):
         self.click(combo)
         popup = combo.view().window()
         proxy = popup.graphicsProxyWidget()
-        self.assertIsNotNone(proxy)
-        self.assertTrue(self.controller.view.sceneRect().contains(proxy.sceneBoundingRect()))
-        QTest.keyClick(self.controller.view.viewport(), Qt.Key_Escape)
+        self.assertTrue(popup.isVisible())
+        if proxy is not None:
+            self.assertTrue(self.controller.view.sceneRect().contains(proxy.sceneBoundingRect()))
+        else:
+            self.assertTrue(combo._available_screen_rect().contains(widget_global_rect(popup)))
+        receiver = self.controller.view.viewport() if proxy is not None else (popup.focusWidget() or combo.view())
+        QTest.keyClick(receiver, Qt.Key_Escape)
         self.settle()
         self.assertFalse(popup.isVisible())
 
@@ -284,7 +289,11 @@ class UiScalingTest(unittest.TestCase):
         self.click(combo)
         popup = combo.view().window()
         proxy = popup.graphicsProxyWidget()
-        self.assertTrue(self.controller.view.sceneRect().contains(proxy.sceneBoundingRect()))
+        self.assertTrue(popup.isVisible())
+        if proxy is not None:
+            self.assertTrue(self.controller.view.sceneRect().contains(proxy.sceneBoundingRect()))
+        else:
+            self.assertTrue(combo._available_screen_rect().contains(widget_global_rect(popup)))
         # Qt suppresses release events briefly after opening a list. Let that
         # timer and the queued popup layout settle before calculating a click
         # position; coordinates taken before this wait may already be stale.
@@ -292,20 +301,26 @@ class UiScalingTest(unittest.TestCase):
         if getattr(combo, '_language_search', None) is not None:
             # The searchable picker starts in the search field. Down enters
             # its result list; End then navigates to the final language.
-            QTest.keyClick(self.controller.view.viewport(), Qt.Key_Down)
-        QTest.keyClick(self.controller.view.viewport(), Qt.Key_End)
+            receiver = self.controller.view.viewport() if proxy is not None else (popup.focusWidget() or combo.view())
+            QTest.keyClick(receiver, Qt.Key_Down)
+        receiver = self.controller.view.viewport() if proxy is not None else (popup.focusWidget() or combo.view())
+        QTest.keyClick(receiver, Qt.Key_End)
         self.settle()
         last = combo.count() - 1
         row = combo.view().visualRect(combo.model().index(last, 0))
         self.assertTrue(combo.view().viewport().rect().contains(row.center()))
-        point = combo.view().viewport().mapTo(popup, row.center())
-        mapped = self.controller.view.mapFromScene(proxy.mapToScene(QPointF(point)))
-        QTest.mouseClick(self.controller.view.viewport(), Qt.LeftButton, pos=mapped)
+        if proxy is not None:
+            point = combo.view().viewport().mapTo(popup, row.center())
+            mapped = self.controller.view.mapFromScene(proxy.mapToScene(QPointF(point)))
+            QTest.mouseClick(self.controller.view.viewport(), Qt.LeftButton, pos=mapped)
+        else:
+            QTest.mouseClick(combo.view().viewport(), Qt.LeftButton, pos=row.center())
         self.settle()
         self.assertEqual(combo.currentIndex(), last)
         self.assertFalse(popup.isVisible())
 
     def test_first_popup_keeps_its_anchor_after_native_proxy_sync_and_zoom(self):
+        from ui_scaling import widget_global_rect
         # Native popups query Qt's actual screen. Keep their host on that same
         # logical desktop (offscreen's 800x600 shrinks further at high DPI).
         self.available.return_value = self.app.primaryScreen().availableGeometry()
@@ -340,14 +355,17 @@ class UiScalingTest(unittest.TestCase):
                         # field in desktop coordinates, never at the canvas
                         # origin.
                         frame = popup.frameGeometry()
-                        field = QRect(combo.mapToGlobal(QPoint()), combo.size())
+                        field = widget_global_rect(combo)
                         horiz_overlap = frame.x() < field.right() and frame.right() > field.left()
                         vertical_clear = frame.bottom() <= field.top() or frame.top() >= field.bottom()
                         self.assertTrue(horiz_overlap and vertical_clear,
                                         (percent, attempt, frame, field))
                         anchors.append((frame.x(), frame.y()))
-                    QTest.keyClick(self.controller.view.viewport(), Qt.Key_Escape)
+                    receiver = (self.controller.view.viewport() if popup.graphicsProxyWidget() is not None
+                                else (popup.focusWidget() or combo.view()))
+                    QTest.keyClick(receiver, Qt.Key_Escape)
                     self.settle()
+                    self.assertFalse(popup.isVisible())
                 self.assertEqual(anchors[0], anchors[1])
 
     def test_dynamic_language_catalog_is_ready_before_the_first_popup(self):

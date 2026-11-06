@@ -39,24 +39,48 @@ def managed_runtime(engine='rapidocr'):
                 choose_bundle({'bundles':[dict(receipt,id=receipt['bundle'])]},receipt['component'],APP_VERSION,
                               channel=receipt['channel'],target=target)
         return runtime
-    except ComponentError:
-        # A damaged optional install must not prevent the settings UI opening.
+    except (ComponentError, KeyError, TypeError, ValueError):
+        # Corrupt receipt fields and compatibility constraints are damaged
+        # optional installs too; they must not prevent the settings UI opening.
         return None
 
 
-def worker_environment():
+def worker_environment(*, managed=True):
+    """Scrub local children; managed runtimes use only their approved model tree."""
     import platform_support
     environment = platform_support.system_subprocess_env()
     for name in ('PYTHONPATH', 'PYTHONHOME', 'PYTHONSTARTUP', 'PYTHONUSERBASE',
                  'LD_PRELOAD', 'LD_AUDIT', 'LD_LIBRARY_PATH', 'DYLD_INSERT_LIBRARIES',
                  'DYLD_LIBRARY_PATH', 'DYLD_FRAMEWORK_PATH',
-                 'CLICKNTRANSLATE_RAPIDOCR_MODEL_DIR', 'CLICKNTRANSLATE_UPDATE_TOKEN',
+                 'CLICKNTRANSLATE_UPDATE_TOKEN',
                  'GITHUB_TOKEN', 'GH_TOKEN', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY',
                  'GEMINI_API_KEY', 'DEEPL_API_KEY'):
         environment.pop(name, None)
+    if managed:
+        environment.pop('CLICKNTRANSLATE_RAPIDOCR_MODEL_DIR', None)
+    environment.pop('CLICKNTRANSLATE_OCR_LEASE', None)
     environment['PYTHONNOUSERSITE'] = '1'
     environment['PYTHONDONTWRITEBYTECODE'] = '1'
     return environment
+
+
+def source_ocr_adapter_command(runtime):
+    """Use current source code without changing an installed approved runtime.
+
+    Frozen apps keep their receipt's adapter contract. Source previews can
+    exercise the new adapter with exactly the already-installed pinned SDK.
+    Unknown SDK revisions retain their own adapter instead of guessing ABI.
+    """
+    import sys
+    if getattr(sys, 'frozen', False) or sys.platform != 'win32':
+        return None
+    from rapidocr_models import RAPIDOCR_VERSION
+    receipt = runtime.get('receipt', {})
+    entry = Path(__file__).resolve().with_name('ocr_runtime_entry.py')
+    if (receipt.get('component') != 'ocr.rapidocr' or receipt.get('upstream') != RAPIDOCR_VERSION
+            or len(runtime.get('command', [])) != 2 or not entry.is_file()):
+        return None
+    return [runtime['command'][0], str(entry)]
 
 
 def run_cancellable(command, *, timeout, check_cancel=lambda:None, **kwargs):
@@ -91,8 +115,12 @@ def validate_rapidocr(folder, receipt, check_cancel=lambda:None):
             payload = json.loads(result.stdout)
         except ValueError as exc:
             raise ComponentError('validation_failed', 'invalid worker response') from exc
+        if not isinstance(payload, dict):
+            raise ComponentError('validation_failed', 'invalid worker response')
         if result.returncode or payload.get('error'):
             raise ComponentError('validation_failed', str(payload.get('error') or 'worker exit')[:300])
+        if payload.get('available') is not True:
+            raise ComponentError('validation_failed', 'invalid worker response')
         return payload
 
 

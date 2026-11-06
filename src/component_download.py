@@ -39,16 +39,33 @@ class ComponentDownloader:
                 return  # ComponentStore verifies the complete digest next.
             headers = {'Accept-Encoding':'identity', 'User-Agent':'ClicknTranslate components'}
             if offset:
-                headers['Range'] = f'bytes={offset}-'
                 try:
                     state = json.loads(metadata.read_text(encoding='utf-8'))
-                    etag = state.get('etag', '') if state.get('url') == url else ''
-                    if isinstance(etag, str) and etag and '\r' not in etag and '\n' not in etag:
+                except (OSError, ValueError):
+                    state = {}
+                if (not isinstance(state, dict) or not isinstance(state.get('url'), str)
+                        or state['url'] != url):
+                    # A failed mirror's unverified prefix must not poison the
+                    # next source. Unknown provenance also needs a clean GET.
+                    path.unlink(missing_ok=True)
+                    metadata.unlink(missing_ok=True)
+                    offset = 0
+                else:
+                    headers['Range'] = f'bytes={offset}-'
+                    etag = state.get('etag', '')
+                    # Only strong HTTP entity tags belong in If-Range. A
+                    # damaged optional cache must not poison every retry with
+                    # an unencodable or otherwise invalid request header.
+                    if isinstance(etag, str) and re.fullmatch(r'"[\x21\x23-\x7e\x80-\xff]*"', etag):
                         headers['If-Range'] = etag
-                except (OSError, ValueError, AttributeError):
-                    pass
             try:
                 with requests.get(url, headers=headers, stream=True, timeout=(15, 15)) as response:
+                    if response.status_code == 416:
+                        # A rejected saved range must not trap every retry at
+                        # the same offset. The full transfer is verified later.
+                        path.unlink(missing_ok=True)
+                        metadata.unlink(missing_ok=True)
+                        raise requests.RequestException('The saved download range was rejected')
                     response.raise_for_status()
                     if response.status_code == 206:
                         match = re.fullmatch(r'bytes (\d+)-(\d+)/(\d+)', response.headers.get('Content-Range', ''))

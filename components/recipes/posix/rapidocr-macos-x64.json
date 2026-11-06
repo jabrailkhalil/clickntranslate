@@ -23,12 +23,15 @@
     "rapidocr_models.py",
     "ocr_text_layout.py",
     "ocr_paragraphs.py",
-    "runtime_bootstrap.py"
+    "runtime_bootstrap.py",
+    "worker_lease.py",
+    "ocr_lifecycle.py"
   ],
   "requirements": [
     "rapidocr[rtl]==3.10.0",
     "onnxruntime==1.23.2",
     "opencv-python-headless==4.11.0.86",
     "Pillow==12.3.0"
-  ]
+  ],
+  "ocr_worker_protocol": 2
 }

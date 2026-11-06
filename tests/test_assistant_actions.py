@@ -19,14 +19,14 @@ from test_desktop_ux import window
     (None, list(ASSISTANT_ACTIONS)), ('area', list(ASSISTANT_ACTIONS)),
     (True, list(ASSISTANT_ACTIONS)), ({'area': True}, list(ASSISTANT_ACTIONS)),
     ([], []), ((), []), (['text', 'area', 'text', 'obsolete', None, {}, ['open']], ['area', 'text']),
-    (['hide', 'settings'], []), (['guide', 'open'], ['open', 'guide']),
+    (['hide', 'settings'], []), (['guide', 'open'], ['open']),
 ])
 def test_action_preferences_accept_only_stable_ids_without_restoring_an_empty_choice(value, expected):
     assert normalized_assistant_actions(value) == expected
     assert assistant_preferences({'desktop_assistant_actions': value})['desktop_assistant_actions'] == expected
 
 
-@pytest.mark.parametrize('selected', [[], ['open'], ['area', 'guide'], list(ASSISTANT_ACTIONS)])
+@pytest.mark.parametrize('selected', [[], ['open'], ['area', 'replace'], list(ASSISTANT_ACTIONS)])
 def test_action_preferences_survive_export_import_and_configuration_migration(selected):
     config = dict(main.DEFAULT_CONFIG, desktop_assistant_actions=selected)
     exported = settings_export_payload(config)
@@ -40,7 +40,7 @@ def test_action_preferences_survive_export_import_and_configuration_migration(se
 def test_unknown_imported_ids_and_duplicates_are_removed_by_configuration_migration():
     payload = settings_export_payload({'desktop_assistant_actions': ['guide', 'old', 'open', 'open', {}]})
     migrated, _missing = main.merge_config_defaults(validated_import_settings(payload, main.DEFAULT_CONFIG))
-    assert migrated['desktop_assistant_actions'] == ['open', 'guide']
+    assert migrated['desktop_assistant_actions'] == ['open']
 
 
 def test_open_restores_the_existing_owner_without_resetting_its_page(companion):
@@ -57,11 +57,11 @@ def test_open_restores_the_existing_owner_without_resetting_its_page(companion):
 def test_changing_actions_rebuilds_the_open_menu_and_empty_selection_keeps_footer(companion):
     companion.toggle_menu()
     previous = companion.menu
-    companion.owner.config['desktop_assistant_actions'] = ['open', 'guide']
+    companion.owner.config['desktop_assistant_actions'] = ['open', 'replace']
     companion.refresh()
     assert not previous.isVisible()
     assert companion.menu.isVisible()
-    assert set(companion.menu.buttons) == {'open', 'guide', 'settings', 'hide'}
+    assert set(companion.menu.buttons) == {'open', 'replace', 'settings', 'hide'}
     companion.owner.config['desktop_assistant_actions'] = []
     companion.refresh()
     assert set(companion.menu.buttons) == {'settings', 'hide'}
@@ -96,7 +96,7 @@ def test_actions_dialog_translations_layout_theme_and_keyboard(app, companion, l
         dialog.open()
         app.processEvents()
         assert dialog.windowTitle() == assistant_text(language, 'menu_buttons').rstrip('…')
-        assert len(dialog.checkboxes) == 8
+        assert len(dialog.checkboxes) == len(ASSISTANT_ACTIONS)
         assert all(isinstance(assistant_action_text(language, action), tuple) for action in ASSISTANT_ACTIONS)
         assert dialog.layoutDirection() == (QtCore.Qt.RightToLeft if language == 'ar' else QtCore.Qt.LeftToRight)
         assert '#111111' in dialog.styleSheet() if dark else '#f0ecf3' in dialog.styleSheet()
@@ -138,7 +138,7 @@ def test_actions_dialog_large_scale_keeps_footer_visible_and_uses_only_vertical_
         assert dialog.scroll.horizontalScrollBar().maximum() == 0
         assert dialog.done_button.isVisible()
         assert dialog.rect().contains(dialog.done_button.mapTo(dialog, dialog.done_button.rect().bottomRight()))
-        dialog.scroll.ensureWidgetVisible(dialog.checkboxes['guide'])
+        dialog.scroll.ensureWidgetVisible(dialog.checkboxes['documents'])
         assert dialog.scroll.verticalScrollBar().value() == dialog.scroll.verticalScrollBar().maximum()
     finally:
         dialog.close()

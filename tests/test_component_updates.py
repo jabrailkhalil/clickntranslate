@@ -15,7 +15,7 @@ import zipfile
 import pytest
 import component_catalog
 from component_catalog import ComponentError, choose_bundle, parse_catalog, trusted_catalog
-from component_store import ComponentStore
+from component_store import ComponentStore, _MAINTENANCE_DONE
 
 
 @pytest.mark.parametrize('system,release,kernel,mac,expected', [
@@ -27,6 +27,7 @@ from component_store import ComponentStore
     ('linux','unknown','','','0'),
 ])
 def test_os_detection_uses_numeric_native_versions(monkeypatch, system, release, kernel, mac, expected):
+    monkeypatch.setattr(component_catalog, '_windows_native_target', lambda: ('AMD64', kernel))
     monkeypatch.setattr(component_catalog.sys, 'platform', system)
     monkeypatch.setattr(component_catalog.platform, 'machine', lambda:'AMD64')
     monkeypatch.setattr(component_catalog.platform, 'release', lambda:release)
@@ -173,6 +174,7 @@ def test_removal_waits_for_running_worker_and_reclaims_cache(tmp_path):
         assert store.active('ocr.rapidocr') is None
         assert active['folder'].is_dir()
         assert (store.root / 'gc-pending').is_file()
+    assert _MAINTENANCE_DONE.wait(3)
     assert not active['folder'].exists()
     assert not list((store.root / 'objects').glob('*'))
 
@@ -188,6 +190,7 @@ def test_two_workers_can_share_a_generation_and_cleanup_after_timeout(tmp_path):
             store.remove('ocr.rapidocr')
             assert active['folder'].is_dir()
             raise TimeoutError()
+    assert _MAINTENANCE_DONE.wait(3)
     assert not active['folder'].exists()
 
 
@@ -338,3 +341,62 @@ def test_real_tuf_rejects_expiry_and_rollback(tmp_path):
         timestamp.to_file(str(timestamp_path))
         with pytest.raises(ComponentError, match='catalog_unavailable'):
             trusted_catalog(tmp_path / 'fresh-client', **options)
+
+
+@pytest.mark.parametrize('damaged', [None, [], 1, {'component': 'ocr.rapidocr'}])
+def test_invalid_receipt_shape_is_a_controlled_component_error(tmp_path, damaged):
+    import component_runtime
+    from unittest import mock
+    catalog, archive = fixture_catalog(tmp_path)
+    store = ComponentStore(tmp_path / 'store')
+    with store.lock():
+        active = store.install(catalog, catalog['bundles'][0],
+            lambda _, path: shutil.copyfile(archive, path), lambda *_: None)
+    (active['folder'] / 'receipt.json').write_text(json.dumps(damaged), encoding='utf-8')
+    with pytest.raises(ComponentError, match='installed_component_damaged'):
+        store.describe('ocr.rapidocr')
+    with mock.patch.object(component_runtime, 'component_store_path', return_value=store.root):
+        assert component_runtime.managed_runtime('rapidocr') is None
+
+
+@pytest.mark.parametrize('mutation', ['missing-python', 'contract-string', 'bad-app', 'bad-min-os', 'missing-channel'])
+def test_invalid_runtime_metadata_does_not_break_the_optional_engine_fallback(tmp_path, monkeypatch, mutation):
+    import component_runtime
+    catalog, archive = fixture_catalog(tmp_path)
+    store = ComponentStore(tmp_path / 'store')
+    with store.lock():
+        active = store.install(catalog, catalog['bundles'][0],
+            lambda _, path: shutil.copyfile(archive, path), lambda *_: None)
+    receipt = active['receipt']
+    receipt['contract'] = 3
+    if mutation == 'missing-python':
+        receipt.pop('python')
+    elif mutation == 'contract-string':
+        receipt['contract'] = '3'
+    elif mutation == 'bad-app':
+        receipt['app'] = 'invalid specifier'
+    elif mutation == 'bad-min-os':
+        receipt['min_os'] = 'invalid version'
+    else:
+        receipt.pop('channel')
+    (active['folder'] / 'receipt.json').write_text(json.dumps(receipt), encoding='utf-8')
+    monkeypatch.setattr(component_runtime, 'component_store_path', lambda: store.root)
+    assert component_runtime.managed_runtime('rapidocr') is None
+
+
+@pytest.mark.parametrize('files', [None, 'invalid', [], [None], [{}], [{'sha256': None}]])
+def test_invalid_previous_inventory_cannot_report_a_failed_committed_update(tmp_path, files):
+    catalog, archive = fixture_catalog(tmp_path)
+    store = ComponentStore(tmp_path / 'store')
+    with store.lock():
+        first = store.install(catalog, catalog['bundles'][0],
+            lambda _, path: shutil.copyfile(archive, path), lambda *_: None)
+        damaged = dict(first['receipt'], files=files)
+        (first['folder'] / 'receipt.json').write_text(json.dumps(damaged), encoding='utf-8')
+        unknown_object = store.object_path('f' * 64)
+        unknown_object.write_bytes(b'preserve cache while an inventory is unknown')
+        second = dict(catalog['bundles'][0], id='rapidocr-r2', revision=2)
+        active = store.install(catalog, second, lambda *_: pytest.fail('verified cache was discarded'), lambda *_: None)
+        assert active['receipt']['revision'] == 2
+        assert store.active('ocr.rapidocr')['receipt']['generation'] == active['receipt']['generation']
+        assert unknown_object.is_file()

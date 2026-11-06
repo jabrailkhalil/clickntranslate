@@ -15,12 +15,14 @@ import re
 import sys
 import threading
 import time
+import unicodedata
+import weakref
 
 from button_styles import button_qss
 from live_translation import LiveTextState, live_frame_changed
 from assistant_motion import notify_current_activity
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5 import QtCore, QtGui, QtWidgets, sip
 
 import platform_support
 from settings_window import LanguageSwapButton
@@ -345,6 +347,16 @@ def normalize_game_ocr_text(text, *, join_paragraphs=False):
     return "\n".join(line for line in lines if line).strip()
 
 
+def _is_readable_game_text(text):
+    # A single CJK ideograph or syllable can be a complete word. Retain the
+    # existing minimum for Latin glyphs, digits and punctuation/noise.
+    return len(text) >= 2 or (
+        len(text) == 1
+        and unicodedata.category(text) == 'Lo'
+        and unicodedata.east_asian_width(text) in {'W', 'F'}
+    )
+
+
 def game_texts_are_similar(left, right, threshold=0.90):
     left = normalize_game_ocr_text(left).casefold()
     right = normalize_game_ocr_text(right).casefold()
@@ -352,6 +364,11 @@ def game_texts_are_similar(left, right, threshold=0.90):
         return False
     if left == right:
         return True
+    # A counter, price or signed value can change only one glyph while the
+    # surrounding dialogue remains almost identical.
+    numbers = r'([+\-\u2212]?)\s*(\d+(?:[.,\u066b\u066c]\d+)*)'
+    if re.findall(numbers, left) != re.findall(numbers, right):
+        return False
     return difflib.SequenceMatcher(None, left, right).ratio() >= float(threshold)
 
 
@@ -498,6 +515,63 @@ class _MacOverlayCaptureWorker(QtCore.QThread):
             self.result_ready.emit(image, '')
 
 
+def _connect_game_worker_result(overlay, worker, signal, slot_name, kind):
+    """Keep queued deliveries attached to the session which requested them."""
+    owner_ref = weakref.ref(overlay)
+    worker_ref = weakref.ref(worker)
+    generation = overlay._ocr_generation
+
+    def deliver(*values):
+        owner, source = owner_ref(), worker_ref()
+        if (owner is None or sip.isdeleted(owner) or owner._closed
+                or source is None or sip.isdeleted(source)
+                or owner._ocr_generation != generation
+                or source is not getattr(owner, f'_active_{kind}_worker')):
+            return
+        getattr(owner, slot_name)(*values)
+
+    signal.connect(deliver)
+
+
+def _finish_game_worker(overlay, worker, kind):
+    overlay._workers.discard(worker)
+    if worker is not None and worker is not getattr(overlay, f'_active_{kind}_worker'):
+        return False
+    setattr(overlay, f'_active_{kind}_worker', None)
+    setattr(overlay, f'_{kind}_busy', False)
+    return True
+
+
+def _start_game_worker(overlay, worker, kind):
+    try:
+        worker.start()
+    except Exception:
+        _finish_game_worker(overlay, worker, kind)
+        try:
+            worker.deleteLater()
+        except RuntimeError:
+            pass
+        raise
+
+
+def _cancel_game_session(overlay):
+    overlay._ocr_generation += 1
+    overlay._revision += 1
+    if overlay._translation_cancel is not None:
+        overlay._translation_cancel.set()
+    overlay._translation_cancel = None
+    overlay._translation_busy = False
+    overlay._deferred_translation = None
+    # Busy remains set until finished: cancellation is cooperative, and a
+    # native recognizer/capture must not overlap its replacement after resume.
+    for worker in (overlay._active_ocr_worker, overlay._active_capture_worker):
+        if worker is not None:
+            try:
+                worker.cancel() if hasattr(worker, 'cancel') else worker.requestInterruption()
+            except RuntimeError:
+                pass
+
+
 def _start_macos_capture(overlay, screen, region):
     from macos_capture import OverlayCapture
 
@@ -508,17 +582,12 @@ def _start_macos_capture(overlay, screen, region):
         overlay._native_capture, screen.geometry().getRect(), region.getRect(),
         screen.devicePixelRatio())
     overlay._capture_busy = True
+    overlay._active_capture_worker = worker
     overlay._workers.add(worker)
-    worker.result_ready.connect(overlay._on_macos_capture)
+    _connect_game_worker_result(overlay, worker, worker.result_ready, '_on_macos_capture', 'capture')
     worker.finished.connect(overlay._capture_finished)
     worker.finished.connect(worker.deleteLater)
-    try:
-        worker.start()
-    except Exception:
-        overlay._capture_busy = False
-        overlay._workers.discard(worker)
-        worker.deleteLater()
-        raise
+    _start_game_worker(overlay, worker, 'capture')
 
 
 def _keep_overlay_visible_without_focus(widget):
@@ -1017,6 +1086,9 @@ class GameTranslationOverlay(QtWidgets.QWidget):
         self._drag_offset = QtCore.QPoint()
         self._ocr_busy = False
         self._capture_busy = False
+        self._ocr_generation = 0
+        self._active_ocr_worker = None
+        self._active_capture_worker = None
         self._closed = False
         self._translation_busy = False
         self._workers = set()
@@ -1024,6 +1096,7 @@ class GameTranslationOverlay(QtWidgets.QWidget):
         self._last_frame = ()
         self._unchanged_ticks = 0
         self._last_source_text = ""
+        self._similar_source_text = ""
         self._pending_source_text = ""
         self._translation_cancel = None
         self._deferred_translation = None
@@ -1150,6 +1223,11 @@ class GameTranslationOverlay(QtWidgets.QWidget):
         )
 
     def _start_scanning(self):
+        if self._closed:
+            return
+        if not self.paused:
+            from ocr_readiness import begin_activity
+            begin_activity(f'game-region:{id(self)}', self.config.get('ocr_engine', ''))
         if not self._timer.isActive():
             self._timer.start()
         self._scan_once()
@@ -1292,6 +1370,7 @@ class GameTranslationOverlay(QtWidgets.QWidget):
                 self.card.hide()
                 self._last_frame = ()
                 self._last_source_text = ''
+                self._similar_source_text = ''
                 self._pending_source_text = ''
                 if self._translation_cancel is not None:
                     self._translation_cancel.set()
@@ -1332,7 +1411,7 @@ class GameTranslationOverlay(QtWidgets.QWidget):
 
     @QtCore.pyqtSlot()
     def _capture_finished(self):
-        self._workers.discard(self.sender())
+        _finish_game_worker(self, self.sender(), 'capture')
 
     def _process_frame(self, qimage):
         self._source_frame = qimage
@@ -1382,8 +1461,6 @@ class GameTranslationOverlay(QtWidgets.QWidget):
             direct_target = self.target_language if profile(api_provider, self.config)['direct'] else None
             worker = ApiOCRWorker(api_provider, _qimage_to_pil_rgb(qimage),
                                   self.source_language, direct_target, self.config)
-            worker.result_ready.connect(self._on_api_ocr_result)
-            worker.failed.connect(self._on_api_ocr_error)
         else:
             variants = _prepare_game_ocr_variants(qimage)
         if engine.lower() == "windows":
@@ -1408,6 +1485,7 @@ class GameTranslationOverlay(QtWidgets.QWidget):
                 )
         elif engine.lower() == "rapidocr":
             worker = RapidOCRWorker(variants, "game-continuous", session)
+            worker.language_code = self.source_language
         elif engine.lower() in {"easyocr", "apple vision"}:
             worker_class = AppleVisionOCRWorker if engine.lower() == "apple vision" else EasyOCRWorker
             worker = worker_class(
@@ -1421,13 +1499,17 @@ class GameTranslationOverlay(QtWidgets.QWidget):
             self._set_status("ocr_error", active=False)
             return
         self._ocr_busy = True
+        self._active_ocr_worker = worker
         self._workers.add(worker)
         worker.join_paragraphs = self.config.get('ocr_join_paragraphs', True) is True
-        if not api_provider:
-            worker.result_ready.connect(self._on_ocr_result)
+        if api_provider:
+            _connect_game_worker_result(self, worker, worker.result_ready, '_on_api_ocr_result', 'ocr')
+            _connect_game_worker_result(self, worker, worker.failed, '_on_api_ocr_error', 'ocr')
+        else:
+            _connect_game_worker_result(self, worker, worker.result_ready, '_on_ocr_result', 'ocr')
         worker.finished.connect(self._ocr_finished)
         worker.finished.connect(worker.deleteLater)
-        worker.start()
+        _start_game_worker(self, worker, 'ocr')
 
     @QtCore.pyqtSlot(str)
     def _on_ocr_result(self, text):
@@ -1452,6 +1534,7 @@ class GameTranslationOverlay(QtWidgets.QWidget):
         if not normalized:
             self._empty_ocr_frames += 1
             self._last_source_text = ''
+            self._similar_source_text = ''
             self._pending_source_text = ''
             if self._translation_cancel is not None:
                 self._translation_cancel.set()
@@ -1460,11 +1543,20 @@ class GameTranslationOverlay(QtWidgets.QWidget):
             self._set_status("no_text", active=False)
             return
         self._empty_ocr_frames = 0
-        if (normalized == self._last_source_text
-                or (not getattr(self, '_ocr_frame_changed', True)
-                    and game_texts_are_similar(self._last_source_text, normalized, self.similarity))):
+        if normalized == self._last_source_text:
+            self._similar_source_text = ''
             self._set_status("waiting")
             return
+        if (not getattr(self, '_ocr_frame_changed', True)
+                and game_texts_are_similar(self._last_source_text, normalized, self.similarity)
+                and normalized != self._similar_source_text):
+            # A small edit can stay below the pixel threshold forever. Keep
+            # one-off OCR jitter out, but trust a second identical reading
+            # from the already scheduled periodic scans.
+            self._similar_source_text = normalized
+            self._set_status("waiting")
+            return
+        self._similar_source_text = ''
         self._last_source_text = normalized
         self.card.hide()
         if translated is None:
@@ -1476,8 +1568,8 @@ class GameTranslationOverlay(QtWidgets.QWidget):
     @QtCore.pyqtSlot()
     def _ocr_finished(self):
         worker = self.sender()
-        self._workers.discard(worker)
-        self._ocr_busy = False
+        if not _finish_game_worker(self, worker, 'ocr'):
+            return
         if self._deferred_translation is not None:
             result, self._deferred_translation = self._deferred_translation, None
             self._apply_translation(*result)
@@ -1513,11 +1605,10 @@ class GameTranslationOverlay(QtWidgets.QWidget):
                     logging.getLogger("clickntranslate.game").exception("Game translation failed")
                 self.translation_ready.emit(revision, source_text, "", str(exc))
 
-        threading.Thread(
-            target=work,
-            name="ClicknTranslate-game-translation",
-            daemon=True,
-        ).start()
+        from background_tasks import TRANSLATION_EXECUTOR
+        if not TRANSLATION_EXECUTOR.submit(work):
+            self._translation_busy = False
+            self._set_status('translation_error')
 
     @QtCore.pyqtSlot(int, str, str, str)
     def _apply_translation(self, revision, source_text, translated, error):
@@ -1535,6 +1626,7 @@ class GameTranslationOverlay(QtWidgets.QWidget):
         self._translation_cancel = None
         if self.paused or not self._target_is_active():
             self._last_source_text = ''
+            self._similar_source_text = ''
             self._last_frame = ()
             notify_current_activity('idle', f'live:{id(self)}', only_if_busy=True)
             return
@@ -1547,6 +1639,7 @@ class GameTranslationOverlay(QtWidgets.QWidget):
         if error or not translated:
             notify_current_activity('error', f'live:{id(self)}')
             self._last_source_text = ''
+            self._similar_source_text = ''
             self._set_status("translation_error", active=False)
         else:
             notify_current_activity('success', f'live:{id(self)}')
@@ -1567,6 +1660,17 @@ class GameTranslationOverlay(QtWidgets.QWidget):
 
     def _toggle_pause(self):
         self.paused = not self.paused
+        from ocr_readiness import begin_activity, end_activity
+        owner = f'game-region:{id(self)}'
+        if self.paused:
+            _cancel_game_session(self)
+            self._last_frame = ()
+            self._last_source_text = ''
+            self._similar_source_text = ''
+            self._pending_source_text = ''
+            end_activity(owner)
+        else:
+            begin_activity(owner, self.config.get('ocr_engine', ''))
         if self.paused:
             notify_current_activity('idle', f'live:{id(self)}', only_if_busy=True)
         self.pause_button.setText("▶" if self.paused else "Ⅱ")
@@ -1603,6 +1707,8 @@ class GameTranslationOverlay(QtWidgets.QWidget):
     def closeEvent(self, event):
         self._timer.stop()
         self._closed = True
+        from ocr_readiness import end_activity
+        end_activity(f'game-region:{id(self)}')
         notify_current_activity('idle', f'live:{id(self)}', only_if_busy=True)
         if self._translation_cancel is not None:
             self._translation_cancel.set()
@@ -1869,6 +1975,9 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
         )
         self._ocr_busy = False
         self._capture_busy = False
+        self._ocr_generation = 0
+        self._active_ocr_worker = None
+        self._active_capture_worker = None
         self._closed = False
         self._translation_busy = False
         self._workers = set()
@@ -1928,6 +2037,8 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
         self._timer.timeout.connect(self._scan_once)
         self._timer.start()
         QtCore.QTimer.singleShot(220, self._scan_once)
+        from ocr_readiness import begin_activity
+        begin_activity(f'game-fullscreen:{id(self)}', self.config.get('ocr_engine', ''))
 
     def _target_is_active(self):
         if not bool(self.config.get("game_pause_when_inactive", True)):
@@ -2032,7 +2143,7 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
 
     @QtCore.pyqtSlot()
     def _capture_finished(self):
-        self._workers.discard(self.sender())
+        _finish_game_worker(self, self.sender(), 'capture')
 
     def _process_frame(self, image):
         pixmap = QtGui.QPixmap.fromImage(image)
@@ -2067,12 +2178,13 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
             self._set_status("ocr_error", error=True)
             return
         self._ocr_busy = True
+        self._active_ocr_worker = worker
         self._workers.add(worker)
         worker.translation_target_code = self.target_language
-        worker.result_ready.connect(self._on_position_ocr_result)
+        _connect_game_worker_result(self, worker, worker.result_ready, '_on_position_ocr_result', 'ocr')
         worker.finished.connect(self._position_ocr_finished)
         worker.finished.connect(worker.deleteLater)
-        worker.start()
+        _start_game_worker(self, worker, 'ocr')
 
     @QtCore.pyqtSlot(object)
     def _on_position_ocr_result(self, lines):
@@ -2081,22 +2193,22 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
         if self._closed or self.paused or not self._target_is_active():
             return
         direct_values = getattr(lines, 'translations', None)
-        direct_pairs = [] if direct_values is None else [
-            (normalize_game_ocr_text(item[4]), str(value or '').strip())
-            for item, value in zip(lines, direct_values)
-        ]
         # Vision providers already return paragraph bounds and matching
         # translations; regrouping would invalidate that correspondence.
         grouped = (lines if direct_values is not None else _group_screen_ocr_lines(
             lines, join_paragraphs=self.config.get('ocr_join_paragraphs', True) is True))
         viewport = QtCore.QRectF(0, 0, self.width() * self._ocr_scale_x, self.height() * self._ocr_scale_y)
-        grouped = [(*item[:4], normalize_game_ocr_text(item[4])) for item in grouped
-                   if len(normalize_game_ocr_text(item[4])) >= 2
-                   and viewport.intersects(QtCore.QRectF(*item[:4]))]
+        visible, visible_translations = [], None if direct_values is None else []
+        for index, item in enumerate(grouped):
+            text = normalize_game_ocr_text(item[4])
+            if not _is_readable_game_text(text) or not viewport.intersects(QtCore.QRectF(*item[:4])):
+                continue
+            visible.append((*item[:4], text))
+            if visible_translations is not None:
+                visible_translations.append(direct_values[index] if index < len(direct_values) else '')
+        grouped = visible
         now = time.monotonic()
-        self._live.observe(grouped, now)
-        if direct_pairs:
-            self._live.remember(direct_pairs)
+        self._live.observe(grouped, now, translations=visible_translations)
         if not grouped:
             self._empty_ocr_frames += 1
             self._last_layout_signature = ()
@@ -2118,7 +2230,7 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
         if blocks != self._blocks:
             previous_text = [(item[4], item[5]) for item in self._blocks]
             self._blocks = blocks
-            if direct_pairs and blocks:
+            if direct_values is not None and blocks:
                 self._has_shown_translation = True
                 self._status_is_error = False
                 if (self.config.get('history', True) is True
@@ -2141,8 +2253,8 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
     @QtCore.pyqtSlot()
     def _position_ocr_finished(self):
         worker = self.sender()
-        self._workers.discard(worker)
-        self._ocr_busy = False
+        if not _finish_game_worker(self, worker, 'ocr'):
+            return
         if self._deferred_translation is not None:
             result, self._deferred_translation = self._deferred_translation, None
             self._apply_translation(*result)
@@ -2209,11 +2321,10 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
             if error:
                 self.translation_ready.emit(revision, [], error, True)
 
-        threading.Thread(
-            target=work,
-            name="ClicknTranslate-game-fullscreen-translation",
-            daemon=True,
-        ).start()
+        from background_tasks import TRANSLATION_EXECUTOR
+        if not TRANSLATION_EXECUTOR.submit(work):
+            self._translation_busy = False
+            self._set_status('translation_error')
 
     @QtCore.pyqtSlot(int, object, str, bool)
     def _apply_translation(self, revision, blocks, error, final=True):
@@ -2261,6 +2372,13 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
 
     def _toggle_pause(self):
         self.paused = not self.paused
+        from ocr_readiness import begin_activity, end_activity
+        owner = f'game-fullscreen:{id(self)}'
+        if self.paused:
+            _cancel_game_session(self)
+            end_activity(owner)
+        else:
+            begin_activity(owner, self.config.get('ocr_engine', ''))
         self.controls.pause_button.setText(game_text(self.language, 'resume' if self.paused else 'pause'))
         self.controls.pause_button.setToolTip(self.controls.pause_button.text())
         self.controls.pause_button.setAccessibleName(self.controls.pause_button.text())
@@ -2281,7 +2399,11 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
 
     def _layout_translation_blocks(self):
         from ocr import FullScreenTranslateOverlay
-
+        signature = (tuple(self._blocks), self.width(), self.height(), self._ocr_scale_x,
+                     self._ocr_scale_y, self.logicalDpiX(), self.logicalDpiY(),
+                     self.devicePixelRatioF(), self.config.get('game_show_original_text', False))
+        if getattr(self, '_render_plan_signature', None) == signature:
+            return self._render_plan
         rendered_blocks = []
         source_rects = []
         for x, y, width, height, source, translated in self._blocks:
@@ -2312,6 +2434,7 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
             )
             occupied.append(layout[0])
             painted_blocks.append((source_rect, source, translated, layout))
+        self._render_plan_signature, self._render_plan = signature, painted_blocks
         return painted_blocks
 
     def _visible_status_rect(self):
@@ -2412,6 +2535,8 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
 
     def closeEvent(self, event):
         global _game_fullscreen_ref
+        from ocr_readiness import end_activity
+        end_activity(f'game-fullscreen:{id(self)}')
         notify_current_activity('idle', f'live:{id(self)}', only_if_busy=True)
         self._timer.stop()
         self._settle_timer.stop()

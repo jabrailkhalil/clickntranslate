@@ -486,6 +486,12 @@ def test_embedded_language_popup_keeps_its_native_arrow_and_end_navigation(windo
     app.processEvents()
     controller = window._ui_scale_controller
     combo = window.target_lang
+    # Prime the real retained Qt host: a fresh Windows popup can bypass the
+    # scene, while this regression specifically covers embedded key routing.
+    QtWidgets.QComboBox.showPopup(combo)
+    app.processEvents()
+    QtWidgets.QComboBox.hidePopup(combo)
+    app.processEvents()
     QTest.mouseClick(controller.view.viewport(), QtCore.Qt.LeftButton,
                      pos=controller.map_widget_to_view(combo))
     QTest.qWait(app.doubleClickInterval() + 20)

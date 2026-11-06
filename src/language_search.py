@@ -1,7 +1,7 @@
 """Filter language popup rows in place, retaining the original item indexes."""
 from PyQt5.QtCore import Qt, QEvent, QObject, QSize
 from PyQt5.QtWidgets import QLineEdit, QLabel, QApplication
-from PyQt5.QtGui import QFont
+from PyQt5.QtGui import QFont, QFontInfo
 from languages import LANGUAGES, LOCALIZED_LANGUAGE_NAMES, AUTO_LANGUAGE_NAMES
 
 _NAMES = {l.code for l in LANGUAGES} | {l.short_label for l in LANGUAGES}
@@ -38,19 +38,17 @@ def language_code_for_option_text(label):
 
 
 def stable_search_popup_size(combo, desired):
-    """Keep the search input stationary until this language picker closes.
+    """Keep row/flag columns stable, while height follows the search results.
 
-    Shrinking the list to a single match changed the side chosen by the common
-    placement helper: a menu opened above a low field jumped below it. Even
-    without a side change, an above-field search input moved under the pointer.
-    Keep the original footprint while filtering; a new opening measures afresh.
-    This applies only to language searches, not provider/category menus.
+    DropDownCombo pins the first placement separately, so shrinking an
+    above-field menu does not move the search box or flip it below its field.
     """
     search = getattr(combo, '_language_search', None)
     if search is None or search.isHidden():
         return desired
     previous = getattr(combo, '_language_popup_size', None)
-    size = desired.expandedTo(previous) if previous is not None else QSize(desired)
+    size = QSize(max(desired.width(), previous.width()) if previous is not None else desired.width(),
+                 desired.height())
     combo._language_popup_size = QSize(size)
     return size
 
@@ -91,6 +89,7 @@ def prepare_language_search(combo):
             combo._language_search.clear()
             combo._language_search.hide()
             combo._language_empty.hide()
+            combo.itemDelegate().invalidate_metrics()
         return
     search = getattr(combo, '_language_search', None)
     if search is None:
@@ -119,6 +118,7 @@ def prepare_language_search(combo):
                 matches += not hidden
             combo._language_empty.setVisible(not matches)
             combo.view().doItemsLayout()
+            combo.view().verticalScrollBar().setValue(0)
             combo._queue_popup_layout()
         search.textChanged.connect(apply_filter)
     combo.setMaxVisibleItems(8)
@@ -133,16 +133,20 @@ def prepare_language_search(combo):
     from combo_popup import popup_font
     font = popup_font(combo)
     font.setWeight(QFont.Normal)
+    font_pixels = font.pixelSize() if font.pixelSize() > 0 else QFontInfo(font).pixelSize()
     search.setFont(font)
     combo._language_empty.setFont(font)
-    combo._language_empty.setFixedHeight(max(round(34*factor), combo._language_empty.fontMetrics().height()+round(12*factor)))
-    search.setFixedHeight(max(round(32*factor), search.fontMetrics().height()+round(12*factor)))
     search.setStyleSheet(f'''QLineEdit {{ background:{colors['surface']}; color:{colors['text']};
         border:1px solid {colors['border']}; border-radius:{round(5*factor)}px;
-        padding:0 {round(9*factor)}px; font-weight:400; }}
+        padding:0 {round(9*factor)}px; font-size:{font_pixels}px; font-weight:400; }}
         QLineEdit:focus {{ border-color:{colors['accent']}; }}''')
-    combo._language_empty.setStyleSheet(f"color:{colors['muted']}; background:transparent; border:0; padding:4px;")
+    combo._language_empty.setStyleSheet(f"color:{colors['muted']}; background:transparent; border:0; padding:4px; font-size:{font_pixels}px;")
+    # Replace a former host's explicit CSS font before measuring the new one.
+    # QWidget.setFont alone cannot override an existing stylesheet font size.
+    combo._language_empty.setFixedHeight(max(round(34*factor), combo._language_empty.fontMetrics().height()+round(12*factor)))
+    search.setFixedHeight(max(round(32*factor), search.fontMetrics().height()+round(12*factor)))
     search.show()
+    combo.itemDelegate().invalidate_metrics()
     search.clear()
     combo._language_empty.hide()
     for row in range(combo.count()):

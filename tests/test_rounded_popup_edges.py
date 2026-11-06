@@ -79,13 +79,17 @@ def test_real_dropdown_uses_its_painted_radius_for_all_four_mask_corners(app,dar
 
 @pytest.mark.parametrize('locale', ['en','ru','es','de','fr','zh','pt','it','ar','tr','hi','id'])
 @pytest.mark.parametrize('dark',[True,False])
-def test_embedded_dropdown_border_corners_survive_all_interface_scales(window,app,locale,dark):
+def test_embedded_dropdown_border_corners_survive_all_interface_scales(window,app,locale,dark,monkeypatch):
     from settings_sections import PAGE_TRANSLATION
     from ui_scaling import widget_global_rect
     window.set_interface_language(locale)
     if (window.current_theme!='Светлая')!=dark: window.toggle_theme()
     window.show_settings();settings=window.settings_window;settings._set_settings_page(PAGE_TRANSLATION)
     combo=settings.result_window_control
+    # Windows normally routes these lists outside the proxy canvas so they
+    # can extend below the application. Exercise the embedded drawing path
+    # explicitly; native popup corners have separate coverage above.
+    monkeypatch.setattr(combo, '_prepare_native_popup', lambda: None)
     for scale in (80,100,125,150,200):
         window.set_ui_scale_percent(scale)
         for _ in range(4): app.processEvents()

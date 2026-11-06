@@ -54,6 +54,19 @@ _COPY = {
 }
 
 _COPY.update({
+    'select_template_error': (
+        'Could not save the template choice. Check that the settings file can be written, then try again.',
+        'Не удалось сохранить выбор шаблона. Проверьте доступ на запись к файлу настроек и попробуйте снова.',
+        'No se pudo guardar la elección de plantilla. Comprueba que se pueda escribir en el archivo de ajustes e inténtalo de nuevo.',
+        'Die Vorlagenauswahl konnte nicht gespeichert werden. Schreibzugriff auf die Einstellungsdatei prüfen und erneut versuchen.',
+        'Impossible d’enregistrer le choix du modèle. Vérifiez que le fichier des réglages est accessible en écriture, puis réessayez.',
+        '无法保存模板选择。请检查设置文件是否可写，然后重试。',
+        'Não foi possível salvar a escolha do modelo. Verifique a permissão de gravação do arquivo de configurações e tente novamente.',
+        'Impossibile salvare la scelta del modello. Verifica che il file delle impostazioni sia scrivibile e riprova.',
+        'تعذّر حفظ اختيار القالب. تحقق من إمكانية الكتابة إلى ملف الإعدادات، ثم حاول مجددًا.',
+        'Şablon seçimi kaydedilemedi. Ayar dosyasının yazılabilir olduğunu kontrol edip tekrar deneyin.',
+        'टेम्पलेट का चयन सहेजा नहीं जा सका। जाँचें कि सेटिंग्स फ़ाइल में लिखा जा सकता है, फिर कोशिश करें।',
+        'Pilihan templat tidak dapat disimpan. Pastikan berkas pengaturan dapat ditulis, lalu coba lagi.'),
     'delete_selected_template': ('Delete the selected template', 'Удалить выбранный шаблон', 'Eliminar la plantilla seleccionada', 'Gewählte Vorlage löschen', 'Supprimer le modèle sélectionné', '删除所选模板', 'Excluir o modelo selecionado', 'Elimina il modello selezionato', 'حذف القالب المحدد', 'Seçili şablonu sil', 'चुना टेम्पलेट हटाएँ', 'Hapus templat terpilih'),
     'delete_template_title': ('Delete template?', 'Удалить шаблон?', '¿Eliminar la plantilla?', 'Vorlage löschen?', 'Supprimer le modèle ?', '删除模板？', 'Excluir modelo?', 'Eliminare il modello?', 'هل تريد حذف القالب؟', 'Şablon silinsin mi?', 'टेम्पलेट हटाएँ?', 'Hapus templat?'),
     'delete_template_question': ('Delete “{name}”? Its saved areas will be removed. Your languages and the remember setting will stay unchanged.', 'Удалить «{name}»? Сохранённые области будут удалены. Языки и настройка запоминания останутся прежними.', '¿Eliminar «{name}»? Se borrarán sus zonas guardadas. Los idiomas y la opción de recordar no cambiarán.', '„{name}“ löschen? Die gespeicherten Bereiche werden entfernt. Sprachen und Merken-Einstellung bleiben unverändert.', 'Supprimer « {name} » ? Ses zones enregistrées seront supprimées. Les langues et le réglage de mémorisation resteront inchangés.', '删除“{name}”？其保存的区域将被移除，语言和记忆设置保持不变。', 'Excluir “{name}”? As áreas salvas serão removidas. Os idiomas e a opção de lembrar não mudarão.', 'Eliminare «{name}»? Le aree salvate saranno rimosse. Le lingue e l’impostazione di memorizzazione resteranno invariate.', 'هل تريد حذف «{name}»؟ ستُحذف مناطقه المحفوظة. ستبقى اللغات وإعداد التذكر دون تغيير.', '“{name}” silinsin mi? Kayıtlı alanları kaldırılır. Diller ve hatırlama ayarı değişmez.', '“{name}” हटाएँ? उसके सहेजे क्षेत्र हट जाएँगे। भाषाएँ और याद रखने की सेटिंग नहीं बदलेंगी।', 'Hapus “{name}”? Area tersimpannya akan dihapus. Bahasa dan pengaturan ingat tidak berubah.'),

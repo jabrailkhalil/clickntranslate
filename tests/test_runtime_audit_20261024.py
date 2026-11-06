@@ -262,6 +262,28 @@ def test_area_completion_preserves_languages_provider_and_history(area_overlay, 
         release.set()
 
 
+@pytest.mark.parametrize('hidden', (False, True))
+def test_area_provider_failure_keeps_ocr_for_retry_without_copying_or_history(area_overlay, hidden):
+    import main
+    state = area_overlay
+    state.config.update(interface_language='pt', translator_engine='Lingva',
+                        result_window_hidden_modes=['area'] if hidden else [])
+    with mock.patch('translater.translate_text', side_effect=RuntimeError('Lingva HTTP 500')):
+        state.overlay.handle_ocr_result('Recognized paragraph', state.overlay._session_id)
+        _wait_for(lambda: state.dialog.called)
+    args, kwargs = state.dialog.call_args
+    assert args[1] == '' and kwargs['source_text'] == 'Recognized paragraph'
+    assert kwargs['source_lang'] == 'en' and kwargs['target_lang'] == 'ar'
+    assert kwargs['auto_copy'] is False
+    result = state.dialog.return_value
+    result.set_window_engine.assert_called_once_with('Lingva')
+    result._set_source_collapsed.assert_called_once_with(False, resize_window=False)
+    assert result._set_status.call_args.args[0] == 'Lingva: ' + main.doc_text('pt', 'provider_unavailable_online')
+    state.warning.assert_not_called()
+    state.copy.assert_not_called()
+    state.history.assert_not_called()
+
+
 def test_closing_area_translation_cancels_and_ignores_queued_results(area_overlay):
     state = area_overlay
     entered, release = threading.Event(), threading.Event()
@@ -293,6 +315,40 @@ def test_closing_area_translation_cancels_and_ignores_queued_results(area_overla
         state.history.assert_not_called()
     finally:
         release.set()
+
+
+def test_area_failure_can_retry_in_the_same_workspace_without_another_ocr(area_overlay, monkeypatch):
+    import main
+    state = area_overlay
+    state.config['translator_engine'] = 'Lingva'
+    dialog = main.TranslationResultDialog(
+        None, '', auto_copy=False, lang='pt', source_text='Recognized paragraph',
+        source_lang='en', target_lang='ar', result_mode='area')
+    state.dialog.return_value = dialog
+    worker = SimpleNamespace(text='Recognized paragraph', source_code='en', target_code='ar', engine='Lingva')
+    save_history = mock.Mock()
+    monkeypatch.setattr(main, 'save_translation_history', save_history)
+    translate = mock.Mock(return_value='الفقرة المترجمة')
+    monkeypatch.setattr(main.translater, 'translate_text', translate)
+    try:
+        dialog.show()
+        state.overlay._present_area_translation_failure(worker, RuntimeError('HTTP 500'))
+        assert dialog.source_edit.toPlainText() == worker.text
+        assert dialog.text_edit.toPlainText() == ''
+        assert not dialog._source_collapsed
+        assert dialog.translate_button.isEnabled() and not dialog.copy_button.isEnabled()
+        assert 'Lingva' in dialog.status_label.toolTip()
+        dialog.engine_combo.setCurrentIndex(dialog.engine_combo.findData('google'))
+        _wait_for(lambda: dialog.text_edit.toPlainText() == 'الفقرة المترجمة')
+        assert translate.call_args.args == ('Recognized paragraph', 'en', 'ar')
+        assert translate.call_args.kwargs['engine'] == 'google'
+        assert state.config['translator_engine'] == 'Lingva'
+        save_history.assert_called_once_with('Recognized paragraph', 'الفقرة المترجمة', 'ar')
+        state.copy.assert_not_called()
+    finally:
+        dialog.close()
+        dialog.deleteLater()
+        QApplication.processEvents()
 
 
 def test_deleted_area_owner_cancels_without_an_orphan_qthread(area_overlay):

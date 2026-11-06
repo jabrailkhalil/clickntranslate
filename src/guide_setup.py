@@ -1,4 +1,4 @@
-"""Shared onboarding recommendations and localized setup copy.
+"""Shared guide card and localized setup labels.
 
 Recommendations are applied only by the user's guide action, through the
 real settings controls. Opening or skipping a step never changes a setting.
@@ -49,6 +49,10 @@ GUIDE_SETUP_INTRO = {
      'Setiap langkah menjelaskan manfaat dan menerapkan pengaturan. Semua rekomendasi boleh ditunda.',
      'Siapkan aplikasi'),
 }
+
+from guide_scenarios import INTRO, copy as scenario_copy
+GUIDE_SETUP_INTRO = {language: (text[0], INTRO[language], scenario_copy(language)[14])
+                     for language, text in GUIDE_SETUP_INTRO.items()}
 
 GUIDE_LINUX_BODIES = {
     "ru": {
@@ -160,6 +164,7 @@ GUIDE_SETTING_STEPS = {
     "notifications": ("copy_notification_checkbox", PAGE_OCR, False),
     "update_check_on_launch": ("update_check_on_launch_checkbox", PAGE_APPLICATION, True),
     "game_pause_when_inactive": ("game_pause_inactive_checkbox", PAGE_DYNAMIC, True),
+    'replace_selection_select_all': ('replace_select_all_checkbox', PAGE_TRANSLATION, True),
 }
 
 GUIDE_SETUP_CHAPTERS = (
@@ -563,6 +568,9 @@ def setup_labels(language):
 
 
 def setting_body(language, action):
+    if action == 'replace_selection_select_all':
+        from guide_scenarios import copy
+        return copy(language)[5]
     bodies = GUIDE_SETTING_BODIES.get(language, GUIDE_SETTING_BODIES["en"])
     return dict(zip(GUIDE_SETTING_STEPS, bodies))[action]
 
@@ -578,6 +586,12 @@ class SetupGuideCard(QFrame):
         layout.setSpacing(8)
         header = QHBoxLayout()
         header.setSpacing(8)
+        self.companion = QLabel()
+        self.companion.setObjectName('guideCompanion')
+        self.companion.setFixedSize(52, 56)
+        self.companion.setAlignment(Qt.AlignCenter)
+        self.companion.setAttribute(Qt.WA_TransparentForMouseEvents)
+        header.addWidget(self.companion)
         self.chapter = QLabel()
         self.chapter.setObjectName("guideChapter")
         self.chapter.setWordWrap(True)
@@ -622,10 +636,22 @@ class SetupGuideCard(QFrame):
         self._dark = None
         self._compact = False
 
+    def set_companion(self, pixmap):
+        self._companion_image = pixmap
+        self._resize_companion()
+
+    def _resize_companion(self):
+        image = getattr(self, '_companion_image', None)
+        if image is not None and not image.isNull():
+            self.companion.setPixmap(image.scaled(self.companion.size(), Qt.KeepAspectRatio,
+                                                  Qt.SmoothTransformation))
+
     def _set_compact(self, compact):
         if compact == self._compact:
             return
         self._compact = compact
+        self.companion.setFixedSize(32 if compact else 52, 36 if compact else 56)
+        self._resize_companion()
         if compact:
             self.layout().removeWidget(self.hint)
             self.footer.insertWidget(0, self.hint, 1)

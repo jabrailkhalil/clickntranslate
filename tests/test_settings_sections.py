@@ -68,16 +68,14 @@ def test_settings_controls_are_in_the_page_their_behavior_belongs_to(window, app
         (PAGE_APPLICATION, settings.settings_general_page,
          ('ui_scale_control', 'translation_font_control',
           'translation_font_preview', 'autostart_checkbox', 'start_minimized_checkbox',
-          'button_tooltips_checkbox', 'update_check_on_launch_checkbox')),
+          'button_tooltips_checkbox', 'update_check_on_launch_checkbox', 'engines_button')),
         (PAGE_TRANSLATION, settings.settings_updates_page,
          ('translator_combo', 'result_window_control', 'copy_translated_checkbox',
           'replace_select_all_checkbox', 'restore_clipboard_checkbox',
-          'close_result_on_outside_click_checkbox', 'translation_offline_button',
-          'translation_api_button', 'capture_memory_modes')),
+          'close_result_on_outside_click_checkbox', 'capture_memory_modes')),
         (PAGE_OCR, settings.settings_ocr_page,
          ('ocr_engine_combo', 'ocr_join_paragraphs_checkbox', 'keep_visible_checkbox',
-          'freeze_screen_checkbox', 'dim_screen_during_ocr_checkbox',
-          'ocr_languages_btn', 'ocr_api_button')),
+          'freeze_screen_checkbox', 'dim_screen_during_ocr_checkbox')),
         (PAGE_DYNAMIC, settings.settings_game_page,
          ('game_source_combo', 'game_target_combo', 'game_remember_template_checkbox',
           'game_template_combo', 'game_delete_template_button', 'game_launch_button')),
@@ -92,6 +90,15 @@ def test_settings_controls_are_in_the_page_their_behavior_belongs_to(window, app
             control = getattr(settings, name)
             assert page.isAncestorOf(control), (page_id, name)
             assert control.isVisible(), (page_id, name)
+    # The former per-page routes now share one visible Engines entry, rather
+    # than duplicating the same manager/API action on multiple pages.
+    settings._set_settings_page(PAGE_APPLICATION)
+    settle(app)
+    for name in ('translation_offline_button', 'translation_api_button',
+                 'ocr_languages_btn', 'ocr_api_button'):
+        assert getattr(settings, name) is settings.engines_button
+    assert settings.application_action_panel.isAncestorOf(settings.engines_button)
+    assert settings.engines_button.isVisible()
 
 
 @pytest.mark.parametrize('locale', tuple(main.INTERFACE_LANGUAGE_BY_CODE))
@@ -228,10 +235,16 @@ def test_all_seven_program_tools_stay_visible_in_the_general_footer(window, app,
             scroll = settings.application_settings_scroll
             buttons = [getattr(settings, name) for name in (
                 'clear_cache_btn', 'reset_btn', 'update_btn', 'export_settings_btn',
-                'import_settings_btn', 'create_bug_report_btn', 'hotkeys_button')]
+                'import_settings_btn', 'create_bug_report_btn', 'engines_button', 'hotkeys_button')]
             context = (locale, theme, scale)
-            assert panel.layout().rowCount() == 3 and panel.layout().columnCount() == 3
-            assert len(panel.findChildren(QtWidgets.QAbstractButton)) == 7
+            # The seven program tools remain, alongside the unified Engines
+            # entry. Six grid units provide three columns, then two halves.
+            assert panel.layout().rowCount() == 3 and panel.layout().columnCount() == 6
+            assert len(panel.findChildren(QtWidgets.QAbstractButton)) == len(buttons) == 8
+            for index in range(panel.layout().count()):
+                row, column, row_span, column_span = panel.layout().getItemPosition(index)
+                assert row_span == 1
+                assert column_span == (3 if row == 2 else 2)
             assert page.rect().contains(rect_in(panel, page)), context
             assert not settings.application_settings_scroll.isAncestorOf(panel)
             assert scroll.horizontalScrollBar().maximum() == 0, context
@@ -261,6 +274,7 @@ def test_general_tool_buttons_keep_their_existing_connected_actions(window, app)
         ('clear_cache_btn', 'clear_all_cache'), ('reset_btn', 'reset_settings'),
         ('update_btn', 'check_for_updates'), ('export_settings_btn', 'export_settings'),
         ('import_settings_btn', 'import_settings'), ('hotkeys_button', 'show_hotkeys_screen'),
+        ('engines_button', 'show_ocr_language_manager'),
     )
     with ExitStack() as stack:
         callbacks = [(button, stack.enter_context(mock.patch.object(SettingsWindow, handler)))

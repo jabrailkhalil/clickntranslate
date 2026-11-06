@@ -284,16 +284,144 @@ def test_windows_photo_with_auto_source_uses_installed_ocr_languages(app):
     assert recognize.call_args.kwargs['join_paragraphs'] is True
 
 
-def test_vision_one_request_keeps_translation_and_does_not_use_local_ocr(app):
+def test_windows_auto_photo_converts_the_actual_position_workers_qimage(app, monkeypatch):
+    import ocr
+    bitmap = object()
+    converted, recognized = [], []
+    def convert(image, engine):
+        assert isinstance(image, QtGui.QImage) and engine == 'windows'
+        converted.append(image.size())
+        return bitmap
+    async def recognize(value, engine):
+        recognized.append(value)
+        assert value is bitmap  # WinRT accepts SoftwareBitmap, never QImage.
+        return SimpleNamespace(text='Recognized photo text')
+    monkeypatch.setattr(ocr, '_position_ocr_bitmap', convert)
+    monkeypatch.setattr(ocr, '_windows_auto_ocr_candidates', lambda: [('en', 'en-US')])
+    monkeypatch.setattr(ocr, '_get_windows_ocr_engine', lambda tag: object())
+    monkeypatch.setattr(ocr, '_get_universal_ocr_engine', lambda: None)
+    monkeypatch.setattr(ocr, 'run_ocr_with_engine', recognize)
+    monkeypatch.setattr(ocr, '_windows_ocr_result_to_text', lambda value, **kw: value.text)
+    assert image_input.recognize_image(photo(), {'ocr_engine':'Windows'}, 'auto', 'ar', lambda:False) == (
+        'Recognized photo text', None)
+    assert converted == [photo().size()] and recognized == [bitmap]
+
+
+@pytest.mark.parametrize('engine', ['RapidOCR', 'EasyOCR'])
+def test_image_cancel_flag_is_forwarded_through_the_actual_worker(app, monkeypatch, engine):
+    import ocr
+    cancelled = threading.Event()
+    checks = []
+    def native(request, pil_variants=None, *, cancel_check=None, **kw):
+        cancelled.set()
+        checks.append(cancel_check())
+        return {'results':[{'items':[], 'text':''}]}
+    monkeypatch.setattr(ocr, '_call_native_ocr_worker', native)
+    assert image_input.recognize_image(photo(), {'ocr_engine':engine}, 'en', 'ar', cancelled.is_set) == ('', None)
+    assert checks == [True]
+
+
+def test_controller_cancel_stops_the_running_native_image_request(app, monkeypatch):
+    import ocr
+    started, stopped, release = threading.Event(), threading.Event(), threading.Event()
+    controller = ImageImportController(app)
+    delivered = []
+    controller.ready.connect(lambda *args: delivered.append(args))
+    controller.failed.connect(delivered.append)
+    def native(request, pil_variants=None, *, cancel_check=None, **kw):
+        started.set()
+        while not release.wait(.01):
+            if cancel_check():
+                stopped.set()
+                raise InterruptedError('Image recognition canceled')
+        stopped.set()
+        return {'results':[]}
+    monkeypatch.setattr(ocr, '_call_native_ocr_worker', native)
+    try:
+        assert controller.start(photo(), {'ocr_engine':'RapidOCR'}, 'en', 'ar')
+        assert started.wait(2)
+        controller.cancel()
+        assert stopped.wait(2)
+        app.processEvents()
+        assert not controller.busy and delivered == []
+    finally:
+        release.set()
+        controller.cancel()
+        controller.deleteLater()
+
+
+@pytest.mark.parametrize('source', ['en', 'auto'])
+def test_vision_one_request_keeps_translation_and_does_not_use_local_ocr(app, source):
     from api_providers import VISION_ENGINES
     engine = next(name for name, code in VISION_ENGINES.items() if code == 'openai')
     config = {'ocr_engine':engine, 'api_profiles':{'openai':{'direct':True}}}
     with (mock.patch('api_providers.recognize', return_value=SimpleNamespace(source='book text', translation='نص الكتاب')) as recognize,
           mock.patch('ocr.create_position_ocr_worker') as local):
-        assert image_input.recognize_image(photo(), config, 'en', 'ar', lambda:False) == ('book text', 'نص الكتاب')
+        assert image_input.recognize_image(photo(), config, source, 'ar', lambda:False) == ('book text', 'نص الكتاب')
     assert recognize.call_args.args[0] == 'openai'
-    assert recognize.call_args.args[2:5] == ('en', 'ar', config)
+    assert recognize.call_args.args[2:5] == (source, 'ar', config)
     local.assert_not_called()
+
+
+@pytest.mark.parametrize('engine', ['RapidOCR', 'EasyOCR', 'Tesseract'])
+@pytest.mark.parametrize('saved,available,expected', [
+    ('ar', ['en', 'ar'], 'ar'),
+    (None, ['ru', 'ar'], 'ru'),
+    ('auto', ['ru', 'ar'], 'ru'),
+    ('ja', ['ru', 'ar'], 'ru'),
+])
+def test_auto_translation_uses_the_configured_or_first_installed_local_ocr_language(
+        app, monkeypatch, engine, saved, available, expected):
+    import ocr
+    config = {'ocr_engine':engine, 'ocr_translate_source_language':saved}
+    before = dict(config)
+    monkeypatch.setattr(ocr, 'installed_ocr_language_codes', lambda **kw: available)
+    recognize = mock.Mock(return_value=[(0, 0, 120, 20, 'نص الصورة')])
+    monkeypatch.setattr(ocr, '_recognize_image_layout', recognize)
+    assert image_input.recognize_image(photo(), config, 'auto', 'fr', lambda:False) == ('نص الصورة', None)
+    assert recognize.call_args.args[1:] == (engine.lower(), expected)
+    assert config == before
+
+
+@pytest.mark.parametrize('locale', tuple(image_input.TEXT))
+@pytest.mark.parametrize('probe', [[], ['auto'], RuntimeError('unusable OCR catalog')])
+def test_auto_image_without_usable_local_ocr_languages_has_localized_install_guidance(app, locale, probe):
+    import ocr
+    config = {'ocr_engine':'RapidOCR', 'interface_language':locale, 'ocr_translate_source_language':'auto'}
+    options = {'side_effect':probe} if isinstance(probe, Exception) else {'return_value':probe}
+    with (mock.patch.object(ocr, 'installed_ocr_language_codes', **options),
+          mock.patch.object(ocr, 'create_position_ocr_worker') as factory):
+        with pytest.raises(RuntimeError) as failure:
+            image_input.recognize_image(photo(), config, 'auto', 'ar', lambda:False)
+    assert str(failure.value) == (ocr.ocr_ui_text(locale, 'no_installed_languages') + '\n\n' +
+                                ocr.ocr_ui_text(locale, 'install_languages_first'))
+    factory.assert_not_called()
+
+
+def test_apple_vision_keeps_native_auto_detection(app, monkeypatch):
+    import ocr
+    monkeypatch.setattr(ocr, 'usable_ocr_engine', lambda value:value)
+    recognize = mock.Mock(return_value=[(0, 0, 120, 20, 'Recognized photo')])
+    monkeypatch.setattr(ocr, '_recognize_image_layout', recognize)
+    with mock.patch.object(ocr, 'installed_ocr_language_codes', side_effect=AssertionError('native auto needs no fallback')):
+        assert image_input.recognize_image(photo(), {'ocr_engine':'Apple Vision'}, 'auto', 'ar', lambda:False) == (
+            'Recognized photo', None)
+    assert recognize.call_args.args[1:] == ('apple vision', 'auto')
+
+
+def test_main_auto_image_preserves_translation_auto_after_using_local_ocr_language(window, app, monkeypatch):
+    import ocr
+    window.config.update(ocr_engine='RapidOCR', translator_engine='Google', ocr_translate_source_language='ar')
+    window.source_lang.setCurrentText(main.language_display_name('auto', window.current_interface_language))
+    window.target_lang.setCurrentText(main.language_display_name('fr', window.current_interface_language))
+    monkeypatch.setattr(ocr, 'installed_ocr_language_codes', lambda **kw: ['en', 'ar'])
+    recognize = mock.Mock(return_value=[(0, 0, 120, 20, 'نص الصورة')])
+    monkeypatch.setattr(ocr, '_recognize_image_layout', recognize)
+    with mock.patch.object(window, '_start_main_translation') as translate:
+        window._import_main_image(photo())
+        finish(app, lambda:translate.called)
+    assert recognize.call_args.args[1:] == ('rapidocr', 'ar')
+    assert translate.call_args.args == ('نص الصورة', 'auto', 'fr', 'google')
 
 
 @pytest.mark.parametrize('join', [False, True])
@@ -340,6 +468,33 @@ def test_image_work_runs_off_gui_thread_and_returns_on_gui_thread(app):
     assert received[0] == (('recognized', None), threading.current_thread())
     assert not controller.busy
     controller.deleteLater()
+
+
+@pytest.mark.parametrize('failure_point', ['construct', 'start'])
+def test_image_thread_launch_failure_restores_controls_and_allows_retry(app, monkeypatch, failure_point):
+    controller = ImageImportController(app)
+    failures, busy, received = [], [], []
+    controller.failed.connect(failures.append)
+    controller.busy_changed.connect(busy.append)
+    controller.ready.connect(lambda *value: received.append(value))
+    unavailable = RuntimeError('Image worker unavailable')
+    factory = (mock.Mock(side_effect=unavailable) if failure_point == 'construct' else
+               mock.Mock(return_value=SimpleNamespace(start=mock.Mock(side_effect=unavailable))))
+    try:
+        with mock.patch.object(image_input.threading, 'Thread', factory):
+            assert controller.start(photo(), {}, 'en', 'ar') is False
+        assert not controller.busy and busy == [True, False]
+        assert failures == ['Image worker unavailable'] and not received
+        def immediate(*, target, **_kwargs):
+            return SimpleNamespace(start=target)
+        with (mock.patch.object(image_input.threading, 'Thread', immediate),
+              mock.patch.object(image_input, 'recognize_image', return_value=('A new image', None))):
+            assert controller.start(photo(), {}, 'en', 'ar')
+        assert received == [('A new image', None)]
+        assert busy == [True, False, True, False] and not controller.busy
+    finally:
+        controller.cancel()
+        controller.deleteLater()
 
 
 def test_cancelled_ocr_cannot_overwrite_a_new_draft(app):

@@ -244,6 +244,7 @@ class KeyboardNavigation(QtCore.QObject):
         self._ring = lambda: None
         self._help_dialog = None
         self._help_pending = False
+        self._popup_closing_key = None
 
     def _hide_ring(self):
         ring = self._ring()
@@ -389,8 +390,37 @@ class KeyboardNavigation(QtCore.QObject):
 
     def eventFilter(self, widget, event):
         kind = event.type()
+        if kind in (QtCore.QEvent.ApplicationDeactivate, QtCore.QEvent.MouseButtonPress, QtCore.QEvent.Wheel):
+            self._popup_closing_key = None
+        elif kind == QtCore.QEvent.KeyRelease:
+            if self._popup_closing_key is not None and event.key() == self._popup_closing_key[1]:
+                self._popup_closing_key = None
+            return False
         if not isinstance(widget, QtWidgets.QWidget):
             return False
+        if kind == QtCore.QEvent.ShortcutOverride:
+            if event.key() in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter, QtCore.Qt.Key_Escape):
+                combo = getattr(self.app, '_cnt_open_combo', lambda: None)()
+                if combo is not None and not sip.isdeleted(combo):
+                    popup = combo.view().window()
+                    from ui_scaling import is_embedded_combo_popup
+                    if popup.isVisible() and is_embedded_combo_popup(combo, popup):
+                        # Qt can hide a scene popup during ShortcutOverride,
+                        # before KeyPress reaches its parent field. Track primitives
+                        # until KeyRelease so that key cannot reopen the field or go Back.
+                        self._popup_closing_key = (weakref.ref(combo), event.key(), int(event.modifiers()))
+            else:
+                self._popup_closing_key = None
+            return False
+        if kind == QtCore.QEvent.KeyPress and self._popup_closing_key is not None:
+            combo_ref, key, modifiers = self._popup_closing_key
+            combo = combo_ref()
+            if (event.key() != key or int(event.modifiers()) != modifiers or combo is None
+                    or sip.isdeleted(combo)):
+                self._popup_closing_key = None
+            # Qt owns the private popup; its temporary Python wrapper can expire.
+            elif not combo.view().window().isVisible() and _root(widget) is combo.window():
+                return True
         if kind == QtCore.QEvent.Polish:
             if isinstance(widget, QtWidgets.QAbstractButton) and widget.focusPolicy() == QtCore.Qt.NoFocus:
                 widget.setFocusPolicy(QtCore.Qt.TabFocus)

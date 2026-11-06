@@ -9,7 +9,7 @@ import zipfile
 import pytest
 
 from component_catalog import ComponentError, materialize_bundle, parse_catalog
-from component_store import ComponentStore
+from component_store import ComponentStore, _MAINTENANCE_DONE
 import component_runtime as runtime
 
 
@@ -74,6 +74,7 @@ def test_language_add_remove_and_update_preserve_running_generation(tmp_path, mo
         third = install(remove_languages=['rus'])
         assert third['receipt']['languages'] == ['ara', 'eng']
         assert (first['folder'] / 'runtime/tessdata/rus.traineddata').is_file()
+    assert _MAINTENANCE_DONE.wait(3)
     assert not first['folder'].exists()
     assert len(downloads) == 4  # runtime and existing languages reused from verified cache
     same = install()
@@ -192,6 +193,7 @@ def test_managed_command_uses_its_own_models_and_holds_lease(tmp_path, monkeypat
     monkeypatch.setattr(runtime, 'recognize_tesseract', recognize)
     assert ocr._run_tesseract_ocr_image_with_cmd(Image.new('RGB', (500, 200)), first['command'][0],
                                                'ara', 'qa', 'qa') == 'مرحبا'
+    assert _MAINTENANCE_DONE.wait(3)
     assert not first['folder'].exists()
 
 

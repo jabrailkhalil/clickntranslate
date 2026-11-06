@@ -6,6 +6,7 @@ from unittest import mock
 
 import pytest
 from PyQt5 import QtCore, QtWidgets, sip
+from PyQt5.QtTest import QTest
 
 import main
 from test_document_session_recovery import document
@@ -301,3 +302,102 @@ def test_successful_attachment_replaces_previous_work_only_after_parsing(loads):
     assert not dialog.translation_error_message_visible
     assert not dialog.save_button.isEnabled()
     assert (dialog._source_code(), dialog.target_combo.currentData(), dialog._provider_engine()) == before[-3:]
+
+
+@pytest.mark.parametrize('kind', ['draft', 'file', 'session'])
+def test_editing_source_cancels_translation_and_never_exports_an_old_result(loads, monkeypatch, kind):
+    dialog, jobs = loads
+    _previous_document_state(dialog, kind)
+    monkeypatch.setattr(main, '_resolve_translation_provider', lambda owner, engine, *args: engine)
+    monkeypatch.setattr(main, 'translate_document_text', lambda *args, **kw: ('Old translation', []))
+    dialog.translate_file_button.click()
+    old_cancel = dialog._translation_cancel_event
+    assert dialog.translation_running and not dialog.original_view.isReadOnly()
+    dialog.original_view.selectAll()
+    QTest.keyClicks(dialog.original_view, 'My edited source draft')
+    assert old_cancel.is_set() and not dialog.translation_running
+    assert dialog.attach_button.isEnabled() and not dialog.save_button.isEnabled()
+    jobs.pop()()
+    payload = dialog._session_payload()
+    assert payload['original_text'] == 'My edited source draft'
+    assert payload['translated_text'] == dialog.translated_view.toPlainText() == ''
+    main.save_translation_history.assert_not_called()
+
+
+@pytest.mark.parametrize('kind', ['draft', 'file', 'session'])
+def test_editing_a_completed_source_invalidates_its_saved_result(loads, kind):
+    dialog, _jobs = loads
+    _previous_document_state(dialog, kind)
+    previous_file, previous_session = dialog.current_document, dialog.session_payload
+    dialog.original_view.selectAll()
+    QTest.keyClicks(dialog.original_view, 'A later source revision')
+    assert dialog._session_payload()['original_text'] == 'A later source revision'
+    assert dialog._session_payload()['translated_text'] == ''
+    assert dialog.translated_view.toPlainText() == '' and not dialog.save_button.isEnabled()
+    assert dialog.current_document is previous_file and dialog.session_payload is previous_session
+
+
+@pytest.mark.parametrize('old_error', [False, True])
+def test_late_translation_events_cannot_change_the_replacement_translation(loads, monkeypatch, old_error):
+    dialog, jobs = loads
+    monkeypatch.setattr(main, '_resolve_translation_provider', lambda owner, engine, *args: engine)
+    def translate(text, *args, progress_callback, delta_callback, **kw):
+        progress_callback(1, 2, 'Old progress')
+        delta_callback('Old delta', 1, 2)
+        if old_error and text == 'Old draft':
+            raise RuntimeError('Old provider error')
+        return 'Translation of ' + text, []
+    monkeypatch.setattr(main, 'translate_document_text', translate)
+    dialog.load_plain_text('Old draft')
+    dialog.translate_file_button.click()
+    old_cancel = dialog._translation_cancel_event
+    dialog.original_view.setPlainText('New draft')
+    dialog.translate_file_button.click()
+    new_cancel = dialog._translation_cancel_event
+    with mock.patch.object(main.QMessageBox, 'warning') as warning:
+        jobs[0]()
+    warning.assert_not_called()
+    assert old_cancel.is_set() and not new_cancel.is_set()
+    assert dialog.translation_running and dialog._translation_cancel_event is new_cancel
+    assert dialog.progress_bar.value() == 0 and dialog.translated_view.toPlainText() == ''
+    jobs[1]()
+    assert not dialog.translation_running
+    assert dialog.original_view.toPlainText() == 'New draft'
+    assert dialog.translated_text == 'Translation of New draft'
+    main.save_translation_history.assert_called_once_with('New draft', 'Translation of New draft',
+                                                        dialog._active_translation_target_code)
+
+
+def test_already_queued_worker_events_are_discarded_after_editing(loads, monkeypatch):
+    dialog, jobs = loads
+    monkeypatch.setattr(main, '_resolve_translation_provider', lambda owner, engine, *args: engine)
+    def translate(*args, progress_callback, delta_callback, **kw):
+        progress_callback(1, 1, 'Finishing old draft')
+        delta_callback('Old delta', 1, 1)
+        return 'Old final result', []
+    monkeypatch.setattr(main, 'translate_document_text', translate)
+    dialog.translate_file_button.click()
+    worker = RealThread(target=jobs[0])
+    worker.start()
+    worker.join(2)
+    assert not worker.is_alive()
+    # The worker has emitted its signals, but the GUI has not delivered them.
+    dialog.original_view.setPlainText('Draft typed before queued delivery')
+    QtWidgets.QApplication.processEvents()
+    assert not dialog.translation_running and dialog.translated_text == ''
+    assert dialog.translated_view.toPlainText() == '' and dialog.progress_bar.value() == 0
+    assert dialog.current_status == main.doc_text(dialog.lang, 'loaded')
+    main.save_translation_history.assert_not_called()
+
+
+def test_translation_thread_start_error_restores_the_editor_actions(loads, monkeypatch):
+    dialog, _jobs = loads
+    monkeypatch.setattr(main, '_resolve_translation_provider', lambda owner, engine, *args: engine)
+    monkeypatch.setattr(main.threading, 'Thread', lambda **kw:
+                        SimpleNamespace(start=mock.Mock(side_effect=RuntimeError('Worker unavailable'))))
+    with mock.patch.object(main.QMessageBox, 'warning') as warning:
+        dialog.translate_file_button.click()
+    warning.assert_called_once()
+    assert not dialog.translation_running and dialog._translation_cancel_event is None
+    assert dialog.attach_button.isEnabled() and dialog.translate_file_button.isEnabled()
+    assert dialog.original_view.toPlainText() == 'Existing draft'

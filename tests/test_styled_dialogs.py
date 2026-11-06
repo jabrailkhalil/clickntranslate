@@ -359,7 +359,11 @@ def test_document_provider_list_groups_online_and_only_installed_offline(monkeyp
     )
     dialog._populate_provider_combo("argos")
     offline_header = dialog.provider_combo.findText("  Offline")
-    assert offline_header > 0
+    assert offline_header == 0
+    online_header = dialog.provider_combo.findText("  Online")
+    assert online_header > offline_header
+    assert dialog.provider_combo.findData("argos") < online_header
+    assert dialog.provider_combo.findData("google") > online_header
     assert not dialog.provider_combo.model().item(offline_header).isEnabled()
     assert dialog.provider_combo.currentData() == "argos"
     assert dialog.provider_combo.findData("hymt") == -1

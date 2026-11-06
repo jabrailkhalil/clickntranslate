@@ -12,20 +12,32 @@ from test_desktop_ux import app, window
 
 @pytest.mark.parametrize('language', list(main.INTERFACE_LANGUAGE_BY_CODE))
 @pytest.mark.parametrize('theme', ['Темная', 'Светлая'])
-def test_result_actions_fit_canvas_at_every_scale_and_toggle(window, app, language, theme):
+def test_result_actions_fit_canvas_at_every_scale_and_toggle(window, app, monkeypatch, language, theme):
+    from settings_sections import PAGE_TRANSLATION
+    from ui_scaling import widget_global_rect
     window.current_interface_language = language
     window.current_theme = theme
     window.show_settings()
     window.apply_theme()
-    combo = window.settings_window.result_window_control
+    settings = window.settings_window
+    settings._set_settings_page(PAGE_TRANSLATION)
+    combo = settings.result_window_control
+    assert combo.isVisible()
+    # The window fixture supplies a virtual large desktop for 200% scaling.
+    # Native popups must use that same desktop instead of offscreen's 800x600.
+    available = window._ui_scale_controller.available_geometry()
+    monkeypatch.setattr(combo, '_available_screen_rect', lambda: QtCore.QRect(available))
     for percent in (80, 100, 150, 200):
         window.set_ui_scale_percent(percent)
         combo.showPopup()
         QTest.qWait(20)
         popup = combo.view().window()
         proxy = popup.graphicsProxyWidget()
-        assert proxy is not None
-        assert window._ui_scale_controller.view.sceneRect().contains(proxy.sceneBoundingRect())
+        assert popup.isVisible()
+        if proxy is not None:
+            assert window._ui_scale_controller.view.sceneRect().contains(proxy.sceneBoundingRect())
+        else:
+            assert combo._available_screen_rect().contains(widget_global_rect(popup))
         for mode in combo._modes:
             item = combo._item(mode)
             font = item.data(QtCore.Qt.FontRole) or combo.view().font()

@@ -9,6 +9,9 @@ from string import Formatter
 
 LOCALES=('en','ru','es','de','fr','zh','pt','it','ar','tr','hi','id')
 TUPLE_FILES={'assistant_text.py','control_hints.py','dialog_text.py','dynamic_templates.py','capture_regions.py','keyboard_navigation.py'}
+# These are input-language smoke-test samples, never interface messages.
+NON_UI_TABLES = {('src/component_argos_worker.py', 'samples'),
+                 ('src/component_argos_worker.py', 'VALIDATION_SAMPLES')}
 
 
 def format_fields(value):
@@ -58,6 +61,13 @@ def audit(root):
         parents={id(child):node for node in ast.walk(tree) for child in ast.iter_child_nodes(node)}
         for node in ast.walk(tree):
             if not isinstance(node,(ast.Dict,ast.Tuple)):continue
+            parent = parents.get(id(node))
+            if isinstance(parent, ast.Assign) and any(
+                isinstance(target, ast.Name)
+                and (path.relative_to(root).as_posix(), target.id) in NON_UI_TABLES
+                for target in parent.targets
+            ):
+                continue
             if path.name == 'languages.py' and isinstance(parents.get(id(node)), ast.Dict):
                 continue
             table=f'{path.relative_to(root).as_posix()}:{node.lineno}'

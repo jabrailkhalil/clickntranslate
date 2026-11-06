@@ -8,6 +8,19 @@ from assistant_sprites import atlas, frame_index, paint_sprite, ROWS, STATIONARY
 WALK_FRAME_DURATIONS = ROWS['running-right'][1]
 WALK_FRAME_NAMES = tuple(f'{index:02}' for index in range(len(WALK_FRAME_DURATIONS)))
 IDLE_REST_SECONDS = 10.
+CALM_BLINK_INTERVAL = 14.
+CALM_BLINK_SECONDS = .18
+# Other atlases were generated as independent poses: their waiting, waving and
+# reaction cells change body proportions. Keep their clean resting cell with
+# an occasional blink; directional cells are aligned separately by the sprite
+# painter. Click retains its existing, consistent full animation set.
+CALM_BLINK_COLUMNS = {'pancake': 3, 'mochi': 2, 'bubu': 3, 'momo': 3, 'orbit': 0}
+
+
+def calm_frame(mascot, time, action='idle', state_time=0.):
+    explicit = action in ('wave', 'success') and state_time < CALM_BLINK_SECONDS
+    blink = explicit or time % CALM_BLINK_INTERVAL >= CALM_BLINK_INTERVAL - CALM_BLINK_SECONDS
+    return CALM_BLINK_COLUMNS.get(mascot, 0) if blink else 0
 
 
 def walk_frame_index(phase):
@@ -62,6 +75,8 @@ class PetMotion:
         return sum(ROWS.get(state, ROWS['idle'])[1]) / 1000
 
     def action(self, locomotion=False):
+        if getattr(self, 'menu_open', False):
+            return 'idle'
         if self.reactions:
             if self.status == 'busy':
                 return 'work'
@@ -74,7 +89,17 @@ class PetMotion:
                 return 'error'
             if self.status == 'success' and self.status_age < 3:
                 return 'success' if self.status_age < .84 else 'review'
-        return 'waiting' if getattr(self, 'menu_open', False) else 'idle'
+        return 'idle'
+
+    def render_key(self):
+        """Stable visible-frame identity, so a resting pet need not repaint."""
+        action = self.action()
+        seconds = self.seconds(action)
+        if self.mascot != 'click':
+            return ('idle', calm_frame(self.mascot, self.time, action, seconds))
+        state = {'work': 'running', 'success': 'jumping', 'error': 'failed',
+                 'wave': 'waving'}.get(action, action)
+        return (state, frame_index(ROWS.get(state, ROWS['idle'])[1], seconds))
 
     def seconds(self, action):
         if self.gesture == action and self.gesture_age < self.gesture_duration:
@@ -125,6 +150,16 @@ def paint_pet(painter, rect, mascot, *, phase=0., time=0., action='idle', facing
              'wave': 'waving', 'drag': 'waiting', 'curious': 'waiting',
              'proud': 'review'}.get(action, action)
     seconds = time if state_time is None else state_time
+    if gaze is not None:
+        # Looking has priority over gestures; direction artwork is aligned by
+        # the shared sprite painter while the body stays at its resting size.
+        state, expression = 'idle', 'neutral'
+    elif mascot_id(mascot) != 'click':
+        # Paint a whole, original idle cell. Do not scale separate body parts
+        # or substitute inconsistent reaction artwork.
+        column = calm_frame(mascot_id(mascot), time, action, seconds)
+        seconds = sum(ROWS['idle'][1][:column]) / 1000
+        state, gaze, expression = 'idle', None, 'neutral'
     if action == 'walk':
         state = 'idle'
     if expression != 'neutral' and action == 'idle' and gaze is None:

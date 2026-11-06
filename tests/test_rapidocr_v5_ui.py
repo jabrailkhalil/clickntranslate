@@ -21,6 +21,7 @@ def test_rapidocr_v5_notes_and_model_table_render_in_supported_locales(locale, t
     parent.current_theme = theme
     owner = _ManagerOwner(parent)
     with mock.patch('settings_window.QtCore.QTimer.singleShot'), \
+         mock.patch.object(OcrLanguageManagerDialog, '_request_update_check') as check_update, \
          mock.patch('rapidocr_models.installed_languages', return_value=['en', 'ru', 'ar', 'zh', 'es']):
         dialog = OcrLanguageManagerDialog(owner)
         try:
@@ -41,9 +42,27 @@ def test_rapidocr_v5_notes_and_model_table_render_in_supported_locales(locale, t
             assert note.isVisible()
             assert note.height() >= note.heightForWidth(note.width())
             assert dialog.rapidocr_table.viewport().height() >= 80
-            update = dialog.rapidocr_table._package_action_buttons[0]
+            # Engine maintenance now lives in the selector's tools menu; the
+            # package footer must not duplicate the same engine update action.
+            assert not dialog.rapidocr_table._package_action_buttons
+            update, = dialog.rapidocr_table._package_engine_actions
+            dialog._populate_engine_menu(dialog.ocr_tabs)
+            menu = dialog.ocr_tabs._tools_menu
+            menu.ensurePolished()
+            menu.resize(menu.sizeHint())
+            menu.show()
+            app.processEvents()
+            assert update in menu.actions()
             assert update.isVisible() and update.toolTip().strip()
-            assert update.fontMetrics().horizontalAdvance(update.text()) + 16 < update.width()
+            assert menu.rect().contains(menu.actionGeometry(update))
+            assert menu.fontMetrics().horizontalAdvance(update.text()) + 16 < menu.width()
+            check_update.reset_mock()
+            update.trigger()
+            check_update.assert_called_once()
+            table, action, install = check_update.call_args.args
+            assert table is dialog.rapidocr_table and action is update
+            assert install.__self__ is dialog and install.__name__ == '_update_rapidocr_engine'
+            menu.hide()
             packages = [dialog.rapidocr_table.item(row, 2).text() for row in range(dialog.rapidocr_table.rowCount())]
             assert packages.count('PP-OCRv5 mobile') == 2
             capture = os.environ.get('CNT_RAPID_QA_CAPTURES')

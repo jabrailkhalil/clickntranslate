@@ -10,7 +10,7 @@ import pytest
 import component_argos as argos
 import component_catalog
 from component_catalog import ComponentError, parse_catalog
-from component_store import ComponentStore
+from component_store import ComponentStore, _MAINTENANCE_DONE
 
 
 @pytest.fixture
@@ -111,6 +111,7 @@ def test_model_changes_preserve_old_generation_during_translation(installation, 
         return {'result':'Привет'}
     monkeypatch.setattr(translater, '_run_argos_worker_request_inner', translate)
     assert translater._run_argos_worker_request({'action':'translate'})['result'] == 'Привет'
+    assert _MAINTENANCE_DONE.wait(3)
     assert not old['folder'].exists()
 
 
@@ -153,6 +154,9 @@ def test_managed_adapter_ignores_inherited_remote_provider_setting(tmp_path, mon
     from types import SimpleNamespace
     from unittest.mock import patch
     import component_argos_worker
+    import portable_paths
+    # main() normally owns a child process; restore its path override here.
+    monkeypatch.setattr(portable_paths, 'portable_base_dir', portable_paths.portable_base_dir)
     checked = []
     def load():
         checked.append(os.environ['ARGOS_MODEL_PROVIDER'])

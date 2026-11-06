@@ -1,4 +1,6 @@
 """New installs, reset and language selection share the 1.8 defaults."""
+import copy
+
 import pytest
 
 import main
@@ -103,6 +105,28 @@ def test_fresh_config_does_not_mutate_shared_defaults():
     config, _ = main.merge_config_defaults({})
     main.follow_default_translation_language(config, 'ru')
     assert main.DEFAULT_CONFIG == original
+
+
+@pytest.mark.parametrize('factory', ['fresh', 'merge'])
+@pytest.mark.parametrize('setting', ['api_providers', 'desktop_assistant_actions'])
+def test_factory_config_keeps_mutable_settings_independent(monkeypatch, factory, setting):
+    # Keep a failing regression from poisoning the constants used by later
+    # tests. Exercise the factory with the application's actual default values.
+    defaults = copy.deepcopy(main.DEFAULT_CONFIG)
+    monkeypatch.setattr(main, 'DEFAULT_CONFIG', copy.deepcopy(defaults))
+    config = main.fresh_config('ru') if factory == 'fresh' else main.merge_config_defaults({})[0]
+    other = main.fresh_config('ar')
+
+    if setting == 'api_providers':
+        config[setting]['openai'] = {'model': 'local test preference'}
+    else:
+        config[setting].clear()
+
+    assert config[setting] != defaults[setting]
+    assert main.DEFAULT_CONFIG == defaults
+    assert other[setting] == defaults[setting]
+    reset = main.fresh_config('de')
+    assert reset[setting] == defaults[setting]
 
 
 @pytest.mark.parametrize('language', main.INTERFACE_LANGUAGE_BY_CODE)

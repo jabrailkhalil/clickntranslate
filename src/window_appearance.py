@@ -215,7 +215,10 @@ class DialogAppearance(QtCore.QObject):
             if state is None:
                 if window.layout() is not None:
                     window.layout().activate()
-                base_size = window.size().expandedTo(window.minimumSizeHint())
+                fixed = window.minimumSize() == window.maximumSize()
+                # A hidden page's sizeHint must not override an explicitly
+                # fixed dialog. Scrollable bodies own their overflow.
+                base_size = window.size() if fixed else window.size().expandedTo(window.minimumSizeHint())
                 if root_layout is not None and root_layout.hasHeightForWidth() and window.minimumHeight() != window.maximumHeight():
                     base_size.setHeight(max(base_size.height(), root_layout.totalHeightForWidth(base_size.width())))
                 state = {'size': base_size,

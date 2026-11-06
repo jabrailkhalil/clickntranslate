@@ -172,7 +172,9 @@ class SettingsEngineLayoutTest(unittest.TestCase):
     def test_engine_rows_share_columns_and_vertical_centers(self):
         parent = _SettingsParent()
         parent.resize(700, 400)
-        with mock.patch.object(SettingsWindow, "_find_local_tesseract_exe", return_value="tesseract.exe"):
+        with mock.patch.object(SettingsWindow, "_find_local_tesseract_exe", return_value="tesseract.exe"), \
+                mock.patch.object(SettingsWindow, '_ready_engine_inventory',
+                                  return_value=({'Windows', 'Tesseract'}, {'google', 'argos'})):
             settings = SettingsWindow(parent)
             settings.setGeometry(0, 0, 700, 400)
             parent.show()
@@ -245,7 +247,7 @@ class SettingsEngineLayoutTest(unittest.TestCase):
             action_rows = (
                 (settings.clear_cache_btn, settings.reset_btn, settings.update_btn),
                 (settings.export_settings_btn, settings.import_settings_btn, settings.create_bug_report_btn),
-                (settings.hotkeys_button,),
+                (settings.engines_button, settings.hotkeys_button),
             )
             action_rects = [
                 [self._rect_in_settings(settings, button) for button in row]
@@ -708,7 +710,7 @@ class SettingsEngineLayoutTest(unittest.TestCase):
             self.assertTrue(all(box.objectName() == "settingsPageCheckbox" for box in boxes))
             self.assertEqual({box.height() for box in boxes}, {settings.autostart_checkbox.height()})
             for page, panel_name in ((0, 'settings_action_panel'),
-                                     (1, 'translation_action_panel'), (4, 'ocr_action_panel'),
+                                     (1, 'translation_action_panel'),
                                      (2, 'game_action_panel'), (3, 'assistant_action_panel')):
                 settings._set_settings_page(page)
                 self.app.processEvents()
@@ -719,6 +721,10 @@ class SettingsEngineLayoutTest(unittest.TestCase):
                     button.ensurePolished()
                     self.assertEqual(button.font().pixelSize(), 13)
                     self.assertEqual(button._label_offset_y, 0)
+            settings._set_settings_page(4)
+            self.app.processEvents()
+            self.assertFalse(settings.ocr_action_panel.isVisible())
+            self.assertIs(settings.ocr_languages_btn, settings.engines_button)
             settings._set_settings_page(0)
             self.app.processEvents()
             for button in (settings.clear_cache_btn, settings.reset_btn, settings.update_btn,

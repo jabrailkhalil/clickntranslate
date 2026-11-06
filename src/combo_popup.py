@@ -2,7 +2,7 @@
 import html
 from functools import lru_cache
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5 import QtCore, QtGui, QtWidgets, sip
 
 from classic_style import classic_palette
 
@@ -19,9 +19,19 @@ def _language_flag(code):
     return QtGui.QIcon(str(resource_root()/path)) if path else QtGui.QIcon()
 
 
+def popup_host_factor(combo):
+    """Scene popups already receive the canvas zoom; native popups do not."""
+    native = combo.__dict__.get('_popup_native_factor', 1.)
+    if native != 1.:
+        from ui_scaling import is_embedded_combo_popup
+        if is_embedded_combo_popup(combo, combo.view().window()):
+            return 1.
+    return native
+
+
 def popup_scale(combo):
-    native = getattr(combo, '_popup_native_factor', 1.)
-    explicit = getattr(combo, 'ui_factor', None)
+    native = popup_host_factor(combo)
+    explicit = combo.__dict__.get('ui_factor')
     if isinstance(explicit, (int, float)):
         return max(.5, min(3., explicit)) * native
     pixels = combo.font().pixelSize()
@@ -31,18 +41,43 @@ def popup_scale(combo):
 def popup_palette(dark, surface=None):
     colors = classic_palette(dark)
     return dict(surface=surface or colors['field'], text=colors['text'],
-                muted=colors['muted'], border=colors['border'],
+                muted=colors['muted'], border='#584963' if dark else '#897397',
                 hover=colors['hover'], selected=colors['selected'],
                 accent=colors['accent_text'])
 
 
 def popup_font(combo):
     font = QtGui.QFont(combo.font())
-    native = getattr(combo, '_popup_native_factor', 1.)
+    native = popup_host_factor(combo)
     if native != 1.:
         pixels = font.pixelSize() if font.pixelSize() > 0 else QtGui.QFontInfo(font).pixelSize()
         font.setPixelSize(round(pixels * native))
     return font
+
+
+class PopupListView(QtWidgets.QListView):
+    """Opaque rows inside an alpha popup, with scroll invalidation for proxies.
+
+    A transparent viewport lets QAbstractScrollArea move cached pixels from
+    the rounded window while exposing only a thin strip for repaint. Repaint
+    the small visible list after scrolling; no cursor event or timer is needed.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.viewport().setAttribute(QtCore.Qt.WA_OpaquePaintEvent, True)
+        self.viewport().setAutoFillBackground(False)
+
+    def paintEvent(self, event):
+        painter = QtGui.QPainter(self.viewport())
+        painter.fillRect(event.rect(), self.palette().color(QtGui.QPalette.Base))
+        painter.end()
+        super().paintEvent(event)
+
+    def scrollContentsBy(self, dx, dy):
+        super().scrollContentsBy(dx, dy)
+        if dx or dy:
+            self.viewport().update(self.viewport().rect())
 
 
 class PopupRowDelegate(QtWidgets.QStyledItemDelegate):
@@ -50,6 +85,45 @@ class PopupRowDelegate(QtWidgets.QStyledItemDelegate):
         super().__init__(combo)
         self.combo = combo
         self.mark_current = mark_current
+        self._size_context = None
+        self._sizes = {}
+        self._size_model = None
+        combo.installEventFilter(self)
+
+    def invalidate_metrics(self, *args):
+        self._sizes.clear()
+        self._size_context = None
+
+    def _update_metrics(self):
+        context = (self.combo.font().key(), popup_scale(self.combo),
+                   self.combo.__dict__.get('interface_language'), self._language_gutter())
+        if context != self._size_context:
+            self._sizes.clear()
+            self._size_context = context
+            self._row_scale = context[1]
+            self._row_gutter = context[3]
+
+    def eventFilter(self, watched, event):
+        if watched is self.combo:
+            if event.type() in (QtCore.QEvent.FontChange, QtCore.QEvent.StyleChange, QtCore.QEvent.Resize):
+                self._update_metrics()
+            return False
+        return super().eventFilter(watched, event)
+
+    def _track_model(self, model):
+        if model is self._size_model:
+            return
+        if self._size_model is not None:
+            try:
+                for name in ('dataChanged', 'rowsInserted', 'rowsRemoved', 'modelReset', 'layoutChanged'):
+                    getattr(self._size_model, name).disconnect(self.invalidate_metrics)
+            except (RuntimeError, TypeError):
+                pass
+        self._size_model = model
+        if model is not None:
+            for name in ('dataChanged', 'rowsInserted', 'rowsRemoved', 'modelReset', 'layoutChanged'):
+                getattr(model, name).connect(self.invalidate_metrics)
+        self.invalidate_metrics()
 
     def label(self, index):
         return str(index.data(QtCore.Qt.DisplayRole) or '')
@@ -62,8 +136,8 @@ class PopupRowDelegate(QtWidgets.QStyledItemDelegate):
         return self.mark_current and index.row() == self.combo.currentIndex()
 
     def _language_gutter(self):
-        search = getattr(self.combo, '_language_search', None)
-        return search is not None and not search.isHidden()
+        search = self.combo.__dict__.get('_language_search')
+        return search is not None and not sip.isdeleted(search) and not search.isHidden()
 
     def icon(self, index):
         decoration = index.data(QtCore.Qt.DecorationRole)
@@ -89,19 +163,31 @@ class PopupRowDelegate(QtWidgets.QStyledItemDelegate):
         return font
 
     def sizeHint(self, option, index):
-        scale = popup_scale(self.combo)
+        self._track_model(index.model())
+        if (self._size_context is None or self._size_context[1] != popup_scale(self.combo)
+                or self._size_context[2] != self.combo.__dict__.get('interface_language')):
+            self._update_metrics()
+        key = (index.row(), index.column())
+        cached = self._sizes.get(key)
+        if cached is not None:
+            # CaptureLanguageCombo adds a minimum width to the returned hint.
+            return QtCore.QSize(cached)
+        scale = self._row_scale
         header = bool(index.data(GROUP_HEADER_ROLE))
+        icon = self.icon(index)
+        specified = index.data(QtCore.Qt.SizeHintRole)
+        label = self.label(index)
         font = self._font(index)
         metrics = QtGui.QFontMetrics(font)
-        icon = self.icon(index)
-        gutter = not header and (not icon.isNull() or self._language_gutter())
+        gutter = not header and (not icon.isNull() or self._row_gutter)
         decoration = 24*scale if gutter else 0
-        width = metrics.horizontalAdvance(self.label(index)) + round((18 if header else 38)*scale+decoration)
+        width = metrics.horizontalAdvance(label) + round((18 if header else 38)*scale+decoration)
         height = max(round((26 if header else 30)*scale), metrics.height()+round(8*scale))
-        specified = index.data(QtCore.Qt.SizeHintRole)
         if isinstance(specified, QtCore.QSize):
             width, height = max(width, specified.width()), max(height, specified.height())
-        return QtCore.QSize(width, height)
+        measured = QtCore.QSize(width, height)
+        self._sizes[key] = measured
+        return QtCore.QSize(measured)
 
     def paint(self, painter, option, index):
         scale, colors = popup_scale(self.combo), self.combo.popup_colors()

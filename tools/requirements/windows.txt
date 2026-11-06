@@ -26,3 +26,4 @@ keyring
 tuf==6.0.0
 securesystemslib[crypto]==1.6.0
 packaging
+comtypes==1.4.17

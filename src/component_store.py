@@ -11,9 +11,51 @@ import tempfile
 import time
 import uuid
 import zipfile
+import threading
 
-from component_catalog import ComponentError, SAFE_ID, safe_relative, runtime_command
+from component_catalog import ComponentError, SAFE_ID, SHA256, safe_relative, runtime_command
 from component_download import ComponentDownloader
+
+_MAINTENANCE_LOCK = threading.Lock()
+_MAINTENANCE_ROOTS = set()
+_MAINTENANCE_RUNNING = False
+_MAINTENANCE_DONE = threading.Event()
+_MAINTENANCE_DONE.set()
+
+
+def _schedule_collection(root):
+    """Coalesce optional deletion outside recognition/result delivery."""
+    global _MAINTENANCE_RUNNING
+    with _MAINTENANCE_LOCK:
+        _MAINTENANCE_ROOTS.add(root)
+        _MAINTENANCE_DONE.clear()
+        if _MAINTENANCE_RUNNING:
+            return
+        _MAINTENANCE_RUNNING = True
+    def collect():
+        global _MAINTENANCE_RUNNING
+        while True:
+            with _MAINTENANCE_LOCK:
+                if not _MAINTENANCE_ROOTS:
+                    _MAINTENANCE_RUNNING = False
+                    _MAINTENANCE_DONE.set()
+                    return
+                target = _MAINTENANCE_ROOTS.pop()
+            try:
+                store = ComponentStore(target)
+                with store.lock():
+                    store.collect_unused()
+            except (ComponentError, OSError, sqlite3.Error):
+                pass  # the durable marker remains for the next store operation
+    try:
+        threading.Thread(target=collect, name='Component-maintenance', daemon=True).start()
+    except (OSError, RuntimeError):
+        # Cleanup is optional; never replace a recognition result or its
+        # original failure with a thread-launch error. Durable markers and
+        # pending roots remain available for the next lease/operation.
+        with _MAINTENANCE_LOCK:
+            _MAINTENANCE_RUNNING = False
+            _MAINTENANCE_DONE.set()
 
 
 @contextmanager
@@ -81,18 +123,26 @@ class ComponentStore:
 
     @contextmanager
     def database(self):
-        self.root.mkdir(parents=True, exist_ok=True)
-        db = sqlite3.connect(str(self.root / 'state.sqlite'), timeout=5)
-        db.execute('PRAGMA synchronous=FULL')
-        db.executescript('''
-            CREATE TABLE IF NOT EXISTS active(component TEXT PRIMARY KEY, generation TEXT, previous TEXT);
-            CREATE TABLE IF NOT EXISTS operations(id TEXT PRIMARY KEY, component TEXT, generation TEXT, phase TEXT);
-        ''')
+        db = None
         try:
-            with db:
-                yield db
+            try:
+                self.root.mkdir(parents=True, exist_ok=True)
+                db = sqlite3.connect(str(self.root / 'state.sqlite'), timeout=5)
+                db.execute('PRAGMA synchronous=FULL')
+                db.executescript('''
+                    CREATE TABLE IF NOT EXISTS active(component TEXT PRIMARY KEY, generation TEXT, previous TEXT);
+                    CREATE TABLE IF NOT EXISTS operations(id TEXT PRIMARY KEY, component TEXT, generation TEXT, phase TEXT);
+                ''')
+            except (sqlite3.Error, OSError) as exc:
+                raise ComponentError('installed_component_damaged', 'state database') from exc
+            try:
+                with db:
+                    yield db
+            except sqlite3.Error as exc:
+                raise ComponentError('installed_component_damaged', 'state database') from exc
         finally:
-            db.close()
+            if db is not None:
+                db.close()
 
     def generation(self, name):
         if not SAFE_ID.fullmatch(str(name or '')):
@@ -113,11 +163,7 @@ class ComponentStore:
                 yield
         finally:
             if (self.root / 'gc-pending').exists():
-                try:
-                    with self.lock():
-                        self.collect_unused()
-                except ComponentError:
-                    pass  # another operation owns the store and will collect later
+                _schedule_collection(self.root)
 
     def collect_unused(self):
         """Called under writer lock; preserve active/previous and running workers."""
@@ -140,8 +186,13 @@ class ComponentStore:
         referenced = set()
         for receipt_path in (self.root / 'generations').glob('*/receipt.json'):
             try:
-                referenced.update(item['sha256'] for item in json.loads(receipt_path.read_text(encoding='utf-8'))['files'])
-            except (ValueError, OSError, KeyError):
+                files = json.loads(receipt_path.read_text(encoding='utf-8'))['files']
+                if (not isinstance(files, list) or not files
+                        or any(not isinstance(item, dict) or not isinstance(item.get('sha256'), str)
+                               or not SHA256.fullmatch(item['sha256']) for item in files)):
+                    return  # unknown inventory: keep objects until it can be repaired
+                referenced.update(item['sha256'] for item in files)
+            except (ValueError, OSError, KeyError, TypeError):
                 return  # unknown receipt: preserve cache rather than guessing
         for path in (self.root / 'objects').glob('*'):
             if path.name not in referenced and path.is_file():
@@ -160,21 +211,25 @@ class ComponentStore:
     def active(self, component):
         description = self.describe(component)
         if description:
-            return dict(description, command=runtime_command(description['folder'], description['receipt']))
+            try:
+                return dict(description, command=runtime_command(description['folder'], description['receipt']))
+            except (KeyError, TypeError, ValueError) as exc:
+                raise ComponentError('installed_component_damaged', component) from exc
         return None
 
     def describe(self, component):
         """Read the saved selection even if its interpreter needs repair."""
-        if not (self.root / 'state.sqlite').is_file():
-            return None
-        with self.database() as db:
-            row = db.execute('SELECT generation FROM active WHERE component=?', (component,)).fetchone()
-        if not row:
-            return None
-        folder = self.generation(row[0])
         try:
+            if not (self.root / 'state.sqlite').is_file():
+                return None
+            with self.database() as db:
+                row = db.execute('SELECT generation FROM active WHERE component=?', (component,)).fetchone()
+            if not row:
+                return None
+            folder = self.generation(row[0])
             receipt = json.loads((folder / 'receipt.json').read_text(encoding='utf-8'))
-            if receipt['component'] != component or receipt['generation'] != row[0]:
+            if (not isinstance(receipt, dict) or receipt.get('component') != component
+                    or receipt.get('generation') != row[0]):
                 raise ValueError('receipt mismatch')
             return {'folder': folder, 'receipt': receipt}
         except (OSError, ValueError, KeyError) as exc:
@@ -358,7 +413,10 @@ class ComponentStore:
             try:
                 self.collect_unused()
             except (OSError, ComponentError):
-                (self.root / 'gc-pending').touch()
+                try:
+                    (self.root / 'gc-pending').touch()
+                except OSError:
+                    pass  # Optional cleanup cannot report a committed install as failed.
             return self.active(bundle['component'])
         except BaseException:
             if committed:

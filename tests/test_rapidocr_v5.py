@@ -43,11 +43,12 @@ def test_empty_modern_result_is_not_an_error():
 
 def test_availability_probe_exercises_lazy_recognizer_and_detector():
     instance = mock.Mock()
+    instance.use_det = True
     with mock.patch.object(ocr_worker, '_rapidocr_engine', return_value=instance):
         assert ocr_worker._recognize_rapidocr({'images': []}) == []
     assert instance.call_count == 2
     assert instance.call_args_list[0].kwargs == {'use_det': False}
-    assert instance.call_args_list[1].kwargs == {}
+    assert instance.call_args_list[1].kwargs == {'use_det': True}
 
 
 def test_winrt_arabic_words_are_joined_by_geometry_without_reversing_characters():

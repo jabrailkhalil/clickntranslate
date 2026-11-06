@@ -1,3 +1,4 @@
+import json
 import os
 import shutil
 import subprocess
@@ -809,6 +810,73 @@ class TestUpdaterCommands(unittest.TestCase):
             self.assertFalse(any(name.startswith(".clickntranslate_backup_") for name in os.listdir(root)))
         finally:
             shutil.rmtree(root, ignore_errors=True)
+
+
+class TestMalformedReleaseResponses(unittest.TestCase):
+    def test_invalid_release_metadata_finishes_check_and_releases_busy_state(self):
+        releases = [None, [], "text", {}, {"tag_name": 42},
+            {"tag_name": "not-a-version", "assets": []},
+            {"tag_name": "v9.9.9", "assets": None},
+            {"tag_name": "v9.9.9", "assets": {}},
+            {"tag_name": "v9.9.9", "assets": [None]},
+            {"tag_name": "v9.9.9", "assets": [{"name": 42}]},
+            {"tag_name": "v9.9.9", "assets": [{"name": "app.zip", "url": []}]}]
+        for release in releases:
+            with self.subTest(release=release):
+                owner = types.SimpleNamespace(
+                    parent=types.SimpleNamespace(current_interface_language="en"),
+                    _update_in_progress=True, _update_phase="checking",
+                    _update_cancel_requested=threading.Event(),
+                    _set_update_controls_enabled=mock.Mock(),
+                    _set_parent_update_flow_active=mock.Mock(),
+                    _start_update_check=mock.Mock(), _leave_update_page=mock.Mock())
+                completed = []
+                def deliver(payload):
+                    completed.append(payload)
+                    sw.SettingsWindow._on_update_check_result(owner, json.dumps(payload))
+                owner._post_update_check_result = deliver
+                owner._pick_update_asset = lambda assets: sw.SettingsWindow._pick_update_asset(owner, assets)
+                owner._pick_checksum_url = lambda assets, name: sw.SettingsWindow._pick_checksum_url(owner, assets, name)
+                response = mock.Mock()
+                response.json.return_value = release
+                with mock.patch.object(sw.requests, "get", return_value=response), \
+                     mock.patch("inline_update.result") as shown:
+                    sw.SettingsWindow._check_latest_release_worker(owner)
+                self.assertEqual(len(completed), 1)
+                self.assertEqual(completed[0]["status"], "error")
+                self.assertFalse(owner._update_in_progress)
+                self.assertEqual(owner._update_phase, "idle")
+                owner._set_update_controls_enabled.assert_called_once_with(True)
+                owner._set_parent_update_flow_active.assert_called_once_with(False)
+                shown.assert_called_once()
+
+    def test_asset_selection_failure_posts_one_terminal_error(self):
+        owner = types.SimpleNamespace(
+            parent=types.SimpleNamespace(current_interface_language="en"),
+            _update_cancel_requested=threading.Event(),
+            _post_update_check_result=mock.Mock(),
+            _pick_update_asset=mock.Mock(side_effect=OSError("injected selection failure")))
+        response = mock.Mock()
+        response.json.return_value = {"tag_name": "v99.9.9", "assets": []}
+        with mock.patch.object(sw.requests, "get", return_value=response):
+            sw.SettingsWindow._check_latest_release_worker(owner)
+        owner._post_update_check_result.assert_called_once()
+        self.assertEqual(owner._post_update_check_result.call_args.args[0]["status"], "error")
+
+    def test_cancelled_response_posts_one_terminal_cancellation(self):
+        owner = types.SimpleNamespace(
+            parent=types.SimpleNamespace(current_interface_language="en"),
+            _update_cancel_requested=threading.Event(),
+            _post_update_check_result=mock.Mock(), _pick_update_asset=mock.Mock())
+        response = mock.Mock()
+        def cancelled_json():
+            owner._update_cancel_requested.set()
+            return None
+        response.json.side_effect = cancelled_json
+        with mock.patch.object(sw.requests, "get", return_value=response):
+            sw.SettingsWindow._check_latest_release_worker(owner)
+        owner._post_update_check_result.assert_called_once_with({"status": "cancelled"})
+        owner._pick_update_asset.assert_not_called()
 
 
 class TestUpdateCancellation(unittest.TestCase):

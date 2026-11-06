@@ -73,6 +73,26 @@ def test_names_agree_between_main_shortcut_stage_and_desktop_menu(window, app, l
     app.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)
 
 
+@pytest.mark.parametrize('language', tuple(ASSISTANT_TEXT))
+def test_live_language_change_relabels_existing_carousel_arrows(window, app, language):
+    window.set_interface_language('en' if language != 'en' else 'ru')
+    window.show_assistant_settings()
+    settings = window.settings_window
+    stage = settings.settings_assistant_page.mascot_preview
+    window.set_interface_language(language)
+    settle(app)
+    assert settings.settings_assistant_page.mascot_preview is stage
+    for button, key in ((stage.previous_button, 'previous_mascot'), (stage.next_button, 'next_mascot')):
+        expected = assistant_text(language, key)
+        assert button.toolTip() == expected
+        assert button.accessibleName() == expected
+    # The retained buttons must still browse after being relabelled.
+    before = stage.mascot
+    stage.next_button.click()
+    assert stage.mascot == MASCOTS[(MASCOTS.index(before) + 1) % len(MASCOTS)]
+    assert settings.settings_pages.currentIndex() == 3
+
+
 @pytest.mark.parametrize('keyboard', [False, True])
 def test_opening_menu_preferences_uses_focus_reason_of_the_actual_input_method(window, app, keyboard):
     keyboard_navigation.install_keyboard_navigation(app)

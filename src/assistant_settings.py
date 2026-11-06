@@ -14,7 +14,8 @@ from number_controls import NumberStepper as AssistantNumberBox
 
 
 BEHAVIORS = ('idle',)
-ASSISTANT_ACTIONS = ('open', 'area', 'screen', 'text', 'copy', 'dynamic', 'documents', 'guide')
+ASSISTANT_ACTIONS = ('open', 'area', 'screen', 'selection', 'replace', 'copy', 'dynamic', 'text', 'documents')
+LEGACY_DEFAULT_ACTIONS = ('open', 'area', 'screen', 'text', 'copy', 'dynamic', 'documents', 'guide')
 ASSISTANT_DEFAULTS = {
     'main_assistant_visible': True,
     'desktop_assistant_behavior': 'idle',
@@ -35,6 +36,8 @@ def normalized_assistant_actions(value):
     if not isinstance(value, (tuple, list)):
         return list(ASSISTANT_ACTIONS)
     selected = {item for item in value if isinstance(item, str) and item in ASSISTANT_ACTIONS}
+    if len(value) == len(LEGACY_DEFAULT_ACTIONS) and set(item for item in value if isinstance(item, str)) == set(LEGACY_DEFAULT_ACTIONS):
+        return list(ASSISTANT_ACTIONS)
     return [action for action in ASSISTANT_ACTIONS if action in selected]
 
 

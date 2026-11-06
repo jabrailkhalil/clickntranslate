@@ -154,7 +154,8 @@ def _panel(settings, parent, rows):
     grid.setContentsMargins(1, 1, 1, 1)
     grid.setHorizontalSpacing(0)
     grid.setVerticalSpacing(1)
-    columns = max(len(row) for row in rows)
+    from math import lcm
+    columns = lcm(*(len(row) for row in rows))
     for column in range(columns):
         grid.setColumnStretch(column, 1)
     for row, buttons in enumerate(rows):
@@ -425,11 +426,17 @@ def organize(settings, general_layout, form, updates_layout, dim_row):
     # Program tools remain directly in this tab. Reuse the original controls
     # and signals, with one grid owning all three rows and their dividers.
     old_panel = settings.settings_action_panel
+    from engine_center import text as center_text
+    from settings_window import OpticallyCenteredPushButton
+    settings.engines_button = OpticallyCenteredPushButton(center_text(lang, 'title'), general)
+    settings.engines_button.setAccessibleName(center_text(lang, 'title'))
+    settings.engines_button.setToolTip(tooltip_text(center_text(lang, 'intro')))
+    settings.engines_button.clicked.connect(lambda _checked=False: settings.show_ocr_language_manager())
     settings.application_action_panel = _panel(settings, general, (
         (settings.clear_cache_btn, settings.reset_btn, settings.update_btn),
         (settings.export_settings_btn, settings.import_settings_btn,
          settings.create_bug_report_btn),
-        (settings.hotkeys_button,)))
+        (settings.engines_button, settings.hotkeys_button)))
     settings.settings_action_panel = settings.application_action_panel
     general_layout.addWidget(settings.application_action_panel)
     old_panel.hide()
@@ -488,16 +495,12 @@ def organize(settings, general_layout, form, updates_layout, dim_row):
     settings.translation_settings_scroll = _scroll(page, content, 'translationSettingsScroll')
     updates_layout.setSpacing(4)
     updates_layout.addWidget(settings.translation_settings_scroll, 1)
-    from provider_settings import show_provider_settings
-    settings.translation_offline_button = _new_action(settings, 'offline', 'offline_hint',
-                                                      settings.show_offline_translation_packages)
-    def open_translation_api(_checked=False):
-        from provider_catalog import provider_id
-        show_provider_settings(settings, provider_id(settings.parent.config.get('translator_engine')))
-    settings.translation_api_button = _new_action(settings, 'api', 'api_hint', open_translation_api)
+    # One entry point belongs to Application. These aliases keep existing
+    # guide/task integrations bound to that same widget, not duplicate routes.
+    settings.translation_offline_button = settings.engines_button
+    settings.translation_api_button = settings.engines_button
     settings.translation_action_panel = _panel(settings, page, (
-        (settings.translation_offline_button, settings.translation_api_button),
-        (settings.copy_history_btn, settings.translation_history_btn)))
+        (settings.copy_history_btn, settings.translation_history_btn),))
     updates_layout.addWidget(settings.translation_action_panel)
 
     # OCR has its own complete form and package/API routes.
@@ -553,16 +556,12 @@ def organize(settings, general_layout, form, updates_layout, dim_row):
     settings.ocr_settings_content = content
     settings.ocr_settings_scroll = _scroll(settings.settings_ocr_page, content, 'ocrSettingsScroll')
     root.addWidget(settings.ocr_settings_scroll, 1)
-    settings.ocr_languages_btn.setText(section_text(lang, 'ocr_packages'))
-    settings.ocr_languages_btn.setToolTip(tooltip_text(section_text(lang, 'ocr_packages_hint')))
+    settings.ocr_languages_btn.hide()
+    settings.ocr_languages_btn = settings.engines_button
+    settings.ocr_api_button = settings.engines_button
     settings._apply_language_package_task_status()
-    def open_ocr_api(_checked=False):
-        from api_providers import VISION_ENGINES
-        show_provider_settings(settings, VISION_ENGINES.get(settings.parent.config.get('ocr_engine')))
-    settings.ocr_api_button = _new_action(settings, 'api', 'api_hint', open_ocr_api)
-    settings.ocr_action_panel = _panel(settings, settings.settings_ocr_page,
-        ((settings.ocr_languages_btn, settings.ocr_api_button),))
-    root.addWidget(settings.ocr_action_panel)
+    settings.ocr_action_panel = QWidget(settings.settings_ocr_page)
+    settings.ocr_action_panel.hide()
     settings.settings_pages.addWidget(settings.settings_ocr_page)
     assert settings.settings_pages.indexOf(settings.settings_ocr_page) == PAGE_OCR
     settings.settings_ocr_page.hide()

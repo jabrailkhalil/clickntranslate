@@ -64,7 +64,11 @@ def render(mascot, **kwargs):
 def test_whole_frames_animate_without_using_directional_gaits(app, mascot):
     poses = [render(mascot, action='wave', time=t) for t in (0., .15, .3, .45)]
     assert len({image.cacheKey() for image in poses}) == 4
-    assert poses[0] != poses[1]
+    if mascot == 'click':
+        assert poses[0] != poses[1]
+    else:
+        assert poses[0] == poses[1]  # one calm blink, no size-changing gesture
+        assert poses[2] == poses[3]
     assert render(mascot, action='walk') == render(mascot, action='idle')
     assert render(mascot, action='idle', facing=-1) == render(mascot, action='idle')
     assert skin(mascot) is skin(mascot)
@@ -213,13 +217,13 @@ def test_display_mode_and_event_reactions_persist_without_manual_emotion_choices
     assert page.mascot_preview.motion.reactions is False
 
 @pytest.mark.parametrize('state', ['idle', 'waving', 'jumping', 'running', 'waiting', 'review', 'failed'])
-def test_explicit_native_reaction_plays_once_then_waits_for_menu_choice(state):
+def test_menu_holds_a_steady_body_instead_of_playing_an_explicit_reaction(state):
     pet = PetMotion('click')
     pet.menu_open = True
     assert pet.play(state)
-    assert pet.seconds(pet.action()) == 0
+    assert pet.action() == 'idle'
     for _ in range(10): pet.advance(.2)
-    assert pet.action() == 'waiting'
+    assert pet.action() == 'idle'
     pet.menu_open = False
     assert pet.action() == 'idle'
     assert not pet.play('sleep') and not pet.play('running-right')

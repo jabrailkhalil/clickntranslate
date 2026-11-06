@@ -39,5 +39,6 @@
   ],
   "requirements_no_deps": [
     "argostranslate==1.11.0"
-  ]
+  ],
+  "argos_document_protocol": 1
 }

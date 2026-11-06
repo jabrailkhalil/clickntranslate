@@ -58,5 +58,6 @@
     },
     "license_url": "https://aka.ms/vc14/license",
     "redistribution_review": false
-  }
+  },
+  "argos_document_protocol": 1
 }

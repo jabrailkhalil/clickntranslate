@@ -384,6 +384,10 @@ class PackageTaskConcurrencyTest(unittest.TestCase):
         self.assertTrue(actions)
         table = self.manager.tesseract_table
         table._pending_package_codes = {"de"}
+        self.manager._sync_package_selection(table)
+        initial_states = [button.isEnabled() for button in actions]
+        self.assertTrue(any(initial_states))
+        self.assertTrue(any(not state for state in initial_states))
 
         self.manager._set_package_actions_busy(True)
 
@@ -393,7 +397,7 @@ class PackageTaskConcurrencyTest(unittest.TestCase):
         self.assertIn("preserved", actions[0].toolTip())
 
         self.manager._set_package_actions_busy(False)
-        self.assertTrue(all(button.isEnabled() for button in actions))
+        self.assertEqual([button.isEnabled() for button in actions], initial_states)
         self.assertTrue(self.manager.refresh_btn.isEnabled())
         self.assertEqual(table._pending_package_codes, {"de"})
 

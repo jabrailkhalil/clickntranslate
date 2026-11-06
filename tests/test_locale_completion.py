@@ -28,6 +28,19 @@ def test_all_ui_catalogs_include_new_locales_and_keep_formatting():
     assert set(LOCALIZED_LANGUAGE_NAMES)==set(LOCALES)
 
 
+@pytest.mark.parametrize('sample_name', ('samples', 'VALIDATION_SAMPLES'))
+def test_locale_audit_distinguishes_worker_samples_from_ui_messages(tmp_path, sample_name):
+    (tmp_path / 'src').mkdir()
+    (tmp_path / 'src/main.py').write_text('', encoding='utf-8')
+    path = tmp_path / 'src' / 'component_argos_worker.py'
+    path.write_text(sample_name + " = {'en': 'Input sample', 'ru': 'Пример'}\n"
+                    "labels = {'en': 'Actual interface text', 'ru': 'Надпись'}\n", encoding='utf-8')
+    report = audit(tmp_path)
+    assert report['issues']
+    assert all(item['table'].endswith(':2') for item in report['issues'])
+    assert len(report['tables']) == 1
+
+
 def test_queued_package_probe_cannot_run_after_dialog_destruction(window,app):
     window.show_settings()
     with (mock.patch.object(settings_window.OcrLanguageManagerDialog,'_start_runtime_probe') as probe,
@@ -145,7 +158,7 @@ def test_new_locale_pages_render_offscreen(window,app,locale):
             if folder:assert settings._language_manager_dialog.grab().save(str(folder/f'api-{theme}.png'))
             settings._language_manager_dialog.close()
     window._guide_active=True
-    window._guide_step_index=GUIDE_SETUP_ORDER.index('selection_behavior')
+    window._guide_step_index=main.ONBOARDING_ORDER.index('chat_languages')
     window._show_guide_step();app.processEvents();window._guide_step_timer.stop()
     if folder:assert window.grab().save(str(folder/'guide.png'))
     window._guide_active=False

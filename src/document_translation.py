@@ -1,4 +1,5 @@
 import threading
+import time
 from dataclasses import dataclass
 
 import translater
@@ -40,6 +41,7 @@ def translate_document_text(
     max_chars=None,
     partial_callback=None,
     interface_language='en',
+    delta_callback=None,
 ):
     text = str(text or '')
     if not text.strip():
@@ -54,6 +56,9 @@ def translate_document_text(
 
     results = []
     translated_parts = []
+    pending_deltas = []
+    pending_size = 0
+    last_delta = time.monotonic()
     total = len(chunks)
     _emit_progress(progress_callback, 0, total, document_message(
         interface_language, 'translating', current=1, total=total))
@@ -74,12 +79,22 @@ def translate_document_text(
             translated = restore_boundary_whitespace(chunk.text, translated)
             results.append(TranslationChunkResult(index, chunk.text, translated, error))
             translated_parts.append(translated)
+            if delta_callback:
+                pending_deltas.append(translated)
+                pending_size += len(translated)
+                now = time.monotonic()
+                if len(results) == 1 or pending_size >= 65536 or now - last_delta >= .05:
+                    delta_callback(''.join(pending_deltas), len(results), total)
+                    pending_deltas.clear()
+                    pending_size, last_delta = 0, now
             if partial_callback:
                 partial_callback(''.join(translated_parts), len(results), total)
             _emit_progress(progress_callback, len(results), total, document_message(
                 interface_language, 'translated', current=index+1, total=total))
     except translater.TranslationCancelledError:
         pass
+    if delta_callback and pending_deltas:
+        delta_callback(''.join(pending_deltas), len(results), total)
     return ''.join(translated_parts), results
 
 

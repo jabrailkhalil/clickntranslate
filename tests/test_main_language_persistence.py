@@ -516,6 +516,7 @@ class MainLanguagePersistenceTest(unittest.TestCase):
         host = main.QWidget()
         host.resize(700, 400)
         host._guide_waiting_action = "language_packages"
+        host._guide_current_action = lambda: host._guide_waiting_action
         host._guide_bubble = main.SetupGuideCard(host)
         host._guide_bubble.set_dark(True)
         host._guide_bubble.title.setText("Language packages")

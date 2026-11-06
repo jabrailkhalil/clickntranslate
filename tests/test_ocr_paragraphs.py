@@ -49,6 +49,20 @@ def test_real_paragraph_gaps_and_two_book_pages_keep_their_reading_order():
     assert all(w<500 for x,y,w,h,text in blocks)
 
 
+@pytest.mark.parametrize('heading', [False, True])
+def test_arabic_columns_read_from_the_right_and_headings_stay_above_them(heading):
+    rectangles = (rows(['العمود الثاني', 'نهاية العمود الثاني'], x=10, y=100, width=250)
+                  + rows(['العمود الأول API v2', 'نهاية العمود الأول'], x=400, y=100, width=250))
+    if heading:
+        rectangles.append((10, 10, 640, 26, 'عنوان الصفحة'))
+    expected = ('العمود الأول API v2 نهاية العمود الأول\n\n'
+                'العمود الثاني نهاية العمود الثاني')
+    if heading:
+        expected = 'عنوان الصفحة\n\n' + expected
+    assert paragraph_text(list(reversed(rectangles))) == expected
+    assert ocr_text_from_items(items(rectangles), join_paragraphs=True) == expected
+
+
 def test_tilted_word_boxes_are_joined_before_the_column_reader_runs():
     # The middle word arrives last when boxes are sorted by their top edge.
     # It bridges both earlier fragments; neither fragment is a separate column.
@@ -197,7 +211,7 @@ def test_dynamic_paragraphs_reach_the_actual_translation_call(enabled):
     source = '\n'.join(REPORTED_LINES) + '\n\nAnother paragraph.'
     expected = (' '.join(REPORTED_LINES) + '\n\nAnother paragraph.'
                 if enabled else '\n'.join(REPORTED_LINES) + '\nAnother paragraph.')
-    with (mock.patch('threading.Thread', side_effect=inline_thread),
+    with (mock.patch('background_tasks.TRANSLATION_EXECUTOR.submit', side_effect=lambda job:(job(), True)[1]),
           mock.patch.object(game_mode, 'notify_current_activity'),
           mock.patch('translater.translate_text', return_value='ترجمة') as translate):
         game_mode.GameTranslationOverlay._consume_ocr_result(owner, source)

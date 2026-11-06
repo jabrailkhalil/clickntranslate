@@ -74,7 +74,7 @@ class NativeOcrWorkerProtocolTest(unittest.TestCase):
     def test_runtime_recognition_never_allows_model_downloads(self):
         captured = {}
 
-        def fake_call(request, pil_variants=None, timeout=1800):
+        def fake_call(request, pil_variants=None, timeout=1800, **kwargs):
             captured.update(request)
             return {"results": [], "error": ""}
 
@@ -92,7 +92,7 @@ class NativeOcrWorkerProtocolTest(unittest.TestCase):
     def test_easyocr_probe_allows_download_only_when_explicitly_requested(self):
         requests = []
 
-        def fake_call(request, pil_variants=None, timeout=1800):
+        def fake_call(request, pil_variants=None, timeout=1800, **kwargs):
             requests.append(dict(request))
             return {"results": [], "error": ""}
 

@@ -69,7 +69,9 @@ def test_lower_main_language_lists_open_below_the_field_when_desktop_space_exist
                     before = popup.geometry()
                     combo._language_search.setText('Russian')
                     app.processEvents()
-                    assert popup.geometry() == before
+                    assert popup.geometry().topLeft() == before.topLeft()
+                    assert popup.width() == before.width()
+                    assert popup.height() < before.height()
             finally:
                 combo.hidePopup()
 

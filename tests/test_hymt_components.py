@@ -12,7 +12,7 @@ import pytest
 import component_catalog
 import component_hymt as hymt
 from component_catalog import ComponentError, parse_catalog
-from component_store import ComponentStore
+from component_store import ComponentStore, _MAINTENANCE_DONE
 
 
 @pytest.fixture
@@ -126,6 +126,7 @@ def test_all_chunks_pin_one_generation_and_cleanup_waits_for_last_chunk(installa
     monkeypatch.setattr(hymt,'translate',translate)
     result=translater.hymt_translate('A sentence. '*240,'en','ru',_cache=cache)
     assert result and len(seen)>1 and set(seen)=={first['folder']}
+    assert _MAINTENANCE_DONE.wait(3)
     assert not first['folder'].exists()
     assert cache._bound_engine_key('hymt')==hymt.cache_identity(first['receipt'])
 
@@ -156,6 +157,7 @@ def test_uninstall_waits_for_workers_and_does_not_resurrect_preserved_legacy(ins
     with store.lease(active['receipt']['generation']):
         hymt.remove(store.root)
         assert active['folder'].exists() and not translater.hymt_installed()
+    assert _MAINTENANCE_DONE.wait(3)
     assert not active['folder'].exists()
     assert model.read_bytes()==b'GGUF legacy model' and runner.is_file()
     assert hymt.legacy_disabled(store.root)

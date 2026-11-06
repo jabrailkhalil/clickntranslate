@@ -7,7 +7,9 @@ import math
 import re
 
 
-_LIST_START = re.compile(r'^\s*(?:[-*•●▪‣–—]|\d+[.)]|[A-Za-z][.)])\s+')
+# Bidi formatting can precede a visible marker without changing list identity.
+# Recognize the prefix without removing those controls from the source text.
+_LIST_START = re.compile(r'^[\s\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]*(?:[-*•●▪‣–—]|\d+[.)]|[A-Za-z][.)])\s+')
 _PARAGRAPH_BREAK = re.compile(r'\n[ \t]*\n+')
 
 
@@ -29,6 +31,7 @@ def _join(left, right):
 def merge_text_lines(text):
     """Fallback when boxes are unavailable; retain blank lines and list items."""
     text = str(text or '').replace('\r\n', '\n').replace('\r', '\n')
+    text = text.replace('\u2029', '\n\n').replace('\u2028', '\n')
     paragraphs = []
     for section in _PARAGRAPH_BREAK.split(text.strip()):
         current = ''
@@ -51,7 +54,7 @@ def boxes_from_items(items):
         try:
             xs, ys = [float(p[0]) for p in box], [float(p[1]) for p in box]
             rows.append((min(xs), min(ys), max(xs)-min(xs), max(ys)-min(ys), text))
-        except (TypeError, ValueError, IndexError):
+        except (TypeError, ValueError, OverflowError, IndexError):
             # Unknown geometry is kept as its own block, never dropped.
             rows.append((None, None, None, None, text))
     return rows
@@ -70,7 +73,7 @@ def _valid_rows(rows):
             if not all(map(math.isfinite, (x, y, w, h))) or w <= 0 or h <= 0:
                 raise ValueError('Invalid OCR bounds')
             valid.append((x, y, w, h, text))
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             unknown.append(text)
     return valid, unknown
 
@@ -127,6 +130,10 @@ def _reading_order(blocks):
             groups[-1].append(block)
             edge=max(edge if edge is not None else end,end)
         if len(groups)>1:
+            if axis == 0:
+                from ocr_text_layout import is_rtl_text
+                if is_rtl_text(' '.join(block[4] for block in blocks)):
+                    groups.reverse()
             return [block for group in groups for block in _reading_order(group)]
     return sorted(blocks,key=lambda b:(b[1],b[0]))
 

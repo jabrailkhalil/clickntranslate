@@ -84,8 +84,7 @@ def test_connected_button_corners_and_dividers_follow_the_physical_grid(window, 
         window.toggle_theme()
     window.show_settings()
     settings = window.settings_window
-    for page, panel_name in ((0, 'settings_action_panel'), (1, 'translation_action_panel'),
-                             (4, 'ocr_action_panel')):
+    for page, panel_name in ((0, 'settings_action_panel'), (1, 'translation_action_panel')):
         settings._set_settings_page(page)
         settle(app)
         panel = getattr(settings, panel_name)
@@ -108,6 +107,15 @@ def test_connected_button_corners_and_dividers_follow_the_physical_grid(window, 
         for x, y in ((panel.width()//2, 0), (panel.width()//2, panel.height()-1),
                      (0, panel.height()//2), (panel.width()-1, panel.height()//2)):
             assert image.pixelColor(x, y).name() == border, (locale, dark, x, y)
+    # Engine management now has one entry point in Application. The old OCR
+    # footer is a hidden compatibility attribute, rather than a painted grid.
+    settings._set_settings_page(4)
+    settle(app)
+    assert settings.ocr_action_panel.isHidden()
+    assert settings.ocr_languages_btn is settings.engines_button
+    assert settings.ocr_api_button is settings.engines_button
+    assert settings.engines_button.parentWidget() is settings.application_action_panel
+    assert not settings.engines_button.isVisible()
 
 
 @pytest.mark.parametrize('locale', ['ru', 'ar', 'hi'])

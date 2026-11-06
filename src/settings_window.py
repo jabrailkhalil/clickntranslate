@@ -7,6 +7,7 @@ from settings_sections import (
     PAGE_COUNT, VISUAL_PAGE_ORDER, page_caption, section_text,
 )
 from package_table import PackageTable
+from engine_center_widgets import EngineCenterSurface, EngineActivationButton, EngineTaskLabel
 from ui_scaling import DEFAULT_SCALE, MAX_SCALE, MIN_SCALE, SCALE_STEP, ScalePercentEdit, ScaleArrowButton, ScaledIconToolButton, native_window_parent, position_embedded_combo_popup, combo_popup_geometry, widget_global_point, widget_global_rect
 from PyQt5 import sip
 import os
@@ -353,12 +354,14 @@ def _populate_grouped_translator_combo(
     lang,
     foreground="#f4f6fb",
     installed_engines=None,
+    ready_only=False,
 ):
     """Populate a compact combo with disabled online/offline group labels."""
     combo.clear()
     groups = TRANSLATOR_GROUP_TEXT.get(lang, TRANSLATOR_GROUP_TEXT["en"])
     installed = {str(engine).lower() for engine in (installed_engines or ())}
     engines_by_index = []
+    visible_groups = []
     for kind in ("offline", "online", "api"):
         combo.addItem(f"  {groups.get(kind, 'API')}", None)
         header_index = combo.count() - 1
@@ -368,11 +371,13 @@ def _populate_grouped_translator_combo(
             option
             for option in TRANSLATOR_ENGINE_OPTIONS
             if option[2] == kind
+            and (not ready_only or option[0].lower() in installed)
         ]
         if not options:
             combo.removeItem(header_index)
             engines_by_index.pop()
             continue
+        visible_groups.append(kind)
         options = [
             option
             for _index, option in sorted(
@@ -393,7 +398,7 @@ def _populate_grouped_translator_combo(
                 Qt.ToolTipRole,
             )
     from provider_categories import configure_categories
-    configure_categories(combo, groups, ('offline', 'online', 'api'))
+    configure_categories(combo, groups, tuple(visible_groups))
     return engines_by_index
 
 
@@ -402,6 +407,10 @@ class _DropDownProxyStyle(QtWidgets.QProxyStyle):
 
     def styleHint(self, hint, option=None, widget=None, returnData=None):
         if hint == QtWidgets.QStyle.SH_ComboBox_Popup:
+            return 0
+        if hint in (QtWidgets.QStyle.SH_Menu_FlashTriggeredItem, QtWidgets.QStyle.SH_Menu_FadeOutOnHide):
+            # Qt's hidePopup can otherwise run nested timed event loops for
+            # selection flashing/fade-out before it releases the old list.
             return 0
         return super().styleHint(hint, option, widget, returnData)
 
@@ -494,6 +503,12 @@ class DropDownCombo(QComboBox):
                              |Qt.AlignVCenter|Qt.AlignAbsolute,value)
             painter.restore()
         else:
+            field = self.style().subControlRect(QtWidgets.QStyle.CC_ComboBox, option,
+                                                QtWidgets.QStyle.SC_ComboBoxEditField, self)
+            # The style's label leaves one pixel on either side of the field.
+            # Fit the complete elision glyph rather than clipping the raw text.
+            option.currentText = self.fontMetrics().elidedText(
+                option.currentText, Qt.ElideRight, max(0, field.width()-2))
             painter.drawControl(QtWidgets.QStyle.CE_ComboBoxLabel, option)
         dark = option.palette.color(QtGui.QPalette.Text).lightness() > 128
         color = QtGui.QColor(button_palette(dark)['text' if self.isEnabled() else 'disabled'])
@@ -516,10 +531,15 @@ class DropDownCombo(QComboBox):
         self.setStyle(self._drop_down_style)
         self._laying_out_popup = False
         self._popup_model = None
+        self._language_popup_origin = None
+        self._language_popup_anchor = None
+        self._language_popup_bounds = None
+        self._popup_filter_installed = False
         self._popup_layout_timer = QtCore.QTimer(self)
         self._popup_layout_timer.setSingleShot(True)
         self._popup_layout_timer.timeout.connect(self._layout_open_popup)
-        from combo_popup import PopupRowDelegate
+        from combo_popup import PopupRowDelegate, PopupListView
+        self.setView(PopupListView(self))
         self.setItemDelegate(PopupRowDelegate(self))
         self.view().setMouseTracking(True)
         self.view().setVerticalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
@@ -582,7 +602,7 @@ class DropDownCombo(QComboBox):
         set_widget_stylesheet(popup, 'QFrame#appComboPopup {background:transparent; border:0;}')
         from scrollbar_styles import scrollbar_stylesheet
         set_widget_stylesheet(view, f'''
-            QAbstractItemView {{ background:transparent; color:{text}; border:0; outline:none; padding:0; }}
+            QAbstractItemView {{ background:{background}; color:{text}; border:0; outline:none; padding:0; }}
             QAbstractItemView::item {{ border:0; padding:0; }}
         ''' + scrollbar_stylesheet())
         view.viewport().setAutoFillBackground(False)
@@ -597,7 +617,8 @@ class DropDownCombo(QComboBox):
         # Its native popup lives outside the dialog's font/scale traversal.
         self.ensurePolished()
         view = self.view()
-        from combo_popup import popup_font
+        from combo_popup import popup_font, popup_host_factor
+        self._popup_metrics_host_factor = popup_host_factor(self)
         font = popup_font(self)
         if view.font() != font:
             view.setFont(font)
@@ -609,6 +630,7 @@ class DropDownCombo(QComboBox):
         view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         view.setMinimumSize(0, 0)
         view.setMaximumSize(16777215, 16777215)
+        view.setViewportMargins(0, 0, 0, 0)
         view.setFrameShape(QtWidgets.QFrame.NoFrame)
         popup.setMinimumSize(0, 0)
         popup.setMaximumSize(16777215, 16777215)
@@ -625,7 +647,14 @@ class DropDownCombo(QComboBox):
         return popup
 
     def showPopup(self):
+        app = QtWidgets.QApplication.instance()
+        previous = getattr(app, '_cnt_open_combo', lambda: None)()
+        if previous is not None and not sip.isdeleted(previous) and previous is not self:
+            previous.hidePopup()
         self._language_popup_size = None
+        self._language_popup_origin = None
+        self._language_popup_anchor = None
+        self._language_popup_bounds = None
         self.aboutToShowPopup.emit()
         self.ensurePolished()
         self._prepare_native_popup()
@@ -640,30 +669,126 @@ class DropDownCombo(QComboBox):
             super().showPopup()
         finally:
             QtWidgets.QApplication.setEffectEnabled(Qt.UI_AnimateCombo, animated)
+        self._sync_popup_host_metrics()
         self._layout_open_popup()
+        self.view().scrollTo(self.view().currentIndex(), QtWidgets.QAbstractItemView.EnsureVisible)
         search = getattr(self, '_language_search', None)
-        if search is not None:
+        if search is not None and not search.isHidden():
             search.setFocus(Qt.PopupFocusReason)
+        if self.view().window().isVisible():
+            import weakref
+            app._cnt_open_combo = weakref.ref(self)
+            app.installEventFilter(self)
+            self._popup_filter_installed = True
         # Cocoa synchronizes a newly created QGraphicsProxyWidget after Show.
         # That can overwrite the scene position with unscaled window coordinates.
         self._queue_popup_layout()
 
+    def _sync_popup_host_metrics(self):
+        from combo_popup import popup_host_factor
+        factor = popup_host_factor(self)
+        if factor != getattr(self, '_popup_metrics_host_factor', factor):
+            # Qt may attach or retain a scene proxy during Show despite the
+            # requested bypass. Rebuild chrome in the actual host's units
+            # before positioning; do not retain a previously oversized width.
+            self._language_popup_size = None
+            self.itemDelegate().invalidate_metrics()
+            search = getattr(self, '_language_search', None)
+            query = search.text() if search is not None else ''
+            categories = getattr(self, '_provider_category_bar', None)
+            category = categories.tabData(categories.currentIndex()) if categories is not None else None
+            from language_search import prepare_language_search
+            from provider_categories import prepare_categories
+            prepare_language_search(self)
+            prepare_categories(self)
+            self._prepare_popup()
+            if query:
+                self._language_search.setText(query)
+            if category is not None:
+                for index in range(categories.count()):
+                    if categories.tabData(index) == category:
+                        categories.setCurrentIndex(index)
+                        break
+
     def hidePopup(self):
         self._popup_layout_timer.stop()
-        self._language_popup_size = None
+        self._clear_popup_session()
         super().hidePopup()
+
+    def _clear_popup_session(self):
+        self._language_popup_size = None
+        self._language_popup_origin = None
+        self._language_popup_anchor = None
+        self._language_popup_bounds = None
+        app = QtWidgets.QApplication.instance()
+        if app is not None:
+            if getattr(app, '_cnt_open_combo', lambda: None)() is self:
+                app._cnt_open_combo = lambda: None
+            if self._popup_filter_installed:
+                app.removeEventFilter(self)
+        self._popup_filter_installed = False
+
+    def _combo_at_global_point(self, watched, point):
+        candidate = watched if isinstance(watched, QtWidgets.QWidget) else None
+        while candidate is not None:
+            if isinstance(candidate, DropDownCombo):
+                if widget_global_rect(candidate).contains(point):
+                    return candidate
+                break
+            candidate = candidate.parentWidget()
+        # A native popup outside the proxy canvas receives the mouse grab.
+        # Resolve another field from that canvas, rather than requiring a
+        # second click to pass through Qt's private popup container.
+        for candidate in self.window().findChildren(DropDownCombo):
+            if candidate.isVisible() and candidate.isEnabled() and widget_global_rect(candidate).contains(point):
+                return candidate
+        if widget_global_rect(self).contains(point):
+            return self
+        return None
+
+    def _open_from_pointer_press(self, event, point):
+        # QComboBox's normal mouse-press path arms its release guard. Calling
+        # showPopup() directly skips that path, so a native grabbed release
+        # outside the new popup immediately closes it again.
+        rect = widget_global_rect(self)
+        local = QtCore.QPointF((point.x()-rect.x())*self.width()/max(1, rect.width()),
+                              (point.y()-rect.y())*self.height()/max(1, rect.height()))
+        press = QtGui.QMouseEvent(QtCore.QEvent.MouseButtonPress, local, QtCore.QPointF(point),
+                                 event.button(), event.buttons(), event.modifiers())
+        QtWidgets.QApplication.sendEvent(self, press)
 
     def _prepare_native_popup(self):
         # Scene popups cannot extend below the fixed application canvas.
         # Native child popups can use the desktop space beneath lower fields.
         popup = self.view().window()
+        before = getattr(self, '_popup_native_factor', 1.)
         if sys.platform == 'win32' and getattr(self.window(), '_ui_native_owner', None) is not None:
             popup.setWindowFlag(Qt.BypassGraphicsProxyWidget, True)
             self._popup_native_factor = widget_global_rect(self).width() / max(1, self.width())
         else:
             self._popup_native_factor = 1.
+        if before != self._popup_native_factor:
+            self.itemDelegate().invalidate_metrics()
 
     def eventFilter(self, watched, event):
+        if self._popup_filter_installed:
+            event_type = event.type()
+            if event_type in (QtCore.QEvent.MouseButtonPress, QtCore.QEvent.GraphicsSceneMousePress):
+                point = event.globalPos() if hasattr(event, 'globalPos') else event.screenPos()
+                if not widget_global_rect(self.view().window()).contains(point):
+                    candidate = self._combo_at_global_point(watched, point)
+                    self.hidePopup()
+                    if candidate is self:
+                        return True  # A second click on the open field closes it.
+                    if candidate is not None and candidate.isEnabled():
+                        candidate._open_from_pointer_press(event, point)
+                        return True
+                    # The original click can still activate the button/editor
+                    # it was addressed to, after synchronous dismissal.
+            elif event_type == QtCore.QEvent.ApplicationDeactivate:
+                self.hidePopup()
+            elif event_type == QtCore.QEvent.Hide and watched is self:
+                self.hidePopup()
         if (getattr(self, '_popup_layout_timer', None) is not None
                 and watched is self.view().window()):
             if event.type() == QtCore.QEvent.Paint:
@@ -687,6 +812,7 @@ class DropDownCombo(QComboBox):
                 self._queue_popup_layout()
             elif event.type() == QtCore.QEvent.Hide:
                 self._popup_layout_timer.stop()
+                self._clear_popup_session()
         return super().eventFilter(watched, event)
 
     def _queue_popup_layout(self, *args):
@@ -695,7 +821,6 @@ class DropDownCombo(QComboBox):
 
     def _popup_content_size(self):
         view = self.view()
-        view.doItemsLayout()
         heights, widest = [], 0
         root = self.rootModelIndex()
         option = QtWidgets.QStyleOptionViewItem()
@@ -707,7 +832,7 @@ class DropDownCombo(QComboBox):
             font = index.data(Qt.FontRole) or view.font()
             metrics = QtGui.QFontMetrics(font)
             hint = self.itemDelegate().sizeHint(option, index)
-            height = max(view.sizeHintForRow(row), hint.height())
+            height = hint.height()
             heights.append(height if height > 0 else metrics.height() + 6)
             # SizeHintRole may specify only a row height (the checkbox picker).
             # Measure text and decoration as well, so localized labels fit.
@@ -719,6 +844,9 @@ class DropDownCombo(QComboBox):
         visible = max(1, min(len(heights), self.maxVisibleItems()))
         # Allow any scrolled group of rows, including taller section headers.
         content_height = sum(sorted(heights, reverse=True)[:visible])
+        # The explicit empty-state label replaces the list completely.
+        empty = getattr(self, '_language_empty', None)
+        view.setMaximumHeight(0 if empty is not None and not empty.isHidden() and not heights else 16777215)
         layout = view.window().layout()
         margins = layout.contentsMargins()
         extras = [layout.itemAt(i).widget() for i in range(layout.count())]
@@ -731,7 +859,8 @@ class DropDownCombo(QComboBox):
         search = getattr(self, '_language_search', None)
         search_width = round(240*popup_scale(self)) if search is not None and not search.isHidden() else 0
         chrome_width = max((widget.minimumSizeHint().width() for widget in extras), default=0)
-        control_width = round(self.width() * getattr(self, '_popup_native_factor', 1.))
+        from combo_popup import popup_host_factor
+        control_width = round(self.width() * popup_host_factor(self))
         width = max(control_width, search_width, chrome_width + margins.left()+margins.right(),
                     widest + margins.left()+margins.right()+scrollbar)
         return QtCore.QSize(width, content_height + chrome)
@@ -741,19 +870,49 @@ class DropDownCombo(QComboBox):
             return
         self._laying_out_popup = True
         try:
+            self._sync_popup_host_metrics()
             popup = self.view().window()
             desired = self._popup_content_size()
             from language_search import stable_search_popup_size
             desired = stable_search_popup_size(self, desired)
             popup.setMinimumSize(0, 0)
-            if not position_embedded_combo_popup(self, popup, self.POPUP_GAP, desired):
-                anchor = widget_global_rect(self)
+            anchor = widget_global_rect(self)
+            embedded = position_embedded_combo_popup(self, popup, self.POPUP_GAP, desired)
+            if not embedded:
+                available = self._available_screen_rect()
                 popup.setGeometry(combo_popup_geometry(anchor, desired,
-                                                       self._available_screen_rect(), self.POPUP_GAP,
+                                                       available, self.POPUP_GAP,
                                                        prefer_below=True))
+            search = getattr(self, '_language_search', None)
+            if search is not None and not search.isHidden():
+                proxy = popup.graphicsProxyWidget() if embedded else None
+                bounds = self.window().rect() if embedded else available
+                context = (embedded, QtCore.QRect(bounds))
+                if (self._language_popup_anchor == anchor and self._language_popup_origin is not None
+                        and self._language_popup_bounds == context):
+                    if proxy is not None:
+                        placed = QtCore.QPointF(proxy.pos())
+                        proxy.setPos(self._language_popup_origin)
+                        rect = proxy.mapRectToItem(self.window().graphicsProxyWidget(), proxy.boundingRect()).toAlignedRect()
+                        if not bounds.contains(rect):
+                            proxy.setPos(placed)
+                    elif bounds.contains(QtCore.QRect(self._language_popup_origin, popup.size())):
+                        popup.move(self._language_popup_origin)
+                self._language_popup_anchor = QtCore.QRect(anchor)
+                self._language_popup_bounds = context
+                self._language_popup_origin = (QtCore.QPointF(proxy.pos()) if proxy is not None
+                                               else QtCore.QPoint(popup.pos()))
             if popup.layout() is not None:
                 popup.layout().activate()
-            self.view().scrollTo(self.view().currentIndex(), QtWidgets.QAbstractItemView.EnsureVisible)
+            # Reserve the scrollbar gutter when it disappears after filtering.
+            # In RTL this keeps flag columns from moving sideways.
+            if search is not None and not search.isHidden():
+                view = self.view()
+                gutter = view.verticalScrollBar().sizeHint().width() if not view.verticalScrollBar().isVisible() else 0
+                rtl = view.layoutDirection() == Qt.RightToLeft
+                margins = QtCore.QMargins(gutter if rtl else 0, 0, 0 if rtl else gutter, 0)
+                if view.viewportMargins() != margins:
+                    view.setViewportMargins(margins)
         finally:
             self._laying_out_popup = False
 
@@ -957,6 +1116,12 @@ class ResultWindowModeCombo(DropDownCombo):
         self.view().viewport().installEventFilter(self)
 
     def eventFilter(self, watched, event):
+        if (watched is self.view() and event.type() == QtCore.QEvent.ShortcutOverride
+                and event.key() in (Qt.Key_Return, Qt.Key_Enter, Qt.Key_Space)):
+            # Keep Qt's single-choice popup from accepting these before the
+            # existing key handler toggles an independent mode in place.
+            event.accept()
+            return True
         if watched is self.view() and event.type() == QtCore.QEvent.KeyPress:
             rows = [row for row in range(self.count()) if self.itemData(row) in self._modes]
             key = event.key()
@@ -1074,6 +1239,19 @@ class ResultWindowModeCombo(DropDownCombo):
             item = self.model().item(row)
             if not item.isEnabled():
                 item.setToolTip(self._help)
+        self._refresh_text()
+
+    def set_labels(self, labels, summaries, short_labels, *, header='', footer=''):
+        with QtCore.QSignalBlocker(self), QtCore.QSignalBlocker(self.model()):
+            self._summaries = dict(summaries)
+            self._short = dict(short_labels)
+            for mode, label in labels.items():
+                self._item(mode).setText(label)
+            headings = [self.model().item(row) for row in range(self.count())
+                        if not self.model().item(row).isEnabled()]
+            for item, label in zip(headings, (header, footer)):
+                item.setText(label)
+            self._refresh_icons()
         self._refresh_text()
 
     def set_dark(self, dark):
@@ -1416,6 +1594,7 @@ def _populate_grouped_ocr_combo(
     lang,
     foreground="#f4f6fb",
     installed_engines=None,
+    ready_only=False,
 ):
     """All bundled OCR providers process recognition locally/offline."""
     combo.clear()
@@ -1441,6 +1620,8 @@ def _populate_grouped_ocr_combo(
         )
     ]
     for engine in engines:
+        if ready_only and engine.lower() not in installed:
+            continue
         combo.addItem(engine, engine)
         combo.setItemData(
             combo.count() - 1,
@@ -1452,10 +1633,22 @@ def _populate_grouped_ocr_combo(
     combo.addItem('  API', None)
     _configure_engine_group_header(combo, combo.count() - 1, foreground)
     for name in VISION_ENGINES:
+        if ready_only and name.lower() not in installed:
+            continue
         combo.addItem(name, name)
         combo.setItemData(combo.count() - 1, tooltip_text(provider_text(lang, 'help')), Qt.ToolTipRole)
     from provider_categories import configure_categories
-    configure_categories(combo, groups, ('offline', 'api'))
+    # Remove empty headings/categories instead of opening a blank API list.
+    visible = []
+    for kind, caption in (('offline', f"  {groups['offline']}"), ('api', '  API')):
+        header = combo.findText(caption)
+        if header >= 0:
+            following = header + 1
+            if following >= combo.count() or combo.itemData(following, DropDownCombo.GROUP_HEADER_ROLE):
+                combo.removeItem(header)
+            else:
+                visible.append(kind)
+    configure_categories(combo, groups, tuple(visible))
 
 
 OCR_DETAIL_TEXT = {
@@ -2042,12 +2235,18 @@ def _version_to_tuple(version_text):
 
 
 def _is_newer_version(latest, current):
-    latest_tuple = _version_to_tuple(latest)
-    current_tuple = _version_to_tuple(current)
-    max_len = max(len(latest_tuple), len(current_tuple))
-    latest_tuple = latest_tuple + (0,) * (max_len - len(latest_tuple))
-    current_tuple = current_tuple + (0,) * (max_len - len(current_tuple))
-    return latest_tuple > current_tuple
+    from packaging.version import InvalidVersion, Version
+    if (not isinstance(latest, str) or not latest.strip()
+            or not isinstance(current, str) or not current.strip()):
+        return False
+    try:
+        latest_version = Version(_normalize_version(latest))
+        current_version = Version(_normalize_version(current))
+    except InvalidVersion:
+        return False
+    # Build identifiers do not make another release; prereleases retain their
+    # actual ordering instead of contributing extra numeric version parts.
+    return Version(latest_version.public) > Version(current_version.public)
 
 SETTINGS_TEXT = {
     "en": {
@@ -3908,6 +4107,23 @@ for _scale_lang, (_caption, _hint) in {
     SETTINGS_TEXT[_scale_lang].update(ui_scale_caption=_caption, ui_scale_edit_hint=_hint)
 
 
+for _refresh_lang, _refresh_text in {
+    'en': 'Some controls could not be refreshed. Reopen settings or restart the application to finish applying them.',
+    'ru': 'Не удалось обновить часть элементов интерфейса. Откройте настройки заново или перезапустите приложение, чтобы завершить применение.',
+    'es': 'No se pudieron actualizar algunos controles. Vuelve a abrir los ajustes o reinicia la aplicación para terminar de aplicarlos.',
+    'de': 'Einige Bedienelemente konnten nicht aktualisiert werden. Öffnen Sie die Einstellungen erneut oder starten Sie die Anwendung neu, um die Änderungen vollständig anzuwenden.',
+    'fr': 'Certains contrôles n’ont pas pu être actualisés. Rouvrez les réglages ou redémarrez l’application pour terminer leur application.',
+    'zh': '部分控件无法刷新。请重新打开设置或重启应用，以完成设置的应用。',
+    'pt': 'Não foi possível atualizar alguns controles. Reabra as configurações ou reinicie o aplicativo para concluir a aplicação das alterações.',
+    'it': 'Impossibile aggiornare alcuni controlli. Riapri le impostazioni o riavvia l’applicazione per completare l’applicazione delle modifiche.',
+    'ar': 'تعذّر تحديث بعض عناصر الواجهة. أعد فتح الإعدادات أو أعد تشغيل التطبيق لإكمال تطبيقها.',
+    'tr': 'Bazı denetimler yenilenemedi. Değişiklikleri uygulamayı tamamlamak için ayarları yeniden açın veya uygulamayı yeniden başlatın.',
+    'hi': 'इंटरफ़ेस के कुछ नियंत्रण ताज़ा नहीं हो सके। बदलाव लागू करना पूरा करने के लिए सेटिंग फिर खोलें या ऐप दोबारा शुरू करें।',
+    'id': 'Beberapa kontrol tidak dapat diperbarui. Buka kembali pengaturan atau mulai ulang aplikasi untuk menyelesaikan penerapannya.',
+}.items():
+    SETTINGS_TEXT[_refresh_lang]['settings_refresh_incomplete'] = _refresh_text
+
+
 SETTINGS_EXPORT_FORMAT = "clickntranslate-settings"
 SETTINGS_EXPORT_SCHEMA = 1
 
@@ -4007,6 +4223,8 @@ def validated_import_settings(payload, defaults):
                           and math.isfinite(value[axis]) for axis in ('x', 'y'))):
                 accepted[key] = dict(screen=value.get('screen', '')[:256],
                                      x=max(0., min(1., value['x'])), y=max(0., min(1., value['y'])))
+                if value.get('space') == 'screen':
+                    accepted[key]['space'] = 'screen'
             continue
         valid = False
         if isinstance(default, bool):
@@ -6114,9 +6332,16 @@ def language_manager_text(lang, key, **values):
     return value.format(**values) if values else value
 
 
+def _package_controls(table):
+    return [*getattr(table, '_package_action_buttons', ()),
+            *getattr(table, '_package_engine_actions', ())]
+
+
 class OcrLanguageManagerDialog(QDialog):
     _runtime_probe_ready = QtCore.pyqtSignal(object)
     _package_sizes_ready = QtCore.pyqtSignal(object)
+    _update_plan_ready = QtCore.pyqtSignal(str, object)
+    _engine_states_ready = QtCore.pyqtSignal(object)
 
     def __init__(self, owner):
         super().__init__(native_window_parent(owner))
@@ -6152,20 +6377,28 @@ class OcrLanguageManagerDialog(QDialog):
         self._runtime_probe_active = False
         self._package_sizes = None
         self._package_sizes_error = ''
+        self._engine_states = {}
+        self._download_access_page = None
         self._title_drag_offset = None
         self._centered_once = False
 
         from package_presentation import text as package_text
-        self.setWindowTitle(package_text(self.lang, 'title'))
+        from engine_center import text as center_text
+        self.setWindowTitle(center_text(self.lang, 'title'))
         self.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
         self.setObjectName("languageManagerDialog")
         self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
+        self.setAttribute(Qt.WA_StyledBackground, True)
+        self.setAttribute(Qt.WA_OpaquePaintEvent, True)
+        self.setAttribute(Qt.WA_NoSystemBackground, False)
+        self.setAttribute(Qt.WA_TranslucentBackground, False)
         self.setWindowModality(Qt.NonModal)
         self.setFixedSize(640, 558)
 
         root_layout = QVBoxLayout(self)
-        root_layout.setContentsMargins(0, 0, 0, 0)
+        root_layout.setContentsMargins(1, 1, 1, 1)
         root_layout.setSpacing(0)
+        root_layout.setSizeConstraint(QtWidgets.QLayout.SetNoConstraint)
 
         self.title_bar = QFrame(self)
         self.title_bar.setObjectName("languageManagerTitleBar")
@@ -6180,7 +6413,7 @@ class OcrLanguageManagerDialog(QDialog):
         self.title_icon.setPixmap(QIcon(resource_path("icons/icon.ico")).pixmap(18, 18))
         title_layout.addWidget(self.title_icon, 0, Qt.AlignVCenter)
 
-        self.title_label = QLabel(package_text(self.lang, 'title'))
+        self.title_label = QLabel(center_text(self.lang, 'title'))
         self.title_label.setObjectName("languageManagerTitleLabel")
         self.title_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         title_layout.addWidget(self.title_label, 1)
@@ -6196,7 +6429,7 @@ class OcrLanguageManagerDialog(QDialog):
         title_layout.addWidget(self.title_close_btn, 0, Qt.AlignVCenter)
         root_layout.addWidget(self.title_bar)
 
-        self.content_widget = QWidget(self)
+        self.content_widget = EngineCenterSurface(self)
         self.content_widget.setObjectName("languageManagerContent")
         root_layout.addWidget(self.content_widget, 1)
 
@@ -6208,12 +6441,12 @@ class OcrLanguageManagerDialog(QDialog):
         for drag_widget in self._title_drag_widgets:
             drag_widget.installEventFilter(self)
 
-        intro = QLabel(package_text(self.lang, 'intro'))
+        intro = QLabel(center_text(self.lang, 'intro'), self.content_widget)
         self.intro_label = intro
         intro.setWordWrap(True)
         intro.setStyleSheet("font-size: 13px;")
         intro.setMinimumHeight(32)
-        layout.addWidget(intro)
+        intro.hide()
 
         # Keep OCR engines and translation packages in two explicit visual
         # sections.  Nested tabs preserve the fixed window size while avoiding
@@ -6245,9 +6478,15 @@ class OcrLanguageManagerDialog(QDialog):
         self.api_section_page = QWidget(self.tabs)
         self.api_section_layout = QVBoxLayout(self.api_section_page)
         self.api_section_layout.setContentsMargins(0, 0, 0, 0)
+        # This explanation belongs to API content, below the shared tab row.
+        # Showing it above the tabs moved the whole navigation on every visit.
+        intro.setContentsMargins(0, 8, 0, 0)
+        self.api_section_layout.addWidget(intro)
         self.api_page = None
         self.tabs.addTab(self.api_section_page, "API")
-        layout.addWidget(self.tabs)
+        self.body_stack = QStackedWidget(self)
+        self.body_stack.addWidget(self.tabs)
+        layout.addWidget(self.body_stack, 1)
 
         self.windows_table = None
         self.tesseract_table = None
@@ -6256,6 +6495,25 @@ class OcrLanguageManagerDialog(QDialog):
         self.hymt_table = None
         self.argos_table = None
         self._build_tabs()
+        from engine_center import text as center_text
+        for engine, name, kind in reversed(TRANSLATOR_ENGINE_OPTIONS):
+            if kind != 'online':
+                continue
+            page = QWidget(self.translation_tabs)
+            page.setProperty('translationEngine', engine)
+            body = QVBoxLayout(page)
+            body.setContentsMargins(8, 8, 8, 8)
+            note = QLabel(center_text(self.lang, 'no_download'), page)
+            note.setWordWrap(True)
+            body.addWidget(note)
+            description = QLabel(page)
+            description.setWordWrap(True)
+            description.setTextFormat(Qt.PlainText)
+            from translation_availability import recovery_text
+            description.setText(name + ' · ' + recovery_text(self.lang, 'online'))
+            body.addWidget(description)
+            body.addStretch(1)
+            self.translation_tabs.insertTab(0, page, name)
         self._engine_selectors = []
         for inner, section_layout in ((self.ocr_tabs, ocr_section_layout),
                                       (self.translation_tabs, translation_section_layout)):
@@ -6273,22 +6531,37 @@ class OcrLanguageManagerDialog(QDialog):
             inner.tabBar().hide()
             form.addWidget(label)
             form.addWidget(picker, 1)
-            for index in range(inner.count()):
-                table = inner.widget(index).findChild(PackageTable)
-                if table is None:
-                    continue
-                for button in table._package_action_buttons:
-                    if button.property('packageAction') not in ('update', 'settings'):
-                        continue
-                    if button.property('packageAction') == 'update':
-                        button.setText('↻')
-                    form.addWidget(button)
-                    button.setVisible(index == inner.currentIndex() and not getattr(table, '_package_is_missing', False))
-                    inner.currentChanged.connect(
-                        lambda current, target=button, page_index=index, target_table=table:
-                        target.setVisible(current == page_index and not getattr(target_table, '_package_is_missing', False)))
+            activate = EngineActivationButton(center_text(self.lang, 'activate'), row)
+            activate.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
+            activate.setObjectName('engineActivateButton')
+            activate.setFixedHeight(30)
+            activate.clicked.connect(self._activate_selected_engine)
+            form.addWidget(activate)
+            inner._activate_button = activate
+            tools = QToolButton(row)
+            tools.setObjectName('engineTools')
+            tools.setIconSize(QtCore.QSize(18, 18))
+            tools.setFixedSize(30, 30)
+            tools.setAccessibleName(center_text(self.lang, 'more'))
+            tools.setToolTip(tooltip_text(center_text(self.lang, 'more')))
+            tools.setPopupMode(QToolButton.InstantPopup)
+            menu = QtWidgets.QMenu(tools)
+            tools.setMenu(menu)
+            inner._tools_button, inner._tools_menu = tools, menu
+            menu.aboutToShow.connect(lambda target=inner: self._populate_engine_menu(target))
+            form.addWidget(tools)
             section_layout.insertWidget(0, row)
             self._engine_selectors.append(picker)
+            config_key = 'ocr_engine' if inner is self.ocr_tabs else 'translator_engine'
+            from provider_catalog import provider_id
+            current = provider_id(getattr(self._owner_app(), 'config', {}).get(config_key))
+            for index in range(inner.count()):
+                page = inner.widget(index)
+                table = page.findChild(PackageTable)
+                key = table._package_engine if table is not None else page.property('translationEngine')
+                if current == key:
+                    inner.setCurrentIndex(index)
+                    break
         for inner in (self.tabs, self.ocr_tabs, self.translation_tabs):
             inner.currentChanged.connect(self._on_tab_changed)
 
@@ -6296,10 +6569,9 @@ class OcrLanguageManagerDialog(QDialog):
         # Where a backgrounded install reports itself. Sending the progress
         # window away should not mean losing sight of the work, and it should
         # not cost another window either.
-        self.task_status_label = QLabel("")
+        self.task_status_label = EngineTaskLabel(self.content_widget)
         self.task_status_label.setObjectName("languagePackageTaskStatus")
         self.task_status_label.setWordWrap(False)
-        self.task_status_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self.task_status_label.hide()
         bottom.addWidget(self.task_status_label, 1)
         self.task_show_button = QPushButton(
@@ -6310,13 +6582,24 @@ class OcrLanguageManagerDialog(QDialog):
         self.task_show_button.hide()
         bottom.addWidget(self.task_show_button)
         bottom.addStretch()
-        self.refresh_btn = QPushButton(language_manager_text(self.lang, "refresh"))
-        self.refresh_btn.clicked.connect(self.refresh_catalog)
-        bottom.addWidget(self.refresh_btn)
-        self.close_btn = QPushButton(settings_text(self.lang, "back"))
+        self.download_access_btn = EngineActivationButton(center_text(self.lang, 'connection'), self.content_widget)
+        self.download_access_btn.captions = tuple(center_text(self.lang, key) for key in ('connection', 'back'))
+        self.download_access_btn.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.download_access_btn.setToolTip(tooltip_text(center_text(self.lang, 'network_intro')))
+        self.download_access_btn.clicked.connect(self._toggle_download_access)
+        bottom.addWidget(self.download_access_btn)
+        self.refresh_btn = QtWidgets.QAction(center_text(self.lang, 'refresh_list'), self)
+        self.refresh_btn.triggered.connect(self.refresh_catalog)
+        self.close_btn = QPushButton(settings_text(self.lang, "close"), self.content_widget)
         self.close_btn.clicked.connect(self.accept)
         bottom.addWidget(self.close_btn)
+        for button in (self.download_access_btn, self.close_btn):
+            button.setFixedHeight(30)
         layout.addLayout(bottom)
+
+        self._surface_refresh_timer = QtCore.QTimer(self)
+        self._surface_refresh_timer.setSingleShot(True)
+        self._surface_refresh_timer.timeout.connect(self._refresh_surfaces)
 
         self._apply_style()
         for package_table in (
@@ -6336,6 +6619,8 @@ class OcrLanguageManagerDialog(QDialog):
         self.translation_tabs.tabBar().setUsesScrollButtons(False)
         self._runtime_probe_ready.connect(self._on_runtime_probe_ready)
         self._package_sizes_ready.connect(self._on_package_sizes_ready)
+        self._update_plan_ready.connect(self._on_update_plan_ready)
+        self._engine_states_ready.connect(self._on_engine_states_ready)
         # These callbacks belong to this dialog. A bare singleShot lambda can
         # outlive it when the app closes before the first event-loop turn.
         self._initial_probe_timer = QtCore.QTimer(self)
@@ -6346,6 +6631,8 @@ class OcrLanguageManagerDialog(QDialog):
         self._initial_catalog_timer.setSingleShot(True)
         self._initial_catalog_timer.timeout.connect(lambda: self._start_argos_catalog_refresh(True))
         self._initial_catalog_timer.start(0)
+        self._ensure_engine_table(self._active_engine_table())
+        self._refresh_activation()
 
     def _owner_app(self):
         owner_parent = getattr(self.owner, "parent", None)
@@ -6356,6 +6643,49 @@ class OcrLanguageManagerDialog(QDialog):
                 owner_parent = None
         return owner_parent
 
+    def paintEvent(self, event):
+        # Clear the native backing store when table/empty-state layouts move
+        # their controls. Transparent child pages must not retain old pixels.
+        from classic_style import classic_palette
+        painter = QtGui.QPainter(self)
+        colors = classic_palette(self._is_dark_theme())
+        painter.fillRect(self.rect(), QColor(colors['background']))
+        painter.setPen(QColor(colors['border']))
+        painter.drawRect(self.rect().adjusted(0, 0, -1, -1))
+        painter.end()
+
+    def event(self, event):
+        result = super().event(event)
+        timer = getattr(self, '_surface_refresh_timer', None)
+        if timer is not None and event.type() in (QtCore.QEvent.LayoutRequest, QtCore.QEvent.Resize,
+                                                   QtCore.QEvent.StyleChange, QtCore.QEvent.FontChange):
+            timer.start(0)
+        return result
+
+    def _refresh_surfaces(self):
+        if not self.updatesEnabled():
+            return
+        self.update(self.rect())
+        self.content_widget.update(self.content_widget.rect())
+
+    def _populate_engine_menu(self, tabs):
+        menu = tabs._tools_menu
+        menu.clear()
+        page = tabs.currentWidget()
+        table = page.findChild(PackageTable) if page is not None else None
+        if table is not None and not getattr(table, '_package_is_missing', True):
+            for action in table._package_engine_actions:
+                if action.isVisible():
+                    menu.addAction(action)
+            remove = getattr(table, '_package_remove_engine_button', None)
+            if remove is not None and remove.isVisible():
+                if menu.actions():
+                    menu.addSeparator()
+                menu.addAction(remove)
+        if menu.actions():
+            menu.addSeparator()
+        menu.addAction(self.refresh_btn)
+
     def _is_dark_theme(self):
         theme = str(getattr(self._owner_app(), "current_theme", "") or "").strip().lower()
         return bool(theme) and theme not in {"светлая", "light", "white"}
@@ -6363,12 +6693,15 @@ class OcrLanguageManagerDialog(QDialog):
     def _apply_style(self):
         from classic_style import classic_palette
         dark = self._is_dark_theme()
+        self.content_widget.set_dark(dark)
         c = classic_palette(dark)
-        self.setStyleSheet(f"""
+        set_widget_stylesheet(self, f"""
             QDialog#languageManagerDialog {{ background:{c['background']}; color:{c['text']}; border:1px solid {c['border']}; font-family:'Segoe UI'; font-size:13px; }}
             QWidget#languageManagerContent {{ background:{c['background']}; }}
             QLabel {{ color:{c['text']}; font-size:13px; }}
             QLabel#packageSizeSummary {{ color:{c['muted']}; font-size:12px; padding:2px 0; }}
+            QFrame#downloadAccessRow {{ background:{c['field']}; border:1px solid {c['border']}; border-radius:6px; }}
+            QFrame#downloadAccessRow QLabel {{ background:transparent; border:0; }}
             QFrame#languageManagerTitleBar {{ background:{c['header']}; border:0; border-bottom:1px solid {c['header_border']}; }}
             QLabel#languageManagerTitleIcon, QLabel#languageManagerTitleLabel {{ background:transparent; border:0; }}
             QLabel#languageManagerTitleLabel {{ font-size:13px; font-weight:600; }}
@@ -6391,15 +6724,16 @@ class OcrLanguageManagerDialog(QDialog):
             self.api_page.apply_theme()
 
     def show_api(self, provider=None):
+        self.body_stack.setCurrentWidget(self.tabs)
         if self.api_page is None:
             from provider_settings import ProviderSettingsPage
             self.api_page = ProviderSettingsPage(self.owner, self.api_section_page)
             self.api_section_layout.addWidget(self.api_page)
         self.tabs.setCurrentWidget(self.api_section_page)
-        from provider_settings import connection_text
-        self.intro_label.setText(connection_text(self.lang, 5))
+        from engine_center import text as center_text
+        self.intro_label.setText(center_text(self.lang, 'api_intro'))
         self.intro_label.show()
-        self.refresh_btn.hide()
+        self.refresh_btn.setVisible(False)
         if provider is not None:
             index = self.api_page.service.findData(provider)
             if index >= 0:
@@ -6407,7 +6741,44 @@ class OcrLanguageManagerDialog(QDialog):
         self.api_page.apply_theme()
         return self.api_page
 
+    def _toggle_download_access(self):
+        from engine_center import text as center_text
+        if self.body_stack.currentWidget() is self.tabs:
+            if self._download_access_page is None:
+                from download_access import DownloadAccessPage
+                self._download_access_page = DownloadAccessPage(self.lang, self)
+                self.body_stack.addWidget(self._download_access_page)
+            self.body_stack.setCurrentWidget(self._download_access_page)
+            self.intro_label.hide()
+            self.refresh_btn.setVisible(False)
+            self.download_access_btn.setText(center_text(self.lang, 'back'))
+            catalog = self._package_sizes.catalog if self._package_sizes is not None else None
+            self._download_access_page.start(catalog)
+        else:
+            self.body_stack.setCurrentWidget(self.tabs)
+            self.download_access_btn.setText(center_text(self.lang, 'connection'))
+            self._on_tab_changed(self.tabs.currentIndex())
+
     def _apply_package_tab_styles(self):
+        from engine_center import text as center_text
+        from engine_center_widgets import engine_actions_icon
+        from combo_popup import popup_palette
+        colors = popup_palette(self._is_dark_theme())
+        for inner in (self.ocr_tabs, self.translation_tabs):
+            if not hasattr(inner, '_tools_button'):
+                continue
+            inner._tools_button.setStyleSheet(button_qss(self._is_dark_theme(), 'secondary',
+                'QToolButton#engineTools', compact=True) + '''QToolButton#engineTools { padding:0; }
+                QToolButton#engineTools::menu-indicator { image:none; width:0; height:0; }''')
+            inner._tools_button.setIcon(engine_actions_icon(self._is_dark_theme()))
+            inner._tools_menu.setStyleSheet(f'''QMenu {{ background:{colors['surface']}; color:{colors['text']};
+                border:1px solid {colors['border']}; padding:4px; }}
+                QMenu::item {{ padding:6px 16px; }}
+                QMenu::item:selected {{ background:{colors['hover']}; }}
+                QMenu::item:disabled {{ color:{colors['muted']}; }}''')
+            button = inner._activate_button
+            button.captions = tuple(center_text(self.lang, key) for key in ('active', 'activate'))
+            button.updateGeometry()
         for tabs in (self.tabs, self.ocr_tabs, self.translation_tabs):
             tabs.tabBar().setStyleSheet('')
             tabs.tabBar().apply_theme(self._is_dark_theme())
@@ -6419,10 +6790,12 @@ class OcrLanguageManagerDialog(QDialog):
         for table in (self.windows_table, self.tesseract_table, self.easyocr_table, self.rapidocr_table,
                       self.hymt_table, self.argos_table):
             if table is not None:
-                for button in table._package_action_buttons:
-                    if button.property('packageAction') in ('update', 'settings'):
+                for button in _package_controls(table):
+                    if isinstance(button, QWidget) and button.property('packageAction') in ('update', 'settings'):
                         button.ensurePolished()
                         button.setFixedHeight(30)
+                        if button.property('packageAction') == 'update':
+                            self._set_update_button_caption(button)
 
     @staticmethod
     def _apply_tab_bar_font(tab_bar, pixel_size, bold=False):
@@ -6530,24 +6903,102 @@ class OcrLanguageManagerDialog(QDialog):
     def _on_tab_changed(self, _index):
         api = self.tabs.currentWidget() is self.api_section_page
         from package_presentation import text as package_text
-        from provider_settings import connection_text
-        self.intro_label.setText(connection_text(self.lang, 5) if api else package_text(self.lang, 'intro'))
-        self.intro_label.show()
+        from engine_center import text as center_text
+        self.intro_label.setText(center_text(self.lang, 'api_intro') if api else center_text(self.lang, 'intro'))
+        self.intro_label.setVisible(api)
         self.refresh_btn.setVisible(not api)
         if api and self.api_page is None:
             self.show_api()
+        self._ensure_engine_table(self._active_engine_table())
+        self._refresh_activation()
         # A page is laid out when it is first shown, so its table can only be
         # measured after switching to it.
         QtCore.QTimer.singleShot(0, self._snap_visible_table)
 
     def _snap_visible_table(self):
-        for table in (self.windows_table, self.tesseract_table, self.easyocr_table,
-                      self.rapidocr_table, self.argos_table):
-            if table is not None and table.isVisible():
-                # Fitting columns may remove a temporary horizontal scrollbar
-                # and change row heights. Measure the cap after that settles.
-                table.fit_columns()
-                self._snap_table_to_whole_rows(table)
+        table = self._active_engine_table()
+        self._ensure_engine_table(table)
+        if table is not None and table.isVisible():
+            # Fitting columns may remove a temporary horizontal scrollbar
+            # and change row heights. Measure the cap after that settles.
+            table.fit_columns()
+            self._snap_table_to_whole_rows(table)
+
+    def _active_engine_table(self):
+        """Use selected pages even before show(); an empty page must never paint."""
+        if self.body_stack.currentWidget() is not self.tabs:
+            return None
+        section = self.tabs.currentWidget()
+        inner = (self.ocr_tabs if section is self.ocr_section_page else
+                 self.translation_tabs if section is self.translation_section_page else None)
+        page = inner.currentWidget() if inner is not None else None
+        return page.findChild(PackageTable) if page is not None else None
+
+    def _refresh_activation(self):
+        from engine_center import text as center_text
+        from provider_catalog import provider_id
+        app = self._owner_app()
+        config = getattr(app, 'config', {}) or {}
+        for inner, key in ((self.ocr_tabs, 'ocr_engine'), (self.translation_tabs, 'translator_engine')):
+            button = getattr(inner, '_activate_button', None)
+            if button is None:
+                continue
+            page = inner.currentWidget()
+            table = page.findChild(PackageTable) if page is not None else None
+            online = page.property('translationEngine') if page is not None else None
+            ready = bool(online) or (table is not None and not getattr(table, '_package_is_missing', True))
+            engine = table._package_engine if table is not None else online or ''
+            active = ready and provider_id(config.get(key)) == engine
+            button.setText(center_text(self.lang, 'active' if active else 'activate'))
+            button.setEnabled(ready and not active and not self._install_in_progress)
+            button.setToolTip(tooltip_text(center_text(self.lang, 'setup_first')) if not ready
+                              else tooltip_text(button.text()))
+
+    def _activate_selected_engine(self):
+        table = self._active_engine_table()
+        online_page = self.translation_tabs.currentWidget()
+        online = online_page.property('translationEngine') if online_page is not None else None
+        if table is None:
+            if self.tabs.currentWidget() is not self.translation_section_page or not online:
+                return
+            engine = online
+        elif getattr(table, '_package_is_missing', True):
+            return
+        else:
+            engine = table._package_engine
+        if table is not None and table._package_target_tabs is self.ocr_tabs:
+            name = 'Apple Vision' if engine == 'apple vision' else next(
+                (self.ocr_tabs.tabText(i) for i in range(self.ocr_tabs.count())
+                 if self.ocr_tabs.widget(i) is table.parentWidget()), engine)
+            self.owner.save_ocr_engine(name)
+        else:
+            self.owner.auto_save_setting('translator_engine', engine)
+        self.owner._refresh_ready_engine_choices()
+        from provider_settings import refresh_provider_routing
+        refresh_provider_routing(self.owner)
+        self._refresh_activation()
+
+    def _ensure_engine_table(self, table):
+        if table is None or getattr(table, '_package_populating', False):
+            return
+        populate = getattr(table, '_package_populate', None)
+        if populate is None or not getattr(table, '_package_rows_dirty', True):
+            return
+        table._package_populating = True
+        try:
+            populate(table)
+            table._package_rows_dirty = False
+            states = getattr(self, '_engine_states', None)
+            if states:
+                self._on_engine_states_ready(states)
+        finally:
+            table._package_populating = False
+
+    def _refresh_engine_table(self, table):
+        if table is not None:
+            table._package_rows_dirty = True
+            if table is self._active_engine_table():
+                self._ensure_engine_table(table)
 
     def _build_tabs(self):
         if platform_support.IS_MAC:
@@ -6600,10 +7051,6 @@ class OcrLanguageManagerDialog(QDialog):
             install_engine_callback=self._install_easyocr_engine,
             remove_engine_callback=self._remove_easyocr_engine,
         )
-        from component_texts import update_hint
-        for button in self.easyocr_table._package_action_buttons:
-            if button.text() == component_update_label(self.lang,'EasyOCR'):
-                button.setToolTip(update_hint(self.lang,'EasyOCR'))
         self.rapidocr_table = self._add_engine_tab(
             self.ocr_tabs,
             "RapidOCR",
@@ -6622,13 +7069,6 @@ class OcrLanguageManagerDialog(QDialog):
             remove_engine_callback=self._remove_rapidocr_engine,
         )
         self.rapidocr_table.setColumnHidden(0, True)
-        from component_texts import update_hint
-        for button in self.tesseract_table._package_action_buttons:
-            if button.text() == component_update_label(self.lang, 'Tesseract'):
-                button.setToolTip(update_hint(self.lang, 'Tesseract'))
-        from component_texts import UPDATE_HINTS
-        for button in self.rapidocr_table._package_action_buttons:
-            button.setToolTip(UPDATE_HINTS.get(self.lang, UPDATE_HINTS['en']))
 
         self.hymt_table = self._add_engine_tab(
             self.translation_tabs,
@@ -6648,9 +7088,6 @@ class OcrLanguageManagerDialog(QDialog):
             remove_engine_callback=self._remove_hymt_engine,
         )
         self.hymt_table.setColumnHidden(0, True)
-        from component_texts import update_hint
-        for button in self.hymt_table._package_action_buttons:
-            button.setToolTip(update_hint(self.lang, 'Hy-MT'))
 
         self.argos_table = self._add_engine_tab(
             self.translation_tabs,
@@ -6671,10 +7108,6 @@ class OcrLanguageManagerDialog(QDialog):
             ],
             search_placeholder=language_manager_text(self.lang, "search"),
         )
-        from component_texts import update_hint
-        for button in self.argos_table._package_action_buttons:
-            if button.text() == component_update_label(self.lang, 'Argos'):
-                button.setToolTip(update_hint(self.lang, 'Argos'))
 
     def _engine_remove_button_style(self):
         return button_qss(self._is_dark_theme(), "danger",
@@ -6701,29 +7134,25 @@ class OcrLanguageManagerDialog(QDialog):
         note_label = QLabel(note)
         note_label.setWordWrap(True)
 
-        # Removing an engine used to be a small × inside the picker in Settings,
-        # which is not where anyone looks for it. It belongs on the engine's own
-        # tab, opposite the note, next to everything else about that engine.
+        # Engine maintenance belongs to the selector menu. The language list
+        # below offers only installing or removing its selected packages.
         remove_engine_button = None
         header_row = QHBoxLayout()
         header_row.setContentsMargins(0, 0, 0, 0)
         header_row.setSpacing(10)
         header_row.addWidget(note_label, 1)
         if remove_engine_callback is not None:
-            remove_engine_button = QPushButton(language_manager_text(self.lang, "remove_engine"))
+            remove_engine_button = QtWidgets.QAction(language_manager_text(self.lang, "remove_engine"), page)
             remove_engine_button.setObjectName("languagePackageEngineRemove")
-            remove_engine_button.setCursor(Qt.PointingHandCursor)
-            remove_engine_button.setMinimumHeight(30)
             remove_engine_button.setToolTip(
                 tooltip_text(language_manager_text(self.lang, "remove_engine_tooltip", engine=title))
             )
-            remove_engine_button.setStyleSheet(self._engine_remove_button_style())
-            remove_engine_button.clicked.connect(remove_engine_callback)
-            header_row.addWidget(remove_engine_button, 0, Qt.AlignTop | Qt.AlignRight)
+            remove_engine_button.triggered.connect(remove_engine_callback)
         layout.addLayout(header_row)
 
         from package_presentation import text as package_text
         size_label = QLabel(package_text(self.lang, 'unknown'), page)
+        size_label.setTextFormat(Qt.PlainText)
         size_label.setObjectName('packageSizeSummary')
         size_label.setWordWrap(True)
         size_label.setToolTip(tooltip_text(package_text(self.lang, 'size_help')))
@@ -6732,7 +7161,7 @@ class OcrLanguageManagerDialog(QDialog):
         missing_frame = QFrame(page)
         missing_frame.setObjectName("languagePackageEmptyState")
         missing_layout = QVBoxLayout(missing_frame)
-        missing_layout.setContentsMargins(32, 24, 32, 24)
+        missing_layout.setContentsMargins(20, 16, 20, 16)
         missing_layout.setSpacing(10)
         missing_layout.addStretch()
         missing_title = QLabel()
@@ -6806,9 +7235,10 @@ class OcrLanguageManagerDialog(QDialog):
         table.cellClicked.connect(
             lambda row, column, target=table: self._on_package_row_clicked(target, row, column)
         )
+        table.itemSelectionChanged.connect(lambda target=table: self._sync_package_selection(target))
         if filter_edit is not None:
             filter_edit.textChanged.connect(lambda _text, target=table: populate_func(target))
-        layout.addWidget(table)
+        layout.addWidget(table, 1)
 
         action_widget = QWidget(page)
         action_row = QGridLayout(action_widget)
@@ -6817,28 +7247,49 @@ class OcrLanguageManagerDialog(QDialog):
         action_row.setColumnStretch(0, 1)
         action_row.setColumnStretch(1, 1)
         table._package_action_buttons = []
+        table._package_engine_actions = []
         for index, (text, callback, role) in enumerate(actions):
-            button = QPushButton(text)
-            button.setObjectName("languagePackageAction")
-            button.setMinimumHeight(32)
-            button.setProperty("buttonRole", role)
-            button.setProperty('packageBaseText', text)
-            button.setAccessibleName(text)
+            # Give every action an owner before setting its visibility. Update
+            # and settings actions previously flashed as tiny native windows.
             action = ('install' if role == 'primary' else 'remove' if role == 'danger' else
                       'update' if callback.__name__.startswith('_update_') else 'settings')
+            if action in ('update', 'settings'):
+                button = QtWidgets.QAction(text, table)
+                trigger = button.triggered
+                table._package_engine_actions.append(button)
+            else:
+                button = QPushButton(text, action_widget)
+                button.setObjectName("languagePackageAction")
+                button.setMinimumHeight(32)
+                button.setAccessibleName(text)
+                button.setStyleSheet(button_qss(self._is_dark_theme(), role))
+                trigger = button.clicked
+                table._package_action_buttons.append(button)
+            button.setProperty("buttonRole", role)
+            button.setProperty('packageBaseText', text)
             button.setProperty('packageAction', action)
             if action == 'update':
                 button.setToolTip(tooltip_text(text))
-            button.setStyleSheet(button_qss(self._is_dark_theme(), role))
-            button.clicked.connect(callback)
-            table._package_action_buttons.append(button)
+            if action == 'update':
+                button.setProperty('packageUpdatePlan', None)
+                trigger.connect(lambda _checked=False, target=table, action_button=button, install=callback:
+                                       self._request_update_check(target, action_button, install))
+                self._set_update_button_caption(button)
+            else:
+                trigger.connect(callback)
             if role == 'primary':
                 action_row.addWidget(button, 0, 0)
             elif role == 'danger':
                 action_row.addWidget(button, 0, 1)
+        action_widget.setVisible(bool(table._package_action_buttons))
         layout.addWidget(action_widget)
 
         table._package_note_label = note_label
+        table._package_default_note = note
+        missing_body.setToolTip(tooltip_text(note))
+        from engine_center import text as center_text
+        if install_engine_callback is not None:
+            missing_body.setText(center_text(self.lang, 'base'))
         table._package_remove_engine_button = remove_engine_button
         table._package_action_widget = action_widget
         table._package_missing_frame = missing_frame
@@ -6849,10 +7300,30 @@ class OcrLanguageManagerDialog(QDialog):
         table._package_target_tabs = target_tabs
         table._package_engine = title.lower().replace('hy-mt', 'hymt')
         table._package_size_label = size_label
+        table._package_populate = populate_func
+        table._package_rows_dirty = True
         target_tabs.addTab(page, title)
-        populate_func(table)
+        # All pages retain their normal structure and actions. Populate only
+        # the selected page; hidden tables can contain hundreds of language
+        # items and should not delay opening an unrelated engine or API page.
+        if table is self._active_engine_table():
+            self._ensure_engine_table(table)
         self._update_package_sizes(table)
+        self._sync_package_selection(table)
         return table
+
+    def _sync_package_selection(self, table):
+        from engine_center import text as center_text
+        pending = bool(getattr(table, '_pending_package_codes', ())) or any(table.item(row, 0) is not None
+                      and table.item(row, 0).checkState() == Qt.Checked
+                      and not table.item(row, 0).data(Qt.UserRole + 1)
+                      and bool(table.item(row, 0).flags() & Qt.ItemIsEnabled)
+                      for row in range(table.rowCount()))
+        removable = bool(self._highlighted_installed_codes(table))
+        for button in getattr(table, '_package_action_buttons', ()):
+            install = button.property('packageAction') == 'install'
+            button.setEnabled(not self._install_in_progress and (pending if install else removable))
+            button.setToolTip(tooltip_text(center_text(self.lang, 'install_hint' if install else 'remove_hint')))
 
     def _set_engine_missing_state(self, table, missing, engine_name=""):
         missing = bool(missing)
@@ -6871,16 +7342,12 @@ class OcrLanguageManagerDialog(QDialog):
             filter_edit.setVisible(not missing)
         actions = getattr(table, "_package_action_widget", None)
         if actions is not None:
-            actions.setVisible(not missing)
+            actions.setVisible(not missing and bool(table._package_action_buttons))
         # Nothing to remove while the engine is missing: that state offers
         # Install engine in the middle of the page instead.
         remove_engine = getattr(table, "_package_remove_engine_button", None)
         if remove_engine is not None:
             remove_engine.setVisible(not missing)
-        for button in getattr(table, '_package_action_buttons', ()):
-            if button.property('packageAction') in ('update', 'settings'):
-                target_tabs = table._package_target_tabs
-                button.setVisible(not missing and target_tabs.currentWidget() is table.parentWidget())
         title = getattr(table, "_package_missing_title", None)
         if title is not None:
             title.setText(
@@ -6890,11 +7357,16 @@ class OcrLanguageManagerDialog(QDialog):
                     engine=engine_name,
                 )
             )
+        self._refresh_activation()
 
     def focus_translation_engine(self, engine, source='', target=''):
         engine = str(engine).lower().replace('hy-mt', 'hymt')
-        table = self.hymt_table if engine == 'hymt' else self.argos_table
         self.tabs.setCurrentWidget(self.translation_section_page)
+        for index in range(self.translation_tabs.count()):
+            if self.translation_tabs.widget(index).property('translationEngine') == engine:
+                self.translation_tabs.setCurrentIndex(index)
+                return
+        table = self.hymt_table if engine == 'hymt' else self.argos_table
         self.translation_tabs.setCurrentWidget(table.parentWidget())
         if engine == 'argos':
             search = getattr(table, '_package_filter_edit', None)
@@ -6917,13 +7389,9 @@ class OcrLanguageManagerDialog(QDialog):
                 return
 
     def refresh_all(self):
-        if self.windows_table is not None:
-            self._populate_windows_table(self.windows_table)
-        self._populate_tesseract_table(self.tesseract_table)
-        self._populate_easyocr_table(self.easyocr_table)
-        self._populate_rapidocr_table(self.rapidocr_table)
-        self._populate_hymt_table(self.hymt_table)
-        self._populate_argos_table(self.argos_table)
+        for name in ('apple_vision_table', 'windows_table', 'tesseract_table', 'easyocr_table',
+                     'rapidocr_table', 'hymt_table', 'argos_table'):
+            self._refresh_engine_table(getattr(self, name, None))
 
     def refresh_catalog(self):
         self._windows_tags_cache = None
@@ -6943,6 +7411,12 @@ class OcrLanguageManagerDialog(QDialog):
         threading.Thread(target=self._runtime_probe_worker, daemon=True).start()
 
     def _runtime_probe_worker(self):
+        # A local receipt lookup must also work when metadata is unreachable.
+        from engine_center import installed_states
+        try:
+            self._engine_states_ready.emit(installed_states())
+        except RuntimeError:
+            return
         windows_payload = {
             "windows_tags": [],
             "windows_capabilities": None,
@@ -6968,7 +7442,7 @@ class OcrLanguageManagerDialog(QDialog):
                     windows_ocr_tag(language.code),
                     available_by_tag,
                 )
-                if matched and ocr._get_windows_ocr_engine(matched) is not None:
+                if matched:
                     windows_payload["windows_ready_codes"].append(language.code)
         except Exception as exc:
             windows_payload["windows_ready_error"] = str(exc)
@@ -6976,14 +7450,16 @@ class OcrLanguageManagerDialog(QDialog):
 
         easyocr_status = (False, "EasyOCR check failed")
         try:
-            easyocr_status = self.owner._easyocr_importable_status()
+            status = getattr(self.owner, '_easyocr_runtime_status', None) or self.owner._easyocr_importable_status
+            easyocr_status = status()
         except Exception as exc:
             easyocr_status = (False, str(exc))
         self._emit_runtime_probe_payload({"easyocr": easyocr_status})
 
         rapidocr_status = (False, "RapidOCR check failed")
         try:
-            rapidocr_status = self.owner._rapidocr_importable_status()
+            status = getattr(self.owner, '_rapidocr_runtime_status', None) or self.owner._rapidocr_importable_status
+            rapidocr_status = status()
         except Exception as exc:
             rapidocr_status = (False, str(exc))
         self._emit_runtime_probe_payload({"rapidocr": rapidocr_status, "complete": True})
@@ -7019,11 +7495,13 @@ class OcrLanguageManagerDialog(QDialog):
         if "rapidocr" in payload:
             self._rapidocr_status_cache = tuple(payload.get("rapidocr") or (False, ""))
         if "windows_tags" in payload and self.windows_table is not None:
-            self._populate_windows_table(self.windows_table)
+            self._refresh_engine_table(self.windows_table)
         if "easyocr" in payload and self.easyocr_table is not None:
-            self._populate_easyocr_table(self.easyocr_table)
+            self._refresh_engine_table(self.easyocr_table)
         if "rapidocr" in payload and self.rapidocr_table is not None:
-            self._populate_rapidocr_table(self.rapidocr_table)
+            self._refresh_engine_table(self.rapidocr_table)
+        if self._engine_states:
+            self._on_engine_states_ready(self._engine_states)
 
     def _on_package_item_changed(self, table, item):
         if item is None or item.column() != 0:
@@ -7037,6 +7515,7 @@ class OcrLanguageManagerDialog(QDialog):
         else:
             pending.discard(code)
         self._update_package_sizes(table)
+        self._sync_package_selection(table)
 
     def _on_package_row_clicked(self, table, row, column):
         # Qt already toggles the actual checkbox. Let the rest of the row act
@@ -7052,6 +7531,23 @@ class OcrLanguageManagerDialog(QDialog):
         item.setCheckState(Qt.Unchecked if item.checkState() == Qt.Checked else Qt.Checked)
 
     def _set_language_rows(self, table, rows):
+        # A refresh is one model update. In particular, sorting must not move
+        # a row between setItem(column=0) and its remaining cells. Preserve an
+        # explicitly disabled child even when its parent is also paint-frozen.
+        sorting = table.isSortingEnabled()
+        updates = not table.testAttribute(Qt.WA_ForceUpdatesDisabled)
+        blocker = QtCore.QSignalBlocker(table)
+        table.setUpdatesEnabled(False)
+        table.setSortingEnabled(False)
+        try:
+            self._populate_language_rows(table, rows)
+        finally:
+            table.setSortingEnabled(sorting)
+            table.setUpdatesEnabled(updates)
+            del blocker
+        self._sync_package_selection(table)
+
+    def _populate_language_rows(self, table, rows):
         pending = set(getattr(table, "_pending_package_codes", set()))
         # Healthy installed packages stay at the top.  Keep source order inside
         # each group so language lists remain predictable and stable.
@@ -7062,7 +7558,6 @@ class OcrLanguageManagerDialog(QDialog):
                 key=lambda pair: (0 if pair[1].get("checked") else 1, pair[0]),
             )
         ]
-        signal_blocker = QtCore.QSignalBlocker(table)
         table.setRowCount(len(rows))
         dark = self._is_dark_theme()
         header_bg = QColor("#24212e" if dark else "#f0eef7")
@@ -7133,7 +7628,6 @@ class OcrLanguageManagerDialog(QDialog):
         table.resizeRowsToContents()
         table._schedule_fit()
         table._pending_package_codes = pending
-        del signal_blocker
         self._update_package_sizes(table)
 
     @QtCore.pyqtSlot(object)
@@ -7142,12 +7636,15 @@ class OcrLanguageManagerDialog(QDialog):
         if isinstance(catalog, dict):
             self._package_sizes = PackageSizes(catalog, channel=os.environ.get('CLICKNTRANSLATE_COMPONENT_CHANNEL', 'stable'))
             self._package_sizes_error = ''
+            if self._download_access_page is not None:
+                self._download_access_page._catalog = catalog
         else:
             self._package_sizes_error = str(catalog or '')
         for table in (self.windows_table, self.tesseract_table, self.easyocr_table,
                       self.rapidocr_table, self.hymt_table, self.argos_table):
             if table is not None:
                 self._update_package_sizes(table)
+                self._sync_package_selection(table)
 
     def _package_model_codes(self, engine, code):
         if engine == 'tesseract':
@@ -7226,7 +7723,7 @@ class OcrLanguageManagerDialog(QDialog):
             install_button = table._package_missing_install_button
             install_button.setText(language_manager_text(self.lang, 'install_engine') + ' · ' + format_size(install_size))
             install_button.setToolTip(tooltip_text(package_text(self.lang, 'size_help')))
-            for button in table._package_action_buttons:
+            for button in _package_controls(table):
                 action = button.property('packageAction')
                 base_text = str(button.property('packageBaseText'))
                 if action == 'install' and pending_codes:
@@ -7235,16 +7732,108 @@ class OcrLanguageManagerDialog(QDialog):
                     value = sizes.size(engine, pending_codes, base=include_base)
                     button.setText(base_text + ' · ' + format_size(value))
                 elif action == 'update':
-                    value = format_size(sizes.size(engine, selected))
-                    button.setText('↻ · ' + value)
-                    button.setAccessibleName(base_text + ' · ' + value)
+                    self._set_update_button_caption(button)
                 else:
                     button.setText(base_text)
-                if action != 'update':
+                if action != 'update' and isinstance(button, QWidget):
                     button.setAccessibleName(button.text())
-        label.setText(summary)
+        table._package_summary = summary
+        status = getattr(table, '_package_update_status', '')
+        label.setText(summary + ('\n' + status if status else ''))
         label.setToolTip(tooltip_text(package_text(self.lang, 'size_help')))
         table._schedule_fit()
+
+    def _set_update_button_caption(self, button):
+        from engine_center import text as center_text
+        from package_presentation import format_size
+        plan = button.property('packageUpdatePlan')
+        if button.property('packageUpdateChecking'):
+            caption = center_text(self.lang, 'checking')
+        elif isinstance(plan, dict) and not plan.get('current', True):
+            caption = center_text(self.lang, 'update') + ' · ' + format_size(plan['size'])
+        elif isinstance(plan, dict):
+            caption = center_text(self.lang, 'current')
+        else:
+            caption = center_text(self.lang, 'check_updates')
+        button.setText(caption)
+        if isinstance(button, QWidget):
+            button.setAccessibleName(caption)
+        button.setToolTip(tooltip_text(center_text(self.lang, 'check_help')))
+
+    def _request_update_check(self, table, button, install):
+        plan = button.property('packageUpdatePlan')
+        if isinstance(plan, dict) and not plan.get('current', True):
+            button.setProperty('packageUpdatePlan', None)
+            self._set_update_button_caption(button)
+            install()
+            return
+        if button.property('packageUpdateChecking'):
+            return
+        button.setProperty('packageUpdateChecking', True)
+        button.setEnabled(False)
+        self._set_update_button_caption(button)
+        try:
+            threading.Thread(target=self._check_update_worker, args=(table._package_engine,),
+                             name='ComponentUpdateCheck', daemon=True).start()
+        except Exception as error:
+            from component_texts import error_text
+            self._on_update_plan_ready(table._package_engine, {'error': error_text(self.lang, error)})
+
+    def _check_update_worker(self, engine):
+        from component_catalog import trusted_catalog, component_store_path
+        from component_store import ComponentStore
+        from engine_center import compare_update
+        try:
+            store = ComponentStore(component_store_path())
+            with store.lock():
+                catalog = trusted_catalog(store.root)
+                result = compare_update(catalog, engine, store=store,
+                    channel=os.environ.get('CLICKNTRANSLATE_COMPONENT_CHANNEL', 'stable'))
+            self._package_sizes_ready.emit(catalog)
+        except Exception as error:
+            from component_texts import error_text
+            result = {'error': error_text(self.lang, error)}
+        try:
+            self._update_plan_ready.emit(engine, result)
+        except RuntimeError:
+            pass
+
+    @QtCore.pyqtSlot(str, object)
+    def _on_update_plan_ready(self, engine, plan):
+        from engine_center import text as center_text
+        table = next((item for item in (self.tesseract_table, self.easyocr_table, self.rapidocr_table,
+                     self.hymt_table, self.argos_table) if item is not None and item._package_engine == engine), None)
+        if table is None:
+            return
+        for button in _package_controls(table):
+            if button.property('packageAction') != 'update':
+                continue
+            button.setProperty('packageUpdateChecking', False)
+            button.setEnabled(not self._install_in_progress)
+            if self._install_in_progress and button.property('packageBusyWasEnabled') is not None:
+                button.setProperty('packageBusyWasEnabled', True)
+            button.setProperty('packageUpdatePlan', None if 'error' in plan else plan)
+            self._set_update_button_caption(button)
+        label = table._package_size_label
+        if 'error' in plan:
+            table._package_update_status = str(plan['error'])
+        else:
+            table._package_update_status = (center_text(self.lang, 'current') + ': ' + plan['available'] if plan['current'] else
+                center_text(self.lang, 'installed') + ': ' + (plan['installed'] or '—') + '\n' +
+                center_text(self.lang, 'available') + ': ' + plan['available'])
+        label.setText(getattr(table, '_package_summary', '') + '\n' + table._package_update_status)
+        label.show()
+
+    @QtCore.pyqtSlot(object)
+    def _on_engine_states_ready(self, states):
+        self._engine_states = states
+        from engine_center import text as center_text
+        for table in (self.tesseract_table, self.easyocr_table, self.rapidocr_table, self.hymt_table, self.argos_table):
+            state = states.get(table._package_engine)
+            if state is not None and not getattr(table, '_package_is_missing', True):
+                note = table._package_note_label
+                note.setText(center_text(self.lang, 'managed' if state else 'local'))
+                note.setToolTip(tooltip_text(table._package_default_note + '\n' + center_text(self.lang, 'base')))
 
     def _language_name(self, language):
         return language.display_name(self.lang)
@@ -7724,7 +8313,7 @@ class OcrLanguageManagerDialog(QDialog):
         self._argos_catalog_loading = True
         self._argos_catalog_error = ""
         if self.argos_table is not None:
-            self._populate_argos_table(self.argos_table)
+            self._refresh_engine_table(self.argos_table)
         threading.Thread(
             target=self._load_argos_catalog_worker,
             args=(bool(refresh),),
@@ -7779,7 +8368,7 @@ class OcrLanguageManagerDialog(QDialog):
         self._argos_catalog_loading = False
         self._argos_catalog_error = str(error or "")
         if self.argos_table is not None:
-            self._populate_argos_table(self.argos_table)
+            self._refresh_engine_table(self.argos_table)
             self._focus_requested_argos_pair()
 
     def _selected_codes(self, table):
@@ -7821,15 +8410,27 @@ class OcrLanguageManagerDialog(QDialog):
         except Exception as exc:
             QMessageBox.warning(self, "Windows OCR", str(exc))
 
+    def _schedule_owner_refresh(self, in_progress_attr, delay=750):
+        timer = QtCore.QTimer(self)
+        timer.setSingleShot(True)
+        timer.timeout.connect(lambda: self._refresh_after_owner_install(in_progress_attr))
+        timer.timeout.connect(timer.deleteLater)
+        timer.start(delay)
+
     def _refresh_after_owner_install(self, in_progress_attr):
+        if sip.isdeleted(self) or sip.isdeleted(self.owner):
+            return
         if bool(getattr(self.owner, in_progress_attr, False)):
-            QtCore.QTimer.singleShot(750, lambda: self._refresh_after_owner_install(in_progress_attr))
+            self._schedule_owner_refresh(in_progress_attr)
             return
         self._windows_tags_cache = None
         self._windows_capabilities_cache = None
         self._windows_ready_codes_cache = None
         self._easyocr_status_cache = None
         self._rapidocr_status_cache = None
+        refresh = getattr(self.owner, '_refresh_ready_engine_choices', None)
+        if callable(refresh):
+            refresh()
         self.refresh_all()
         self._start_runtime_probe()
 
@@ -7843,7 +8444,7 @@ class OcrLanguageManagerDialog(QDialog):
         if remover is None:
             return
         remover()
-        QtCore.QTimer.singleShot(400, lambda: self._refresh_after_owner_install(in_progress_attr))
+        self._schedule_owner_refresh(in_progress_attr, 400)
 
     def _remove_tesseract_engine(self):
         self._remove_engine("remove_tesseract_engine", "_tesseract_install_in_progress")
@@ -7866,7 +8467,7 @@ class OcrLanguageManagerDialog(QDialog):
             )
             return
         self.owner.start_hymt_install(progress_owner=self)
-        QtCore.QTimer.singleShot(750, lambda: self._refresh_after_owner_install("_hymt_install_in_progress"))
+        self._schedule_owner_refresh('_hymt_install_in_progress')
 
     def _install_tesseract_engine(self):
         if self.owner._find_available_tesseract_exe():
@@ -7877,7 +8478,7 @@ class OcrLanguageManagerDialog(QDialog):
             )
             return
         self.owner.start_tesseract_install(progress_owner=self)
-        QtCore.QTimer.singleShot(750, lambda: self._refresh_after_owner_install("_tesseract_install_in_progress"))
+        self._schedule_owner_refresh('_tesseract_install_in_progress')
 
     def _install_easyocr_engine(self):
         if self._easyocr_status_cache is None:
@@ -7896,7 +8497,7 @@ class OcrLanguageManagerDialog(QDialog):
             )
             return
         self.owner.start_easyocr_install(progress_owner=self)
-        QtCore.QTimer.singleShot(750, lambda: self._refresh_after_owner_install("_easyocr_install_in_progress"))
+        self._schedule_owner_refresh('_easyocr_install_in_progress')
 
     def _install_rapidocr_engine(self):
         if self._rapidocr_status_cache is None:
@@ -7915,23 +8516,23 @@ class OcrLanguageManagerDialog(QDialog):
             )
             return
         self.owner.start_rapidocr_install(progress_owner=self)
-        QtCore.QTimer.singleShot(750, lambda: self._refresh_after_owner_install("_rapidocr_install_in_progress"))
+        self._schedule_owner_refresh('_rapidocr_install_in_progress')
 
     def _update_rapidocr_engine(self):
         self.owner.start_rapidocr_install(progress_owner=self, select_on_success=False)
-        QtCore.QTimer.singleShot(750, lambda: self._refresh_after_owner_install('_rapidocr_install_in_progress'))
+        self._schedule_owner_refresh('_rapidocr_install_in_progress')
 
     def _update_tesseract_engine(self):
         self.owner.start_tesseract_install(progress_owner=self, select_on_success=False)
-        QtCore.QTimer.singleShot(750, lambda: self._refresh_after_owner_install('_tesseract_install_in_progress'))
+        self._schedule_owner_refresh('_tesseract_install_in_progress')
 
     def _update_hymt_engine(self):
         self.owner.start_hymt_install(progress_owner=self, select_on_success=False)
-        QtCore.QTimer.singleShot(750, lambda: self._refresh_after_owner_install('_hymt_install_in_progress'))
+        self._schedule_owner_refresh('_hymt_install_in_progress')
 
     def _update_easyocr_engine(self):
         self.owner.start_easyocr_install(progress_owner=self, select_on_success=False)
-        QtCore.QTimer.singleShot(750,lambda:self._refresh_after_owner_install('_easyocr_install_in_progress'))
+        self._schedule_owner_refresh('_easyocr_install_in_progress')
 
     def _windows_ocr_capability_name(self, language_code):
         return f"Language.OCR~~~{windows_ocr_tag(language_code)}~0.0.1.0"
@@ -8132,7 +8733,7 @@ class OcrLanguageManagerDialog(QDialog):
         codes = []
         for row in rows:
             item = table.item(row, 0)
-            if item is None or item.checkState() != Qt.Checked:
+            if item is None or not item.data(Qt.UserRole + 1):
                 continue
             code = item.data(Qt.UserRole)
             if code:
@@ -8353,6 +8954,15 @@ class OcrLanguageManagerDialog(QDialog):
         refresh = getattr(self, "refresh_btn", None)
         if refresh is not None:
             buttons.append(refresh)
+        tables = [self.windows_table, self.tesseract_table, self.easyocr_table,
+                  self.rapidocr_table, self.hymt_table, self.argos_table]
+        for table in tables:
+            if table is None:
+                continue
+            buttons.extend(getattr(table, '_package_engine_actions', ()))
+            remove = getattr(table, '_package_remove_engine_button', None)
+            if remove is not None:
+                buttons.append(remove)
         for button in buttons:
             if busy:
                 if button.property("packageBusyWasEnabled") is None:
@@ -8367,6 +8977,10 @@ class OcrLanguageManagerDialog(QDialog):
                     button.setToolTip(str(button.property("packageBusyOldToolTip") or ""))
                     button.setProperty("packageBusyWasEnabled", None)
                     button.setProperty("packageBusyOldToolTip", None)
+        if not busy:
+            for table in tables:
+                if table is not None:
+                    self._sync_package_selection(table)
 
     def reject(self):
         # Closing the package manager must not terminate an active Windows
@@ -8487,11 +9101,9 @@ class OcrLanguageManagerDialog(QDialog):
         label.setStyleSheet(
             f"color: {colors.get(kind, colors['running'])}; font-size: 12px; font-weight: 600;"
         )
-        metrics = QtGui.QFontMetrics(label.font())
-        # Before the first show Qt reports the label's tiny sizeHint width. Use
-        # the real minimum space it receives in the fixed manager layout, or a
-        # useful status can be shortened to "Component …" before it appears.
-        label.setText(metrics.elidedText(summary, Qt.ElideRight, max(320, label.width())))
+        # Paint to the current available width. A guessed minimum of 320px
+        # pushed the progress/connection/close buttons outside a fixed window.
+        label.setText(summary)
         full_detail = str(text or summary).strip()
         if kind == "running":
             full_detail = f"{full_detail}\n\n{language_manager_text(self.lang, 'task_busy_help')}"
@@ -8522,6 +9134,9 @@ class OcrLanguageManagerDialog(QDialog):
 
     @QtCore.pyqtSlot(str, str, bool)
     def _on_language_task_finished(self, engine, error, canceled=False):
+        refresh = getattr(self.owner, '_refresh_ready_engine_choices', None)
+        if callable(refresh):
+            refresh()
         self._install_in_progress = False
         self._set_package_actions_busy(False)
         self._active_language_task_title = ""
@@ -10143,10 +10758,14 @@ class SettingsWindow(QWidget):
         if unchanged:
             self._update_game_swap_enabled()
             return
+        source_changed = str(self.parent.config.get("game_translate_source_language", "")) != str(source)
         self.parent.config["game_translate_source_language"] = str(source)
         self.parent.config["game_translate_target_language"] = str(target)
         self.parent.save_config()
         _invalidate_main_config_cache()
+        if source_changed:
+            from ocr_readiness import selected
+            selected(self.parent.config, language=source)
         self._update_game_swap_enabled()
 
     def _update_game_swap_enabled(self):
@@ -10329,24 +10948,48 @@ class SettingsWindow(QWidget):
                     bool(merged.get("button_tooltips_enabled", True)),
                 )
             requested_autostart = self.parent.autostart
+            autostart_warning = None
             if requested_autostart != previous['autostart']:
-                actual_autostart = bool(self.parent.set_autostart(requested_autostart))
+                # Native backends retain this last known state on failure.
+                # The imported preference is already durable, but it is not
+                # evidence that the OS accepted the requested change.
+                self.parent.autostart = previous['autostart']
+                try:
+                    actual_autostart = bool(self.parent.set_autostart(requested_autostart))
+                except Exception:
+                    logging.exception("Imported settings applied; autostart change failed")
+                    actual_autostart = previous['autostart']
+                    autostart_warning = 0
+                if (actual_autostart != requested_autostart
+                        or getattr(self.parent, '_autostart_error', '')):
+                    autostart_warning = 0
                 self.parent.autostart = actual_autostart
                 self.parent.config["autostart"] = actual_autostart
                 if actual_autostart != requested_autostart:
-                    self.parent.save_config(capture_languages=False)
+                    try:
+                        self.parent.save_config(capture_languages=False)
+                    except Exception:
+                        logging.exception("Imported settings applied; actual autostart state could not be saved")
+                        autostart_warning = 1
 
-            restart_hotkeys = getattr(self.parent, "restart_all_hotkey_listeners", None)
-            if callable(restart_hotkeys):
-                restart_hotkeys()
-            self.parent.apply_theme()
-            sync_selection = getattr(self.parent, '_sync_selection_quick_translate', None)
-            if callable(sync_selection):
-                sync_selection()
-            self.parent.refresh_interface_language_ui()
-            self.init_ui()
-            self.apply_theme()
-            self._set_settings_page(0)
+            refresh_warning = False
+            finalizers = (
+                ('hotkeys', getattr(self.parent, 'restart_all_hotkey_listeners', None)),
+                ('application theme', self.parent.apply_theme),
+                ('selection', getattr(self.parent, '_sync_selection_quick_translate', None)),
+                ('interface language', self.parent.refresh_interface_language_ui),
+                ('settings controls', self.init_ui),
+                ('settings theme', self.apply_theme),
+                ('settings page', lambda: self._set_settings_page(0)),
+            )
+            for name, finalize in finalizers:
+                if not callable(finalize):
+                    continue
+                try:
+                    finalize()
+                except Exception:
+                    logging.exception('Imported settings saved; could not refresh %s', name)
+                    refresh_warning = True
         except Exception as error:
             logging.exception("Could not import Click'n'Translate settings")
             QMessageBox.warning(
@@ -10357,11 +11000,47 @@ class SettingsWindow(QWidget):
             return None
 
         applied_lang = self.parent.current_interface_language
-        QMessageBox.information(
-            self,
-            settings_text(applied_lang, "import_settings"),
-            settings_text(applied_lang, "settings_imported"),
-        )
+        followup_warnings = []
+        if autostart_warning is not None:
+            messages = {
+                'en': ('The requested autostart setting could not be confirmed. Check autostart in the application and system settings.',
+                       'The actual autostart state could not be saved. The imported settings are applied; check autostart and save that setting again.'),
+                'ru': ('Не удалось подтвердить запрошенную настройку автозапуска. Проверьте автозапуск в приложении и настройках системы.',
+                       'Не удалось сохранить фактическое состояние автозапуска. Импортированные настройки применены; проверьте автозапуск и сохраните эту настройку ещё раз.'),
+                'es': ('No se pudo confirmar el inicio automático solicitado. Revísalo en la aplicación y en los ajustes del sistema.',
+                       'No se pudo guardar el estado real del inicio automático. Los ajustes importados están aplicados; revísalo y guarda esa opción de nuevo.'),
+                'de': ('Der gewünschte Autostart konnte nicht bestätigt werden. Prüfen Sie ihn in der Anwendung und den Systemeinstellungen.',
+                       'Der tatsächliche Autostart-Status konnte nicht gespeichert werden. Die importierten Einstellungen sind angewendet; prüfen und speichern Sie den Autostart erneut.'),
+                'fr': ('Le démarrage automatique demandé n’a pas pu être confirmé. Vérifiez-le dans l’application et les paramètres système.',
+                       'L’état réel du démarrage automatique n’a pas pu être enregistré. Les réglages importés sont appliqués ; vérifiez et enregistrez à nouveau cette option.'),
+                'zh': ('无法确认所请求的自动启动设置。请检查应用和系统中的自动启动设置。',
+                       '无法保存实际的自动启动状态。导入的设置已应用；请检查自动启动并重新保存该设置。'),
+                'pt': ('Não foi possível confirmar a inicialização automática solicitada. Verifique-a no aplicativo e nas configurações do sistema.',
+                       'Não foi possível salvar o estado real da inicialização automática. As configurações importadas foram aplicadas; verifique e salve essa opção novamente.'),
+                'it': ('Impossibile confermare l’avvio automatico richiesto. Controllalo nell’applicazione e nelle impostazioni di sistema.',
+                       'Impossibile salvare lo stato effettivo dell’avvio automatico. Le impostazioni importate sono applicate; controlla e salva nuovamente questa opzione.'),
+                'ar': ('تعذّر تأكيد إعداد التشغيل التلقائي المطلوب. تحقّق منه في التطبيق وإعدادات النظام.',
+                       'تعذّر حفظ الحالة الفعلية للتشغيل التلقائي. طُبّقت الإعدادات المستوردة؛ تحقّق من التشغيل التلقائي واحفظ هذا الإعداد مجددًا.'),
+                'tr': ('İstenen otomatik başlatma ayarı doğrulanamadı. Uygulama ve sistem ayarlarından kontrol edin.',
+                       'Gerçek otomatik başlatma durumu kaydedilemedi. İçe aktarılan ayarlar uygulandı; otomatik başlatmayı kontrol edip yeniden kaydedin.'),
+                'hi': ('माँगी गई ऑटोस्टार्ट सेटिंग की पुष्टि नहीं हो सकी। ऐप और सिस्टम की सेटिंग में ऑटोस्टार्ट जाँचें।',
+                       'ऑटोस्टार्ट की वास्तविक स्थिति सहेजी नहीं जा सकी। आयातित सेटिंग लागू हैं; ऑटोस्टार्ट जाँचकर यह सेटिंग फिर सहेजें।'),
+                'id': ('Pengaturan mulai otomatis yang diminta tidak dapat dikonfirmasi. Periksa di aplikasi dan pengaturan sistem.',
+                       'Status mulai otomatis yang sebenarnya tidak dapat disimpan. Pengaturan yang diimpor telah diterapkan; periksa dan simpan kembali opsi tersebut.'),
+            }
+            followup_warnings.append(messages.get(applied_lang, messages['en'])[autostart_warning])
+        if refresh_warning:
+            followup_warnings.append(settings_text(applied_lang, 'settings_refresh_incomplete'))
+        if followup_warnings:
+            QMessageBox.warning(self, settings_text(applied_lang, "import_settings"),
+                settings_text(applied_lang, "settings_imported") + '\n\n'
+                + '\n\n'.join(followup_warnings))
+        else:
+            QMessageBox.information(
+                self,
+                settings_text(applied_lang, "import_settings"),
+                settings_text(applied_lang, "settings_imported"),
+            )
         return Path(path)
 
     def on_history_checkbox_toggled(self, state):
@@ -10422,41 +11101,12 @@ class SettingsWindow(QWidget):
             controller.view.before_mouse_release.connect(self._commit_deferred_ui_scale)
 
     def clear_main_layout(self):
-        # Hide cached pages synchronously before Qt processes deferred deletes.
-        for attribute in (
-            "settings_updates_page",
-            "settings_game_page",
-            "settings_assistant_page",
-            "settings_ocr_page",
-            "settings_action_panel",
-            "settings_page_footer",
-            "settings_pages",
-        ):
-            region = getattr(self, attribute, None)
-            if region is None:
-                continue
-            try:
-                for child in region.findChildren(QWidget):
-                    child.hide()
-                region.hide()
-            except RuntimeError:
-                pass
-        # Очищаем все элементы из текущего макета
         if self.main_layout is not None:
             while self.main_layout.count():
                 item = self.main_layout.takeAt(0)
                 widget = item.widget()
                 if widget:
-                    # A deferred delete is not an immediate visual removal.
-                    # Hide the old settings page first so a theme/language
-                    # change cannot expose its cached pixels over the new one.
-                    # A stacked page keeps its children's own hidden flag
-                    # unchanged when only the stack is hidden, so hide every
-                    # descendant explicitly as well.
-                    for child in widget.findChildren(QWidget):
-                        child.hide()
-                    widget.hide()
-                    widget.deleteLater()
+                    self._retire_settings_widget(widget)
                 elif item.layout():
                     self.clear_nested_layout(item.layout())
 
@@ -10466,10 +11116,16 @@ class SettingsWindow(QWidget):
                 item = layout.takeAt(0)
                 widget = item.widget()
                 if widget:
-                    widget.hide()
-                    widget.deleteLater()
+                    self._retire_settings_widget(widget)
                 elif item.layout():
                     self.clear_nested_layout(item.layout())
+
+    def _retire_settings_widget(self, widget):
+        # Hide before the safe deferred destruction, including proxy children.
+        for child in widget.findChildren(QWidget):
+            child.hide()
+        widget.hide()
+        widget.deleteLater()
 
     def setup_new_layout(self):
         # Scale/screen signals can arrive while a secondary page replaces the form.
@@ -10485,6 +11141,7 @@ class SettingsWindow(QWidget):
         self.translation_font_control = None
         self._update_progress = None
         self.selection_quick_translate_mode_combo = None
+        self.clear_main_layout()
         # Clear page references as well as the layout during a rebuild.
         for attribute in (
             "settings_updates_page",
@@ -10495,19 +11152,53 @@ class SettingsWindow(QWidget):
             "settings_page_footer",
             "settings_pages",
         ):
-            widget = getattr(self, attribute, None)
-            if widget is None:
-                continue
-            try:
-                for child in widget.findChildren(QWidget):
-                    child.hide()
-                widget.hide()
-                widget.deleteLater()
-            except RuntimeError:
-                pass
             setattr(self, attribute, None)
-        # Больше не пересоздаём layout, только очищаем
-        self.clear_main_layout()
+
+    def _ready_engine_inventory(self, refresh=False):
+        """Local metadata only; language changes reuse the same installation inventory."""
+        from api_providers import configured_engines, VISION_ENGINES, profile
+        config = self.parent.config
+        key = json.dumps(config.get('api_providers', {}), sort_keys=True, default=str)
+        if not refresh and getattr(self, '_ready_inventory_key', None) == key:
+            return self._ready_inventory
+        local = {'Windows'} if platform_support.supports_windows_ocr() else set()
+        if platform_support.IS_MAC:
+            local.add('Apple Vision')
+        if self._find_available_tesseract_exe():
+            local.add('Tesseract')
+        if self._rapidocr_runtime_installed():
+            local.add(RAPIDOCR_ENGINE_DISPLAY)
+        if self._easyocr_runtime_installed():
+            local.add(EASYOCR_ENGINE_DISPLAY)
+        translators = {key for key, _name, kind in TRANSLATOR_ENGINE_OPTIONS if kind == 'online'}
+        import translater
+        if translater.argos_installed_translation_pairs_fast():
+            translators.add('argos')
+        if self._hymt_installed():
+            translators.add(HYMT_ENGINE_KEY)
+        configured = configured_engines(config)
+        translators.update(configured)
+        local.update(name for name, provider in VISION_ENGINES.items()
+                     if provider in configured and profile(provider, config)['vision'])
+        self._ready_inventory_key = key
+        self._ready_inventory = (local, translators)
+        return self._ready_inventory
+
+    def _refresh_ready_engine_choices(self):
+        from engine_center import text as center_text
+        from provider_catalog import provider_id
+        lang = self.parent.current_interface_language
+        local, translators = self._ready_engine_inventory(refresh=True)
+        color = '#f4f6fb' if self.parent.current_theme != 'Светлая' else '#202124'
+        with QtCore.QSignalBlocker(self.ocr_engine_combo), QtCore.QSignalBlocker(self.translator_combo):
+            _populate_grouped_ocr_combo(self.ocr_engine_combo, lang, color, local, ready_only=True)
+            self._translator_engines = _populate_grouped_translator_combo(
+                self.translator_combo, lang, color, translators, ready_only=True)
+            self.ocr_engine_combo.setCurrentIndex(self.ocr_engine_combo.findData(self.parent.config.get('ocr_engine')))
+            self.translator_combo.setCurrentIndex(self.translator_combo.findData(provider_id(self.parent.config.get('translator_engine'))))
+            for combo in (self.ocr_engine_combo, self.translator_combo):
+                combo.setPlaceholderText(center_text(lang, 'select'))
+                combo.setToolTip(tooltip_text(center_text(lang, 'ready_help')))
 
     def init_ui(self):
         if self._update_in_progress and getattr(self, 'settings_pages', None) is not None:
@@ -10574,20 +11265,13 @@ class SettingsWindow(QWidget):
         engine_group_color = (
             "#f4f6fb" if self.parent.current_theme != "Светлая" else "#202124"
         )
-        installed_ocr_engines = {"Windows"} if platform_support.supports_windows_ocr() else set()
-        if platform_support.IS_MAC:
-            installed_ocr_engines.add("Apple Vision")
-        if self._find_available_tesseract_exe():
-            installed_ocr_engines.add("Tesseract")
-        if self._rapidocr_runtime_installed():
-            installed_ocr_engines.add(RAPIDOCR_ENGINE_DISPLAY)
-        if self._easyocr_runtime_installed():
-            installed_ocr_engines.add(EASYOCR_ENGINE_DISPLAY)
+        installed_ocr_engines, installed_translator_engines = self._ready_engine_inventory()
         _populate_grouped_ocr_combo(
             self.ocr_engine_combo,
             lang,
             engine_group_color,
             installed_engines=installed_ocr_engines,
+            ready_only=True,
         )
         default_engine = platform_support.default_ocr_engine()
         current_engine = self.parent.config.get("ocr_engine", default_engine)
@@ -10595,8 +11279,9 @@ class SettingsWindow(QWidget):
         if idx >= 0:
             self.ocr_engine_combo.setCurrentIndex(idx)
         else:
-            fallback_index = self.ocr_engine_combo.findData(default_engine)
-            self.ocr_engine_combo.setCurrentIndex(max(0, fallback_index))
+            self.ocr_engine_combo.setCurrentIndex(-1)
+        from engine_center import text as center_text
+        self.ocr_engine_combo.setPlaceholderText(center_text(lang, 'select'))
 
         self.ocr_engine_combo.currentTextChanged.connect(self.handle_ocr_engine_change)
         self._apply_engine_combo_style(self.ocr_engine_combo)
@@ -10624,8 +11309,8 @@ class SettingsWindow(QWidget):
             'hi': 'OCR इंजन चुनें। जो इंस्टॉल नहीं हैं उन्हें चुनकर इंस्टॉल करें।',
             'id': 'Pilih mesin OCR. Mesin yang belum ada dapat dipasang saat dipilih.',
         }
-        self.ocr_engine_combo.setToolTip(tooltip_text(ocr_picker_help.get(lang, ocr_picker_help["en"])))
-        self.ocr_engine_label.setToolTip(tooltip_text(ocr_picker_help.get(lang, ocr_picker_help["en"])))
+        self.ocr_engine_combo.setToolTip(tooltip_text(center_text(lang, 'ready_help')))
+        self.ocr_engine_label.setToolTip(self.ocr_engine_combo.toolTip())
 
         # --- СТРОКА 2: Запускать в режиме тень + Переводчик ---
         self.start_minimized_checkbox = QCheckBox(settings_text(lang, "start_minimized"))
@@ -10642,32 +11327,21 @@ class SettingsWindow(QWidget):
         self.translator_engine_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
 
         self.translator_combo = DropDownCombo()
-        installed_translator_engines = {
-            engine
-            for engine, _name, kind in TRANSLATOR_ENGINE_OPTIONS
-            if kind == "online"
-        }
-        try:
-            import translater
-            if translater.argos_installed_translation_pairs_fast():
-                installed_translator_engines.add("argos")
-        except Exception:
-            pass
-        if self._hymt_installed():
-            installed_translator_engines.add(HYMT_ENGINE_KEY)
         self._translator_engines = _populate_grouped_translator_combo(
             self.translator_combo,
             lang,
             engine_group_color,
             installed_engines=installed_translator_engines,
+            ready_only=True,
         )
 
         current_tr = self.parent.config.get("translator_engine", "Google").lower()
         try:
             idx = self._translator_engines.index(current_tr)
         except ValueError:
-            idx = self._translator_engines.index("google")
+            idx = -1
         self.translator_combo.setCurrentIndex(idx)
+        self.translator_combo.setPlaceholderText(center_text(lang, 'select'))
         self.translator_combo.currentIndexChanged.connect(self._on_translator_changed)
         self._apply_engine_combo_style(self.translator_combo)
         self.translator_combo.setFixedWidth(engine_combo_width)
@@ -10694,7 +11368,7 @@ class SettingsWindow(QWidget):
             'hi': 'ऑनलाइन प्रदाता को इंटरनेट चाहिए। इंस्टॉल ऑफ़लाइन प्रदाता अलग दिखते हैं।',
             'id': 'Penyedia daring memerlukan internet. Penyedia luring terpasang ditampilkan terpisah.',
         }
-        picker_help = translator_picker_help.get(lang, translator_picker_help["en"])
+        picker_help = center_text(lang, 'ready_help')
         self.translator_combo.setToolTip(tooltip_text(picker_help))
         self.translator_engine_label.setToolTip(tooltip_text(picker_help))
 
@@ -11622,9 +12296,26 @@ class SettingsWindow(QWidget):
             self.game_template_combo.setToolTip(tooltip_text(hint))
             self.game_template_combo.setAccessibleDescription(hint)
             return False
-        self.parent.config.update(game_last_template=value['name'], game_remember_template=True,
-            game_translate_source_language=source, game_translate_target_language=target)
-        self.parent.save_config()
+        updates = dict(game_last_template=value['name'], game_remember_template=True,
+                       game_translate_source_language=source, game_translate_target_language=target)
+        missing = object()
+        before = {key: self.parent.config.get(key, missing) for key in updates}
+        self.parent.config.update(updates)
+        try:
+            if self.parent.save_config() is False:
+                raise OSError('Could not save the selected template preference')
+        except Exception:
+            for key, previous in before.items():
+                if previous is missing:
+                    self.parent.config.pop(key, None)
+                else:
+                    self.parent.config[key] = previous
+            self._refresh_game_templates()
+            logging.exception('Could not save the selected dynamic template')
+            lang = self.parent.current_interface_language
+            QMessageBox.warning(self, dynamic_text(lang, 'choose_template'),
+                                dynamic_text(lang, 'select_template_error'))
+            return False
         _invalidate_main_config_cache()
         self._populate_game_language_controls()
         self._refresh_game_templates()
@@ -11842,7 +12533,9 @@ class SettingsWindow(QWidget):
         if button is None or sip.isdeleted(button):
             return
         lang = getattr(self.parent, "current_interface_language", "en")
-        base = section_text(lang, 'ocr_packages')
+        from engine_center import text as center_text
+        base = (center_text(lang, 'title') if button is getattr(self, 'engines_button', None)
+                else section_text(lang, 'ocr_packages'))
         state = dict(getattr(self, "_language_package_task_state", {}) or {})
         kind = state.get("kind", "idle")
         if kind in {"running", "done", "failed"}:
@@ -11867,7 +12560,8 @@ class SettingsWindow(QWidget):
         # recalculation.
         button.style().unpolish(button)
         button.style().polish(button)
-        help_text = section_text(lang, 'ocr_packages_hint')
+        help_text = (center_text(lang, 'intro') if button is getattr(self, 'engines_button', None)
+                     else section_text(lang, 'ocr_packages_hint'))
         detail = str(state.get("text") or "").strip()
         button.setToolTip(tooltip_text(f"{help_text}\n{detail}" if detail else help_text))
         button.setAccessibleDescription(detail or help_text)
@@ -11913,11 +12607,20 @@ class SettingsWindow(QWidget):
         if dialog is None:
             dialog = OcrLanguageManagerDialog(self)
             self._language_manager_dialog = dialog
+            def resume_guide(_result):
+                schedule = getattr(self.parent, '_schedule_guide_step', None)
+                if not sip.isdeleted(self.parent) and callable(schedule):
+                    schedule(0)
+            dialog.finished.connect(resume_guide)
         elif not getattr(dialog, "_install_in_progress", False):
             dialog.refresh_all()
             dialog._start_runtime_probe()
             if dialog.argos_table.isVisible():
                 dialog._start_argos_catalog_refresh(False)
+        dialog.body_stack.setCurrentWidget(dialog.tabs)
+        from engine_center import text as center_text
+        dialog.download_access_btn.setText(center_text(dialog.lang, 'connection'))
+        dialog._on_tab_changed(dialog.tabs.currentIndex())
         dialog._apply_style()
         dialog._apply_package_tab_styles()
         dialog.show()
@@ -13057,8 +13760,13 @@ class SettingsWindow(QWidget):
         self._show_update_progress(update_text(lang, "checking"))
         self._update_in_progress = True
 
-        worker = threading.Thread(target=self._check_latest_release_worker, daemon=True)
-        worker.start()
+        try:
+            worker = threading.Thread(target=self._check_latest_release_worker, daemon=True)
+            worker.start()
+        except Exception as error:
+            self._on_update_check_result(json.dumps({
+                'status': 'error', 'error': update_text(lang, 'check_failed', error=str(error)),
+            }, ensure_ascii=False))
 
     def _set_parent_update_flow_active(self, active):
         parent = getattr(self, "parent", None)
@@ -13194,56 +13902,52 @@ class SettingsWindow(QWidget):
             response = requests.get(update_api_url, headers=headers, timeout=20)
             response.raise_for_status()
             release = response.json()
-        except Exception as e:
             if self._update_cancel_requested.is_set():
-                self._post_update_check_result({"status": "cancelled"})
-                return
-            self._post_update_check_result({
-                "status": "error",
-                "error": update_text(lang, "check_failed", error=str(e)),
-            })
-            return
+                raise UpdateCancelledError("Update canceled by the user.")
+            if not isinstance(release, dict):
+                raise ValueError("The update server returned invalid release metadata.")
+            latest_tag = release.get("tag_name") or release.get("name")
+            if not isinstance(latest_tag, str) or not latest_tag.strip():
+                raise ValueError("The release is missing its version.")
+            latest_version = _normalize_version(latest_tag)
+            if not re.fullmatch(r"\d+(?:\.\d+){1,3}(?:[-+][0-9A-Za-z.-]+)?", latest_version):
+                raise ValueError("The release version is invalid.")
+            assets = release.get("assets", [])
+            if not isinstance(assets, list):
+                raise ValueError("The release asset list is invalid.")
+            for asset in assets:
+                if (not isinstance(asset, dict) or not isinstance(asset.get("name"), str)
+                        or not asset["name"].strip()
+                        or any(asset.get(key) is not None and not isinstance(asset[key], str)
+                               for key in ("url", "browser_download_url"))):
+                    raise ValueError("The release contains invalid asset metadata.")
 
+            if not _is_newer_version(latest_version, APP_VERSION):
+                payload = {"status": "up_to_date", "latest_version": latest_version}
+            else:
+                selected_asset = self._pick_update_asset(assets)
+                if not selected_asset:
+                    payload = {"status": "no_asset", "latest_version": latest_version}
+                else:
+                    asset_name = selected_asset["name"]
+                    asset_url = _update_asset_download_url(selected_asset)
+                    if not asset_url:
+                        payload = {"status": "invalid_asset", "latest_version": latest_version}
+                    else:
+                        payload = {
+                            "status": "ready", "latest_version": latest_version,
+                            "asset_name": asset_name, "asset_url": asset_url,
+                            "checksum_url": self._pick_checksum_url(assets, asset_name),
+                        }
+        except UpdateCancelledError:
+            payload = {"status": "cancelled"}
+        except Exception as e:
+            payload = {"status": "error", "error": update_text(lang, "check_failed", error=str(e))}
         if self._update_cancel_requested.is_set():
-            self._post_update_check_result({"status": "cancelled"})
-            return
-
-        latest_tag = release.get("tag_name") or release.get("name") or ""
-        latest_version = _normalize_version(latest_tag) or APP_VERSION
-
-        if not _is_newer_version(latest_version, APP_VERSION):
-            self._post_update_check_result({
-                "status": "up_to_date",
-                "latest_version": latest_version,
-            })
-            return
-
-        assets = release.get("assets") or []
-        selected_asset = self._pick_update_asset(assets)
-        if not selected_asset:
-            self._post_update_check_result({
-                "status": "no_asset",
-                "latest_version": latest_version,
-            })
-            return
-
-        asset_name = selected_asset.get("name") or f"ClicknTranslate-v{latest_version}.zip"
-        asset_url = _update_asset_download_url(selected_asset)
-        if not asset_url:
-            self._post_update_check_result({
-                "status": "invalid_asset",
-                "latest_version": latest_version,
-            })
-            return
-
-        checksum_url = self._pick_checksum_url(assets, asset_name)
-        self._post_update_check_result({
-            "status": "ready",
-            "latest_version": latest_version,
-            "asset_name": asset_name,
-            "asset_url": asset_url,
-            "checksum_url": checksum_url,
-        })
+            payload = {"status": "cancelled"}
+        # Every response, including malformed JSON values, releases the UI's
+        # busy state through exactly one terminal callback.
+        self._post_update_check_result(payload)
 
     @QtCore.pyqtSlot(str)
     def _on_update_check_result(self, payload_text):
@@ -13289,12 +13993,15 @@ class SettingsWindow(QWidget):
         self._update_cancel_requested.clear()
         self._set_update_controls_enabled(False, update_text(lang, "downloading_button"))
         self._show_update_progress(update_text(lang, "preparing_download"), determinate=False)
-        worker = threading.Thread(
-            target=self._download_and_prepare_update,
-            args=(asset_url, asset_name, latest_version, checksum_url),
-            daemon=True
-        )
-        worker.start()
+        try:
+            worker = threading.Thread(
+                target=self._download_and_prepare_update,
+                args=(asset_url, asset_name, latest_version, checksum_url),
+                daemon=True
+            )
+            worker.start()
+        except Exception as error:
+            self._on_update_failed(str(error))
 
     def _pick_update_asset(self, assets):
         if not platform_support.IS_WINDOWS:
@@ -13307,6 +14014,13 @@ class SettingsWindow(QWidget):
             else:
                 kind = target[0]
             return pick_asset(assets, kind)
+
+        def is_32_bit_asset(name):
+            # Preserve both common x86-64 spellings before matching a bare
+            # x86 token. Legacy x64/win64 asset names continue to work too.
+            normalized = re.sub(r'x86[-_]64', 'x64', name)
+            return re.search(r'(?<![a-z0-9])(?:x86|ia32|i[3-6]86)(?![a-z0-9])', normalized) is not None
+
         installed_copy = _is_inno_installed_copy()
         if installed_copy:
             setup_assets = []
@@ -13317,6 +14031,7 @@ class SettingsWindow(QWidget):
                     name.endswith(".exe")
                     and "clickntranslate" in compact_name
                     and not any(token in name for token in ("arm64", "aarch64", "x86-installer", "win32"))
+                    and not is_32_bit_asset(name)
                     and ("setup" in name or "installer" in name)
                     and (asset.get("browser_download_url") or asset.get("url"))
                 ):
@@ -13350,7 +14065,7 @@ class SettingsWindow(QWidget):
             compact_name = name.replace("-", "").replace("_", "")
             if "clickntranslate" not in compact_name:
                 return -1
-            if any(token in name for token in ("tesseract", "hymt", "hy-mt", "model", "runtime",
+            if is_32_bit_asset(name) or any(token in name for token in ("tesseract", "hymt", "hy-mt", "model", "runtime",
                     "macos", "darwin", "linux", "arm64", "aarch64", "win32", "source", "verification", "signature")):
                 return -1
             score = 0
@@ -13698,15 +14413,6 @@ class SettingsWindow(QWidget):
         except Exception as e:
             try:
                 self._cleanup_update_temp_dir()
-            except Exception:
-                pass
-            try:
-                if hasattr(self, "update_btn"):
-                    QMetaObject.invokeMethod(
-                        self,
-                        "_restore_update_button_after_download",
-                        Qt.QueuedConnection
-                    )
             except Exception:
                 pass
             QMetaObject.invokeMethod(
@@ -14605,49 +15311,16 @@ finally {
 
     def _apply_action_panel_style(self):
         """Connected actions use the same palette and states as dialog buttons."""
+        from button_styles import connected_action_panel
         dark = self.parent.current_theme != "Светлая"
-        colors = button_palette(dark)
         panel_names = ('settings_action_panel', 'translation_action_panel',
                        'ocr_action_panel', 'game_action_panel')
-        for name, object_name in tuple((name, 'settingsActionPanel') for name in panel_names) + (
-                                  ("settings_transfer_panel", "settingsTransferPanel"),):
-            panel = getattr(self, name, None)
-            if panel is not None and not sip.isdeleted(panel):
-                set_widget_stylesheet(panel,
-                    f"QWidget#{object_name} {{ background:{colors['border']}; "
-                    f"border:1px solid {colors['border']}; border-radius:7px; }}"
-                )
-        # Derive physical edges from the actual grid, including spans and RTL.
-        # Reusing LTR corner numbers on Arabic put rounded holes in inner
-        # dividers and square fills over the panel's outside corners.
         for name in panel_names + ('settings_transfer_panel',):
             panel = getattr(self, name, None)
             if panel is None or sip.isdeleted(panel):
                 continue
-            grid = panel.layout()
-            if not isinstance(grid, QGridLayout):
-                continue
-            rtl = panel.layoutDirection() == Qt.RightToLeft
-            for index in range(grid.count()):
-                button = grid.itemAt(index).widget()
-                if not isinstance(button, QPushButton):
-                    continue
-                row, column, row_span, column_span = grid.getItemPosition(index)
-                left = column+column_span == grid.columnCount() if rtl else column == 0
-                right = column == 0 if rtl else column+column_span == grid.columnCount()
-                top = row == 0
-                bottom = row+row_span == grid.rowCount()
-                tl, tr, bl, br = (6 if edge else 0 for edge in (
-                    top and left, top and right, bottom and left, bottom and right))
-                divider = '' if left else f"border-left:1px solid {colors['border']};"
-                role = 'danger' if button is getattr(self, 'reset_btn', None) else 'secondary'
-                set_widget_stylesheet(button, button_qss(dark, role, compact=True, radius=0) + f'''
-                    QPushButton {{ border:none; {divider} padding:0 6px;
-                        border-top-left-radius:{tl}px; border-top-right-radius:{tr}px;
-                        border-bottom-left-radius:{bl}px; border-bottom-right-radius:{br}px; }}
-                    QPushButton[keyboardFocus="true"]:focus {{ background:{colors['hover']}; }}
-                    QPushButton[packageTaskDone="true"] {{ color:{'#90c79e' if dark else '#307b45'}; }}
-                ''')
+            connected_action_panel(panel, dark, role_for=lambda button:
+                'danger' if button is getattr(self, 'reset_btn', None) else 'secondary')
 
     def apply_theme(self):
         THEMES_LOCAL = {
@@ -14827,8 +15500,8 @@ finally {
             self._ui_language = self.parent.current_interface_language
             self.apply_theme()
         else:
-            self.update_language()
-            self._set_settings_page(page)
+            from settings_retranslate import retranslate
+            retranslate(self)
         area = getattr(self, area_name, None) if area_name else self._settings_scroll_for_page(page)
         if area is not None and not sip.isdeleted(area):
             # Layouts calculate the final scroll range after the translated
@@ -15183,6 +15856,8 @@ finally {
     def _set_ocr_combo_silently(self, engine_name):
         if not hasattr(self, "ocr_engine_combo"):
             return
+        if self.ocr_engine_combo.findData(engine_name) < 0:
+            self._refresh_ready_engine_choices()
         self.ocr_engine_combo.blockSignals(True)
         self.ocr_engine_combo.setCurrentText(engine_name)
         self.ocr_engine_combo.blockSignals(False)
@@ -15354,9 +16029,13 @@ finally {
             return False, str(e)
 
     def save_ocr_engine(self, text):
+        changed = self.parent.config.get('ocr_engine') != text
         self.auto_save_setting("ocr_engine", text)
         from provider_settings import refresh_provider_routing
         refresh_provider_routing(self)
+        if changed:
+            from ocr_readiness import selected
+            selected(self.parent.config)
 
     def _local_hymt_dir(self):
         return os.path.join(self._portable_app_dir(), "translators", "hymt")
@@ -15431,18 +16110,14 @@ finally {
     def _set_translator_combo_silently(self, engine_name):
         if not hasattr(self, "translator_combo"):
             return
-        idx = 0
-        if hasattr(self, "_translator_engines"):
-            try:
-                idx = self._translator_engines.index(str(engine_name).lower())
-            except ValueError:
-                try:
-                    idx = self._translator_engines.index("google")
-                except ValueError:
-                    idx = 0
-        self.translator_combo.blockSignals(True)
-        self.translator_combo.setCurrentIndex(idx)
-        self.translator_combo.blockSignals(False)
+        from provider_catalog import provider_id
+        if self.translator_combo.findData(provider_id(engine_name)) < 0:
+            self._refresh_ready_engine_choices()
+        # An unavailable saved provider must not look like a switch to Google.
+        # Keep its setting intact and show the center's setup placeholder.
+        with QtCore.QSignalBlocker(self.translator_combo):
+            self.translator_combo.setCurrentIndex(
+                self.translator_combo.findData(provider_id(engine_name)))
 
     def _current_translator_engine_from_combo(self):
         combo = getattr(self, "translator_combo", None)
@@ -15474,7 +16149,7 @@ finally {
         if hasattr(self, '_translator_engines') and 0 <= idx < len(self._translator_engines):
             value = self._translator_engines[idx]
         else:
-            value = "google"
+            return
         if not value:
             return
         lang = self.parent.current_interface_language
@@ -17152,28 +17827,27 @@ finally {
 
     def clear_all_cache(self):
         """Очистить временные кэши, не затрагивая настройки, истории и модели."""
+        from PyQt5 import sip
         from PyQt5.QtCore import QTimer
         from PyQt5.QtWidgets import QApplication
-        from cache_manager import clear_all_cache as cm_clear, get_cache_stats, format_size
+        from cache_manager import clear_all_cache as cm_clear, format_size
 
         lang = self.parent.current_interface_language
-        original_text = settings_text(lang, "clear_cache")
         clearing_text = settings_text(lang, "clearing")
 
-        if hasattr(self, 'clear_cache_btn'):
-            self.clear_cache_btn.setText(clearing_text)
-            self.clear_cache_btn.setEnabled(False)
+        button = getattr(self, 'clear_cache_btn', None)
+        if button is not None:
+            button.setText(clearing_text)
+            button.setEnabled(False)
             QApplication.processEvents()
 
-        # Get real stats before clearing
+        # Statistics are not evidence that bytes were removed, and a failed
+        # metadata read must not prevent cleanup of the remaining files.
         try:
             from main import get_data_file
             data_dir = os.path.dirname(get_data_file("config.json"))
-            stats_before = get_cache_stats(data_dir)
-            total_before = stats_before["cache_bytes"]
         except Exception:
             data_dir = None
-            total_before = 0
 
         total_cleared = 0
         ocr_logging_paused = False
@@ -17247,24 +17921,24 @@ finally {
             except Exception:
                 pass
 
-        # Use real total if cache_manager gave us 0
-        if total_cleared == 0:
-            total_cleared = total_before
-
         size_str = format_size(total_cleared)
-        done_text = settings_text(lang, "cleared").format(size=size_str)
 
         # Показываем результат и возвращаем текст через 2 сек
-        if hasattr(self, 'clear_cache_btn'):
-            self.clear_cache_btn.setText(done_text)
+        if (not sip.isdeleted(self) and button is not None and not sip.isdeleted(button)
+                and getattr(self, 'clear_cache_btn', None) is button):
+            done_text = settings_text(self.parent.current_interface_language, "cleared").format(size=size_str)
+            button.setText(done_text)
             # Зеленый фон, но форма сохраняется (закругление только слева)
             self._apply_action_panel_style()
 
             def restore_button():
                 try:
-                    self.clear_cache_btn.setText(original_text)
+                    if (sip.isdeleted(self) or sip.isdeleted(button)
+                            or getattr(self, 'clear_cache_btn', None) is not button):
+                        return
+                    button.setText(settings_text(self.parent.current_interface_language, "clear_cache"))
                     self._apply_action_panel_style()
-                    self.clear_cache_btn.setEnabled(True)
+                    button.setEnabled(True)
                 except Exception:
                     pass
 
@@ -17288,6 +17962,7 @@ finally {
         if reply != QMessageBox.Yes:
             return
         from main import fresh_config
+        from atomic_storage import write_json
         default_config = fresh_config(lang)
         default_config.update(
             show_update_info=False,
@@ -17297,8 +17972,7 @@ finally {
         # Save to disk
         config_path = get_data_file("config.json")
         try:
-            with open(config_path, "w", encoding="utf-8") as f:
-                json.dump(default_config, f, ensure_ascii=False, indent=4)
+            write_json(config_path, default_config, indent=4)
         except Exception as e:
             w = QMessageBox(self)
             w.setWindowTitle(title)
@@ -17308,6 +17982,8 @@ finally {
             w.exec_()
             return
         # Update parent state
+        previous_autostart = bool(getattr(self.parent, 'autostart', False))
+        requested_autostart = bool(default_config['autostart'])
         self.parent.config = default_config
         app = QApplication.instance()
         if app is not None:
@@ -17317,14 +17993,38 @@ finally {
             )
         self.parent.current_theme = default_config["theme"]
         self.parent.current_interface_language = default_config["interface_language"]
-        self.parent.autostart = default_config["autostart"]
+        self.parent.autostart = previous_autostart
         self.parent.translation_mode = default_config["translation_mode"]
         self.parent.start_minimized = default_config["start_minimized"]
         # Удаляем ярлык автозапуска (autostart = False)
-        self.parent.set_autostart(False)
-        # Сохраняем конфиг
-        self.parent.save_config()
+        autostart_warning = False
+        try:
+            actual_autostart = bool(self.parent.set_autostart(False))
+        except Exception:
+            logging.exception("Settings reset applied; autostart change failed")
+            actual_autostart = previous_autostart
+            autostart_warning = True
+        self.parent.autostart = actual_autostart
+        self.parent.config['autostart'] = actual_autostart
+        if actual_autostart or getattr(self.parent, '_autostart_error', ''):
+            autostart_warning = True
+        if actual_autostart != requested_autostart:
+            try:
+                self.parent.save_config(capture_languages=False)
+            except Exception:
+                logging.exception("Settings reset applied; actual autostart state could not be saved")
+                autostart_warning = True
         _invalidate_main_config_cache()  # Сбрасываем кэш после сохранения
+
+        # Existing listeners retain their registration until explicitly
+        # replaced, and an enabled selection controller owns its own state.
+        # Apply the saved defaults before rebuilding the settings controls.
+        restart_hotkeys = getattr(self.parent, "restart_all_hotkey_listeners", None)
+        if callable(restart_hotkeys):
+            restart_hotkeys()
+        sync_selection = getattr(self.parent, "_sync_selection_quick_translate", None)
+        if callable(sync_selection):
+            sync_selection()
 
         # Перестроить интерфейс под новую тему и сброшенные настройки до показа диалогов
         self.init_ui()
@@ -17342,18 +18042,34 @@ finally {
         msg_clear.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
         msg_clear.exec_()
         if msg_clear.clickedButton() == yes_btn:
+            from history_storage import update_records
             for fname in ("translation_history.json", "copy_history.json"):
                 try:
                     path = get_data_file(fname)
-                    with open(path, 'w', encoding='utf-8') as f:
-                        json.dump([], f)
+                    update_records(path, lambda _current: [])
                 except Exception:
                     pass
 
         done_text = settings_text(lang, "settings_reset_done")
+        if autostart_warning:
+            messages = {
+                'en': 'Autostart could not be fully reconciled or saved. Check it in the application and system settings.',
+                'ru': 'Не удалось полностью согласовать или сохранить автозапуск. Проверьте его в приложении и настройках системы.',
+                'es': 'No se pudo ajustar o guardar por completo el inicio automático. Revísalo en la aplicación y en los ajustes del sistema.',
+                'de': 'Der Autostart konnte nicht vollständig abgeglichen oder gespeichert werden. Prüfen Sie ihn in der Anwendung und den Systemeinstellungen.',
+                'fr': 'Le démarrage automatique n’a pas pu être entièrement synchronisé ou enregistré. Vérifiez-le dans l’application et les paramètres système.',
+                'zh': '无法完全同步或保存自动启动状态。请检查应用和系统中的自动启动设置。',
+                'pt': 'Não foi possível ajustar ou salvar totalmente a inicialização automática. Verifique-a no aplicativo e nas configurações do sistema.',
+                'it': 'Impossibile sincronizzare o salvare completamente l’avvio automatico. Controllalo nell’applicazione e nelle impostazioni di sistema.',
+                'ar': 'تعذّرت مطابقة حالة التشغيل التلقائي أو حفظها بالكامل. تحقّق منها في التطبيق وإعدادات النظام.',
+                'tr': 'Otomatik başlatma tamamen eşitlenemedi veya kaydedilemedi. Uygulama ve sistem ayarlarından kontrol edin.',
+                'hi': 'ऑटोस्टार्ट की स्थिति पूरी तरह मिलाई या सहेजी नहीं जा सकी। ऐप और सिस्टम की सेटिंग में इसे जाँचें।',
+                'id': 'Mulai otomatis tidak dapat diselaraskan atau disimpan sepenuhnya. Periksa di aplikasi dan pengaturan sistem.',
+            }
+            done_text += '\n\n' + messages.get(lang, messages['en'])
         info = QMessageBox(self)
         info.setWindowTitle(title)
         info.setText(done_text)
-        info.setIcon(QMessageBox.Information)
+        info.setIcon(QMessageBox.Warning if autostart_warning else QMessageBox.Information)
         info.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
         info.exec_()

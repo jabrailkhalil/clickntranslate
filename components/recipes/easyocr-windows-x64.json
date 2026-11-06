@@ -51,7 +51,9 @@
     "easyocr_models.py",
     "ocr_text_layout.py",
     "ocr_paragraphs.py",
-    "runtime_bootstrap.py"
+    "runtime_bootstrap.py",
+    "worker_lease.py",
+    "ocr_lifecycle.py"
   ],
   "source_wheels": [
     {
@@ -77,5 +79,6 @@
       "source_url": "https://raw.githubusercontent.com/JaidedAI/EasyOCR/11fa4b123786fbec78ce6fb70abd1d27705223af/easyocr/config.py",
       "model_md5": "4b93972fdacdcdabe6d57097025d4dc2"
     }
-  }
+  },
+  "ocr_worker_protocol": 2
 }

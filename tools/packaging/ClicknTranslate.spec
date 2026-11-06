@@ -3,7 +3,7 @@ import re as _re
 import runpy as _runpy
 import sys as _sys
 
-from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_submodules
+from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_submodules, copy_metadata
 
 from pathlib import Path as _Path
 import sys as _spec_sys
@@ -77,6 +77,8 @@ for package_name in (
     gui_binaries += package_binaries
     gui_hiddenimports += package_hiddenimports
 gui_hiddenimports += collect_submodules('winrt')
+gui_hiddenimports += collect_submodules('comtypes')
+gui_datas += copy_metadata('comtypes')
 
 argos_hiddenimports = [
     'argostranslate.package',

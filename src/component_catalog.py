@@ -1,4 +1,5 @@
 """Trusted component descriptions; no Qt, native engines or network at import."""
+from copy import deepcopy
 import json
 import os
 from pathlib import Path, PurePosixPath
@@ -21,7 +22,7 @@ class ComponentError(RuntimeError):
 
 
 def safe_relative(value):
-    if not isinstance(value, str) or not value or '\\' in value or ':' in value:
+    if not isinstance(value, str) or not value or '\x00' in value or '\\' in value or ':' in value:
         raise ComponentError('invalid_path', str(value))
     path = PurePosixPath(value)
     if path.is_absolute() or any(part in ('', '.', '..') for part in value.split('/')):
@@ -29,15 +30,32 @@ def safe_relative(value):
     return value
 
 
+def _windows_native_target():
+    """Stable host metadata without Python's synchronous WMI startup query."""
+    import ctypes
+    from ctypes import wintypes
+    kernel = ctypes.WinDLL('kernel32')
+    info = ctypes.create_string_buffer(64)  # SYSTEM_INFO is <= 48 bytes.
+    query = kernel.GetNativeSystemInfo
+    query.argtypes = [ctypes.c_void_p]
+    query.restype = None
+    query(ctypes.byref(info))
+    architecture = ctypes.cast(info, ctypes.POINTER(wintypes.WORD))[0]
+    machine = {0: 'x86', 9: 'amd64', 12: 'arm64'}.get(architecture, 'unknown')
+    version = sys.getwindowsversion().platform_version
+    return machine, '.'.join(map(str, version))
+
+
 def current_platform():
-    machine = platform.machine().lower()
+    native = _windows_native_target() if sys.platform == 'win32' else None
+    machine = (native[0] if native else platform.machine()).lower()
     arch = {'amd64': 'x86_64', 'aarch64': 'arm64'}.get(machine, machine)
     name = {'win32': 'windows', 'darwin': 'macos'}.get(sys.platform, sys.platform)
     # release() is a marketing label on Windows Server (e.g. 2022Server),
     # whereas compatibility requires the NT kernel version. Linux kernels
     # can carry distribution suffixes which are not package-version syntax.
     version = (platform.mac_ver()[0] if name == 'macos' else
-               platform.version() if name == 'windows' else platform.release())
+               native[1] if name == 'windows' else platform.release())
     numeric = re.match(r'^\d+(?:\.\d+)*', version)
     version = numeric.group() if numeric else '0'  # unknown OS fails minimum-version checks
     result = {'os': name, 'arch': arch, 'os_version': version}
@@ -149,6 +167,7 @@ def materialize_bundle(bundle, languages):
     selected = sorted(set(languages))
     if not set(selected).issubset(bundle['languages']):
         raise ComponentError('no_compatible_update', 'installed languages')
+    bundle = deepcopy(bundle)
     if not bundle.get('language_files'):
         return dict(bundle)
     files = [*bundle['files']]
@@ -219,7 +238,7 @@ def bootstrap_path():
 def trusted_catalog(root, *, metadata_url=CATALOG_URL, target_url=TARGET_URL, bootstrap=None):
     """Only TUF-authenticated bytes become a catalog. The caller holds store lock."""
     try:
-        from tuf.ngclient import Updater
+        from component_trust import PortableUpdater as Updater
     except ImportError as exc:
         raise ComponentError('update_client_missing', 'tuf') from exc
     root = Path(root)

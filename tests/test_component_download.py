@@ -1,6 +1,8 @@
 from contextlib import contextmanager
 import hashlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import json
+import random
 import threading
 
 import pytest
@@ -21,6 +23,12 @@ def artifact_server(data, mode='normal'):
             calls.append((range_value, self.headers.get('If-Range')))
             if self.path == '/missing':
                 self.send_error(404)
+                return
+            if range_value and mode == 'reject-range':
+                self.send_response(416)
+                self.send_header('Content-Range', f'bytes */{len(data)}')
+                self.send_header('Content-Length', '0')
+                self.end_headers()
                 return
             start = int(range_value.removeprefix('bytes=').removesuffix('-')) if range_value else 0
             resumed = bool(range_value and mode != 'ignore-range')
@@ -83,7 +91,7 @@ def test_canceled_download_resumes_exact_prefix_and_checks_full_digest(tmp_path)
         assert not ComponentDownloader.metadata_path(partial).exists()
 
 
-@pytest.mark.parametrize('mode', ['normal', 'ignore-range', 'bad-range'])
+@pytest.mark.parametrize('mode', ['normal', 'ignore-range', 'bad-range', 'reject-range'])
 def test_resume_handles_standard_and_nonresuming_servers_without_mixing_bytes(tmp_path, mode):
     data = b'approved component bytes' * 4096
     store = ComponentStore(tmp_path)
@@ -92,10 +100,12 @@ def test_resume_handles_standard_and_nonresuming_servers_without_mixing_bytes(tm
         partial = store.root / 'downloads' / digest
         partial.parent.mkdir()
         partial.write_bytes(data[:100])
+        ComponentDownloader.metadata_path(partial).write_text(
+            json.dumps({'url': url, 'etag': '"component-v1"'}), encoding='utf-8')
         result = store.obtain(digest, item, ComponentDownloader(), lambda: None)
         assert result.read_bytes() == data
         assert calls[0][0] == 'bytes=100-'
-        if mode == 'bad-range':
+        if mode in ('bad-range', 'reject-range'):
             assert calls[1][0] is None
 
 
@@ -143,3 +153,30 @@ def test_approved_mirror_is_tried_after_network_failure(tmp_path):
         result = store.obtain(digest, item, ComponentDownloader(), lambda: None)
         assert result.read_bytes() == data
         assert len(calls) == 4
+
+
+@pytest.mark.parametrize('etag,expected_if_range', [
+    ('"component-v1"', '"component-v1"'),
+    ('"component-\xff"', '"component-\xff"'),
+    ('"component-\u2603"', None),
+    (' "component-v1"', None),
+    ('\t"component-v1"', None),
+    ('"component-\x00v1"', None),
+    ('"component-\x7fv1"', None),
+])
+def test_unusable_cached_etag_cannot_poison_a_verified_resume(tmp_path, etag, expected_if_range):
+    data = bytes(range(256)) * 256
+    prefix = random.Random(20261106).randrange(1, len(data) // 2)
+    store = ComponentStore(tmp_path / 'store')
+    with artifact_server(data) as (url, calls), store.lock():
+        digest, item = specification(data, url)
+        partial = store.root / 'downloads' / digest
+        partial.parent.mkdir()
+        partial.write_bytes(data[:prefix])
+        ComponentDownloader.metadata_path(partial).write_text(
+            json.dumps({'url': url, 'etag': etag}), encoding='utf-8')
+        result = store.obtain(digest, item, ComponentDownloader(), lambda: None)
+        assert result.read_bytes() == data
+        assert calls == [(f'bytes={prefix}-', expected_if_range)]
+        assert not partial.exists()
+        assert not ComponentDownloader.metadata_path(partial).exists()

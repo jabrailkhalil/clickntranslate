@@ -261,10 +261,11 @@ class FixedWindowTextLayoutTest(unittest.TestCase):
                         self.assertAlmostEqual(box_rect.center().y(), combo_rect.center().y(), delta=1)
                     settings._set_settings_page(4)
                     self.settle()
-                    self.assertLess(
-                        self.rect_in(settings, settings.copy_notification_checkbox).bottom(),
-                        self.rect_in(settings, settings.ocr_action_panel).top(),
-                    )
+                    self.assertTrue(settings.ocr_action_panel.isHidden())
+                    self.assertTrue(settings.copy_notification_checkbox.isVisible())
+                    viewport = settings.ocr_settings_scroll.viewport()
+                    self.assertTrue(viewport.rect().contains(
+                        self.rect_in(viewport, settings.copy_notification_checkbox)))
                     for page in VISUAL_PAGE_ORDER:
                         settings._set_settings_page(page)
                         self.settle()

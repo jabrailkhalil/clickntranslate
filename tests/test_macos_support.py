@@ -297,15 +297,20 @@ def test_denied_screen_permission_does_not_capture_or_prompt(mac, app, monkeypat
 @pytest.mark.parametrize('engine', ['apple vision', 'tesseract', 'rapidocr', 'easyocr'])
 def test_fullscreen_worker_uses_exactly_the_selected_engine(app, monkeypatch, engine):
     import ocr
+    from threading import Event
     recognize = mock.Mock(return_value=[(10, 20, 30, 40, 'Text')])
     monkeypatch.setattr(ocr, '_recognize_image_layout', recognize)
     captured = []
     image = object()
-    worker = ocr.FullScreenOCRWorker(image, 'ru', engine=engine)
+    cancelled = Event()
+    worker = ocr.FullScreenOCRWorker(image, 'ru', engine=engine, cancel_check=cancelled.is_set)
     worker.result_ready.connect(captured.append)
     worker.run()
-    recognize.assert_called_once_with(image, engine, 'ru')
+    recognize.assert_called_once_with(image, engine, 'ru', cancel_check=worker._is_cancelled)
     assert captured == [[(10, 20, 30, 40, 'Text')]]
+    assert not recognize.call_args.kwargs['cancel_check']()
+    cancelled.set()
+    assert recognize.call_args.kwargs['cancel_check']()
 
 
 def test_macos_never_downloads_windows_installers(mac):
@@ -353,13 +358,26 @@ def test_position_factory_keeps_selected_engine_and_retina_pixels(mac, app, monk
     import ocr
     from PyQt5.QtGui import QImage
     image = QImage(400, 200, QImage.Format_RGB32)
-    image.fill(0xffffffff)
+    image.fill(0xffff0000)
     image.setDevicePixelRatio(2)
-    constructor = mock.Mock()
-    monkeypatch.setattr(ocr, 'FullScreenOCRWorker', constructor)
-    ocr.create_position_ocr_worker(image, 'en', engine)
-    assert constructor.call_args.kwargs['engine'] == engine.lower()
-    assert constructor.call_args.args[0].size == (400, 200)
+    convert = mock.Mock(wraps=ocr._position_ocr_bitmap)
+    recognize = mock.Mock(return_value=[(10, 20, 30, 40, 'Text')])
+    monkeypatch.setattr(ocr, '_position_ocr_bitmap', convert)
+    monkeypatch.setattr(ocr, '_recognize_image_layout', recognize)
+    worker = ocr.create_position_ocr_worker(image, 'en', engine)
+    assert worker.engine == engine.lower()
+    assert isinstance(worker.bitmap, QImage)
+    assert (worker.bitmap.width(), worker.bitmap.height(), worker.bitmap.devicePixelRatio()) == (400, 200, 2)
+    convert.assert_not_called()  # Conversion belongs to the worker, not its GUI caller.
+    image.fill(0xff00ff00)  # The worker retains its submitted frame after a source edit.
+    captured = []
+    worker.result_ready.connect(captured.append)
+    worker.run()
+    convert.assert_called_once()
+    converted = recognize.call_args.args[0]
+    assert converted.size == (400, 200) and converted.getpixel((399, 199)) == (255, 0, 0)
+    assert recognize.call_args.args[1:] == (engine.lower(), 'en')
+    assert captured == [[(10, 20, 30, 40, 'Text')]]
 
 
 def test_dynamic_position_mode_passes_its_selected_engine(app, monkeypatch):

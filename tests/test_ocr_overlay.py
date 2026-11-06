@@ -22,6 +22,13 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
         cls.app = QApplication.instance() or QApplication([])
 
     def setUp(self):
+        # FullScreenTranslateOverlay captures in its constructor. All tests in
+        # this class exercise routing/layout against generated pixels only.
+        screenshot = ocr.QtGui.QPixmap(800, 600)
+        screenshot.fill(ocr.QtGui.QColor('white'))
+        screen_patch = mock.patch.object(ocr, 'grab_screen_pixmap', return_value=screenshot)
+        screen_patch.start()
+        self.addCleanup(screen_patch.stop)
         # An overlay whose language combo has no entries shows a modal "install a
         # language pack" dialog, which blocks a headless run forever. That is the
         # right behaviour for a user, but these tests are about the overlay

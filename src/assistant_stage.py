@@ -76,7 +76,12 @@ class MascotStage(QtWidgets.QWidget):
         self.mascot, self.appearance, self.custom_image = mascot, appearance, custom_image
         self.motion.mascot = mascot
         self.motion.reactions = self.owner.config.get('desktop_assistant_reactions', True) is True
-        self.setAccessibleName(companion_display_name(self.owner.current_interface_language, mascot, appearance))
+        language = self.owner.current_interface_language
+        self.setAccessibleName(companion_display_name(language, mascot, appearance))
+        for button, key in ((self.previous_button, 'previous_mascot'), (self.next_button, 'next_mascot')):
+            label = assistant_text(language, key)
+            button.setAccessibleName(label)
+            button.setToolTip(label)
         self._style_buttons()
         if changed:
             self.motion.greet()
@@ -155,6 +160,7 @@ class MascotStage(QtWidgets.QWidget):
 
     def _sync_animation(self):
         active = self.isVisible() and not self.owner.isMinimized() and self._animated()
+        self.timer.setInterval(33 if self.mascot == 'click' and self.motion.action() != 'idle' else 80)
         if active and not self.timer.isActive():
             self.clock.start()
             self.timer.start()
@@ -182,9 +188,11 @@ class MascotStage(QtWidgets.QWidget):
         return super().eventFilter(watched, event)
 
     def _tick(self):
+        previous = self.motion.render_key()
         self.motion.advance(min(.2, self.clock.restart()/1000))
         self._sync_animation()
-        self.update()
+        if self.motion.render_key() != previous:
+            self.update()
 
     def mouseReleaseEvent(self, event):
         if event.button() == QtCore.Qt.LeftButton:

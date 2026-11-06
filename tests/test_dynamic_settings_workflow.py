@@ -205,6 +205,46 @@ def test_unavailable_template_language_does_not_replace_the_visible_or_saved_cho
     assert 'unavailable' in settings.game_template_combo.toolTip().lower()
 
 
+@pytest.mark.parametrize('locale', ('en', 'ru', 'es', 'de', 'fr', 'zh', 'pt', 'it', 'ar', 'tr', 'hi', 'id'))
+@pytest.mark.parametrize('failure', ('raises', 'false'))
+def test_failed_template_choice_restores_preferences_languages_and_visible_choice(window, app, isolated, monkeypatch, locale, failure):
+    _, store = isolated
+    save_layout(store, 'Original', 'en', 'ru')
+    save_layout(store, 'Other', 'ru', 'en')
+    window.set_interface_language(locale)
+    window.config.update(game_last_template='Original', game_remember_template=False,
+                         game_translate_source_language='en', game_translate_target_language='ru')
+    settings = settings_page(window, store, monkeypatch)
+    before, original_config = copy.deepcopy(window.config), window.config
+    raw = store.path.read_bytes()
+    unhandled = mock.Mock()
+    monkeypatch.setattr('sys.excepthook', unhandled)
+    failure_result = (dict(side_effect=OSError('read only')) if failure == 'raises'
+                      else dict(return_value=False))
+    with mock.patch.object(window, 'save_config', **failure_result), \
+            mock.patch.object(settings_window.QMessageBox, 'warning') as warning:
+        combo = settings.game_template_combo
+        index = combo.findData('Other')
+        combo.setCurrentIndex(index)
+        combo.activated.emit(index)
+        app.processEvents()
+    unhandled.assert_not_called()
+    warning.assert_called_once_with(settings, dynamic_templates.text(locale, 'choose_template'),
+                                    dynamic_templates.text(locale, 'select_template_error'))
+    assert window.config is original_config and window.config == before
+    assert store.path.read_bytes() == raw
+    assert combo.currentData() == 'Original'
+    assert not settings.game_remember_template_checkbox.isChecked()
+    assert settings.game_source_combo.currentData() == 'en'
+    assert settings.game_target_combo.currentData() == 'ru'
+    # A failed write must leave the same picker usable for a later retry.
+    combo.setCurrentIndex(combo.findData('Other'))
+    combo.activated.emit(combo.currentIndex())
+    assert window.config['game_last_template'] == combo.currentData() == 'Other'
+    assert settings.game_source_combo.currentData() == 'ru'
+    assert settings.game_target_combo.currentData() == 'en'
+
+
 def test_template_named_like_the_create_action_is_a_real_choice(window, isolated, monkeypatch):
     _, store = isolated
     name = dynamic_templates.text(window.current_interface_language, 'create_template')

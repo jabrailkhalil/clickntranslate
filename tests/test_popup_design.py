@@ -13,6 +13,31 @@ from settings_window import DropDownCombo
 from test_desktop_ux import app, window
 
 
+def test_shared_row_measurement_tracks_changed_text_font_and_icons_without_aliasing(app):
+    combo = DropDownCombo()
+    combo.addItem('Short')
+    option = QtWidgets.QStyleOptionViewItem()
+    option.initFrom(combo.view())
+    delegate = combo.itemDelegate()
+    try:
+        first = delegate.sizeHint(option, combo.model().index(0, 0))
+        width = first.width()
+        first.setWidth(1)
+        assert delegate.sizeHint(option, combo.model().index(0, 0)).width() == width
+        combo.setItemText(0, 'A much longer visible option')
+        longer = delegate.sizeHint(option, combo.model().index(0, 0))
+        assert longer.width() > width
+        font = combo.font()
+        font.setPixelSize(28)
+        combo.setFont(font)
+        larger = delegate.sizeHint(option, combo.model().index(0, 0))
+        assert larger.height() > longer.height()
+        combo.setItemIcon(0, QtGui.QIcon(str(resource_root()/language_icon_path('en'))))
+        assert delegate.sizeHint(option, combo.model().index(0, 0)).width() > larger.width()
+    finally:
+        combo.deleteLater()
+
+
 @pytest.fixture
 def show_picker(app):
     widgets = []
@@ -172,9 +197,10 @@ def test_search_empty_state_is_localized_and_clearing_preserves_indexes(app, sho
     app.processEvents()
     assert combo._language_empty.isVisible()
     assert combo._language_empty.text() == SEARCH_TEXT[locale][1]
-    # Filtering must not move the search field or flip an above-field popup
-    # below its anchor. The empty state uses the existing list footprint.
-    assert popup.geometry() == geometry
+    # Search stays under the pointer, while the empty state drops unused rows.
+    assert popup.geometry().topLeft() == geometry.topLeft()
+    assert popup.width() == geometry.width()
+    assert popup.height() < geometry.height()
     assert combo._language_search.geometry() == search_geometry
     assert popup.rect().contains(combo._language_empty.geometry())
     assert popup.rect().contains(combo._language_search.geometry())
@@ -184,7 +210,9 @@ def test_search_empty_state_is_localized_and_clearing_preserves_indexes(app, sho
     assert combo.view().window().isVisible()
     combo._language_search.setText('Russian')
     app.processEvents()
-    assert popup.geometry() == geometry
+    assert popup.geometry().topLeft() == geometry.topLeft()
+    assert popup.width() == geometry.width()
+    assert popup.height() < geometry.height()
     assert not combo._language_empty.isVisible()
     QTest.keyClick(combo._language_search, QtCore.Qt.Key_Return)
     assert combo.currentIndex() == original and combo.currentData() == 'ru'

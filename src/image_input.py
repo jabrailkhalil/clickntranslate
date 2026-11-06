@@ -53,6 +53,7 @@ TEXT = {
 EXTENSIONS = {'.png', '.jpg', '.jpeg', '.webp', '.bmp', '.tif', '.tiff', '.gif'}
 MAX_PIXELS = 16_000_000
 MAX_BYTES = 32 * 1024 * 1024
+_TOO_LARGE_IMAGE = object()
 
 ATTACHMENT_TEXT = {
     'en': ('Browse', 'Choose a document or image. You can also drop a file here or paste it with Ctrl+V.', 'Supported files'),
@@ -130,6 +131,11 @@ def image_from_mime(mime):
     """Copy clipboard pixels before leaving the GUI thread; never write to it."""
     if mime.hasImage():
         value = mime.imageData()
+        if (isinstance(value, (QtGui.QImage, QtGui.QPixmap))
+                and value.width() * value.height() > MAX_PIXELS):
+            # Let the existing import flow report its localized size error,
+            # without copying/converting an already-rejected pixel buffer.
+            return _TOO_LARGE_IMAGE
         image = value.toImage() if isinstance(value, QtGui.QPixmap) else value
         if isinstance(image, QtGui.QImage) and not image.isNull():
             return image.copy()
@@ -173,6 +179,9 @@ class ImageInputTextEdit(QtWidgets.QTextEdit):
         super().insertFromMimeData(mime)
 
     def dragEnterEvent(self, event):
+        if self.isReadOnly():
+            event.ignore()
+            return
         if (self.receivers(self.image_requested) and has_image_mime(event.mimeData())) or self._document_path(event.mimeData()):
             event.acceptProposedAction()
         else:
@@ -181,6 +190,9 @@ class ImageInputTextEdit(QtWidgets.QTextEdit):
     dragMoveEvent = dragEnterEvent
 
     def dropEvent(self, event):
+        if self.isReadOnly():
+            event.ignore()
+            return
         image = image_from_mime(event.mimeData())
         if image is not None and self.receivers(self.image_requested):
             self.image_requested.emit(image)
@@ -192,23 +204,118 @@ class ImageInputTextEdit(QtWidgets.QTextEdit):
             super().dropEvent(event)
 
 
+def _png_exif_orientation(device):
+    """Read optional eXIf metadata without decoding another pixel buffer."""
+    position = None
+    try:
+        from PIL import Image
+        import zlib
+        if device is None:
+            return 1
+        position = device.pos()
+        limit = min(device.size(), MAX_BYTES)
+        if not device.seek(0) or bytes(device.read(8)) != b'\x89PNG\r\n\x1a\n':
+            return 1
+        while device.pos() + 12 <= limit:
+            header = bytes(device.read(8))
+            if len(header) != 8:
+                break
+            length, kind = int.from_bytes(header[:4], 'big'), header[4:]
+            if length > limit - device.pos() - 4:
+                break
+            if kind == b'eXIf':
+                data, checksum = bytes(device.read(length)), bytes(device.read(4))
+                if len(data) != length or len(checksum) != 4 or zlib.crc32(kind + data) != int.from_bytes(checksum, 'big'):
+                    return 1
+                exif = Image.Exif()
+                exif.load(data)
+                orientation = exif.get(274, 1)
+                return orientation if type(orientation) is int and 1 <= orientation <= 8 else 1
+            if kind == b'IEND' or not device.seek(device.pos() + length + 4):
+                break
+    except Exception:
+        pass  # Optional metadata must not reject otherwise-readable pixels.
+    finally:
+        if position is not None:
+            try:
+                device.seek(position)
+            except Exception:
+                pass
+    return 1
+
+
+def _opaque_ocr_image(image):
+    """Composite alpha against the opposite opacity-weighted foreground brightness."""
+    if not image.hasAlphaChannel():
+        return image
+    from PIL import Image, ImageStat
+    premultiplied = image.convertToFormat(QtGui.QImage.Format_RGBA8888_Premultiplied)
+    pointer = premultiplied.constBits()
+    pointer.setsize(premultiplied.byteCount())
+    plane = Image.frombuffer('RGBA', (image.width(), image.height()), pointer,
+                             'raw', 'RGBA', premultiplied.bytesPerLine(), 1)
+    try:
+        stats = ImageStat.Stat(plane)
+        opaque = stats.extrema[3][0] == 255
+        red, green, blue, alpha = stats.mean
+    finally:
+        plane.close()
+        del plane, pointer, premultiplied
+    if opaque:
+        return image
+    brightness = (.299 * red + .587 * green + .114 * blue) * 255 / alpha if alpha else 0
+    result = QtGui.QImage(image.size(), QtGui.QImage.Format_RGB32)
+    result.fill(QtCore.Qt.black if brightness > 127.5 else QtCore.Qt.white)
+    if hasattr(image, 'colorSpace'):
+        result.setColorSpace(image.colorSpace())
+    painter = QtGui.QPainter(result)
+    try:
+        # Both rectangles are raw pixels; source DPR must not shrink the glyph.
+        rect = QtCore.QRectF(0, 0, image.width(), image.height())
+        painter.drawImage(rect, image, rect)
+    finally:
+        painter.end()
+    result.setDevicePixelRatio(image.devicePixelRatio())
+    return result
+
+
 def load_image(payload):
+    if payload is _TOO_LARGE_IMAGE:
+        raise ValueError('large')
     if isinstance(payload, QtGui.QImage):
         image = payload
     else:
         if os.path.getsize(payload) > MAX_BYTES:
             raise ValueError('large')
-        reader = QtGui.QImageReader(str(payload))
-        reader.setAutoTransform(True)
-        size = reader.size()
-        if size.width() * size.height() > MAX_PIXELS:
-            raise ValueError('large')
-        image = reader.read()
+        device = QtCore.QFile(str(payload))
+        if not device.open(QtCore.QIODevice.ReadOnly):
+            raise ValueError('invalid')
+        try:
+            if device.size() > MAX_BYTES:
+                raise ValueError('large')
+            reader = QtGui.QImageReader(device)
+            reader.setAutoTransform(True)
+            size = reader.size()
+            if size.width() * size.height() > MAX_PIXELS:
+                raise ValueError('large')
+            png_without_transform = (bytes(reader.format()).lower() == b'png'
+                                     and reader.transformation() == QtGui.QImageIOHandler.TransformationNone)
+            image = reader.read()
+            if not image.isNull() and png_without_transform:
+                orientation = _png_exif_orientation(device)
+                transforms = {2: (-1, 0, 0, 1, 0, 0), 3: (-1, 0, 0, -1, 0, 0),
+                              4: (1, 0, 0, -1, 0, 0), 5: (0, 1, 1, 0, 0, 0),
+                              6: (0, 1, -1, 0, 0, 0), 7: (0, -1, -1, 0, 0, 0),
+                              8: (0, -1, 1, 0, 0, 0)}
+                if orientation in transforms:
+                    image = image.transformed(QtGui.QTransform(*transforms[orientation]))
+        finally:
+            device.close()
     if image.isNull():
         raise ValueError('invalid')
     if image.width() * image.height() > MAX_PIXELS:
         raise ValueError('large')
-    return image
+    return _opaque_ocr_image(image)
 
 
 def recognize_image(payload, config, source, target, cancelled):
@@ -230,13 +337,34 @@ def recognize_image(payload, config, source, target, cancelled):
         except ProviderError as error:
             raise RuntimeError(display_error(error, config.get('interface_language', 'en'))) from None
         return result.source, result.translation
-    from ocr import create_position_ocr_worker
-    worker = create_position_ocr_worker(image, source, engine)
+    from ocr import create_position_ocr_worker, usable_ocr_engine
+    ocr_source = source
+    if source == 'auto' and usable_ocr_engine(engine).lower() in {'rapidocr', 'easyocr', 'tesseract'}:
+        from ocr import installed_ocr_language_codes, _configured_ocr_translate_pair, ocr_ui_text
+        from languages import get_language
+        try:
+            available = [code for code in installed_ocr_language_codes(engine=engine, config=config)
+                         if isinstance(code, str) and get_language(code) is not None]
+        except Exception:
+            available = []
+        if not available:
+            locale = config.get('interface_language', 'en')
+            raise RuntimeError(ocr_ui_text(locale, 'no_installed_languages') + '\n\n' +
+                               ocr_ui_text(locale, 'install_languages_first'))
+        # Translation's auto detection is independent of local recognition.
+        # Match the capture controls' configured/first-installed OCR choice.
+        preferred, _target = _configured_ocr_translate_pair(config)
+        ocr_source = preferred if preferred in available else available[0]
+    worker = create_position_ocr_worker(image, ocr_source, engine, cancel_check=cancelled)
     if worker is None:
         raise ValueError('invalid')
     if source == 'auto' and getattr(worker, 'engine', '') == 'windows':
-        from ocr import _recognize_with_windows_auto
-        return _recognize_with_windows_auto(worker.bitmap, cancel_check=cancelled,
+        from ocr import _position_ocr_bitmap, _recognize_with_windows_auto
+        # Position workers defer their QImage conversion until run(). Auto
+        # recognition bypasses run(), so perform the same conversion here.
+        bitmap = (_position_ocr_bitmap(worker.bitmap, 'windows')
+                  if isinstance(worker.bitmap, QtGui.QImage) else worker.bitmap)
+        return _recognize_with_windows_auto(bitmap, cancel_check=cancelled,
             join_paragraphs=config.get('ocr_join_paragraphs', True) is True), None
     rows = []
     worker.result_ready.connect(lambda value: rows.extend(value), QtCore.Qt.DirectConnection)
@@ -288,7 +416,12 @@ class ImageImportController(QtCore.QObject):
                     self._completed.emit(revision, result)
                 except RuntimeError:
                     pass  # The owning window was closed while OCR was finishing.
-        threading.Thread(target=run, name='image-recognition', daemon=True).start()
+        try:
+            threading.Thread(target=run, name='image-recognition', daemon=True).start()
+        except Exception as error:
+            self._completed.emit(revision, ('', None, str(error) or image_text(
+                snapshot.get('interface_language', 'en'), 'error')))
+            return False
         return True
 
     def cancel(self):

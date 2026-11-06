@@ -17,12 +17,14 @@ class LiveTextState:
         self.max_entries = max_entries
         self.max_chars = max_chars
         self.lines = []
+        self._frame_translations = ()
+        self._resolved_texts = set()
         self._seen = {}
         self._wave_started = None
         self._cache = OrderedDict()
         self._cache_chars = 0
 
-    def observe(self, lines, now):
+    def observe(self, lines, now, *, translations=None):
         previous = {}
         for item in self.lines:
             previous.setdefault(item[4], []).append(item)
@@ -33,27 +35,37 @@ class LiveTextState:
                           if all(abs(a - b) <= 2 for a, b in zip(item[:4], old[:4]))), None)
             stable_lines.append(candidates.pop(match) if match is not None else item)
         self.lines = stable_lines
+        # Direct vision results belong to this frame and box, not a cache
+        # indexed by text: two identical labels can have different meanings.
+        self._frame_translations = tuple(str(value or '').strip()
+                                         for _, value in zip(self.lines, translations or ()))
+        unresolved = {item[4] for index, item in enumerate(self.lines)
+                      if index >= len(self._frame_translations) or not self._frame_translations[index]}
+        self._resolved_texts = {item[4] for item in self.lines} - unresolved
         seen = {}
         for *_, text in self.lines:
             if text not in seen:
                 first, count = self._seen.get(text, (now, 0))
                 seen[text] = (first, count + 1)
         self._seen = seen
-        if any(text not in self._cache for text in seen):
+        if any(not self._is_translated(text) for text in seen):
             if self._wave_started is None:
                 self._wave_started = now
         else:
             self._wave_started = None
 
+    def _is_translated(self, text):
+        return text in self._cache or text in self._resolved_texts
+
     def pending(self, now):
         return [text for text, (first, count) in self._seen.items()
-                if text not in self._cache and (
+                if not self._is_translated(text) and (
                     (count >= 2 and now - first >= self.stable_after)
                     or (self._wave_started is not None and now - self._wave_started >= self.max_wait))]
 
     def settling(self, now):
         ready = set(self.pending(now))
-        return any(text not in self._cache and text not in ready for text in self._seen)
+        return any(not self._is_translated(text) and text not in ready for text in self._seen)
 
     def remember(self, pairs):
         for source, translated in pairs:
@@ -70,19 +82,24 @@ class LiveTextState:
             while len(self._cache) > self.max_entries or self._cache_chars > self.max_chars:
                 old_source, old_translation = self._cache.popitem(last=False)
                 self._cache_chars -= len(old_source) + len(old_translation)
-        if all(text in self._cache for text in self._seen):
+        if all(self._is_translated(text) for text in self._seen):
             self._wave_started = None
 
     def blocks(self):
         blocks = []
-        for *rect, source in self.lines:
-            if source in self._cache:
+        for index, (*rect, source) in enumerate(self.lines):
+            translated = self._frame_translations[index] if index < len(self._frame_translations) else ''
+            if translated:
+                blocks.append((*rect, source, translated))
+            elif source in self._cache:
                 self._cache.move_to_end(source)
                 blocks.append((*rect, source, self._cache[source]))
         return blocks
 
     def reset_visible(self):
         self.lines = []
+        self._frame_translations = ()
+        self._resolved_texts = set()
         self._seen = {}
         self._wave_started = None
 

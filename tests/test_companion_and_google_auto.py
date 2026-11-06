@@ -45,7 +45,8 @@ def test_static_shortcut_stays_still_but_menu_and_home_work(window, app, appeara
     assert helper.anchor.pos() == position
     assert helper.anchor.grab().toImage() == image
     helper.toggle_menu()
-    assert set(helper.menu.buttons) == {'open', 'area', 'screen', 'text', 'copy', 'dynamic', 'documents', 'guide', 'settings', 'hide'}
+    from assistant_settings import ASSISTANT_ACTIONS
+    assert set(helper.menu.buttons) == set(ASSISTANT_ACTIONS) | {'settings', 'hide'}
     assert all(button.isVisible() for button in helper.menu.buttons.values())
 
 

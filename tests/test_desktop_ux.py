@@ -112,12 +112,25 @@ def test_hover_and_menu_keep_reactions_running_and_capture_hides_pet(window, app
     helper = window._desktop_assistant
     anchor = helper.anchor
     before = anchor.grab().toImage()
-    anchor.enterEvent(QtCore.QEvent(QtCore.QEvent.Enter))
-    assert anchor.grab().toImage() == before
+    geometry = QtCore.QRect(anchor.geometry())
+    motion_key = anchor.motion.render_key()
+    right = QtCore.QPoint(anchor.width()-2, round(anchor.height()*.44))
+    with mock.patch.object(QtGui.QCursor, 'pos', return_value=anchor.mapToGlobal(right)):
+        QtWidgets.QApplication.sendEvent(anchor, QtCore.QEvent(QtCore.QEvent.Enter))
+    assert anchor._hover and anchor._gaze_angle == 90
+    left = QtCore.QPointF(2, anchor.height()*.44)
+    move = QtGui.QMouseEvent(QtCore.QEvent.MouseMove, left, QtCore.Qt.NoButton,
+                            QtCore.Qt.NoButton, QtCore.Qt.NoModifier)
+    QtWidgets.QApplication.sendEvent(anchor, move)
+    assert anchor._gaze_angle == 270
+    assert anchor.geometry() == geometry
+    assert anchor.grab().toImage().size() == before.size()
+    assert anchor.motion.render_key() == motion_key
     assert anchor._animation.isActive()
     helper.request_action('walk')
     assert anchor._animation.isActive()
     anchor.leaveEvent(QtCore.QEvent(QtCore.QEvent.Leave))
+    assert anchor._gaze_angle is None and anchor.geometry() == geometry
     assert anchor._animation.isActive()
     start = anchor.pos()
     anchor._advance(.25)

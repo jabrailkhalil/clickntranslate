@@ -16,9 +16,21 @@ def inline_reading_order(items, *, position, text):
         return ordered
     groups = []
     latin_run = []
+    kinds = []
     for item in ordered:
         directions = {unicodedata.bidirectional(c) for c in str(text(item))}
-        if not directions.intersection({'R', 'AL'}) and directions.intersection({'L', 'EN', 'AN'}):
+        kinds.append(-1 if directions.intersection({'R', 'AL'}) else
+                     1 if directions.intersection({'L', 'EN', 'AN'}) else 0)
+    # OCR can split a decimal, time or URL into number/Latin and punctuation
+    # boxes. Neutral separators inside that run must keep their visual order.
+    following = [0] * len(kinds)
+    next_kind = 0
+    for index in range(len(kinds) - 1, -1, -1):
+        following[index] = next_kind
+        if kinds[index]:
+            next_kind = kinds[index]
+    for index, item in enumerate(ordered):
+        if kinds[index] == 1 or (kinds[index] == 0 and latin_run and following[index] == 1):
             latin_run.append(item)
         else:
             if latin_run:
@@ -48,7 +60,7 @@ def _bounds(box):
         if not xs or not all(math.isfinite(value) for value in xs + ys):
             return None
         return min(xs), min(ys), max(xs), max(ys)
-    except (TypeError, ValueError, IndexError):
+    except (TypeError, ValueError, OverflowError, IndexError):
         return None
 
 

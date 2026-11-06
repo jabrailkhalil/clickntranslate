@@ -13,10 +13,20 @@ from test_desktop_ux import app
 LOCALES = tuple(game_mode.GAME_TEXT)
 
 
+@pytest.fixture
+def readiness(monkeypatch):
+    import ocr_readiness
+    state = SimpleNamespace(begin=mock.Mock(), end=mock.Mock())
+    monkeypatch.setattr(ocr_readiness, 'begin_activity', state.begin)
+    monkeypatch.setattr(ocr_readiness, 'end_activity', state.end)
+    return state
+
+
 @pytest.mark.parametrize('locale', LOCALES)
-def test_region_pause_uses_its_own_reason_without_changing_resume_or_activity(app, locale):
+def test_region_pause_uses_its_own_reason_without_changing_resume_or_activity(app, locale, readiness):
     button = QtWidgets.QToolButton()
     owner = SimpleNamespace(paused=False, language=locale, pause_button=button,
+                            config={'ocr_engine': 'windows'},
                             _set_status=mock.Mock())
     try:
         with mock.patch.object(game_mode, 'notify_current_activity') as activity:
@@ -30,14 +40,16 @@ def test_region_pause_uses_its_own_reason_without_changing_resume_or_activity(ap
             assert button.toolTip() == game_mode.game_text(locale, 'pause')
             assert owner._set_status.call_args == mock.call('waiting', active=True)
             assert activity.call_count == 1
+            readiness.end.assert_called_once_with(f'game-region:{id(owner)}')
+            readiness.begin.assert_called_once_with(f'game-region:{id(owner)}', 'windows')
     finally:
         button.deleteLater()
 
 
 @pytest.mark.parametrize('locale', LOCALES)
-def test_fullscreen_pause_caption_retains_cancel_and_resume_semantics(app, locale):
+def test_fullscreen_pause_caption_retains_cancel_and_resume_semantics(app, locale, readiness):
     button, label = QtWidgets.QPushButton(), QtWidgets.QLabel()
-    owner = SimpleNamespace(paused=False, language=locale,
+    owner = SimpleNamespace(paused=False, language=locale, config={'ocr_engine': 'windows'},
         controls=SimpleNamespace(pause_button=button, label=label),
         _settle_timer=mock.Mock(), _live=mock.Mock(), _translation_cancel=threading.Event(),
         _status='Previous text', _status_is_error=True, _blocks=['old'],
@@ -59,6 +71,8 @@ def test_fullscreen_pause_caption_retains_cancel_and_resume_semantics(app, local
             assert button.text() == game_mode.game_text(locale, 'pause')
             owner._scan_once.assert_called_once_with()
             assert activity.call_count == 1
+            readiness.end.assert_called_once_with(f'game-fullscreen:{id(owner)}')
+            readiness.begin.assert_called_once_with(f'game-fullscreen:{id(owner)}', 'windows')
     finally:
         button.deleteLater()
         label.deleteLater()

@@ -257,6 +257,43 @@ def button_qss(dark, role="secondary", selector="QPushButton", *, compact=False,
     """
 
 
+def connected_action_panel(panel, dark, *, role_for=None):
+    """The shared joined action grid, including physical corners in RTL."""
+    from PyQt5.QtCore import Qt
+    from PyQt5.QtWidgets import QGridLayout, QPushButton
+    from styled_dialogs import set_widget_stylesheet
+    colors = button_palette(dark)
+    name = panel.objectName()
+    if not name:
+        name = 'connectedActionPanel'
+        panel.setObjectName(name)
+    set_widget_stylesheet(panel, f'QWidget#{name} {{ background:{colors["border"]}; '
+                         f'border:1px solid {colors["border"]}; border-radius:7px; }}')
+    grid = panel.layout()
+    if not isinstance(grid, QGridLayout):
+        return
+    rtl = panel.layoutDirection() == Qt.RightToLeft
+    for index in range(grid.count()):
+        button = grid.itemAt(index).widget()
+        if not isinstance(button, QPushButton):
+            continue
+        row, column, row_span, column_span = grid.getItemPosition(index)
+        left = column+column_span == grid.columnCount() if rtl else column == 0
+        right = column == 0 if rtl else column+column_span == grid.columnCount()
+        top, bottom = row == 0, row+row_span == grid.rowCount()
+        tl, tr, bl, br = (6 if edge else 0 for edge in (
+            top and left, top and right, bottom and left, bottom and right))
+        divider = '' if left else f'border-left:1px solid {colors["border"]};'
+        role = role_for(button) if role_for is not None else 'secondary'
+        set_widget_stylesheet(button, button_qss(dark, role, compact=True, radius=0) + f'''
+            QPushButton {{ border:none; {divider} padding:0 6px;
+                border-top-left-radius:{tl}px; border-top-right-radius:{tr}px;
+                border-bottom-left-radius:{bl}px; border-bottom-right-radius:{br}px; }}
+            QPushButton[keyboardFocus="true"]:focus {{ background:{colors['hover']}; }}
+            QPushButton[packageTaskDone="true"] {{ color:{'#90c79e' if dark else '#307b45'}; }}
+        ''')
+
+
 def standard_buttons(dark, *, compact=False):
     """Known action roles, using the stable object names in our windows."""
     rules = [button_qss(dark, compact=compact)]

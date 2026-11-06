@@ -40,5 +40,15 @@
     },
     "license_url": "https://aka.ms/vc14/license",
     "redistribution_review": false
-  }
+  },
+  "adapter_files": [
+    "ocr_worker.py",
+    "rapidocr_models.py",
+    "ocr_text_layout.py",
+    "ocr_paragraphs.py",
+    "runtime_bootstrap.py",
+    "worker_lease.py",
+    "ocr_lifecycle.py"
+  ],
+  "ocr_worker_protocol": 2
 }
