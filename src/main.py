@@ -105,6 +105,7 @@ from ui_scaling import (BASE_SCALE, DEFAULT_SCALE, MIN_SCALE, MAX_SCALE, ScaledI
                         prepare_native_popup)
 from settings_sections import PAGE_APPLICATION, PAGE_TRANSLATION, PAGE_OCR, PAGE_DYNAMIC, PAGE_COMPANION
 from header_icons import header_icon
+from icon_rendering import load_icon
 from control_hints import control_hint
 configure_qt_platform()
 
@@ -170,18 +171,18 @@ AUTOSTART_BACKEND = (
 )
 
 INTERFACE_LANGUAGE_OPTIONS = [
-    {"code": "en", "name": "English", "icon": "icons/American_flag.png"},
-    {"code": "ru", "name": "Русский", "icon": "icons/Russian_flag.png"},
-    {"code": "es", "name": "Español", "icon": "icons/Spanish_flag.png"},
-    {"code": "de", "name": "Deutsch", "icon": "icons/German_flag.png"},
-    {"code": "fr", "name": "Français", "icon": "icons/French_flag.png"},
-    {"code": "zh", "name": "中文", "icon": "icons/Chinese_flag.png"},
-    {"code": "pt", "name": "Português", "icon": "icons/Portuguese_flag.png"},
-    {"code": "it", "name": "Italiano", "icon": "icons/Italian_flag.png"},
-    {"code": "ar", "name": "العربية", "icon": "icons/Arabic_flag.png"},
-    {"code": "tr", "name": "Türkçe", "icon": "icons/Turkish_flag.png"},
-    {"code": "hi", "name": "हिन्दी", "icon": "icons/Hindi_flag.png"},
-    {"code": "id", "name": "Indonesia", "icon": "icons/flags/id.png"},
+    {"code": "en", "name": "English", "icon": "icons/flags/us.svg"},
+    {"code": "ru", "name": "Русский", "icon": "icons/flags/ru.svg"},
+    {"code": "es", "name": "Español", "icon": "icons/flags/es.svg"},
+    {"code": "de", "name": "Deutsch", "icon": "icons/flags/de.svg"},
+    {"code": "fr", "name": "Français", "icon": "icons/flags/fr.svg"},
+    {"code": "zh", "name": "中文", "icon": "icons/flags/cn.svg"},
+    {"code": "pt", "name": "Português", "icon": "icons/flags/pt.svg"},
+    {"code": "it", "name": "Italiano", "icon": "icons/flags/it.svg"},
+    {"code": "ar", "name": "العربية", "icon": "icons/flags/sa.svg"},
+    {"code": "tr", "name": "Türkçe", "icon": "icons/flags/tr.svg"},
+    {"code": "hi", "name": "हिन्दी", "icon": "icons/flags/in.svg"},
+    {"code": "id", "name": "Indonesia", "icon": "icons/flags/id.svg"},
 ]
 INTERFACE_LANGUAGE_BY_CODE = {item["code"]: item for item in INTERFACE_LANGUAGE_OPTIONS}
 
@@ -3060,7 +3061,7 @@ def _apply_language_flags(combo, interface_language):
     for index in range(combo.count()):
         code = combo.itemData(index) or language_code_from_name(combo.itemText(index), interface_language)
         path = language_icon_path(code)
-        combo.setItemIcon(index, QIcon(resource_path(path)) if path else QIcon())
+        combo.setItemIcon(index, load_icon(resource_path(path)) if path else QIcon())
 
 
 def clipboard_copy_icon(theme_name):
@@ -6444,7 +6445,7 @@ class ArgosPackageInstallDialog(QDialog):
         super().__init__(parent)
         text = ARGOS_PACKAGE_DIALOG_TEXT.get(lang, ARGOS_PACKAGE_DIALOG_TEXT["en"])
         self.setWindowTitle(text["title"])
-        self.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+        self.setWindowIcon(load_icon(resource_path("icons/icon.ico")))
         self.setWindowFlag(Qt.WindowContextHelpButtonHint, False)
         self.setFixedSize(510, 310)
 
@@ -6635,7 +6636,7 @@ class ArgosTranslationErrorDialog(QDialog):
         super().__init__(parent)
         text = ARGOS_ERROR_DIALOG_TEXT.get(lang, ARGOS_ERROR_DIALOG_TEXT["en"])
         self.setWindowTitle(text["title"])
-        self.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+        self.setWindowIcon(load_icon(resource_path("icons/icon.ico")))
         self.setWindowFlag(Qt.WindowContextHelpButtonHint, False)
         self.setFixedSize(520, 320)
 
@@ -7137,7 +7138,7 @@ class TranslationResultDialog(QDialog):
 
         self.setObjectName("translationResultRoot")
         self.setWindowTitle(self.text["workspace_title"])
-        self.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+        self.setWindowIcon(load_icon(resource_path("icons/icon.ico")))
         self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
         self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.setMinimumSize(400, 330)
@@ -8165,7 +8166,7 @@ class WelcomeDialog(QDialog):
             parent.current_interface_language if hasattr(parent, 'current_interface_language') else 'ru'
         )
         self.setWindowTitle(welcome_text(self.lang)["window"])
-        self.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+        self.setWindowIcon(load_icon(resource_path("icons/icon.ico")))
         # Keep the compact width, but let wrapped copy use its real font height.
         self.setFixedWidth(560)
         self.setMinimumHeight(390)
@@ -8295,7 +8296,7 @@ class WelcomeDialog(QDialog):
 
         self.flag_button = QPushButton()
         self.flag_button.setObjectName("welcomeLang")
-        self.flag_button.setIcon(QIcon(resource_path(get_interface_language_option(self.lang)["icon"])))
+        self.flag_button.setIcon(load_icon(resource_path(get_interface_language_option(self.lang)["icon"])))
         self.flag_button.setIconSize(QSize(20, 20))
         self.flag_button.setFixedSize(36, 32)
         self.flag_button.setAccessibleName(ui_text(self.lang, "choose_interface_language"))
@@ -8507,7 +8508,7 @@ class WelcomeDialog(QDialog):
         """)
         for option in INTERFACE_LANGUAGE_OPTIONS:
             selected = option["code"] == self.lang
-            action = menu.addAction(QIcon(resource_path(option["icon"])), ("• " if selected else "  ") + option["name"])
+            action = menu.addAction(load_icon(resource_path(option["icon"])), ("• " if selected else "  ") + option["name"])
             action.triggered.connect(lambda _checked=False, code=option["code"]: self.set_language(code))
         menu.ensurePolished()
         size = menu.sizeHint()
@@ -8597,7 +8598,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self.setWindowTitle(doc_text(self.lang, "title"))
         self.setObjectName("documentTranslationDialog")
         self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
-        self.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+        self.setWindowIcon(load_icon(resource_path("icons/icon.ico")))
         self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.setMinimumSize(980, 680)
         self.resize(1080, 700)
@@ -11085,7 +11086,7 @@ class DarkThemeApp(QMainWindow):
 
         self.HotkeyListenerThread = HotkeyListenerThread
 
-        self.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+        self.setWindowIcon(load_icon(resource_path("icons/icon.ico")))
 
     def load_config(self):
         config_path = get_data_file("config.json")
@@ -12070,7 +12071,7 @@ class DarkThemeApp(QMainWindow):
         self.update_theme_icon()
         self.theme_button.setToolTip(tooltip_text(ui_text(self.current_interface_language, "theme")))
         self.theme_button.setStyleSheet(styled_transparent_button_qss(self.current_theme != "Светлая"))
-        self.theme_button.clicked.connect(self.toggle_theme)
+        self.theme_button.clicked.connect(self.request_theme_change)
 
         self.minimize_button = QPushButton(self.ui_root)
         self.minimize_button.setText("‒")
@@ -12138,7 +12139,7 @@ class DarkThemeApp(QMainWindow):
                 button.setIconSize(QSize(20, 20) if button is self.flag_button else QSize(24, 24))
 
     def create_tray_icon(self):
-        self.tray_icon = QSystemTrayIcon(QIcon(resource_path("icons/icon.ico")), self)
+        self.tray_icon = QSystemTrayIcon(load_icon(resource_path("icons/icon.ico")), self)
         self.tray_icon.setToolTip(tooltip_text("Click'n'Translate"))
         self.update_tray_menu()
         self.tray_icon.activated.connect(self.on_tray_icon_activated)
@@ -13917,29 +13918,61 @@ class DarkThemeApp(QMainWindow):
     @QtCore.pyqtSlot()
     @measure('ui.theme')
     def toggle_theme(self):
+        from ui_operations import consume_steps
+        return consume_steps(self._theme_change_steps())
+
+    @QtCore.pyqtSlot()
+    def request_theme_change(self):
+        from ui_operations import operation_for, show_operation_error
+        return operation_for(self).start('theme', steps=lambda _value: self._theme_change_steps(keep_header_live=True),
+            failed=lambda error: show_operation_error(self, error))
+
+    def _theme_change_steps(self, *, keep_header_live=False):
+        from PyQt5 import sip
         # Apply the parent and every open child as one paint transaction.  Qt
         # otherwise exposes the parent with the new palette while cached child
         # backing stores still contain the old one, leaving dark rectangles in
         # the light theme until another repaint happens.
         # The scaled canvas is a separate top-level widget embedded in a
         # graphics proxy: disabling the native owner alone does not freeze it.
-        roots = list(dict.fromkeys((self, getattr(self, 'ui_root', self),
-                                    *QApplication.topLevelWidgets())))
+        # Keep the native owner alive for the in-window header indicator while
+        # its proxy canvas and dialogs retain their last complete frame.
+        ui_root = getattr(self, 'ui_root', self)
+        roots = list(dict.fromkeys((self.central_widget,
+            ui_root, getattr(getattr(self, '_ui_scale_controller', None), 'view', None),
+            *(widget for widget in QApplication.topLevelWidgets() if widget not in (self, ui_root)))))
+        if not keep_header_live:
+            roots = list(dict.fromkeys((self, ui_root, *QApplication.topLevelWidgets())))
         frozen = [(widget, widget.updatesEnabled()) for widget in roots
-                  if widget.isVisible() or widget is self or widget is getattr(self, 'ui_root', None)]
+                  if widget is not None and (widget.isVisible() or widget in (self, ui_root))]
         for widget, _enabled in frozen:
             widget.setUpdatesEnabled(False)
         try:
+            previous_theme = self.current_theme
+            previous_config_theme = self.config.get('theme')
             self.current_theme = "Светлая" if self.current_theme == "Темная" else "Темная"
-            self.save_config()
+            try:
+                self.save_config()
+            except Exception:
+                self.current_theme = previous_theme
+                if previous_config_theme is None:
+                    self.config.pop('theme', None)
+                else:
+                    self.config['theme'] = previous_config_theme
+                raise
+            yield 'theme'
             self.apply_theme()
+            yield 'theme'
             if self.settings_window is not None:
                 self.settings_window.apply_theme()
+                yield 'theme'
             if self.document_dialog is not None:
                 self.document_dialog.refresh_theme(self.current_theme)
+                yield 'theme'
         finally:
             for widget, enabled in reversed(frozen):
-                widget.setUpdatesEnabled(enabled)
+                if not sip.isdeleted(widget):
+                    widget.setUpdatesEnabled(enabled)
         self._refresh_theme_paint_tree()
         self._complete_guide_step("theme")
 
@@ -13973,7 +14006,7 @@ class DarkThemeApp(QMainWindow):
 
     def update_interface_language_button(self):
         option = get_interface_language_option(self.current_interface_language)
-        self.flag_button.setIcon(QIcon(resource_path(option["icon"])))
+        self.flag_button.setIcon(load_icon(resource_path(option["icon"])))
         self.flag_button.setIconSize(QSize(20, 20))
         from interface_language_picker import PICKER_TEXT
         expanded = getattr(self, '_interface_language_picker', None) is not None
@@ -14164,7 +14197,7 @@ class DarkThemeApp(QMainWindow):
         dialog.setObjectName('helpDialogRoot')
         dialog.setWindowTitle(help_action_text(lang, 'title'))
         dialog.setFixedSize(620, 520)
-        dialog.setWindowIcon(QIcon(resource_path('icons/icon.ico')))
+        dialog.setWindowIcon(load_icon(resource_path('icons/icon.ico')))
         outer = QVBoxLayout(dialog)
         outer.setContentsMargins(0, 0, 0, 0)
         frame = QFrame(dialog)
@@ -14547,7 +14580,7 @@ class DarkThemeApp(QMainWindow):
         )
         box = QMessageBox(self)
         box.setWindowTitle(hotkey_settings_prompt_text(lang, "title"))
-        box.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+        box.setWindowIcon(load_icon(resource_path("icons/icon.ico")))
         box.setIcon(QMessageBox.Question)
         box.setText(message)
         open_button = box.addButton(
@@ -14572,7 +14605,7 @@ class DarkThemeApp(QMainWindow):
         lang = self.current_interface_language
         box = QMessageBox(self)
         box.setWindowTitle(assistant_text(lang, 'companion_section'))
-        box.setWindowIcon(QIcon(resource_path('icons/icon.ico')))
+        box.setWindowIcon(load_icon(resource_path('icons/icon.ico')))
         box.setIcon(QMessageBox.Question)
         box.setText(assistant_text(lang, 'preview_settings_question'))
         open_button = box.addButton(assistant_text(lang, 'preview_open_settings'), QMessageBox.AcceptRole)
@@ -15833,7 +15866,7 @@ class DarkThemeApp(QMainWindow):
         dialog.setTextFormat(Qt.RichText)
         dialog.setText(msg)
         dialog.setIcon(QMessageBox.Warning)
-        dialog.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+        dialog.setWindowIcon(load_icon(resource_path("icons/icon.ico")))
 
         if theme == "Темная":
             dialog.setStyleSheet("""
@@ -15996,7 +16029,7 @@ class DarkThemeApp(QMainWindow):
             self._argos_progress.setAutoReset(False)
             self._argos_progress.setMinimumDuration(0)
             self._argos_progress.setMinimumWidth(430)
-            self._argos_progress.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+            self._argos_progress.setWindowIcon(load_icon(resource_path("icons/icon.ico")))
             try:
                 progress_frame = self._argos_progress.frameGeometry()
                 progress_frame.moveCenter(self.frameGeometry().center())

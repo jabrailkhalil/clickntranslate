@@ -202,7 +202,10 @@ def test_rtl_names_flags_check_and_theme_do_not_rearrange_catalog(make_picker, a
     for code, label in picker.name_labels.items():
         assert label.fontMetrics().horizontalAdvance(label.text()) <= label.width()+1
         flag = picker.buttons[code].findChild(QtWidgets.QLabel, 'interfaceLanguageFlag')
-        assert not flag.pixmap().isNull() and flag.pixmap().devicePixelRatio() == 4
+        # The label now renders its vector at the real painter density rather
+        # than retaining a 72px preview that is stretched with the main scene.
+        from icon_rendering import ScalableIconLabel
+        assert isinstance(flag, ScalableIconLabel) and not flag.grab().isNull()
         assert picker.ticks[code].width() == 12
     picker.set_language('pt')
     settle(app)

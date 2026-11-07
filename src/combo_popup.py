@@ -15,8 +15,9 @@ CHECKED_ROLE = QtCore.Qt.UserRole + 101
 def _language_flag(code):
     from languages import language_icon_path
     from project_paths import resource_root
+    from icon_rendering import load_icon
     path = language_icon_path(code)
-    return QtGui.QIcon(str(resource_root()/path)) if path else QtGui.QIcon()
+    return load_icon(str(resource_root()/path)) if path else QtGui.QIcon()
 
 
 def popup_host_factor(combo):
@@ -212,13 +213,9 @@ class PopupRowDelegate(QtWidgets.QStyledItemDelegate):
         if isinstance(icon, QtGui.QIcon) and not icon.isNull() and not header:
             size = round(18*scale)
             x = content.right()-size if rtl else content.left()
-            pixels = icon.pixmap(QtCore.QSize(size*3, size*3),
-                                 QtGui.QIcon.Normal if enabled else QtGui.QIcon.Disabled)
-            if not pixels.isNull():
-                fitted = QtCore.QSizeF(pixels.size()).scaled(QtCore.QSizeF(size, size), QtCore.Qt.KeepAspectRatio)
-                target = QtCore.QRectF(x+(size-fitted.width())/2,
-                    content.center().y()-fitted.height()/2, fitted.width(), fitted.height())
-                painter.drawPixmap(target, pixels, QtCore.QRectF(pixels.rect()))
+            from icon_rendering import paint_icon
+            paint_icon(painter, icon, QtCore.QRectF(x, content.center().y()-size/2, size, size),
+                       QtGui.QIcon.Normal if enabled else QtGui.QIcon.Disabled)
         if not header and (not icon.isNull() or self._language_gutter()):
             content.adjust(0 if rtl else 24*scale, 0, -24*scale if rtl else 0, 0)
         if not header:

@@ -1,0 +1,12 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 90 80" width="90" height="80"><defs><clipPath id="cnt-flag-shape"><rect x="6" y="10" width="78" height="60" rx="8" /></clipPath></defs><rect x="2" y="6" width="86" height="68" rx="12" fill="#fff" /><g clip-path="url(#cnt-flag-shape)"><g id="flag-icons-is" transform="translate(6 10) scale(0.121875 0.125) translate(-0 -0)"><defs>
+    <clipPath id="is-a">
+      <path fill-opacity=".7" d="M0 0h640v480H0z" />
+    </clipPath>
+  </defs>
+  <g fill-rule="evenodd" stroke-width="0" clip-path="url(#is-a)">
+    <path fill="#003897" d="M0 0h666.7v480H0z" />
+    <path fill="#fff" d="M0 186.7h186.7V0h106.6v186.7h373.4v106.6H293.3V480H186.7V293.3H0z" />
+    <path fill="#d72828" d="M0 213.3h213.3V0h53.4v213.3h400v53.4h-400V480h-53.4V266.7H0z" />
+  </g>
+</g></g></svg>

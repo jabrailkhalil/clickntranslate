@@ -1,3 +1,4 @@
+from icon_rendering import load_icon
 from button_styles import button_qss, button_palette, standard_buttons, paint_down_arrow
 from number_controls import ChoiceStepper, StepperFrame
 from numeric_stepper import NumericStepper
@@ -493,8 +494,9 @@ class DropDownCombo(QComboBox):
                          else field.adjusted(icon_size.width()+6,0,0,0))
             painter.save()
             painter.setClipRect(field)
-            option.currentIcon.paint(painter,icon_rect,Qt.AlignCenter,
-                QIcon.Normal if self.isEnabled() else QIcon.Disabled)
+            from icon_rendering import paint_icon
+            paint_icon(painter, option.currentIcon, icon_rect,
+                       QIcon.Normal if self.isEnabled() else QIcon.Disabled)
             painter.setFont(self.font())
             painter.setPen(option.palette.color(QtGui.QPalette.Active if self.isEnabled()
                                                else QtGui.QPalette.Disabled,QtGui.QPalette.Text))
@@ -4124,6 +4126,52 @@ for _refresh_lang, _refresh_text in {
     SETTINGS_TEXT[_refresh_lang]['settings_refresh_incomplete'] = _refresh_text
 
 
+def _write_settings_payload(target, payload):
+    """Atomic file-only work; payload was snapshotted on the GUI thread."""
+    temporary = None
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', prefix=target.name+'.',
+                suffix='.tmp', dir=target.parent, delete=False) as output:
+            temporary = Path(output.name)
+            json.dump(payload, output, ensure_ascii=False, indent=2, sort_keys=True)
+            output.write('\n')
+        os.replace(str(temporary), str(target))
+        return target
+    finally:
+        if temporary is not None:
+            try:
+                temporary.unlink(missing_ok=True)
+            except OSError:
+                pass
+
+
+def _read_settings_payload(path, lang):
+    with Path(path).open('rb') as source:
+        content = source.read(1024 * 1024 + 1)
+    if len(content) > 1024 * 1024:
+        messages = {
+            'en': 'This settings file is too large. Choose a ClicknTranslate export.',
+            'ru': 'Файл настроек слишком большой. Выберите экспорт ClicknTranslate.',
+            'es': 'El archivo es demasiado grande. Elige una exportación de ClicknTranslate.',
+            'de': 'Die Einstellungsdatei ist zu groß. Wählen Sie einen ClicknTranslate-Export.',
+            'fr': 'Ce fichier est trop volumineux. Choisissez un export ClicknTranslate.',
+            'zh': '设置文件过大，请选择 ClicknTranslate 导出的文件。',
+
+            'pt': 'Este arquivo de configurações é muito grande. Escolha uma exportação ClicknTranslate.',
+            'it': "Questo file delle impostazioni è troppo grande. Scegli un'esportazione ClicknTranslate.",
+
+            'ar': 'ملف الإعدادات كبير جدًا. اختر ملفًا مصدّرًا من ClicknTranslate.',
+
+            'tr': 'Ayar dosyası çok büyük. ClicknTranslate dışa aktarımı seçin.',
+            'hi': 'सेटिंग्स फ़ाइल बहुत बड़ी है। ClicknTranslate निर्यात चुनें।',
+            'id': 'Berkas pengaturan terlalu besar. Pilih ekspor ClicknTranslate.',
+        }
+        raise ValueError(messages.get(lang, messages['en']))
+    payload = json.loads(content.decode('utf-8-sig'))
+    return payload
+
+
 SETTINGS_EXPORT_FORMAT = "clickntranslate-settings"
 SETTINGS_EXPORT_SCHEMA = 1
 
@@ -6385,7 +6433,7 @@ class OcrLanguageManagerDialog(QDialog):
         from package_presentation import text as package_text
         from engine_center import text as center_text
         self.setWindowTitle(center_text(self.lang, 'title'))
-        self.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+        self.setWindowIcon(load_icon(resource_path("icons/icon.ico")))
         self.setObjectName("languageManagerDialog")
         self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
         self.setAttribute(Qt.WA_StyledBackground, True)
@@ -6410,7 +6458,7 @@ class OcrLanguageManagerDialog(QDialog):
         self.title_icon = QLabel()
         self.title_icon.setObjectName("languageManagerTitleIcon")
         self.title_icon.setFixedSize(18, 18)
-        self.title_icon.setPixmap(QIcon(resource_path("icons/icon.ico")).pixmap(18, 18))
+        self.title_icon.setPixmap(load_icon(resource_path("icons/icon.ico")).pixmap(18, 18))
         title_layout.addWidget(self.title_icon, 0, Qt.AlignVCenter)
 
         self.title_label = QLabel(center_text(self.lang, 'title'))
@@ -7597,7 +7645,7 @@ class OcrLanguageManagerDialog(QDialog):
             table.setItem(row, 0, check_item)
 
             icon_path = data.get("icon", "")
-            icon = QIcon(resource_path(icon_path)) if icon_path else QIcon()
+            icon = load_icon(resource_path(icon_path)) if icon_path else QIcon()
             lang_item = QTableWidgetItem(icon, data["name"])
             lang_item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
             lang_item.setBackground(QBrush(bg))
@@ -10641,7 +10689,7 @@ class SettingsWindow(QWidget):
             for language in APP_LANGUAGES:
                 if language.code not in available or language.code == source:
                     continue
-                target_combo.addItem(QIcon(resource_path(language_icon_path(language.code))),
+                target_combo.addItem(load_icon(resource_path(language_icon_path(language.code))),
                     language.display_name(self.parent.current_interface_language), language.code)
             if target_combo.count() == 0:
                 from ocr import ocr_ui_text
@@ -10704,7 +10752,7 @@ class SettingsWindow(QWidget):
             for language in APP_LANGUAGES:
                 if language.code not in available:
                     continue
-                source_combo.addItem(QIcon(resource_path(language_icon_path(language.code))),
+                source_combo.addItem(load_icon(resource_path(language_icon_path(language.code))),
                     language.display_name(self.parent.current_interface_language), language.code)
             if source_combo.count() == 0:
                 from ocr import ocr_ui_text
@@ -10844,27 +10892,11 @@ class SettingsWindow(QWidget):
         target = Path(path)
         if target.suffix.lower() != ".json":
             target = target.with_suffix(".json")
-        temporary = None
         try:
-            target.parent.mkdir(parents=True, exist_ok=True)
-            with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8',
-                    prefix=target.name+'.', suffix='.tmp', dir=target.parent, delete=False) as output:
-                temporary = Path(output.name)
-                json.dump(settings_export_payload(self.parent.config), output,
-                          ensure_ascii=False, indent=2, sort_keys=True)
-                output.write('\n')
-            os.replace(str(temporary), str(target))
+            _write_settings_payload(target, settings_export_payload(self.parent.config))
         except Exception as error:
-            try:
-                if temporary is not None:
-                    temporary.unlink(missing_ok=True)
-            except OSError:
-                pass
-            QMessageBox.warning(
-                self,
-                settings_text(lang, "export_settings"),
-                settings_text(lang, "settings_transfer_failed").format(error=error),
-            )
+            QMessageBox.warning(self, settings_text(lang, 'export_settings'),
+                settings_text(lang, 'settings_transfer_failed').format(error=error))
             return None
         QMessageBox.information(
             self,
@@ -10872,6 +10904,36 @@ class SettingsWindow(QWidget):
             settings_text(lang, "settings_exported").format(path=target),
         )
         return target
+
+
+    def request_export_settings(self):
+        from ui_operations import operation_for
+        operation = operation_for(self.parent)
+        if operation.active:
+            return False
+        lang = self.parent.current_interface_language
+        path, _selected = QtWidgets.QFileDialog.getSaveFileName(
+            native_window_parent(self),
+            settings_text(lang, "export_settings"),
+            self._settings_default_export_path(),
+            settings_text(lang, "settings_file_filter"),
+        )
+        if not path:
+            return None
+        target = Path(path)
+        if target.suffix.lower() != ".json":
+            target = target.with_suffix(".json")
+        try:
+            payload = settings_export_payload(self.parent.config)
+        except Exception as error:
+            QMessageBox.warning(self, settings_text(lang, 'export_settings'),
+                settings_text(lang, 'settings_transfer_failed').format(error=error))
+            return False
+        return operation.start('export', work=lambda: _write_settings_payload(target, payload),
+            done=lambda result: QMessageBox.information(self, settings_text(lang, 'export_settings'),
+                settings_text(lang, 'settings_exported').format(path=result)),
+            failed=lambda error: QMessageBox.warning(self, settings_text(lang, 'export_settings'),
+                settings_text(lang, 'settings_transfer_failed').format(error=error)))
 
     def import_settings(self):
         lang = self.parent.current_interface_language
@@ -10883,29 +10945,44 @@ class SettingsWindow(QWidget):
         )
         if not path:
             return None
+        from ui_operations import consume_steps
         try:
-            with Path(path).open('rb') as source:
-                content = source.read(1024 * 1024 + 1)
-            if len(content) > 1024 * 1024:
-                messages = {
-                    'en': 'This settings file is too large. Choose a ClicknTranslate export.',
-                    'ru': 'Файл настроек слишком большой. Выберите экспорт ClicknTranslate.',
-                    'es': 'El archivo es demasiado grande. Elige una exportación de ClicknTranslate.',
-                    'de': 'Die Einstellungsdatei ist zu groß. Wählen Sie einen ClicknTranslate-Export.',
-                    'fr': 'Ce fichier est trop volumineux. Choisissez un export ClicknTranslate.',
-                    'zh': '设置文件过大，请选择 ClicknTranslate 导出的文件。',
+            payload = _read_settings_payload(path, lang)
+        except Exception as error:
+            return SettingsWindow._show_import_outcome(self, (None, 'warning',
+                settings_text(lang, 'import_settings'), settings_text(lang, 'settings_transfer_failed').format(
+                    error=_settings_import_error(error, lang))))
+        return SettingsWindow._show_import_outcome(self, consume_steps(
+            SettingsWindow._import_settings_steps(self, path, lang, payload)))
 
-                    'pt': 'Este arquivo de configurações é muito grande. Escolha uma exportação ClicknTranslate.',
-                    'it': "Questo file delle impostazioni è troppo grande. Scegli un'esportazione ClicknTranslate.",
+    def request_import_settings(self):
+        from ui_operations import operation_for
+        operation = operation_for(self.parent)
+        if operation.active:
+            return False
+        lang = self.parent.current_interface_language
+        path, _selected = QtWidgets.QFileDialog.getOpenFileName(
+            native_window_parent(self),
+            settings_text(lang, "import_settings"),
+            str(Path(self._settings_default_export_path()).parent),
+            settings_text(lang, "settings_file_filter"),
+        )
+        if not path:
+            return None
+        return operation.start('import', work=lambda: _read_settings_payload(path, lang),
+            steps=lambda payload: SettingsWindow._import_settings_steps(self, path, lang, payload),
+            done=lambda outcome: SettingsWindow._show_import_outcome(self, outcome),
+            failed=lambda error: SettingsWindow._show_import_outcome(self, (None, 'warning',
+                settings_text(lang, 'import_settings'), settings_text(lang, 'settings_transfer_failed').format(
+                    error=_settings_import_error(error, lang)))))
 
-                    'ar': 'ملف الإعدادات كبير جدًا. اختر ملفًا مصدّرًا من ClicknTranslate.',
+    def _show_import_outcome(self, outcome):
+        result, kind, title, message = outcome
+        getattr(QMessageBox, kind)(self, title, message)
+        return result
 
-                    'tr': 'Ayar dosyası çok büyük. ClicknTranslate dışa aktarımı seçin.',
-                    'hi': 'सेटिंग्स फ़ाइल बहुत बड़ी है। ClicknTranslate निर्यात चुनें।',
-                    'id': 'Berkas pengaturan terlalu besar. Pilih ekspor ClicknTranslate.',
-                }
-                raise ValueError(messages.get(lang, messages['en']))
-            payload = json.loads(content.decode('utf-8-sig'))
+    def _import_settings_steps(self, path, lang, payload):
+        try:
             from main import (
                 DEFAULT_CONFIG,
                 merge_config_defaults,
@@ -10941,6 +11018,7 @@ class SettingsWindow(QWidget):
                 for name, value in previous.items():
                     setattr(self.parent, name, value)
                 raise
+            yield 'settings'
             app = QApplication.instance()
             if app is not None:
                 app.setProperty(
@@ -10972,32 +11050,32 @@ class SettingsWindow(QWidget):
                         logging.exception("Imported settings applied; actual autostart state could not be saved")
                         autostart_warning = 1
 
-            refresh_warning = False
-            finalizers = (
-                ('hotkeys', getattr(self.parent, 'restart_all_hotkey_listeners', None)),
-                ('application theme', self.parent.apply_theme),
-                ('selection', getattr(self.parent, '_sync_selection_quick_translate', None)),
-                ('interface language', self.parent.refresh_interface_language_ui),
-                ('settings controls', self.init_ui),
-                ('settings theme', self.apply_theme),
-                ('settings page', lambda: self._set_settings_page(0)),
-            )
-            for name, finalize in finalizers:
-                if not callable(finalize):
-                    continue
-                try:
-                    finalize()
-                except Exception:
-                    logging.exception('Imported settings saved; could not refresh %s', name)
-                    refresh_warning = True
+            yield 'settings'
+            from ui_operations import hold_content_paint
+            with hold_content_paint(self.parent, self):
+                refresh_warning = False
+                finalizers = (
+                    ('hotkeys', getattr(self.parent, 'restart_all_hotkey_listeners', None)),
+                    ('application theme', self.parent.apply_theme),
+                    ('selection', getattr(self.parent, '_sync_selection_quick_translate', None)),
+                    ('interface language', self.parent.refresh_interface_language_ui),
+                    ('settings controls', self.init_ui),
+                    ('settings theme', self.apply_theme),
+                    ('settings page', lambda: self._set_settings_page(0)),
+                )
+                for name, finalize in finalizers:
+                    if not callable(finalize):
+                        continue
+                    try:
+                        finalize()
+                    except Exception:
+                        logging.exception('Imported settings saved; could not refresh %s', name)
+                        refresh_warning = True
+                    yield 'settings'
         except Exception as error:
             logging.exception("Could not import Click'n'Translate settings")
-            QMessageBox.warning(
-                self,
-                settings_text(lang, "import_settings"),
-                settings_text(lang, "settings_transfer_failed").format(error=_settings_import_error(error,lang)),
-            )
-            return None
+            return (None, 'warning', settings_text(lang, 'import_settings'),
+                settings_text(lang, 'settings_transfer_failed').format(error=_settings_import_error(error, lang)))
 
         applied_lang = self.parent.current_interface_language
         followup_warnings = []
@@ -11031,17 +11109,11 @@ class SettingsWindow(QWidget):
             followup_warnings.append(messages.get(applied_lang, messages['en'])[autostart_warning])
         if refresh_warning:
             followup_warnings.append(settings_text(applied_lang, 'settings_refresh_incomplete'))
+        message = settings_text(applied_lang, "settings_imported")
         if followup_warnings:
-            QMessageBox.warning(self, settings_text(applied_lang, "import_settings"),
-                settings_text(applied_lang, "settings_imported") + '\n\n'
-                + '\n\n'.join(followup_warnings))
-        else:
-            QMessageBox.information(
-                self,
-                settings_text(applied_lang, "import_settings"),
-                settings_text(applied_lang, "settings_imported"),
-            )
-        return Path(path)
+            message += '\n\n' + '\n\n'.join(followup_warnings)
+        return (Path(path), 'warning' if followup_warnings else 'information',
+                settings_text(applied_lang, "import_settings"), message)
 
     def on_history_checkbox_toggled(self, state):
         self.auto_save_setting("history", state)
@@ -11848,7 +11920,7 @@ class SettingsWindow(QWidget):
         self.export_settings_btn.setToolTip(
             tooltip_text(settings_text(lang, "export_settings_tooltip"))
         )
-        self.export_settings_btn.clicked.connect(self.export_settings)
+        self.export_settings_btn.clicked.connect(self.request_export_settings)
 
         self.import_settings_btn = OpticallyCenteredPushButton(
             settings_text(lang, "import_settings"), self.settings_updates_page
@@ -11857,7 +11929,7 @@ class SettingsWindow(QWidget):
         self.import_settings_btn.setToolTip(
             tooltip_text(settings_text(lang, "import_settings_tooltip"))
         )
-        self.import_settings_btn.clicked.connect(self.import_settings)
+        self.import_settings_btn.clicked.connect(self.request_import_settings)
 
         self.create_bug_report_btn = OpticallyCenteredPushButton(
             settings_text(lang, "create_bug_report"), self.settings_updates_page
@@ -15904,7 +15976,7 @@ finally {
         msg.setWindowTitle(engine_text(lang, "not_found", engine="Tesseract"))
         msg.setText(engine_text(lang, "tesseract_prompt"))
         msg.setIcon(QMessageBox.Question)
-        msg.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+        msg.setWindowIcon(load_icon(resource_path("icons/icon.ico")))
         msg.setWindowFlag(QtCore.Qt.WindowContextHelpButtonHint, False)
         yes_btn = msg.addButton(engine_text(lang, "install"), QMessageBox.YesRole)
         msg.addButton(engine_text(lang, "cancel"), QMessageBox.NoRole)
@@ -15924,7 +15996,7 @@ finally {
         msg.setWindowTitle(engine_text(lang, "not_found", engine="Tesseract"))
         msg.setText(message)
         msg.setIcon(QMessageBox.Information)
-        msg.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+        msg.setWindowIcon(load_icon(resource_path("icons/icon.ico")))
         msg.setWindowFlag(QtCore.Qt.WindowContextHelpButtonHint, False)
         msg.exec_()
 
@@ -15939,7 +16011,7 @@ finally {
         msg.setWindowTitle(engine_text(lang, "not_found", engine="EasyOCR"))
         msg.setText(engine_text(lang, "easyocr_prompt"))
         msg.setIcon(QMessageBox.Question)
-        msg.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+        msg.setWindowIcon(load_icon(resource_path("icons/icon.ico")))
         msg.setWindowFlag(QtCore.Qt.WindowContextHelpButtonHint, False)
         yes_btn = msg.addButton(engine_text(lang, "install"), QMessageBox.YesRole)
         msg.addButton(engine_text(lang, "cancel"), QMessageBox.NoRole)
@@ -15962,7 +16034,7 @@ finally {
         msg.setWindowTitle(engine_text(lang, "not_found", engine="RapidOCR"))
         msg.setText(engine_text(lang, "rapidocr_prompt"))
         msg.setIcon(QMessageBox.Question)
-        msg.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+        msg.setWindowIcon(load_icon(resource_path("icons/icon.ico")))
         msg.setWindowFlag(QtCore.Qt.WindowContextHelpButtonHint, False)
         yes_btn = msg.addButton(engine_text(lang, "install"), QMessageBox.YesRole)
         msg.addButton(engine_text(lang, "cancel"), QMessageBox.NoRole)
@@ -16140,7 +16212,7 @@ finally {
         msg.setWindowTitle(engine_text(lang, "not_found", engine="Hy-MT"))
         msg.setText(message)
         msg.setIcon(QMessageBox.Information)
-        msg.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+        msg.setWindowIcon(load_icon(resource_path("icons/icon.ico")))
         msg.setWindowFlag(QtCore.Qt.WindowContextHelpButtonHint, False)
         msg.exec_()
 
@@ -16293,7 +16365,7 @@ finally {
             self.progress.setAutoReset(False)
             self.progress.setMinimumDuration(0)
             self.progress.setMinimumWidth(430)
-            self.progress.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+            self.progress.setWindowIcon(load_icon(resource_path("icons/icon.ico")))
             self.progress.canceled.connect(self._request_tesseract_install_cancel)
             try:
                 owner_window = (getattr(self, "_tesseract_progress_owner", None) or self).window()
@@ -16845,7 +16917,7 @@ finally {
             self.rapidocr_progress.setAutoReset(False)
             self.rapidocr_progress.setMinimumDuration(0)
             self.rapidocr_progress.setMinimumWidth(430)
-            self.rapidocr_progress.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+            self.rapidocr_progress.setWindowIcon(load_icon(resource_path("icons/icon.ico")))
             try:
                 owner_window = (getattr(self, "_rapidocr_progress_owner", None) or self).window()
                 owner_center = owner_window.frameGeometry().center()
@@ -17168,7 +17240,7 @@ finally {
             self.easyocr_progress.setAutoReset(False)
             self.easyocr_progress.setMinimumDuration(0)
             self.easyocr_progress.setMinimumWidth(430)
-            self.easyocr_progress.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+            self.easyocr_progress.setWindowIcon(load_icon(resource_path("icons/icon.ico")))
             try:
                 owner_window = (getattr(self, "_easyocr_progress_owner", None) or self).window()
                 owner_center = owner_window.frameGeometry().center()
@@ -17567,7 +17639,7 @@ finally {
             self.hymt_progress.setAutoReset(False)
             self.hymt_progress.setMinimumDuration(0)
             self.hymt_progress.setMinimumWidth(430)
-            self.hymt_progress.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+            self.hymt_progress.setWindowIcon(load_icon(resource_path("icons/icon.ico")))
             try:
                 owner_window = (getattr(self, "_hymt_progress_owner", None) or self).window()
                 owner_center = owner_window.frameGeometry().center()
@@ -17678,7 +17750,7 @@ finally {
         confirm.setWindowTitle(engine_text(lang, "remove_title", engine="Hy-MT"))
         confirm.setText(engine_text(lang, "remove_hymt_prompt"))
         confirm.setIcon(QMessageBox.Question)
-        confirm.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+        confirm.setWindowIcon(load_icon(resource_path("icons/icon.ico")))
         confirm.setWindowFlag(QtCore.Qt.WindowContextHelpButtonHint, False)
         yes_btn = confirm.addButton(engine_text(lang, "remove"), QMessageBox.YesRole)
         confirm.addButton(engine_text(lang, "cancel"), QMessageBox.NoRole)
@@ -17726,7 +17798,7 @@ finally {
         confirm.setWindowTitle(engine_text(lang, "remove_title", engine="RapidOCR"))
         confirm.setText(engine_text(lang, "remove_ocr_prompt", engine="RapidOCR"))
         confirm.setIcon(QMessageBox.Question)
-        confirm.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+        confirm.setWindowIcon(load_icon(resource_path("icons/icon.ico")))
         yes_btn = confirm.addButton(engine_text(lang, "remove"), QMessageBox.YesRole)
         confirm.addButton(engine_text(lang, "cancel"), QMessageBox.NoRole)
         confirm.exec_()
@@ -17763,7 +17835,7 @@ finally {
         confirm.setWindowTitle(engine_text(lang, "remove_title", engine="EasyOCR"))
         confirm.setText(engine_text(lang, "remove_ocr_prompt", engine="EasyOCR"))
         confirm.setIcon(QMessageBox.Question)
-        confirm.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+        confirm.setWindowIcon(load_icon(resource_path("icons/icon.ico")))
         yes_btn = confirm.addButton(engine_text(lang, "remove"), QMessageBox.YesRole)
         confirm.addButton(engine_text(lang, "cancel"), QMessageBox.NoRole)
         confirm.exec_()
@@ -17800,7 +17872,7 @@ finally {
         confirm.setWindowTitle(engine_text(lang, "remove_title", engine="Tesseract"))
         confirm.setText(engine_text(lang, "remove_ocr_prompt", engine="Tesseract"))
         confirm.setIcon(QMessageBox.Question)
-        confirm.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+        confirm.setWindowIcon(load_icon(resource_path("icons/icon.ico")))
         yes_btn = confirm.addButton(engine_text(lang, "remove"), QMessageBox.YesRole)
         confirm.addButton(engine_text(lang, "cancel"), QMessageBox.NoRole)
         confirm.exec_()
@@ -17954,7 +18026,7 @@ finally {
         box.setWindowTitle(title)
         box.setText(question)
         box.setIcon(QMessageBox.Question)
-        box.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+        box.setWindowIcon(load_icon(resource_path("icons/icon.ico")))
         yes_btn = box.addButton(settings_text(lang, "yes"), QMessageBox.YesRole)
         box.addButton(settings_text(lang, "no"), QMessageBox.NoRole)
         box.exec_()
@@ -17978,7 +18050,7 @@ finally {
             w.setWindowTitle(title)
             w.setText(str(e))
             w.setIcon(QMessageBox.Warning)
-            w.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+            w.setWindowIcon(load_icon(resource_path("icons/icon.ico")))
             w.exec_()
             return
         # Update parent state
@@ -18039,7 +18111,7 @@ finally {
         yes_btn = msg_clear.addButton(yes_text, QMessageBox.YesRole)
         msg_clear.addButton(no_text, QMessageBox.NoRole)
         msg_clear.setIcon(QMessageBox.Question)
-        msg_clear.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+        msg_clear.setWindowIcon(load_icon(resource_path("icons/icon.ico")))
         msg_clear.exec_()
         if msg_clear.clickedButton() == yes_btn:
             from history_storage import update_records
@@ -18071,5 +18143,5 @@ finally {
         info.setWindowTitle(title)
         info.setText(done_text)
         info.setIcon(QMessageBox.Warning if autostart_warning else QMessageBox.Information)
-        info.setWindowIcon(QIcon(resource_path("icons/icon.ico")))
+        info.setWindowIcon(load_icon(resource_path("icons/icon.ico")))
         info.exec_()

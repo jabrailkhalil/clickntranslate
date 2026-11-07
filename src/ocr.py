@@ -718,7 +718,8 @@ def _cached_qt_icon(relative_path):
     normalized_path = str(relative_path or "").replace("\\", "/")
     icon = _QT_ICON_CACHE.get(normalized_path)
     if icon is None:
-        icon = QtGui.QIcon(resource_path(normalized_path))
+        from icon_rendering import load_icon
+        icon = load_icon(resource_path(normalized_path))
         _QT_ICON_CACHE[normalized_path] = icon
     return icon
 

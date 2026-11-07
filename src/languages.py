@@ -187,22 +187,22 @@ class LanguageInfo:
 
 
 LANGUAGES = [
-    LanguageInfo("en", "English", "Английский", "EN", "American_flag.png", "en-US", "eng"),
-    LanguageInfo("ru", "Russian", "Русский", "RU", "Russian_flag.png", "ru-RU", "rus"),
-    LanguageInfo("de", "German", "Немецкий", "DE", "German_flag.png", "de-DE", "deu"),
-    LanguageInfo("fr", "French", "Французский", "FR", "French_flag.png", "fr-FR", "fra"),
-    LanguageInfo("es", "Spanish", "Испанский", "ES", "Spanish_flag.png", "es-ES", "spa"),
-    LanguageInfo("it", "Italian", "Итальянский", "IT", "Italian_flag.png", "it-IT", "ita"),
-    LanguageInfo("pt", "Portuguese", "Португальский", "PT", "Portuguese_flag.png", "pt-BR", "por"),
-    LanguageInfo("pl", "Polish", "Польский", "PL", "Polish_flag.png", "pl-PL", "pol"),
-    LanguageInfo("uk", "Ukrainian", "Украинский", "UK", "Ukrainian_flag.png", "uk-UA", "ukr"),
-    LanguageInfo("tr", "Turkish", "Турецкий", "TR", "Turkish_flag.png", "tr-TR", "tur"),
-    LanguageInfo("nl", "Dutch", "Нидерландский", "NL", "Dutch_flag.png", "nl-NL", "nld"),
-    LanguageInfo("zh", "Chinese", "Китайский", "ZH", "Chinese_flag.png", "zh-CN", "chi_sim", google_code="zh-CN", mymemory_code="zh-CN"),
-    LanguageInfo("ja", "Japanese", "Японский", "JA", "Japanese_flag.png", "ja-JP", "jpn"),
-    LanguageInfo("ko", "Korean", "Корейский", "KO", "Korean_flag.png", "ko-KR", "kor"),
-    LanguageInfo("ar", "Arabic", "Арабский", "AR", "Arabic_flag.png", "ar-SA", "ara"),
-    LanguageInfo("hi", "Hindi", "Хинди", "HI", "Hindi_flag.png", "hi-IN", "hin"),
+    LanguageInfo("en", "English", "Английский", "EN", "flags/us.svg", "en-US", "eng"),
+    LanguageInfo("ru", "Russian", "Русский", "RU", "flags/ru.svg", "ru-RU", "rus"),
+    LanguageInfo("de", "German", "Немецкий", "DE", "flags/de.svg", "de-DE", "deu"),
+    LanguageInfo("fr", "French", "Французский", "FR", "flags/fr.svg", "fr-FR", "fra"),
+    LanguageInfo("es", "Spanish", "Испанский", "ES", "flags/es.svg", "es-ES", "spa"),
+    LanguageInfo("it", "Italian", "Итальянский", "IT", "flags/it.svg", "it-IT", "ita"),
+    LanguageInfo("pt", "Portuguese", "Португальский", "PT", "flags/pt.svg", "pt-BR", "por"),
+    LanguageInfo("pl", "Polish", "Польский", "PL", "flags/pl.svg", "pl-PL", "pol"),
+    LanguageInfo("uk", "Ukrainian", "Украинский", "UK", "flags/ua.svg", "uk-UA", "ukr"),
+    LanguageInfo("tr", "Turkish", "Турецкий", "TR", "flags/tr.svg", "tr-TR", "tur"),
+    LanguageInfo("nl", "Dutch", "Нидерландский", "NL", "flags/nl.svg", "nl-NL", "nld"),
+    LanguageInfo("zh", "Chinese", "Китайский", "ZH", "flags/cn.svg", "zh-CN", "chi_sim", google_code="zh-CN", mymemory_code="zh-CN"),
+    LanguageInfo("ja", "Japanese", "Японский", "JA", "flags/jp.svg", "ja-JP", "jpn"),
+    LanguageInfo("ko", "Korean", "Корейский", "KO", "flags/kr.svg", "ko-KR", "kor"),
+    LanguageInfo("ar", "Arabic", "Арабский", "AR", "flags/sa.svg", "ar-SA", "ara"),
+    LanguageInfo("hi", "Hindi", "Хинди", "HI", "flags/in.svg", "hi-IN", "hin"),
 ]
 
 from extended_languages import EXTRA_NAMES, EXTRA_OCR_CODES, EXTRA_WINDOWS_TAGS, EXTRA_FLAG_COUNTRIES
@@ -211,7 +211,7 @@ for _locale, _names in EXTRA_NAMES.items():
     LOCALIZED_LANGUAGE_NAMES[_locale].update(_names)
 for _code, _tesseract in EXTRA_OCR_CODES.items():
     LANGUAGES.append(LanguageInfo(_code, EXTRA_NAMES['en'][_code], EXTRA_NAMES['ru'][_code],
-                                  _code.upper(), f'flags/{EXTRA_FLAG_COUNTRIES[_code]}.png',
+                                  _code.upper(), f'flags/{EXTRA_FLAG_COUNTRIES[_code]}.svg',
                                   EXTRA_WINDOWS_TAGS[_code], _tesseract,
                                   easyocr_code='no' if _code == 'nb' else ''))
 

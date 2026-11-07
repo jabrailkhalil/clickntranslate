@@ -94,6 +94,8 @@ def test_theme_can_be_kept_or_changed_without_automatic_toggling(window):
     assert window._guide_current_action() == 'replace_selection_select_all'
     show_step(window, 'theme')
     window.theme_button.click()
+    from test_ui_operations import wait_until
+    wait_until(QApplication.instance(), lambda: not window._ui_operation.active)
     assert window.current_theme != before
     assert window._guide_current_action() == 'replace_selection_select_all'
 

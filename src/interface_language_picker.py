@@ -180,14 +180,11 @@ class InterfaceLanguagePicker(QtWidgets.QFrame):
             content = QtWidgets.QHBoxLayout(cell)
             content.setContentsMargins(8, 0, 6, 0)
             content.setSpacing(6)
-            flag = QtWidgets.QLabel(cell)
+            from icon_rendering import ScalableIconLabel, load_icon
+            flag = ScalableIconLabel(load_icon(resource_path(option['icon'])), cell)
             flag.setObjectName('interfaceLanguageFlag')
             flag.setFixedSize(18, 18)
             flag.setAlignment(QtCore.Qt.AlignCenter)
-            pixels = QtGui.QPixmap(resource_path(option['icon'])).scaled(
-                flag.size()*4, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
-            pixels.setDevicePixelRatio(4)
-            flag.setPixmap(pixels)
             content.addWidget(flag)
             label = QtWidgets.QLabel(name, cell)
             label.setObjectName('interfaceLanguageName')

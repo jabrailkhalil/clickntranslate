@@ -1,0 +1,8 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 90 80" width="90" height="80"><defs><clipPath id="cnt-flag-shape"><rect x="6" y="10" width="78" height="60" rx="8" /></clipPath></defs><rect x="2" y="6" width="86" height="68" rx="12" fill="#fff" /><g clip-path="url(#cnt-flag-shape)"><g id="flag-icons-az" transform="translate(6 10) scale(0.121875 0.125) translate(-0 -0)"><path fill="#3f9c35" d="M.1 0h640v480H.1z" />
+  <path fill="#ed2939" d="M.1 0h640v320H.1z" />
+  <path fill="#00b9e4" d="M.1 0h640v160H.1z" />
+  <circle cx="304" cy="240" r="72" fill="#fff" />
+  <circle cx="320" cy="240" r="60" fill="#ed2939" />
+  <path fill="#fff" d="m384 200 7.7 21.5 20.6-9.8-9.8 20.7L424 240l-21.5 7.7 9.8 20.6-20.6-9.8L384 280l-7.7-21.5-20.6 9.8 9.8-20.6L344 240l21.5-7.7-9.8-20.6 20.6 9.8z" />
+</g></g></svg>

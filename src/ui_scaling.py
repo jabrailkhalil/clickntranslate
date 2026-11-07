@@ -301,24 +301,14 @@ def center_window(window, owner=None, offset=None, available=None):
 
 def paint_scaled_icon(painter, button, option):
     """Request source pixels for the final size, not a stretched 24px preview."""
-    controller = getattr(native_window_parent(button), '_ui_scale_controller', None)
-    scale = controller.effective_percent / BASE_SCALE if controller is not None else 1.0
-    density = scale * button.devicePixelRatioF()
+    from icon_rendering import paint_icon
     size = button.iconSize()
-    requested = QSize(math.ceil(size.width() * density), math.ceil(size.height() * density))
     mode = QIcon.Disabled if not button.isEnabled() else (
         QIcon.Active if option.state & QStyle.State_MouseOver else QIcon.Normal)
     state = QIcon.On if button.isChecked() else QIcon.Off
-    pixmap = button.icon().pixmap(requested, mode, state)
-    if pixmap.isNull() and (mode != QIcon.Normal or state != QIcon.Off):
-        pixmap = button.icon().pixmap(requested, QIcon.Normal, QIcon.Off)
-    if pixmap.isNull():
-        return
-    pixmap.setDevicePixelRatio(1)
-    fit = min(size.width() / pixmap.width(), size.height() / pixmap.height())
-    width, height = pixmap.width() * fit, pixmap.height() * fit
-    target = QRectF((button.width() - width) / 2, (button.height() - height) / 2, width, height)
-    painter.drawPixmap(target, pixmap, QRectF(pixmap.rect()))
+    target = QRectF((button.width()-size.width())/2, (button.height()-size.height())/2,
+                    size.width(), size.height())
+    paint_icon(painter, button.icon(), target, mode, state)
 
 
 class ScaledIconButton(QPushButton):

@@ -572,13 +572,14 @@ def capture_picker_and_notice_check(main, app, window, report_path, screenshots)
     from PyQt5.QtTest import QTest
     from capture_widgets import CaptureLanguageCombo
     from languages import LANGUAGES, language_icon_path
+    from icon_rendering import load_icon
 
     previous = dict(window.config)
     old_theme = window.current_theme
     owner = QtWidgets.QWidget()
     combo = CaptureLanguageCombo(owner)
     for language in LANGUAGES:
-        combo.addItem(QtGui.QIcon(main.resource_path(language_icon_path(language.code))),
+        combo.addItem(load_icon(main.resource_path(language_icon_path(language.code))),
                       language.short_label, language.code)
     combo.setCurrentIndex(combo.findData('en'))
     owner.resize(150, 70)
