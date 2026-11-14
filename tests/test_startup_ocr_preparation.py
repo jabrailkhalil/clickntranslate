@@ -28,7 +28,7 @@ class TestStartupOcrPreparation(unittest.TestCase):
     def setUpClass(cls):
         cls.app = QApplication.instance() or QApplication([])
 
-    def test_background_warmup_queues_widget_preparation_to_gui_thread(self):
+    def test_startup_keeps_models_and_unused_overlays_unloaded(self):
         receiver = _CallbackReceiver()
         main.hotkey_dispatcher.triggered.connect(receiver.receive)
         try:
@@ -49,23 +49,9 @@ class TestStartupOcrPreparation(unittest.TestCase):
                 worker.start()
                 worker.join(timeout=3)
                 self.assertFalse(worker.is_alive())
-                warm_up.assert_called_once_with()
-
-            deadline = time.monotonic() + 2
-            while not receiver.callbacks and time.monotonic() < deadline:
-                self.app.processEvents()
-
-            self.assertEqual(len(receiver.callbacks), 1)
-            callback, callback_thread = receiver.callbacks[0]
-            self.assertIs(callback, main._prepare_ocr_overlays_on_gui_thread)
-            self.assertEqual(callback_thread, self.app.thread())
-
-            with mock.patch.object(ocr, "prepare_overlay", return_value=True) as prepare:
-                callback()
-            self.assertEqual(
-                [call.args for call in prepare.call_args_list],
-                [("ocr",), ("copy",), ("translate",)],
-            )
+                warm_up.assert_not_called()
+            self.app.processEvents()
+            self.assertEqual(receiver.callbacks, [])
         finally:
             main.hotkey_dispatcher.triggered.disconnect(receiver.receive)
 

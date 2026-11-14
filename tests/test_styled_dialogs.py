@@ -40,7 +40,7 @@ def test_external_message_style_cannot_remove_shared_chrome():
     box.setStyleSheet("QMessageBox { background-color: #ffffff; }")
 
     assert box._dark is False
-    assert "#efecf2" in box.styleSheet()
+    assert "#f0ecf3" in box.styleSheet()
     assert "QFrame#styledMessageTitleBar" in box.styleSheet()
 
 
@@ -261,7 +261,8 @@ def test_document_pane_borders_survive_theme_and_language_switches():
                     (20, editor.y() - 1, editor.y(), pane.height() // 2)]
             assert all(color == edge[0] for color in edge)
             assert edge[0] != image.pixelColor(round(12 * dpr), round(pane.height() / 2 * dpr))
-        left, right = dialog.document_splitter.widget(0), dialog.document_splitter.widget(1)
+        left, right = sorted((dialog.document_splitter.widget(0), dialog.document_splitter.widget(1)),
+                             key=lambda pane: pane.x())
         assert right.x() - (left.x() + left.width()) >= 10
 
         margins = dialog.window_frame.layout().contentsMargins()
@@ -358,7 +359,11 @@ def test_document_provider_list_groups_online_and_only_installed_offline(monkeyp
     )
     dialog._populate_provider_combo("argos")
     offline_header = dialog.provider_combo.findText("  Offline")
-    assert offline_header > 0
+    assert offline_header == 0
+    online_header = dialog.provider_combo.findText("  Online")
+    assert online_header > offline_header
+    assert dialog.provider_combo.findData("argos") < online_header
+    assert dialog.provider_combo.findData("google") > online_header
     assert not dialog.provider_combo.model().item(offline_header).isEnabled()
     assert dialog.provider_combo.currentData() == "argos"
     assert dialog.provider_combo.findData("hymt") == -1

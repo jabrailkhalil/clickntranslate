@@ -56,7 +56,7 @@ class PackageTable(QtWidgets.QTableWidget):
             self._scroll_header_gap.changeSize(
                 0, gap, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed)
             self.verticalScrollBar().parentWidget().layout().invalidate()
-        if self.columnCount() != 4:
+        if self.columnCount() not in (4, 5):
             return
         metrics = self.fontMetrics()
         padding = max(12, metrics.height())
@@ -65,7 +65,18 @@ class PackageTable(QtWidgets.QTableWidget):
         if checkbox:
             self.setColumnWidth(0, checkbox)
         available = max(60, self.viewport().width()-checkbox)
-        for column, fraction in ((2, .31), (3, .40)):
+        if self.columnCount() == 5:
+            size_width = max(74, metrics.horizontalAdvance('999.9 MB')+padding)
+            title = self.horizontalHeaderItem(4)
+            if title is not None:
+                size_width = max(size_width, header.fontMetrics().horizontalAdvance(title.text())+padding)
+            for row in range(self.rowCount()):
+                item = self.item(row, 4)
+                if item is not None:
+                    size_width = max(size_width, metrics.horizontalAdvance(item.text())+padding)
+            self.setColumnWidth(4, size_width)
+            available -= size_width
+        for column, fraction in ((2, .31), (3, .34)):
             title = self.horizontalHeaderItem(column)
             needed = header.fontMetrics().horizontalAdvance(title.text())+padding if title else 0
             for row in range(self.rowCount()):

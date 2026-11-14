@@ -36,6 +36,8 @@ if ($CertificateThumbprint) {
 if (-not $SkipPyInstaller) {
     Push-Location $repoRoot
     try {
+        & (Join-Path $repoRoot '.venv\Scripts\python.exe') (Join-Path $repoRoot 'tools/prepare_rapidocr_models.py')
+        if ($LASTEXITCODE -ne 0) { throw 'PP-OCRv5 model preparation failed.' }
         & (Join-Path $repoRoot ".venv\Scripts\python.exe") -m PyInstaller `
             (Join-Path $repoRoot "tools/packaging/ClicknTranslate.spec") --clean --noconfirm
         if ($LASTEXITCODE -ne 0) {

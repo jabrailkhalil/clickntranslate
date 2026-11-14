@@ -2,6 +2,22 @@
 import json
 import os
 import tempfile
+import time
+
+
+def _replace_complete_file(source, target):
+    for attempt in range(8):
+        try:
+            os.replace(source, target)
+            return
+        except OSError as error:
+            # AV/indexers and readers can briefly deny replacement on Windows.
+            # Retry the same complete temporary file; permanent errors still
+            # propagate, and at most 0.45 seconds are spent waiting.
+            if (os.name != 'nt' or getattr(error, 'winerror', None) not in (5, 32, 33)
+                    or attempt == 7):
+                raise
+            time.sleep(min(0.01 * 2 ** attempt, 0.1))
 
 
 def write_text(path, text):
@@ -17,7 +33,7 @@ def write_text(path, text):
             stream.flush()
             os.fsync(stream.fileno())
         # Same-directory replacement stays on the same filesystem.
-        os.replace(temporary, path)
+        _replace_complete_file(temporary, path)
     finally:
         if temporary is not None:
             try:

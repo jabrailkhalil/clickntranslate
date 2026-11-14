@@ -9,8 +9,9 @@ from PyQt5 import QtCore, QtGui, QtWidgets, sip
 from PyQt5.QtTest import QTest
 
 from assistant_text import ASSISTANT_TEXT, assistant_text
+from assistant_settings import ASSISTANT_ACTIONS
 from desktop_assistant import (DesktopAssistant, AssistantMenu, ACTION_METHODS,
-                               clamp_position, normalized_position)
+                               CAPTURE_ACTIONS, clamp_position, normalized_position)
 import mode_coordinator
 from qt_layout_test_support import ensure_layout_fonts
 
@@ -79,11 +80,12 @@ def test_macos_companion_opts_out_of_native_shadow_and_deactivation_hiding(compa
 @pytest.mark.parametrize('action', tuple(ACTION_METHODS) + ('text', 'settings'))
 def test_actions_reuse_existing_workflows_and_preserve_provider(companion, action):
     companion.request_action(action)
-    assert not companion.anchor.isVisible()
+    assert companion.anchor.isVisible() == (action not in CAPTURE_ACTIONS)
     companion.request_action(action)  # Ignore a duplicate click during dispatch.
     QTest.qWait(220)
     method = {'text': 'open_text_translation', 'settings': 'show_settings'}.get(action, ACTION_METHODS.get(action))
-    getattr(companion.owner, method).assert_called_once_with()
+    expected = {'expected_target': companion._selection_target or 0} if action in ('selection', 'replace') else {}
+    getattr(companion.owner, method).assert_called_once_with(**expected)
     assert companion.owner.config['translator_engine'] == 'DeepL'
     QTest.qWait(370)
     assert companion.anchor.isVisible()
@@ -128,7 +130,8 @@ def test_theme_and_language_change_replace_the_menu_immediately(companion):
     assert not old_menu.isVisible()
     companion.toggle_menu()
     assert companion.menu.windowTitle() == assistant_text('de', 'quick_actions')
-    assert companion.menu._background.name() == '#f0edf3'
+    from classic_style import classic_palette
+    assert companion.menu._background.name() == classic_palette(False)['background']
     assert not companion.anchor.dark
 
 
@@ -224,18 +227,22 @@ def test_menu_buttons_are_readable_and_reachable_on_small_screens(app, language,
                 required = label.heightForWidth(label.width())
                 assert required <= label.height(), (language, key, label.text(), required, label.height())
             assert button.width() > 0
-        assert set(menu.buttons) == {'area', 'screen', 'text', 'copy', 'dynamic', 'documents', 'settings', 'hide'}
-        assert not menu.findChildren(QtWidgets.QScrollArea)
+        assert set(menu.buttons) == set(ASSISTANT_ACTIONS) | {'settings', 'hide'}
+        assert len(menu.findChildren(QtWidgets.QScrollArea)) == 1
+        assert menu.scroll.horizontalScrollBar().maximum() == 0
         assert all(menu.rect().contains(button.geometry()) for button in menu.buttons.values())
         assert 'border-radius' in menu.buttons['text'].styleSheet()
         assert 'background:' in menu.buttons['text'].styleSheet()
-        if sys.platform != 'darwin':
-            assert not menu.mask().contains(QtCore.QPoint(0, 0))
-            assert menu.mask().contains(menu.rect().center())
-        else:
-            image = menu.grab().toImage()
-            assert image.pixelColor(0, 0).alpha() < 20
-            assert image.pixelColor(image.width()//2, image.height()//2).alpha() > 240
+        # Windows and Cocoa deliberately use alpha painting without a binary
+        # QRegion: a region clips antialiased borders at fractional DPI. Verify
+        # the rendered surface on every platform, including all four corners.
+        image = menu.grab().toImage()
+        width, height = image.width(), image.height()
+        for x, y in ((0, 0), (width-1, 0), (0, height-1), (width-1, height-1)):
+            assert image.pixelColor(x, y).alpha() < 20
+        assert image.pixelColor(width//2, height//2).alpha() > 240
+        for x, y in ((width//2, 0), (0, height//2), (width-1, height//2), (width//2, height-1)):
+            assert image.pixelColor(x, y).alpha() > 180
         requested = []
         menu.action_requested.connect(requested.append)
         menu.buttons['screen'].click()
@@ -259,7 +266,8 @@ def test_repeated_enable_appearance_changes_capture_and_dispose_release_widgets(
             owner.current_interface_language = language
             owner.current_theme = 'Светлая' if index % 2 else 'Темная'
             helper.refresh()
-            helper.toggle_menu()
+            if helper.menu is None or not helper.menu.isVisible():
+                helper.toggle_menu()
             assert helper.menu.isVisible()
             from ui_scaling import desktop_control_scale
             extent = round(84 * desktop_control_scale(helper.anchor.screen()))
@@ -271,6 +279,7 @@ def test_repeated_enable_appearance_changes_capture_and_dispose_release_widgets(
             assert not helper.anchor._animation.isActive()
             mode_coordinator.release_mode(name)
             assert helper.anchor.isVisible()
+            assert helper.menu.isVisible()
             app.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)
         helper.request_action('screen')
         anchor = helper.anchor
@@ -284,16 +293,17 @@ def test_repeated_enable_appearance_changes_capture_and_dispose_release_widgets(
     owner.launch_fullscreen_translate.assert_not_called()
 
 
-def test_click_greets_and_opens_actions_without_a_manual_emotion_picker(companion, app):
+def test_click_looks_at_actions_without_a_manual_emotion_picker(companion, app):
     companion.anchor.move(250, 80)
     QTest.mouseClick(companion.anchor, QtCore.Qt.LeftButton, pos=QtCore.QPoint(42, 42))
     assert companion.menu.isVisible()
-    assert companion.anchor.motion.action() == 'wave'
+    assert companion.anchor.motion.action() == 'idle'
+    assert companion.anchor._menu_gaze_angle is not None
     assert companion.anchor._animation.isActive()
     assert companion.menu.y() > companion.anchor.geometry().bottom()
     assert not companion.menu.findChildren(QtWidgets.QComboBox)
     for _ in range(10): companion.anchor._advance(.2)
-    assert companion.anchor.motion.action() == 'waiting'
+    assert companion.anchor.motion.action() == 'idle'
     companion.menu.hide()
     assert companion.anchor.motion.action() == 'idle'
 
@@ -303,6 +313,10 @@ def test_translation_events_automatically_drive_the_pet_and_popup_status(compani
     companion.toggle_menu()
     notify_activity(companion.owner, 'busy')
     assert companion.menu.activity_label.text() == assistant_text('ru', 'activity_busy')
+    assert companion.anchor.motion.action() == 'idle'
+    assert companion.anchor.motion.status == 'busy'
+    assert companion.anchor._menu_gaze_angle is not None
+    companion.menu.hide()
     assert companion.anchor.motion.action() == 'work'
     notify_activity(companion.owner, 'success')
     assert companion.anchor.motion.action() == 'success'
@@ -312,20 +326,24 @@ def test_translation_events_automatically_drive_the_pet_and_popup_status(compani
     assert companion.anchor.motion.action() == 'error'
 
 @pytest.mark.parametrize('appearance', ['portrait', 'waiting'])
-def test_static_native_pose_reacts_once_to_click_and_then_returns_to_its_pose(companion, appearance):
+def test_static_native_pose_looks_at_the_menu_then_returns_to_its_pose(companion, appearance):
     companion.owner.config['desktop_assistant_appearance'] = appearance
     companion.refresh()
     assert not companion.anchor._animation.isActive()
     before = companion.anchor.grab().toImage()
     companion.toggle_menu()
-    assert companion.anchor.motion.action() == 'wave'
-    assert companion.anchor._animation.isActive()
+    assert companion.anchor.motion.action() == 'idle'
+    assert companion.anchor._menu_gaze_angle is not None
+    assert not companion.anchor._animation.isActive()
+    looking = companion.anchor.grab().toImage()
     for _ in range(10): companion.anchor._advance(.2)
     assert not companion.anchor._animation.isActive()
-    assert companion.anchor.grab().toImage() == before
+    assert companion.anchor.grab().toImage() == looking
     companion.menu.hide()
+    assert companion.anchor.grab().toImage() == before
     companion.toggle_menu()
-    assert companion.anchor._animation.isActive()
+    assert companion.anchor._menu_gaze_angle is not None
+    assert not companion.anchor._animation.isActive()
 
 
 

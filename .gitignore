@@ -119,3 +119,13 @@ data/**/*.log
 *.dmg
 *.icns
 *.p12
+/assets/rapidocr_models/
+/components/objects/
+/components/generations/
+/components/downloads/
+/components/catalog/
+/components/trust/
+/components/leases/
+/components/state.sqlite*
+/components/install.lock
+/components/gc-pending

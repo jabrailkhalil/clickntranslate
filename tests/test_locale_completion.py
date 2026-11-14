@@ -1,4 +1,4 @@
-"""The two new UI languages must cover real workflows, not English fallbacks."""
+"""New UI languages cover real workflows, hints, guides and action labels."""
 import json
 import os
 from pathlib import Path
@@ -28,6 +28,19 @@ def test_all_ui_catalogs_include_new_locales_and_keep_formatting():
     assert set(LOCALIZED_LANGUAGE_NAMES)==set(LOCALES)
 
 
+@pytest.mark.parametrize('sample_name', ('samples', 'VALIDATION_SAMPLES'))
+def test_locale_audit_distinguishes_worker_samples_from_ui_messages(tmp_path, sample_name):
+    (tmp_path / 'src').mkdir()
+    (tmp_path / 'src/main.py').write_text('', encoding='utf-8')
+    path = tmp_path / 'src' / 'component_argos_worker.py'
+    path.write_text(sample_name + " = {'en': 'Input sample', 'ru': 'Пример'}\n"
+                    "labels = {'en': 'Actual interface text', 'ru': 'Надпись'}\n", encoding='utf-8')
+    report = audit(tmp_path)
+    assert report['issues']
+    assert all(item['table'].endswith(':2') for item in report['issues'])
+    assert len(report['tables']) == 1
+
+
 def test_queued_package_probe_cannot_run_after_dialog_destruction(window,app):
     window.show_settings()
     with (mock.patch.object(settings_window.OcrLanguageManagerDialog,'_start_runtime_probe') as probe,
@@ -42,6 +55,10 @@ def test_queued_package_probe_cannot_run_after_dialog_destruction(window,app):
 @pytest.mark.parametrize('locale,close,resume,still',[
     ('pt','Fechar','Continuar','Sem animação'),
     ('it','Chiudi','Riprendi','Senza animazione'),
+    ('ar','إغلاق','استئناف','ثابت'),
+    ('tr','Kapat','Sürdür','Sabit'),
+    ('hi','बंद करें','जारी रखें','स्थिर'),
+    ('id','Tutup','Lanjutkan','Diam'),
 ])
 def test_guides_hints_actions_and_names_are_localized(locale,close,resume,still):
     from dialog_text import _ACTIONS
@@ -70,14 +87,23 @@ def test_guides_hints_actions_and_names_are_localized(locale,close,resume,still)
         assert (Path(main.__file__).parent/option['icon']).is_file()
 
 
-@pytest.mark.parametrize('locale',['pt','it'])
+@pytest.mark.parametrize('locale',['pt','it','ar','tr','hi','id'])
 def test_new_interface_language_survives_export_import(locale):
     restored=validated_import_settings(settings_export_payload(dict(main.DEFAULT_CONFIG,
         interface_language=locale)),main.DEFAULT_CONFIG)
     assert main.normalize_interface_language(restored['interface_language'])==locale
 
 
-@pytest.mark.parametrize('locale',['pt','it'])
+@pytest.mark.parametrize('locale', ['tr', 'hi', 'id'])
+def test_all_language_names_round_trip_without_collisions(locale):
+    import languages
+    for language in languages.LANGUAGES:
+        name = language_display_name(language.code, locale)
+        assert language_code_from_name(name, locale) == language.code
+    assert len(set(LOCALIZED_LANGUAGE_NAMES[locale].values())) == len(languages.LANGUAGES)
+
+
+@pytest.mark.parametrize('locale',['pt','it','ar','tr','hi','id'])
 def test_invalid_api_settings_have_localized_feedback(window,app,locale):
     from provider_settings import show_provider_settings,connection_text
     window.set_interface_language(locale);window.show_settings()
@@ -109,7 +135,7 @@ def test_invalid_settings_import_has_localized_feedback(window,app,tmp_path,loca
     assert 'Expecting property' not in message
 
 
-@pytest.mark.parametrize('locale',['pt','it'])
+@pytest.mark.parametrize('locale',['pt','it','ar','tr','hi','id'])
 def test_new_locale_pages_render_offscreen(window,app,locale):
     """Optional saved renders use the existing offscreen regression runner."""
     output=os.environ.get('CNT_LOCALE_SCREENSHOTS')
@@ -119,7 +145,7 @@ def test_new_locale_pages_render_offscreen(window,app,locale):
     for theme in ('Темная','Светлая'):
         if window.current_theme!=theme:window.toggle_theme()
         window.show_settings();settings=window.settings_window
-        for index,name in ((0,'general'),(1,'translation'),(2,'mascot'),(3,'dynamic')):
+        for index,name in ((0,'general'),(1,'translation'),(4,'ocr'),(2,'dynamic'),(3,'companion')):
             settings._set_settings_page(index);app.processEvents()
             assert settings.settings_pages.currentIndex()==index
             if folder:assert window.grab().save(str(folder/f'{name}-{theme}.png'))
@@ -132,7 +158,7 @@ def test_new_locale_pages_render_offscreen(window,app,locale):
             if folder:assert settings._language_manager_dialog.grab().save(str(folder/f'api-{theme}.png'))
             settings._language_manager_dialog.close()
     window._guide_active=True
-    window._guide_step_index=GUIDE_SETUP_ORDER.index('selection_behavior')
+    window._guide_step_index=main.ONBOARDING_ORDER.index('chat_languages')
     window._show_guide_step();app.processEvents();window._guide_step_timer.stop()
     if folder:assert window.grab().save(str(folder/'guide.png'))
     window._guide_active=False

@@ -53,35 +53,25 @@ class _NewsOwner(QtWidgets.QWidget):
 
 
 def test_startup_news_is_localized_and_explains_user_benefits():
-    download_words = {
-        "en": "downloads",
-        "ru": "скачиван",
-        "es": "descargas",
-        "de": "downloads",
-        "fr": "téléchargements",
-        "zh": "下载",
-    }
-    user_words = {
-        "en": "users",
-        "ru": "пользовател",
-        "es": "usuarios",
-        "de": "nutzer",
-        "fr": "utilisateurs",
-        "zh": "用户",
-    }
-    for language in ("en", "ru", "es", "de", "fr", "zh"):
+    from html import escape
+    for language in main.INTERFACE_LANGUAGE_BY_CODE:
         text = main.startup_news_text(language)
         assert 'changes' not in text and 'promise' not in text
         assert len(text['intro']) < 190
         assert text["continue"]
-        assert "000" in f"{text['title']} {text['intro']}"
-        milestone = f"{text['window']} {text['title']} {text['intro']}".lower()
-        assert download_words[language] in milestone
-        assert user_words[language] not in milestone
+        assert '000' not in str(text)
         html = main.startup_news_html(language, "9.9.9")
         assert "9.9.9" in html
-        assert text["title"] in html
-        assert text['intro'] in html
+        assert escape(text["title"]) in html
+        assert escape(text['intro']) in html
+        assert html.count('<li>') == 5
+        assert all(escape(point) in html for point in main.welcome_text(language)['features'])
+
+
+def test_startup_news_escapes_the_supplied_version():
+    html = main.startup_news_html('en', '<img src=x>')
+    assert '<img' not in html
+    assert '&lt;img src=x&gt;' in html
 
 
 def test_startup_news_is_shown_once_per_announcement_and_remembered():

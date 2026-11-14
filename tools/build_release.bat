@@ -22,6 +22,8 @@ if exist "build" rmdir /s /q "build"
 if exist "dist" rmdir /s /q "dist"
 
 echo [3/5] Building executable...
+python tools/prepare_rapidocr_models.py
+if errorlevel 1 exit /b 1
 pyinstaller tools/packaging/ClicknTranslate.spec --clean --noconfirm
 
 echo [4/5] Adding extras...

@@ -1,3 +1,5 @@
+import codecs
+import html
 import json
 import os
 import tempfile
@@ -13,6 +15,37 @@ import main
 
 
 class TestDocumentParser(unittest.TestCase):
+    def test_unicode_text_boms_are_decoded_before_legacy_fallbacks(self):
+        text = 'Hello · Привет · مرحبا · 🙂'
+        encodings = [('utf-16-le', codecs.BOM_UTF16_LE), ('utf-16-be', codecs.BOM_UTF16_BE),
+                     ('utf-32-le', codecs.BOM_UTF32_LE), ('utf-32-be', codecs.BOM_UTF32_BE)]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            for encoding, bom in encodings:
+                with self.subTest(encoding=encoding):
+                    path = os.path.join(temp_dir, 'unicode.txt')
+                    with open(path, 'wb') as stream:
+                        stream.write(bom + text.encode(encoding))
+                    self.assertEqual(document_parser.parse_document(path).text, text)
+
+    def test_literal_entities_survive_every_text_document_reader(self):
+        text = 'Use &lt;tag&gt; and &amp; literally.'
+        with tempfile.TemporaryDirectory() as temp_dir:
+            for extension in ('.txt', '.md', '.html', '.rtf', '.docx'):
+                with self.subTest(extension=extension):
+                    path = os.path.join(temp_dir, 'technical-note' + extension)
+                    if extension == '.docx':
+                        xml = ('<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+                               '<w:body><w:p><w:r><w:t>' + html.escape(text) +
+                               '</w:t></w:r></w:p></w:body></w:document>')
+                        with zipfile.ZipFile(path, 'w') as archive:
+                            archive.writestr('word/document.xml', xml)
+                    else:
+                        content = ('<p>' + html.escape(text) + '</p>' if extension == '.html' else
+                                   r'{\rtf1\ansi ' + text + '}' if extension == '.rtf' else text)
+                        with open(path, 'w', encoding='utf-8') as stream:
+                            stream.write(content)
+                    self.assertEqual(document_parser.parse_document(path).text, text)
+
     def test_parse_txt_detects_text(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             path = os.path.join(temp_dir, "note.txt")
@@ -86,7 +119,8 @@ class TestDocumentTranslation(unittest.TestCase):
         self.assertEqual(len(results), 2)
         self.assertTrue(results[1].error)
 
-    def test_translate_document_text_can_override_provider(self):
+    @mock.patch('translater._argos_document_worker_supported', return_value=False)
+    def test_translate_document_text_can_override_provider(self, _legacy_worker):
         seen_engines = []
 
         def fake_translate(text, source, target, status_callback=None, engine=None, **_kwargs):
@@ -103,7 +137,8 @@ class TestDocumentTranslation(unittest.TestCase):
 
         self.assertEqual(seen_engines, ["argos"])
 
-    def test_translate_document_text_reports_engine_status_through_progress(self):
+    @mock.patch('translater._argos_document_worker_supported', return_value=False)
+    def test_translate_document_text_reports_engine_status_through_progress(self, _legacy_worker):
         messages = []
 
         def fake_translate(text, source, target, status_callback=None, engine=None, **_kwargs):

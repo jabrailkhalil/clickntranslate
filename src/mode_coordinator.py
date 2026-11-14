@@ -15,6 +15,34 @@ _lock = threading.RLock()
 _active_name: str | None = None
 _stop_active: Callable[[], object] | None = None
 _listeners: set[Callable[[], object]] = set()
+_request_generation = 0
+_deferred_name: str | None = None
+
+
+def defer_mode_request(name: str) -> int | None:
+    """Reserve a delayed hotkey; repeating the pending hotkey cancels it."""
+    global _request_generation, _deferred_name
+    requested = str(name or "").strip()
+    if not requested:
+        raise ValueError("mode name must not be empty")
+    with _lock:
+        previous = _deferred_name
+        _request_generation += 1
+        _deferred_name = None if previous == requested else requested
+        return _request_generation if _deferred_name is not None else None
+
+
+def mode_request_is_current(token: int) -> bool:
+    with _lock:
+        return _deferred_name is not None and token == _request_generation
+
+
+def cancel_deferred_mode_request() -> None:
+    """Invalidate queued capture work when a newer non-capture action starts."""
+    global _request_generation, _deferred_name
+    with _lock:
+        _request_generation += 1
+        _deferred_name = None
 
 
 def subscribe(callback: Callable[[], object]) -> Callable[[], None]:
@@ -47,7 +75,7 @@ def request_mode(name: str, stop_callback: Callable[[], object]) -> bool:
     before this function returns ``True`` to its replacement.
     """
 
-    global _active_name, _stop_active
+    global _active_name, _stop_active, _request_generation, _deferred_name
     requested = str(name or "").strip()
     if not requested:
         raise ValueError("mode name must not be empty")
@@ -55,6 +83,8 @@ def request_mode(name: str, stop_callback: Callable[[], object]) -> bool:
         raise TypeError("stop_callback must be callable")
 
     with _lock:
+        _request_generation += 1
+        _deferred_name = None
         previous_name = _active_name
         previous_stop = _stop_active
         if previous_name == requested:
@@ -83,12 +113,14 @@ def request_mode(name: str, stop_callback: Callable[[], object]) -> bool:
 def release_mode(name: str) -> bool:
     """Release *name* if it is still the current owner."""
 
-    global _active_name, _stop_active
+    global _active_name, _stop_active, _request_generation, _deferred_name
     with _lock:
         if _active_name != str(name or "").strip():
             return False
         _active_name = None
         _stop_active = None
+        _request_generation += 1
+        _deferred_name = None
     _notify_listeners()
     return True
 
@@ -96,12 +128,14 @@ def release_mode(name: str) -> bool:
 def stop_active_mode() -> str | None:
     """Stop and clear the current mode, returning its name when present."""
 
-    global _active_name, _stop_active
+    global _active_name, _stop_active, _request_generation, _deferred_name
     with _lock:
         name = _active_name
         callback = _stop_active
         _active_name = None
         _stop_active = None
+        _request_generation += 1
+        _deferred_name = None
     _notify_listeners()
     if callback is not None:
         try:
@@ -119,7 +153,9 @@ def active_mode() -> str | None:
 def _reset_for_tests() -> None:
     """Clear process state without invoking application callbacks."""
 
-    global _active_name, _stop_active
+    global _active_name, _stop_active, _request_generation, _deferred_name
     with _lock:
         _active_name = None
         _stop_active = None
+        _request_generation += 1
+        _deferred_name = None

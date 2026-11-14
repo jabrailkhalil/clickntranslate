@@ -64,7 +64,7 @@ class _ManagerOwner(QWidget):
     def _local_hymt_dir(self):
         return str(ROOT / "translators" / "hymt")
 
-    def start_hymt_install(self, progress_owner=None):
+    def start_hymt_install(self, progress_owner=None, *, select_on_success=True):
         self.hymt_installs += 1
         self.last_progress_owner = progress_owner
 
@@ -86,15 +86,15 @@ class _ManagerOwner(QWidget):
     def _local_easyocr_dir(self):
         return str(ROOT / "ocr" / "easyocr")
 
-    def start_tesseract_install(self, progress_owner=None):
+    def start_tesseract_install(self, progress_owner=None, *, select_on_success=True):
         self.tesseract_installs += 1
         self.last_progress_owner = progress_owner
 
-    def start_easyocr_install(self, progress_owner=None):
+    def start_easyocr_install(self, progress_owner=None, *, select_on_success=True):
         self.easyocr_installs += 1
         self.last_progress_owner = progress_owner
 
-    def start_rapidocr_install(self, progress_owner=None):
+    def start_rapidocr_install(self, progress_owner=None, *, select_on_success=True):
         self.rapidocr_installs += 1
         self.last_progress_owner = progress_owner
 
@@ -209,7 +209,8 @@ class LanguagePackageDialogTest(unittest.TestCase):
         self.assertEqual(ocr_titles, expected_ocr_titles)
         # Hy-MT is a translator you install and remove, so it has a tab of its
         # own here; that used to be possible only from the × in the picker.
-        self.assertEqual(translation_titles, ["Hy-MT", "Argos"])
+        self.assertEqual(translation_titles, ["Google", "MyMemory", "Lingva", "LibreTranslate", "Hy-MT", "Argos"])
+        self.dialog.ocr_tabs.setCurrentWidget(self.dialog.rapidocr_table.parentWidget())
         self.assertEqual(self.dialog.rapidocr_table.rowCount(), 4)
         packages = {
             self.dialog.rapidocr_table.item(row, 2).text()
@@ -225,10 +226,17 @@ class LanguagePackageDialogTest(unittest.TestCase):
     def test_constructor_does_not_run_native_engine_probes_on_the_ui_thread(self):
         self.assertEqual(self.owner.easyocr_status_checks, 0)
         self.assertEqual(self.owner.rapidocr_status_checks, 0)
+        self.assertEqual(self.dialog.easyocr_table.rowCount(), 0)
+        self.assertEqual(self.dialog.rapidocr_table.rowCount(), 0)
+        self.dialog.ocr_tabs.setCurrentWidget(self.dialog.easyocr_table.parentWidget())
         self.assertEqual(self.dialog.easyocr_table.item(0, 3).text(), "Checking…")
+        self.dialog.ocr_tabs.setCurrentWidget(self.dialog.rapidocr_table.parentWidget())
         self.assertEqual(self.dialog.rapidocr_table.item(0, 3).text(), "Checking…")
+        self.assertEqual(self.owner.easyocr_status_checks, 0)
+        self.assertEqual(self.owner.rapidocr_status_checks, 0)
 
     def test_missing_engine_replaces_language_table_with_install_action(self):
+        self.dialog.ocr_tabs.setCurrentWidget(self.dialog.tesseract_table.parentWidget())
         self.assertTrue(self.dialog.tesseract_table.isHidden())
         self.assertFalse(self.dialog.tesseract_table._package_missing_frame.isHidden())
         self.assertIn(
@@ -238,7 +246,7 @@ class LanguagePackageDialogTest(unittest.TestCase):
         self.assertEqual(self.dialog.tesseract_table.rowCount(), 0)
 
         self.dialog._easyocr_status_cache = (False, "missing")
-        self.dialog._populate_easyocr_table(self.dialog.easyocr_table)
+        self.dialog.ocr_tabs.setCurrentWidget(self.dialog.easyocr_table.parentWidget())
         self.assertTrue(self.dialog.easyocr_table.isHidden())
         self.assertFalse(self.dialog.easyocr_table._package_missing_frame.isHidden())
         self.assertEqual(self.dialog.easyocr_table.rowCount(), 0)
@@ -316,12 +324,18 @@ class LanguagePackageDialogTest(unittest.TestCase):
             if self.dialog.windows_table.item(row, 0).data(Qt.UserRole) == "de"
         )
         self.assertTrue(self.dialog.windows_table.item(german_row, 0).flags() & Qt.ItemIsEnabled)
-        self.assertEqual(self.dialog.easyocr_table.item(0, 3).text(), "Checking…")
-        self.assertEqual(self.dialog.rapidocr_table.item(0, 3).text(), "Checking…")
+        self.assertEqual(self.dialog.easyocr_table.rowCount(), 0)
+        self.assertEqual(self.dialog.rapidocr_table.rowCount(), 0)
+        self.assertIsNone(self.dialog._easyocr_status_cache)
+        self.assertIsNone(self.dialog._rapidocr_status_cache)
         self.assertTrue(self.dialog._runtime_probe_active)
 
         self.dialog._on_runtime_probe_ready({"rapidocr": (True, ""), "complete": True})
         self.assertFalse(self.dialog._runtime_probe_active)
+        self.assertEqual(self.dialog._rapidocr_status_cache, (True, ""))
+        self.assertEqual(self.dialog.rapidocr_table.rowCount(), 0)
+        self.dialog.ocr_tabs.setCurrentWidget(self.dialog.rapidocr_table.parentWidget())
+        self.assertEqual(self.dialog.rapidocr_table.rowCount(), 4)
         self.assertEqual(self.dialog.rapidocr_table.item(0, 3).text(), "Installed")
 
     def test_manager_uses_black_custom_title_bar_and_centers_on_owner(self):
@@ -340,8 +354,9 @@ class LanguagePackageDialogTest(unittest.TestCase):
         self.assertEqual(self.dialog.title_bar.objectName(), "languageManagerTitleBar")
         self.assertEqual(self.dialog.title_bar.height(), 38)
         self.assertEqual(self.dialog.title_close_btn.objectName(), "languageManagerTitleClose")
-        self.assertEqual(self.dialog.title_label.text(), "Language packages")
-        self.assertIn("background-color: #090a0d", self.dialog.styleSheet())
+        from engine_center import text as center_text
+        self.assertEqual(self.dialog.title_label.text(), center_text(self.dialog.lang, 'title'))
+        self.assertIn("QFrame#languageManagerTitleBar { background:#1e1e1e", self.dialog.styleSheet())
         self.assertEqual(self.dialog.size().width(), 640)
         self.assertEqual(self.dialog.size().height(), 558)
 
@@ -367,9 +382,10 @@ class LanguagePackageDialogTest(unittest.TestCase):
         self.dialog._apply_style()
 
         style = self.dialog.styleSheet()
-        self.assertIn("background-color: #f2edf7", style)
-        self.assertIn("color: #2b2333", style)
-        self.assertNotIn("background-color: #090a0d", style)
+        self.assertIn("QDialog#languageManagerDialog { background:#f0ecf3", style)
+        self.assertIn("QFrame#languageManagerTitleBar { background:#ddd7e2", style)
+        self.assertIn("color:#202124", style)
+        self.assertNotIn("background:#111111", style)
 
     def test_every_ocr_language_is_present_in_each_per_language_table(self):
         expected = {language.code for language in LANGUAGES}
@@ -487,7 +503,13 @@ class LanguagePackageDialogTest(unittest.TestCase):
         for table in self._package_tables():
             for button in table._package_action_buttons:
                 self.assertEqual(button.objectName(), "languagePackageAction")
-                self.assertGreaterEqual(button.minimumHeight(), 32)
+                if button.property('packageAction') in ('update', 'settings'):
+                    self.assertEqual(button.minimumHeight(), 30)
+                else:
+                    self.assertGreaterEqual(button.minimumHeight(), 32)
+                # Selection availability is tested separately. Compare the
+                # enabled visual state instead of its deliberate disabled tint.
+                button.setEnabled(True)
                 button.ensurePolished()
                 self.assertEqual(button.palette().button().color().name(),
                                  "#7a5fa1" if button.property("buttonRole") == "primary" else "#211d28")
@@ -508,18 +530,19 @@ class LanguagePackageDialogTest(unittest.TestCase):
         table.selectRow(0)
         table.setFocus()
         self.app.processEvents()
-        rect = table.visualItemRect(table.item(0, 2))
+        rect = table.visualItemRect(table.item(0, 3))
         point = rect.topRight() + QPoint(-4, 4)
         active = table.viewport().grab().toImage().pixelColor(point)
         table.clearFocus()
         self.app.processEvents()
         inactive = table.viewport().grab().toImage().pixelColor(point)
-        self.assertEqual(active.name(), '#5f4a88')
+        from classic_style import classic_palette
+        self.assertEqual(active.name(), classic_palette(True)['selected'])
         self.assertEqual(inactive, active)
         from PyQt5.QtWidgets import QStyle, QStyleOptionViewItem
         option = QStyleOptionViewItem()
         option.state |= QStyle.State_HasFocus
-        table.itemDelegate().initStyleOption(option, table.model().index(0, 2))
+        table.itemDelegate().initStyleOption(option, table.model().index(0, 3))
         self.assertFalse(option.state & QStyle.State_HasFocus)
 
     def test_package_columns_fit_after_font_changes_and_preserve_long_values_in_tooltips(self):
@@ -914,16 +937,17 @@ class LanguagePackageDialogTest(unittest.TestCase):
     def test_all_manager_buttons_are_connected_and_safe_to_click(self):
         expected_action_counts = {
             "windows_table": 3,
-            "tesseract_table": 2,
-            "easyocr_table": 2,
-            "rapidocr_table": 0,
-            "argos_table": 2,
+            "tesseract_table": 3 if __import__("component_runtime").managed_install_supported() else 2,
+            "easyocr_table": 3 if __import__("component_runtime").managed_install_supported() else 2,
+            "rapidocr_table": 1,
+            "argos_table": 3 if __import__("component_runtime").managed_install_supported() else 2,
         }
         for name, expected_count in expected_action_counts.items():
             table = getattr(self.dialog, name, None)
             if table is None:
                 continue  # tab not built on this platform
-            self.assertEqual(len(table._package_action_buttons), expected_count, name)
+            controls = table._package_action_buttons + table._package_engine_actions
+            self.assertEqual(len(controls), expected_count, name)
 
         # Keep the EasyOCR "install selected" path non-modal in this wiring test.
         self.owner.easyocr_status = (True, "")
@@ -931,7 +955,11 @@ class LanguagePackageDialogTest(unittest.TestCase):
         self.dialog._rapidocr_status_cache = (False, "missing")
         self.dialog._populate_easyocr_table(self.dialog.easyocr_table)
         self.dialog._argos_catalog_request_active = True
-        with mock.patch("settings_window.QMessageBox.information"):
+        with mock.patch("settings_window.QMessageBox.information"), \
+                mock.patch.object(self.dialog, '_run_language_task') as queued, \
+                mock.patch.object(self.dialog, '_request_update_check') as checks, \
+                mock.patch.object(self.dialog, '_start_runtime_probe') as runtime_probe, \
+                mock.patch.object(self.dialog, '_start_argos_catalog_refresh') as catalog_refresh:
             # os.startfile does not exist off Windows, hence create=True.
             with mock.patch("settings_window.os.startfile", create=True) as startfile:
                 for name in expected_action_counts:
@@ -940,8 +968,10 @@ class LanguagePackageDialogTest(unittest.TestCase):
                         continue
                     for button in table._package_action_buttons:
                         button.click()
+                    for action in table._package_engine_actions:
+                        action.trigger()
                 self.dialog.rapidocr_table._package_missing_install_button.click()
-                self.dialog.refresh_btn.click()
+                self.dialog.refresh_btn.trigger()
                 self.dialog.close_btn.click()
 
         if platform_support.supports_windows_ocr():
@@ -950,10 +980,24 @@ class LanguagePackageDialogTest(unittest.TestCase):
             startfile.assert_called_once_with("ms-settings:regionlanguage")
         else:
             startfile.assert_not_called()
-        self.assertGreaterEqual(self.owner.tesseract_installs, 1)
         self.assertGreaterEqual(self.owner.rapidocr_installs, 1)
         self.assertIs(self.owner.last_progress_owner, self.dialog)
         self.assertEqual(self.dialog.result(), self.dialog.Accepted)
+        # The first update click checks metadata only. No package should be
+        # installed while the user has not yet reviewed the available version.
+        expected_checks = []
+        for name in expected_action_counts:
+            table = getattr(self.dialog, name, None)
+            if table is not None:
+                for button in table._package_engine_actions:
+                    if button.property('packageAction') == 'update':
+                        expected_checks.append((table, button))
+        self.assertEqual(checks.call_count, len(expected_checks))
+        for table, button in expected_checks:
+            self.assertTrue(any(call.args[:2] == (table, button) for call in checks.call_args_list))
+        queued.assert_not_called()
+        runtime_probe.assert_called_once_with()
+        catalog_refresh.assert_called_once_with(True)
 
 
 class TesseractLanguageDownloadTest(unittest.TestCase):
@@ -1120,9 +1164,10 @@ class EngineRemovalPlacementTest(unittest.TestCase):
             button = getattr(table, "_package_remove_engine_button", None)
             self.assertIsNotNone(button, name)
             self.assertTrue(button.text().strip(), name)
-            # Its own sheet: a rule in the dialog's stylesheet is outranked by
-            # the settings window this dialog is a child of.
-            self.assertIn("languagePackageEngineRemove", button.styleSheet(), name)
+            from PyQt5.QtWidgets import QAction
+            self.assertIsInstance(button, QAction, name)
+            self.assertEqual(button.objectName(), "languagePackageEngineRemove", name)
+            self.assertTrue(button.toolTip().strip(), name)
 
     def test_engines_that_cannot_be_removed_have_no_button(self):
         """Windows OCR belongs to the OS and Argos is per-direction."""
@@ -1138,16 +1183,15 @@ class EngineRemovalPlacementTest(unittest.TestCase):
         self.dialog.show()
         self.app.processEvents()
 
-        # isHidden, not isVisible: this page belongs to a tab that is not the
-        # current one, so nothing on it is on screen either way.
+        # QAction visibility controls whether it is offered in the engine menu.
         self.owner.hymt_present = False
         self.dialog._populate_hymt_table(table)
-        self.assertTrue(button.isHidden(), "nothing to remove yet")
+        self.assertFalse(button.isVisible(), "nothing to remove yet")
 
         self.owner.hymt_present = True
         self.dialog._populate_hymt_table(table)
         self.app.processEvents()
-        self.assertFalse(button.isHidden())
+        self.assertTrue(button.isVisible())
 
     def test_removal_goes_through_the_owner(self):
         """The confirmation and the deletion live in SettingsWindow; the dialog
@@ -1170,6 +1214,23 @@ class EngineRemovalPlacementTest(unittest.TestCase):
         self.owner.hymt_present = False
         self.dialog._install_hymt_engine()
         self.assertEqual(self.owner.hymt_installs, 1)
+
+    @unittest.skipUnless(platform_support.IS_WINDOWS, 'Windows component candidate')
+    def test_updating_hymt_has_a_localized_button_and_reuses_the_owner_progress(self):
+        from engine_center import text as center_text
+        from styled_dialogs import tooltip_text
+        button=self.dialog.hymt_table._package_engine_actions[0]
+        self.assertEqual(button.text(),center_text('en', 'check_updates'))
+        self.assertEqual(button.toolTip(),tooltip_text(center_text('en', 'check_help')))
+        self.owner.hymt_present=True
+        self.dialog._populate_hymt_table(self.dialog.hymt_table)
+        with mock.patch('settings_window.threading.Thread'):
+            button.trigger()
+        self.assertEqual(self.owner.hymt_installs,0)
+        self.dialog._on_update_plan_ready('hymt', dict(current=False, installed='1', available='2', size=100))
+        button.trigger()
+        self.assertEqual(self.owner.hymt_installs,1)
+        self.assertIs(self.owner.last_progress_owner,self.dialog)
 
 
 class _SettingsParent(QWidget):

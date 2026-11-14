@@ -76,11 +76,159 @@ _TEXT = {
      "esportazioni. L'utilizzo dell'API può essere fatturato dal servizio.",
      'Chiave salvata; lascia vuoto per conservarla',
      'Inserisci la chiave API del servizio'),
+
+ 'ar': ('اتصالات API',
+  'الخدمة:',
+  'عنوان API:',
+  'مفتاح API:',
+  'النموذج:',
+  'النموذج يدعم الصور',
+  'التعرف والترجمة في طلب واحد',
+  'حفظ',
+  'رجوع',
+  'حذف المفتاح',
+  'تم الحفظ',
+  'حُفظ لهذه الجلسة فقط. مخزن مفاتيح النظام غير متاح؛ أدخل المفتاح مجددًا بعد إعادة التشغيل.',
+  'تستخدم الترجمة الخدمة المختارة. للتعرف على النص، اختر الخدمة نفسها من قائمة OCR. يترجم وضع الطلب '
+  'الواحد الصورة المحددة بهذا النموذج ويتجاوز المترجم المنفصل. تبقى المفاتيح في مخزن النظام '
+  'وتُستبعد من التصدير. قد تفرض الخدمة رسومًا على استخدام API.',
+  'المفتاح محفوظ؛ اترك الحقل فارغًا للإبقاء عليه',
+  'أدخل مفتاح API للخدمة'),
+
+ 'tr': ('API bağlantıları',
+  'Hizmet:',
+  'API adresi:',
+  'API anahtarı:',
+  'Model:',
+  'Model görüntü kabul eder',
+  'Tek istekte tanı ve çevir',
+  'Kaydet',
+  'Geri',
+  'Anahtarı sil',
+  'Kaydedildi',
+  'Bu oturum için kaydedildi. Sistem anahtar kasası kullanılamıyor; yeniden başlattıktan sonra '
+  'anahtarı tekrar girin.',
+  'Çeviri seçilen hizmeti kullanır. OCR için aynı hizmeti OCR listesinden seçin. Tek istek modu '
+  'görüntüyü bu modelle çevirir ve ayrı çevirmeni atlar. Anahtarlar sistem kasasında tutulur, dışa '
+  'aktarılmaz. API kullanımını hizmet ücretlendirebilir.',
+  'Anahtar kayıtlı; korumak için boş bırakın',
+  'Hizmetin API anahtarını girin'),
+ 'hi': ('API कनेक्शन',
+  'सेवा:',
+  'API पता:',
+  'API कुंजी:',
+  'मॉडल:',
+  'मॉडल इमेज स्वीकारता है',
+  'एक अनुरोध में पहचान और अनुवाद',
+  'सहेजें',
+  'वापस',
+  'कुंजी हटाएँ',
+  'सहेजा गया',
+  'इस सत्र के लिए सहेजा। सिस्टम कुंजी भंडार उपलब्ध नहीं है; दोबारा शुरू करने पर कुंजी फिर डालें।',
+  'अनुवाद चुनी सेवा से होता है। OCR के लिए इसी सेवा को OCR सूची में चुनें। एक-अनुरोध मोड इसी मॉडल '
+  'से इमेज का अनुवाद करता है और अलग अनुवादक छोड़ता है। कुंजियाँ सिस्टम भंडार में रहती हैं, निर्यात '
+  'में नहीं जातीं। सेवा API उपयोग का शुल्क ले सकती है।',
+  'कुंजी सहेजी है; रखने के लिए खाली छोड़ें',
+  'सेवा की API कुंजी डालें'),
+ 'id': ('Koneksi API',
+  'Layanan:',
+  'Alamat API:',
+  'Kunci API:',
+  'Model:',
+  'Model menerima gambar',
+  'Kenali dan terjemahkan dalam satu permintaan',
+  'Simpan',
+  'Kembali',
+  'Hapus kunci',
+  'Disimpan',
+  'Disimpan untuk sesi ini. Brankas kunci sistem tidak tersedia; masukkan kunci lagi setelah '
+  'memulai ulang.',
+  'Terjemahan memakai layanan pilihan. Untuk OCR, pilih layanan ini di daftar OCR. Mode satu '
+  'permintaan menerjemahkan gambar dengan model ini tanpa penerjemah terpisah. Kunci disimpan di '
+  'brankas sistem dan tidak diekspor. Layanan dapat mengenakan biaya API.',
+  'Kunci tersimpan; kosongkan untuk mempertahankan',
+  'Masukkan kunci API layanan'),
 }
 
 
 def provider_text(lang, key):
     return _TEXT.get(lang, _TEXT['en'])[_KEYS.index(key)]
+
+
+_SAVE_ERROR = {
+    'en': 'Could not save the connection. Check free space and access to the settings file, then try again.',
+    'ru': 'Не удалось сохранить подключение. Проверьте свободное место и доступ к файлу настроек, затем повторите попытку.',
+    'es': 'No se pudo guardar la conexión. Comprueba el espacio libre y el acceso al archivo de ajustes e inténtalo de nuevo.',
+    'de': 'Die Verbindung konnte nicht gespeichert werden. Speicherplatz und Zugriff auf die Einstellungsdatei prüfen und erneut versuchen.',
+    'fr': 'Impossible d’enregistrer la connexion. Vérifiez l’espace libre et l’accès au fichier de réglages, puis réessayez.',
+    'zh': '无法保存连接。请检查可用空间和设置文件的访问权限，然后重试。',
+    'pt': 'Não foi possível salvar a conexão. Verifique o espaço livre e o acesso ao arquivo de configurações e tente novamente.',
+    'it': 'Impossibile salvare la connessione. Controlla lo spazio libero e l’accesso al file delle impostazioni, poi riprova.',
+    'ar': 'تعذّر حفظ الاتصال. تحقّق من المساحة المتاحة وصلاحية الوصول إلى ملف الإعدادات، ثم حاول مجددًا.',
+    'tr': 'Bağlantı kaydedilemedi. Boş alanı ve ayar dosyasına erişimi kontrol edip yeniden deneyin.',
+    'hi': 'कनेक्शन सहेजा नहीं जा सका। खाली स्थान और सेटिंग फ़ाइल की अनुमति जाँचें, फिर कोशिश करें।',
+    'id': 'Koneksi tidak dapat disimpan. Periksa ruang kosong dan akses ke berkas pengaturan, lalu coba lagi.',
+}
+
+
+_DELETE_STATUS = {
+    'en': ('Key deleted.',
+           'Key disabled for this session. Deletion from the system key vault could not be confirmed; the key may be available again after restart.',
+           'Save or restore the API address before deleting its saved key.'),
+    'ru': ('Ключ удалён.',
+           'Ключ отключён на этот сеанс. Не удалось подтвердить удаление из системного хранилища; после перезапуска ключ может снова стать доступен.',
+           'Сохраните или восстановите адрес API, прежде чем удалять сохранённый для него ключ.'),
+    'es': ('Clave eliminada.',
+           'Clave desactivada para esta sesión. No se pudo confirmar su eliminación de la bóveda del sistema; podría volver a estar disponible tras reiniciar.',
+           'Guarda o restaura la dirección API antes de eliminar su clave guardada.'),
+    'de': ('Schlüssel gelöscht.',
+           'Schlüssel für diese Sitzung deaktiviert. Die Löschung aus dem Systemtresor konnte nicht bestätigt werden; nach einem Neustart ist er möglicherweise wieder verfügbar.',
+           'API-Adresse speichern oder wiederherstellen, bevor der dafür gespeicherte Schlüssel gelöscht wird.'),
+    'fr': ('Clé supprimée.',
+           'Clé désactivée pour cette session. La suppression du coffre système n’a pas pu être confirmée ; elle pourrait être disponible à nouveau après le redémarrage.',
+           'Enregistrez ou rétablissez l’adresse API avant de supprimer la clé correspondante.'),
+    'zh': ('密钥已删除。',
+           '密钥已在本次会话中禁用。无法确认是否已从系统密钥库中删除；重启后密钥可能再次可用。',
+           '删除已保存的密钥前，请先保存或恢复 API 地址。'),
+    'pt': ('Chave excluída.',
+           'Chave desativada nesta sessão. Não foi possível confirmar a exclusão do cofre do sistema; a chave poderá ficar disponível novamente após reiniciar.',
+           'Salve ou restaure o endereço da API antes de excluir a chave salva para ele.'),
+    'it': ('Chiave eliminata.',
+           'Chiave disattivata per questa sessione. Non è stato possibile confermare la rimozione dal portachiavi di sistema; potrebbe essere nuovamente disponibile dopo il riavvio.',
+           'Salva o ripristina l’indirizzo API prima di eliminare la chiave salvata per esso.'),
+    'ar': ('تم حذف المفتاح.',
+           'تم تعطيل المفتاح لهذه الجلسة. تعذّر تأكيد حذفه من مخزن مفاتيح النظام؛ قد يصبح متاحًا مرة أخرى بعد إعادة التشغيل.',
+           'احفظ عنوان API أو استعده قبل حذف المفتاح المحفوظ له.'),
+    'tr': ('Anahtar silindi.',
+           'Anahtar bu oturum için devre dışı bırakıldı. Sistem kasasından silindiği doğrulanamadı; yeniden başlatınca tekrar kullanılabilir hale gelebilir.',
+           'Kayıtlı anahtarını silmeden önce API adresini kaydedin veya geri yükleyin.'),
+    'hi': ('कुंजी हटा दी गई।',
+           'इस सत्र के लिए कुंजी बंद कर दी गई है। सिस्टम वॉल्ट से हटने की पुष्टि नहीं हुई; पुनः शुरू करने पर कुंजी फिर उपलब्ध हो सकती है।',
+           'सहेजी कुंजी हटाने से पहले API पता सहेजें या पुराना पता वापस रखें।'),
+    'id': ('Kunci dihapus.',
+           'Kunci dinonaktifkan untuk sesi ini. Penghapusan dari brankas sistem tidak dapat dipastikan; kunci mungkin tersedia lagi setelah memulai ulang.',
+           'Simpan atau pulihkan alamat API sebelum menghapus kunci yang tersimpan untuk alamat tersebut.'),
+}
+
+
+_ROUTING = {
+ 'en': ('After “Save and select”:', 'Text translation: {service}. OCR stays {ocr}.', 'OCR: {service}; then translation: {translator}. Text translator stays unchanged.', 'Images: {service} recognizes and translates in one request. Plain text also uses this service.', 'Selected for OCR only.', 'Save this connection without changing the active translator or OCR engine.', 'This service is currently used for OCR. Choose another OCR engine before disabling image input.'),
+ 'ru': ('После «Сохранить и выбрать»:', 'Перевод текста: {service}. OCR остаётся {ocr}.', 'Распознавание: {service}; затем перевод: {translator}. Переводчик текста не меняется.', 'Изображения: {service} распознаёт и переводит одним запросом. Обычный текст тоже переводит этот сервис.', 'Выбран только для OCR.', 'Сохранить подключение, не меняя выбранные движки перевода и OCR.', 'Этот сервис сейчас используется для OCR. Сначала выберите другой OCR-движок, затем отключайте распознавание изображений.'),
+ 'es': ('Después de Guardar y elegir:', 'Traducción de texto: {service}. OCR sigue en {ocr}.', 'OCR: {service}; después, traducción: {translator}. El traductor de texto no cambia.', 'Imágenes: {service} reconoce y traduce en una petición. El texto también usa este servicio.', 'Elegido solo para OCR.', 'Guarda la conexión sin cambiar el traductor ni el motor OCR activos.', 'Este servicio se usa para OCR. Elige otro motor OCR antes de desactivar la entrada de imágenes.'),
+ 'de': ('Nach Speichern und wählen:', 'Textübersetzung: {service}. OCR bleibt {ocr}.', 'OCR: {service}; danach Übersetzung: {translator}. Der Textübersetzer bleibt unverändert.', 'Bilder: {service} erkennt und übersetzt in einer Anfrage. Auch Text nutzt diesen Dienst.', 'Nur für OCR ausgewählt.', 'Verbindung speichern, ohne den aktiven Übersetzer oder die OCR-Engine zu ändern.', 'Dieser Dienst wird für OCR verwendet. Wählen Sie eine andere OCR-Engine, bevor Sie Bildeingaben deaktivieren.'),
+ 'fr': ('Après Enregistrer et choisir :', 'Traduction du texte : {service}. L’OCR reste {ocr}.', 'OCR : {service} ; puis traduction : {translator}. Le traducteur de texte ne change pas.', 'Images : {service} reconnaît et traduit en une requête. Le texte utilise aussi ce service.', 'Choisi uniquement pour l’OCR.', 'Enregistrer la connexion sans changer le traducteur ni le moteur OCR actifs.', 'Ce service est utilisé pour l’OCR. Choisissez un autre moteur OCR avant de désactiver les images.'),
+ 'zh': ('点击“保存并选用”后：', '文字翻译：{service}。OCR 仍为 {ocr}。', 'OCR：{service}；然后由 {translator} 翻译。文字翻译服务保持不变。', '图像：{service} 在一次请求中识别并翻译。普通文字也使用此服务。', '已选择仅用于 OCR。', '保存连接，不更改当前翻译服务或 OCR 引擎。', '此服务正在用于 OCR。请先选择其他 OCR 引擎，再关闭图像输入。'),
+ 'pt': ('Após Salvar e selecionar:', 'Tradução de texto: {service}. OCR continua em {ocr}.', 'OCR: {service}; depois, tradução: {translator}. O tradutor de texto não muda.', 'Imagens: {service} reconhece e traduz em uma solicitação. O texto também usa esse serviço.', 'Selecionado apenas para OCR.', 'Salve a conexão sem alterar o tradutor ou o motor OCR ativos.', 'Este serviço está em uso para OCR. Escolha outro motor OCR antes de desativar a entrada de imagens.'),
+ 'it': ('Dopo Salva e seleziona:', 'Traduzione del testo: {service}. OCR rimane {ocr}.', 'OCR: {service}; poi traduzione: {translator}. Il traduttore del testo non cambia.', 'Immagini: {service} riconosce e traduce in una richiesta. Anche il testo usa questo servizio.', 'Selezionato solo per OCR.', 'Salva la connessione senza cambiare il traduttore o il motore OCR attivi.', 'Questo servizio è usato per OCR. Scegli un altro motore OCR prima di disattivare le immagini.'),
+ 'ar': ('بعد الحفظ والاختيار:', 'ترجمة النص: {service}. يبقى OCR على {ocr}.', 'التعرف: {service}؛ ثم الترجمة: {translator}. لا يتغير مترجم النص.', 'الصور: يتعرف {service} ويترجم في طلب واحد. يستخدم النص العادي الخدمة نفسها.', 'تم اختياره للتعرف على النص فقط.', 'احفظ الاتصال دون تغيير المترجم أو محرك OCR النشط.', 'تُستخدم هذه الخدمة حاليًا للتعرف على النص. اختر محرك OCR آخر قبل تعطيل إدخال الصور.'),
+ 'tr': ('Kaydet ve seç sonrasında:', 'Metin çevirisi: {service}. OCR, {ocr} olarak kalır.', 'OCR: {service}; ardından çeviri: {translator}. Metin çevirmeni değişmez.', 'Görüntüler: {service} tek istekte tanır ve çevirir. Düz metin de bu hizmeti kullanır.', 'Yalnız OCR için seçildi.', 'Etkin çevirmeni veya OCR motorunu değiştirmeden bağlantıyı kaydedin.', 'Bu hizmet OCR için kullanılıyor. Görüntü girişini kapatmadan önce başka bir OCR motoru seçin.'),
+ 'hi': ('सहेजें और चुनें के बाद:', 'टेक्स्ट अनुवाद: {service}। OCR {ocr} ही रहेगा।', 'OCR: {service}; फिर अनुवाद: {translator}। टेक्स्ट अनुवादक नहीं बदलता।', 'इमेज: {service} एक अनुरोध में पहचान और अनुवाद करता है। साधारण टेक्स्ट भी यही सेवा इस्तेमाल करता है।', 'सिर्फ़ OCR के लिए चुना गया।', 'सक्रिय अनुवादक या OCR इंजन बदले बिना कनेक्शन सहेजें।', 'यह सेवा अभी OCR के लिए इस्तेमाल हो रही है। इमेज इनपुट बंद करने से पहले दूसरा OCR इंजन चुनें।'),
+ 'id': ('Setelah Simpan dan pilih:', 'Terjemahan teks: {service}. OCR tetap {ocr}.', 'OCR: {service}; lalu terjemahan: {translator}. Penerjemah teks tidak berubah.', 'Gambar: {service} mengenali dan menerjemahkan dalam satu permintaan. Teks biasa juga memakai layanan ini.', 'Dipilih hanya untuk OCR.', 'Simpan koneksi tanpa mengubah penerjemah atau mesin OCR aktif.', 'Layanan ini sedang dipakai untuk OCR. Pilih mesin OCR lain sebelum menonaktifkan masukan gambar.'),
+}
+
+
+def routing_text(lang, index, **values):
+    return _ROUTING.get(lang, _ROUTING['en'])[index].format(**values)
 
 
 def refresh_provider_routing(settings):
@@ -110,6 +258,12 @@ def refresh_provider_routing(settings):
         'pt': 'Imagens: {provider} · {model}. Um pedido; o tradutor separado é usado apenas para texto simples.',
         'it': ('Immagini: {provider} · {model}. Una richiesta; il traduttore separato viene utilizzato solo per '
          'il testo semplice.'),
+
+        'ar': 'الصور: {provider} · {model}. طلب واحد؛ يُستخدم المترجم المنفصل للنص العادي فقط.',
+
+        'tr': 'Görüntüler: {provider} · {model}. Tek istek; ayrı çevirmen yalnızca düz metin için kullanılır.',
+        'hi': 'इमेज: {provider} · {model}। एक अनुरोध; अलग अनुवादक सिर्फ़ साधारण टेक्स्ट के लिए है।',
+        'id': 'Gambar: {provider} · {model}. Satu permintaan; penerjemah terpisah hanya untuk teks biasa.',
     }
     description = text.get(lang,text['en']).format(provider=BY_KEY[provider].name, model=item['model']) if direct else ''
     captions = {
@@ -119,6 +273,12 @@ def refresh_provider_routing(settings):
 
         'pt': ('Uma API: ', 'API de imagem: '),
         'it': ("Un'API: ", 'API immagine: '),
+
+        'ar': ('API واحد: ', 'API للصور: '),
+
+        'tr': ('Tek API: ', "Görüntü API'si: "),
+        'hi': ('एक API: ', 'इमेज API: '),
+        'id': ('Satu API: ', 'API gambar: '),
     }
     import html
     note.setText(captions.get(lang,captions['en'])[0 if shared else 1] +
@@ -161,6 +321,48 @@ EXTRA = {
      'Selezionato per traduzione e OCR.',
      'Immettere un ID modello nel campo Modello.',
      'API'),
+
+ 'ar': ('الاستخدام:',
+  'ترجمة النص فقط',
+  'التعرف على النص (OCR)',
+  'التعرف والترجمة',
+  'حفظ واختيار',
+  'اضبط خدمة ثم اخترها للترجمة والتعرف على النص.',
+  'تم اختيارها للترجمة.',
+  'تم اختيارها للترجمة والتعرف على النص.',
+  'أدخل معرّف النموذج في حقل النموذج.',
+  'API'),
+
+ 'tr': ('Kullanım:',
+  'Yalnızca metin çevirisi',
+  'Metin tanıma (OCR)',
+  'Tanıma ve çeviri',
+  'Kaydet ve seç',
+  'Hizmeti ayarlayıp çeviri ve OCR için seçin.',
+  'Çeviri için seçildi.',
+  'Çeviri ve OCR için seçildi.',
+  'Model alanına model kimliğini girin.',
+  'API'),
+ 'hi': ('उपयोग:',
+  'सिर्फ़ टेक्स्ट अनुवाद',
+  'टेक्स्ट पहचान (OCR)',
+  'पहचान और अनुवाद',
+  'सहेजें और चुनें',
+  'सेवा सेट करके अनुवाद और OCR के लिए चुनें।',
+  'अनुवाद के लिए चुना गया।',
+  'अनुवाद और OCR के लिए चुना गया।',
+  'मॉडल बॉक्स में मॉडल ID डालें।',
+  'API'),
+ 'id': ('Gunakan untuk:',
+  'Terjemahan teks saja',
+  'Pengenalan teks (OCR)',
+  'Pengenalan dan terjemahan',
+  'Simpan dan pilih',
+  'Atur layanan, lalu pilih untuk terjemahan dan OCR.',
+  'Dipilih untuk terjemahan.',
+  'Dipilih untuk terjemahan dan OCR.',
+  'Masukkan ID model di kolom Model.',
+  'API'),
 }
 
 
@@ -190,8 +392,8 @@ class ProviderSettingsPage(QWidget):
         self.setObjectName('apiConnectionsPage')
         tr = lambda key: provider_text(self.lang, key)
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(0, 10, 0, 0)
-        outer.setSpacing(8)
+        outer.setContentsMargins(0, 8, 0, 0)
+        outer.setSpacing(6)
         self.scroll = QScrollArea(self)
         self.scroll.setWidgetResizable(True)
         self.scroll.setFrameShape(QFrame.NoFrame)
@@ -199,17 +401,21 @@ class ProviderSettingsPage(QWidget):
         content = QWidget()
         content.setObjectName('apiConnectionsContent')
         body = QVBoxLayout(content)
-        body.setContentsMargins(2, 0, 8, 0)
-        body.setSpacing(8)
+        body.setContentsMargins(0, 0, 0, 0)
+        body.setSpacing(6)
         form = QFormLayout()
         form.setContentsMargins(0, 0, 0, 0)
-        form.setSpacing(8)
+        form.setHorizontalSpacing(12)
+        form.setVerticalSpacing(6)
         form.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
         form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         self.service = DropDownCombo(content)
         for spec in PROVIDERS:
             self.service.addItem(spec.name, spec.key)
         self.address, self.key, self.model = (QLineEdit(content) for _ in range(3))
+        for technical_field in (self.address, self.key, self.model):
+            technical_field.setLayoutDirection(Qt.LeftToRight)
+            technical_field.setAlignment(Qt.AlignLeft)
         self.address.setMaxLength(2048)
         self.model.setMaxLength(200)
         self.key.setMaxLength(8192)
@@ -219,11 +425,17 @@ class ProviderSettingsPage(QWidget):
         model_placeholder = {
             'en': 'Model ID', 'ru': 'ID модели', 'es': 'ID del modelo', 'de': 'Modell-ID',
             'fr': 'ID du modèle', 'zh': '模型 ID', 'pt': 'ID do modelo', 'it': 'ID del modello',
+
+            'ar': 'معرّف النموذج',
+
+            'tr': 'Model kimliği',
+            'hi': 'मॉडल ID',
+            'id': 'ID model',
         }
         self.model.setPlaceholderText(model_placeholder.get(self.lang,model_placeholder['en']))
         self.labels = []
         for name, widget in (('service', self.service), ('address', self.address), ('key', self.key), ('model', self.model)):
-            widget.setMinimumHeight(32)
+            widget.setFixedHeight(28)
             widget.setMinimumWidth(0)
             widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
             widget.setAccessibleName(tr(name).rstrip(':： '))
@@ -234,7 +446,7 @@ class ProviderSettingsPage(QWidget):
             self.labels.append(label)
             form.addRow(label, widget)
         self.usage = DropDownCombo(content)
-        self.usage.setMinimumHeight(32)
+        self.usage.setFixedHeight(28)
         self.usage.setAccessibleName(connection_text(self.lang, 0))
         self.usage.setToolTip(tooltip_text(tr('help')))
         label = QLabel(connection_text(self.lang, 0), content)
@@ -246,10 +458,21 @@ class ProviderSettingsPage(QWidget):
         self.note.setObjectName('apiConnectionHint')
         self.note.setWordWrap(True)
         self.note.setToolTip(tooltip_text(tr('help')))
-        body.addWidget(self.note)
+        # Keep the explanation available without repeating a paragraph below
+        # the five self-labelled fields on every visit.
+        explanation = self.note.text() + '\n\n' + tr('help')
+        self.note.hide()
+        self.usage.setToolTip(tooltip_text(explanation))
+        self.usage.setAccessibleDescription(explanation)
+        self.routing_label = QLabel('', content)
+        self.routing_label.setObjectName('apiConnectionRouting')
+        self.routing_label.setWordWrap(True)
+        self.routing_label.setTextFormat(Qt.PlainText)
+        body.addWidget(self.routing_label)
         self.status = QLabel('', content)
         self.status.setObjectName('apiConnectionStatus')
         self.status.setWordWrap(True)
+        self.status.hide()
         body.addWidget(self.status)
         body.addStretch(1)
         self.scroll.setWidget(content)
@@ -259,8 +482,9 @@ class ProviderSettingsPage(QWidget):
         self.delete = QPushButton(tr('delete'), self)
         self.save = QPushButton(tr('save'), self)
         self.use = QPushButton(connection_text(self.lang, 4), self)
-        for button in (self.delete, self.save, self.use):
-            button.setMinimumHeight(32)
+        for button, role in ((self.delete, 'danger'), (self.save, 'secondary'), (self.use, 'primary')):
+            button.setProperty('buttonRole', role)
+            button.setFixedHeight(29)
             button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
             footer.addWidget(button, 1)
         outer.addLayout(footer)
@@ -268,43 +492,83 @@ class ProviderSettingsPage(QWidget):
         self.use.clicked.connect(self.select_profile)
         self.delete.clicked.connect(self.delete_key)
         self.service.currentIndexChanged.connect(self.load_profile)
+        self.usage.currentIndexChanged.connect(self._refresh_routing_preview)
+        self.model.textChanged.connect(self._refresh_routing_preview)
+        self.save.setToolTip(tooltip_text(routing_text(self.lang, 5)))
+        self.save.setAccessibleDescription(routing_text(self.lang, 5))
         self.address.textChanged.connect(lambda text: self.address.setToolTip(tooltip_text(text)))
         self.apply_theme()
         self.load_profile()
 
     def apply_theme(self):
-        from settings_window import modern_combo_style
+        from PyQt5.QtGui import QColor, QPalette
+        from settings_window import compact_combo_style
         from styled_dialogs import install_accent_controls, set_widget_stylesheet
-        from button_styles import button_qss
+        from button_styles import standard_buttons
+        from classic_style import classic_palette
         dark = self.app.current_theme != 'Светлая'
-        field, text, border = ('#17181d', '#f4f6fb', '#34313f') if dark else ('#f3eff5', '#241f2a', '#bcb2c7')
-        muted = '#aaa0b8' if dark else '#71667d'
+        colors = classic_palette(dark)
+        field, text, border, muted = (colors[key] for key in ('field', 'text', 'border', 'muted'))
         set_widget_stylesheet(self, f"""
-            QWidget#apiConnectionsPage, QWidget#apiConnectionsContent, QScrollArea {{ background:transparent; border:none; }}
-            QLabel {{ color:{text}; font-size:13px; background:transparent; }}
-            QLabel#apiConnectionHint, QLabel#apiConnectionStatus {{ color:{muted}; font-size:12px; }}
-            QLineEdit {{ color:{text}; background:{field}; border:1px solid {border}; border-radius:6px; padding:3px 8px; font-size:14px; }}
-            QLineEdit:focus {{ border-color:#9B78C8; }}
-        """)
+            QWidget#apiConnectionsPage {{ background:{colors['background']}; border:none; }}
+            QWidget#apiConnectionsContent, QScrollArea {{ background:transparent; border:none; }}
+            QLabel {{ color:{text}; font-size:14px; background:transparent; }}
+            QLabel#apiConnectionHint, QLabel#apiConnectionStatus, QLabel#apiConnectionRouting {{ color:{muted}; font-size:12px; }}
+            QLineEdit {{ color:{text}; background:{field}; border:1px solid {border}; border-radius:6px; margin:0; padding:1px 8px; font-size:14px; }}
+            QLineEdit:focus {{ border-color:{colors['accent_text']}; }}
+        """ + standard_buttons(dark, compact=True))
         for combo in (self.service, self.usage):
-            set_widget_stylesheet(combo, modern_combo_style(dark, font_size=14))
+            set_widget_stylesheet(combo, compact_combo_style(dark))
             combo.set_popup_background(field)
-        for button, role in ((self.delete, 'danger'), (self.save, 'secondary'), (self.use, 'primary')):
-            set_widget_stylesheet(button, button_qss(dark, role, compact=True))
+            # QSS min-height resets QComboBox's native minimum; keep the form
+            # row identical to its line edits after the style has been polished.
+            combo.ensurePolished()
+            combo.setFixedHeight(28)
+        for field_widget in (self.address, self.key, self.model):
+            palette = field_widget.palette()
+            palette.setColor(QPalette.PlaceholderText, QColor(muted))
+            field_widget.setPalette(palette)
         install_accent_controls(self, dark=dark)
         # Stylesheet fonts must also inform the form's label measurements.
         self.ensurePolished()
         for label in self.labels:
             label.ensurePolished()
-            label.setMinimumWidth(label.sizeHint().width())
+            ink_width = label.fontMetrics().boundingRect(label.text()).width()
+            label.setMinimumWidth(max(label.sizeHint().width(), ink_width + 4))
 
     def _capture(self):
         usage = self.usage.currentData()
         return dict(url=self.address.text().strip(), model=self.model.text().strip(),
                     vision=usage in ('ocr', 'direct'), direct=usage == 'direct', key=self.key.text())
 
+    def _set_status(self, text):
+        self.status.setText(text)
+        self.status.setVisible(bool(text))
+
+    def _refresh_routing_preview(self, *_args):
+        if not self.active or getattr(self, '_loading_profile', False):
+            return
+        from provider_catalog import TRANSLATION_PROVIDERS, provider_id
+        from styled_dialogs import tooltip_text
+        names = {key: name for key, name, _kind in TRANSLATION_PROVIDERS}
+        config = self.app.config
+        translator = names.get(provider_id(config.get('translator_engine')), str(config.get('translator_engine', '')))
+        ocr = str(config.get('ocr_engine', ''))
+        model = self.model.text().strip()
+        service = BY_KEY[self.active].name + (' · ' + model if model else '')
+        usage = self.usage.currentData() or 'text'
+        text = routing_text(self.lang, {'text': 1, 'ocr': 2, 'direct': 3}[usage],
+                            service=service, translator=translator, ocr=ocr)
+        from api_providers import VISION_ENGINES
+        if usage == 'text' and VISION_ENGINES.get(config.get('ocr_engine')) == self.active:
+            text = routing_text(self.lang, 6)
+        self.routing_label.setText(routing_text(self.lang, 0) + '\n' + text)
+        self.routing_label.setToolTip(tooltip_text(text))
+        self.usage.setAccessibleDescription(self.note.text() + '\n\n' + provider_text(self.lang, 'help') + '\n\n' + text)
+
     def load_profile(self, *_args):
         from provider_secrets import get_key
+        self._loading_profile = True
         if self.active:
             self.drafts[self.active] = self._capture()
         self.active = self.service.currentData()
@@ -323,7 +587,32 @@ class ProviderSettingsPage(QWidget):
         usage = ('direct' if item['direct'] else 'ocr') if item['vision'] and spec.vision else 'text'
         self.usage.setCurrentIndex(max(0, self.usage.findData(usage)))
         self.usage.setEnabled(spec.vision)
-        self.status.clear()
+        self._set_status('')
+        self._loading_profile = False
+        self._refresh_routing_preview()
+
+    def _save_preferences(self, values):
+        missing = object()
+        previous = {key: self.app.config.get(key, missing) for key in values}
+        self.app.config.update(values)
+        try:
+            if self.app.save_config() is False:
+                raise OSError('Settings publication was refused')
+        except Exception:
+            for key, value in previous.items():
+                if value is missing:
+                    self.app.config.pop(key, None)
+                else:
+                    self.app.config[key] = value
+            self._set_status(_SAVE_ERROR.get(self.lang, _SAVE_ERROR['en']))
+            return False
+        from settings_window import _invalidate_main_config_cache
+        _invalidate_main_config_cache()
+        complete = getattr(self.app, '_complete_guide_setting', None)
+        if callable(complete):
+            for key in values:
+                complete(key)
+        return True
 
     def save_profile(self):
         from provider_secrets import set_key, get_key
@@ -336,22 +625,25 @@ class ProviderSettingsPage(QWidget):
                 raise ProviderError(connection_text(self.lang, 8))
         except ProviderError as error:
             from api_providers import display_error
-            self.status.setText(str(error) if str(error) == connection_text(self.lang, 8)
-                                else display_error(error, self.lang))
+            self._set_status(str(error) if str(error) == connection_text(self.lang, 8)
+                             else display_error(error, self.lang))
             return False
-        persisted = True
-        if item['key']:
-            persisted = set_key(self.active, item['url'], item.pop('key'))
-        else:
-            item.pop('key')
+        from api_providers import VISION_ENGINES
+        if VISION_ENGINES.get(self.app.config.get('ocr_engine')) == self.active and not item['vision']:
+            self._set_status(routing_text(self.lang, 6))
+            return False
+        key = item.pop('key')
         profiles = dict(self.app.config.get('api_providers', {}))
         profiles[self.active] = item
-        self.settings.auto_save_setting('api_providers', profiles)
+        if not self._save_preferences({'api_providers': profiles}):
+            return False
+        persisted = set_key(self.active, item['url'], key) if key else True
+        self.settings._refresh_ready_engine_choices()
         refresh_provider_routing(self.settings)
         self.key.clear()
         self.key.setPlaceholderText(provider_text(self.lang, 'stored' if get_key(self.active, item['url']) else 'empty'))
         self.drafts[self.active] = item
-        self.status.setText(provider_text(self.lang, 'saved' if persisted else 'session'))
+        self._set_status(provider_text(self.lang, 'saved' if persisted else 'session'))
         return True
 
     def select_profile(self):
@@ -362,22 +654,36 @@ class ProviderSettingsPage(QWidget):
             validate(self.active, self.app.config)
         except ProviderError as error:
             from api_providers import display_error
-            self.status.setText(display_error(error, self.lang))
+            self._set_status(display_error(error, self.lang))
             return
         status = self.status.text()
-        self.settings._set_translator_combo_silently(self.active)
-        self.settings.auto_save_setting('translator_engine', self.active)
-        item = profile(self.active, self.app.config)
-        if item['vision']:
+        usage = self.usage.currentData()
+        values = {}
+        if usage in ('text', 'direct'):
+            values['translator_engine'] = self.active
+        if usage in ('ocr', 'direct'):
             engine = next(name for name, key in VISION_ENGINES.items() if key == self.active)
-            self.settings.ocr_engine_combo.setCurrentIndex(self.settings.ocr_engine_combo.findData(engine))
+            values['ocr_engine'] = engine
+        if not self._save_preferences(values):
+            return
+        if 'translator_engine' in values:
+            self.settings._set_translator_combo_silently(self.active)
+        if 'ocr_engine' in values:
+            self.settings._set_ocr_combo_silently(engine)
         refresh_provider_routing(self.settings)
-        self.status.setText(connection_text(self.lang, 7 if item['vision'] else 6) + ' ' + status)
+        self._refresh_routing_preview()
+        selected = routing_text(self.lang, 4) if usage == 'ocr' else connection_text(self.lang, 7 if usage == 'direct' else 6)
+        self._set_status(selected + ' ' + status)
 
     def delete_key(self):
         from provider_secrets import set_key
-        persisted = set_key(self.active, profile(self.active, self.app.config)['url'], '')
+        saved_url = profile(self.active, self.app.config)['url']
+        if self.address.text().strip().rstrip('/') != saved_url:
+            self._set_status(_DELETE_STATUS.get(self.lang, _DELETE_STATUS['en'])[2])
+            return
+        persisted = set_key(self.active, saved_url, '')
         self.key.clear()
         self.drafts.pop(self.active, None)
         self.key.setPlaceholderText(provider_text(self.lang, 'empty'))
-        self.status.setText(provider_text(self.lang, 'saved' if persisted else 'session'))
+        self.settings._refresh_ready_engine_choices()
+        self._set_status(_DELETE_STATUS.get(self.lang, _DELETE_STATUS['en'])[0 if persisted else 1])

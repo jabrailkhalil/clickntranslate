@@ -10,13 +10,16 @@ BUTTON_FONT_SIZE = 13
 
 def paint_down_arrow(painter, rect, font, color, factor=1.0):
     """The stepper's light › glyph, turned down and optically centered."""
-    from PyQt5.QtCore import QPointF
+    from PyQt5.QtCore import QPointF, Qt
     from PyQt5.QtGui import QFont, QFontMetricsF
     font = QFont(font)
     font.setPixelSize(max(1, round(15 * factor)))
     font.setWeight(QFont.Normal)
     bounds = QFontMetricsF(font).tightBoundingRect('›')
     painter.save()
+    # These are directional icons, not RTL text. Bidi mirroring would turn
+    # the down arrow upwards when the Arabic interface is selected.
+    painter.setLayoutDirection(Qt.LeftToRight)
     painter.setFont(font)
     painter.setPen(color)
     painter.translate(rect.center())
@@ -102,12 +105,26 @@ def _install_keyboard_focus_tracking():
     from PyQt5.QtWidgets import QApplication, QAbstractButton, QComboBox, QPushButton, QToolButton, QToolTip, QWidget
 
     app = QApplication.instance()
+    from keyboard_navigation import install_keyboard_navigation
+    install_keyboard_navigation(app)
     if app is None or hasattr(app, "_button_focus_filter"):
         return
 
     class ButtonFocusFilter(QObject):
+        _styled_focus = lambda self: None
+
+        def _set_keyboard_style(self, widget, keyboard):
+            import weakref
+            if bool(widget.property('keyboardFocus')) != keyboard:
+                widget.setProperty('keyboardFocus', keyboard)
+                widget.style().unpolish(widget)
+                widget.style().polish(widget)
+                widget.update()
+            if keyboard:
+                self._styled_focus = weakref.ref(widget)
+
         _events = frozenset((
-            QEvent.ApplicationDeactivate, QEvent.MouseMove, QEvent.MouseButtonPress,
+            QEvent.ApplicationDeactivate, QEvent.MouseMove, QEvent.MouseButtonPress, QEvent.Wheel,
             QEvent.Leave, QEvent.WindowDeactivate, QEvent.Hide, QEvent.EnabledChange,
             QEvent.Enter, QEvent.DynamicPropertyChange, QEvent.ToolTip,
             QEvent.GraphicsSceneHelp, QEvent.FocusIn, QEvent.FocusOut, QEvent.KeyPress,
@@ -117,6 +134,17 @@ def _install_keyboard_focus_tracking():
             kind = event.type()
             if kind not in self._events:
                 return False
+            if (kind in (QEvent.MouseButtonPress, QEvent.Wheel)
+                    or kind == QEvent.FocusIn and event.reason() == Qt.MouseFocusReason):
+                navigation = app._keyboard_navigation
+                navigation.keyboard = False
+                navigation._hide_ring()
+                previous = self._styled_focus()
+                if previous is not None:
+                    from PyQt5 import sip
+                    if not sip.isdeleted(previous):
+                        self._set_keyboard_style(previous, False)
+                self._styled_focus = lambda: None
             hovered = getattr(app, '_hovered_app_button', lambda: None)()
             if hovered is not None:
                 from PyQt5 import sip
@@ -158,14 +186,10 @@ def _install_keyboard_focus_tracking():
                 return False
             if not isinstance(widget, (QPushButton, QToolButton, QComboBox)):
                 return False
-            keyboard = kind == QEvent.KeyPress or (kind == QEvent.FocusIn and event.reason() in (
-                Qt.TabFocusReason, Qt.BacktabFocusReason, Qt.ShortcutFocusReason,
-            ))
-            if bool(widget.property("keyboardFocus")) != keyboard:
-                widget.setProperty("keyboardFocus", keyboard)
-                widget.style().unpolish(widget)
-                widget.style().polish(widget)
-                widget.update()
+            navigation = app._keyboard_navigation
+            keyboard = (navigation.note_key_input(widget, event) if kind == QEvent.KeyPress
+                        else kind == QEvent.FocusIn and navigation.keyboard)
+            self._set_keyboard_style(widget, keyboard)
             return False
 
     app._button_focus_filter = ButtonFocusFilter(app)
@@ -231,6 +255,43 @@ def button_qss(dark, role="secondary", selector="QPushButton", *, compact=False,
         {state(':disabled')} {{ background:{colors['disabled_surface']};
             color:{colors['disabled']}; border-color:{colors['disabled_border']}; }}
     """
+
+
+def connected_action_panel(panel, dark, *, role_for=None):
+    """The shared joined action grid, including physical corners in RTL."""
+    from PyQt5.QtCore import Qt
+    from PyQt5.QtWidgets import QGridLayout, QPushButton
+    from styled_dialogs import set_widget_stylesheet
+    colors = button_palette(dark)
+    name = panel.objectName()
+    if not name:
+        name = 'connectedActionPanel'
+        panel.setObjectName(name)
+    set_widget_stylesheet(panel, f'QWidget#{name} {{ background:{colors["border"]}; '
+                         f'border:1px solid {colors["border"]}; border-radius:7px; }}')
+    grid = panel.layout()
+    if not isinstance(grid, QGridLayout):
+        return
+    rtl = panel.layoutDirection() == Qt.RightToLeft
+    for index in range(grid.count()):
+        button = grid.itemAt(index).widget()
+        if not isinstance(button, QPushButton):
+            continue
+        row, column, row_span, column_span = grid.getItemPosition(index)
+        left = column+column_span == grid.columnCount() if rtl else column == 0
+        right = column == 0 if rtl else column+column_span == grid.columnCount()
+        top, bottom = row == 0, row+row_span == grid.rowCount()
+        tl, tr, bl, br = (6 if edge else 0 for edge in (
+            top and left, top and right, bottom and left, bottom and right))
+        divider = '' if left else f'border-left:1px solid {colors["border"]};'
+        role = role_for(button) if role_for is not None else 'secondary'
+        set_widget_stylesheet(button, button_qss(dark, role, compact=True, radius=0) + f'''
+            QPushButton {{ border:none; {divider} padding:0 6px;
+                border-top-left-radius:{tl}px; border-top-right-radius:{tr}px;
+                border-bottom-left-radius:{bl}px; border-bottom-right-radius:{br}px; }}
+            QPushButton[keyboardFocus="true"]:focus {{ background:{colors['hover']}; }}
+            QPushButton[packageTaskDone="true"] {{ color:{'#90c79e' if dark else '#307b45'}; }}
+        ''')
 
 
 def standard_buttons(dark, *, compact=False):

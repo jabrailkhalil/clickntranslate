@@ -1,0 +1,345 @@
+"""Settings destinations stay reachable in the real fixed, scaled viewport."""
+from unittest import mock
+from contextlib import ExitStack
+
+import pytest
+from PyQt5 import QtCore, QtWidgets
+from PyQt5.QtGui import QFontMetrics
+
+import main
+from settings_window import SettingsWindow
+from settings_metrics import SETTINGS_ROW_GAP, SETTINGS_ROW_HEIGHT
+from settings_sections import (
+    PAGE_APPLICATION, PAGE_TRANSLATION, PAGE_DYNAMIC, PAGE_COMPANION, PAGE_OCR,
+    PAGE_COUNT, PAGE_CAPTIONS, VISUAL_PAGE_ORDER, page_caption,
+)
+from test_desktop_ux import app, window
+
+
+def settle(app):
+    for _ in range(3):
+        app.processEvents()
+
+
+def rect_in(widget, parent):
+    return QtCore.QRect(widget.mapTo(parent, QtCore.QPoint()), widget.size())
+
+
+def assert_standard_settings_rows(settings, page_id, context):
+    companion = settings.settings_assistant_page
+    controls = {
+        PAGE_APPLICATION: (settings.autostart_checkbox, settings.start_minimized_checkbox,
+                           settings.copy_history_checkbox, settings.history_checkbox,
+                           settings.button_tooltips_checkbox, settings.update_check_on_launch_checkbox),
+        PAGE_TRANSLATION: (settings.copy_translated_checkbox, settings.replace_select_all_checkbox,
+                           settings.restore_clipboard_checkbox, settings.close_result_on_outside_click_checkbox),
+        PAGE_OCR: (settings.ocr_join_paragraphs_checkbox, settings.keep_visible_checkbox,
+                   settings.freeze_screen_checkbox, settings.dim_screen_during_ocr_checkbox),
+        PAGE_DYNAMIC: (settings.game_pause_inactive_checkbox, settings.game_manual_output_checkbox,
+                       settings.game_toolbar_checkbox, settings.game_remember_template_checkbox),
+        PAGE_COMPANION: (companion.main_visible, companion.toggle, companion.topmost, companion.reactions),
+    }[page_id]
+    page = settings.settings_pages.currentWidget()
+    rectangles = [rect_in(control, page) for control in controls]
+    for control, rect in zip(controls, rectangles):
+        assert rect.height() == SETTINGS_ROW_HEIGHT, (context, control.text(), rect)
+    for first, second in zip(rectangles, rectangles[1:]):
+        assert second.top() - first.bottom() - 1 == SETTINGS_ROW_GAP, (context, rectangles)
+    if page_id == PAGE_DYNAMIC:
+        fields = (settings.game_language_row, settings.game_interval_controls,
+                  settings.game_opacity_controls, settings.game_template_actions)
+        assert [rect_in(field, page).top() for field in fields] == [rect.top() for rect in rectangles], context
+
+
+def test_legacy_destinations_have_a_separate_visual_order_and_complete_captions():
+    assert (PAGE_APPLICATION, PAGE_TRANSLATION, PAGE_DYNAMIC, PAGE_COMPANION, PAGE_OCR) == (0, 1, 2, 3, 4)
+    assert VISUAL_PAGE_ORDER == (0, 1, 4, 2, 3)
+    assert PAGE_COUNT == 5
+    assert set(PAGE_CAPTIONS) == set(main.INTERFACE_LANGUAGE_BY_CODE)
+    for locale in main.INTERFACE_LANGUAGE_BY_CODE:
+        captions = [page_caption(locale, page) for page in VISUAL_PAGE_ORDER]
+        assert len(set(captions)) == PAGE_COUNT and all(captions), locale
+
+
+def test_settings_controls_are_in_the_page_their_behavior_belongs_to(window, app):
+    window.show_settings()
+    settings = window.settings_window
+    owners = (
+        (PAGE_APPLICATION, settings.settings_general_page,
+         ('ui_scale_control', 'translation_font_control',
+          'translation_font_preview', 'autostart_checkbox', 'start_minimized_checkbox',
+          'button_tooltips_checkbox', 'update_check_on_launch_checkbox', 'engines_button')),
+        (PAGE_TRANSLATION, settings.settings_updates_page,
+         ('translator_combo', 'result_window_control', 'copy_translated_checkbox',
+          'replace_select_all_checkbox', 'restore_clipboard_checkbox',
+          'close_result_on_outside_click_checkbox', 'capture_memory_modes')),
+        (PAGE_OCR, settings.settings_ocr_page,
+         ('ocr_engine_combo', 'ocr_join_paragraphs_checkbox', 'keep_visible_checkbox',
+          'freeze_screen_checkbox', 'dim_screen_during_ocr_checkbox')),
+        (PAGE_DYNAMIC, settings.settings_game_page,
+         ('game_source_combo', 'game_target_combo', 'game_remember_template_checkbox',
+          'game_template_combo', 'game_delete_template_button', 'game_launch_button')),
+        (PAGE_COMPANION, settings.settings_assistant_page,
+         ('desktop_assistant_checkbox',)),
+    )
+    for page_id, page, names in owners:
+        settings._set_settings_page(page_id)
+        settle(app)
+        assert settings.settings_pages.currentWidget() is page
+        for name in names:
+            control = getattr(settings, name)
+            assert page.isAncestorOf(control), (page_id, name)
+            assert control.isVisible(), (page_id, name)
+    # The former per-page routes now share one visible Engines entry, rather
+    # than duplicating the same manager/API action on multiple pages.
+    settings._set_settings_page(PAGE_APPLICATION)
+    settle(app)
+    for name in ('translation_offline_button', 'translation_api_button',
+                 'ocr_languages_btn', 'ocr_api_button'):
+        assert getattr(settings, name) is settings.engines_button
+    assert settings.application_action_panel.isAncestorOf(settings.engines_button)
+    assert settings.engines_button.isVisible()
+
+
+@pytest.mark.parametrize('locale', tuple(main.INTERFACE_LANGUAGE_BY_CODE))
+def test_factory_preferences_have_matching_visible_checkboxes(window, app, locale):
+    from test_first_run_defaults import FACTORY_FLAGS
+    window.set_interface_language(locale)
+    window.show_settings()
+    settings = window.settings_window
+    companion = settings.settings_assistant_page
+    pages = (
+        (PAGE_APPLICATION, (
+            ('autostart', settings.autostart_checkbox),
+            ('start_minimized', settings.start_minimized_checkbox),
+            ('copy_history', settings.copy_history_checkbox),
+            ('history', settings.history_checkbox),
+            ('button_tooltips_enabled', settings.button_tooltips_checkbox),
+            ('update_check_on_launch', settings.update_check_on_launch_checkbox))),
+        (PAGE_TRANSLATION, (
+            ('copy_translated_text', settings.copy_translated_checkbox),
+            ('replace_selection_select_all', settings.replace_select_all_checkbox),
+            ('restore_clipboard_after_selection', settings.restore_clipboard_checkbox),
+            ('close_result_window_on_outside_click', settings.close_result_on_outside_click_checkbox))),
+        (PAGE_OCR, (
+            ('ocr_join_paragraphs', settings.ocr_join_paragraphs_checkbox),
+            ('keep_visible_on_ocr', settings.keep_visible_checkbox),
+            ('freeze_screen_on_ocr', settings.freeze_screen_checkbox),
+            ('dim_screen_during_ocr', settings.dim_screen_during_ocr_checkbox),
+            ('notifications', settings.copy_notification_checkbox))),
+        (PAGE_DYNAMIC, (
+            ('game_pause_when_inactive', settings.game_pause_inactive_checkbox),
+            ('game_manual_output', settings.game_manual_output_checkbox),
+            ('game_show_toolbar', settings.game_toolbar_checkbox),
+            ('game_remember_template', settings.game_remember_template_checkbox))),
+        (PAGE_COMPANION, (
+            ('main_assistant_visible', companion.main_visible),
+            ('desktop_assistant_enabled', companion.toggle),
+            ('desktop_assistant_topmost', companion.topmost),
+            ('desktop_assistant_reactions', companion.reactions))),
+    )
+    for page_id, controls in pages:
+        settings._set_settings_page(page_id)
+        settle(app)
+        for key, control in controls:
+            assert control.isVisible(), (locale, key)
+            assert control.isChecked() is FACTORY_FLAGS.get(key, main.DEFAULT_CONFIG[key]), (locale, key)
+    settings._set_settings_page(PAGE_TRANSLATION)
+    assert settings.capture_memory_modes.checked_modes() == ()
+
+
+@pytest.mark.parametrize('locale', tuple(main.INTERFACE_LANGUAGE_BY_CODE))
+def test_five_pages_fit_every_theme_and_scale_and_overflow_is_reachable(window, app, locale):
+    """One window per locale covers 600 page states without 600 app startups."""
+    window.set_interface_language(locale)
+    window.show_settings()
+    settings = window.settings_window
+    for theme in ('Темная', 'Светлая'):
+        if window.current_theme != theme:
+            window.toggle_theme()
+        for scale in (80, 100, 125, 150, 200):
+            window.set_ui_scale_percent(scale)
+            settle(app)
+            for page_id in VISUAL_PAGE_ORDER:
+                settings._set_settings_page(page_id)
+                settle(app)
+                page = settings.settings_pages.currentWidget()
+                context = (locale, theme, scale, page_id)
+                assert settings.rect().contains(rect_in(page, settings)), context
+                assert settings.settings_pages.count() == PAGE_COUNT
+                assert_standard_settings_rows(settings, page_id, context)
+                for tab in settings.settings_page_tabs:
+                    font, area = tab.label_layout()
+                    assert QFontMetrics(font).horizontalAdvance(tab.text()) <= area.width(), (context, tab.text())
+                    assert QFontMetrics(font).height() <= area.height(), (context, tab.text())
+
+                scrolls = page.findChildren(QtWidgets.QScrollArea)
+                for scroll in scrolls:
+                    assert scroll.horizontalScrollBar().maximum() == 0, (context, scroll.objectName())
+                    assert page.rect().contains(rect_in(scroll, page)), context
+                    body = scroll.widget()
+                    # Every focusable control can be brought fully into view;
+                    # a scrollbar extending over the footer cannot satisfy it.
+                    controls = [control for control in body.findChildren(QtWidgets.QWidget)
+                                if isinstance(control, (QtWidgets.QAbstractButton, QtWidgets.QComboBox,
+                                                        QtWidgets.QAbstractSlider))
+                                and control.isVisible() and control.height() > 0]
+                    assert controls, context
+                    for control in controls:
+                        assert body.rect().contains(rect_in(control, body)), (context, control.objectName())
+                        scroll.ensureWidgetVisible(control, 0, 0)
+                        settle(app)
+                        assert scroll.viewport().rect().contains(rect_in(control, scroll.viewport())), (context, control.objectName())
+                    scroll.verticalScrollBar().setValue(scroll.verticalScrollBar().maximum())
+                    settle(app)
+                    assert scroll.verticalScrollBar().value() == scroll.verticalScrollBar().maximum()
+
+                for name in ('settings_action_panel', 'translation_action_panel', 'ocr_action_panel',
+                             'game_action_panel', 'assistant_action_panel'):
+                    footer = getattr(settings, name, None)
+                    if footer is None or not footer.isVisible() or not page.isAncestorOf(footer):
+                        continue
+                    assert page.rect().contains(rect_in(footer, page)), (context, name)
+                    for scroll in scrolls:
+                        assert not scroll.isAncestorOf(footer), (context, name)
+                        assert not rect_in(scroll, page).intersects(rect_in(footer, page)), (context, name)
+
+                for control in page.findChildren(QtWidgets.QWidget):
+                    if not control.isVisible() or control.height() == 0:
+                        continue
+                    if isinstance(control, QtWidgets.QCheckBox):
+                        assert control.sizeHint().width() <= control.width(), (context, control.text())
+                        assert control.fontMetrics().height() <= control.contentsRect().height(), (context, control.text())
+                    elif isinstance(control, QtWidgets.QLabel) and control.text():
+                        if control.wordWrap():
+                            assert control.heightForWidth(control.width()) <= control.height(), (context, control.text())
+                        else:
+                            assert control.fontMetrics().horizontalAdvance(control.text()) <= control.contentsRect().width(), (context, control.text())
+                            assert control.fontMetrics().height() <= control.contentsRect().height(), (context, control.text())
+
+
+@pytest.mark.parametrize('locale', tuple(main.INTERFACE_LANGUAGE_BY_CODE))
+def test_all_seven_program_tools_stay_visible_in_the_general_footer(window, app, locale):
+    window.set_interface_language(locale)
+    window.show_settings()
+    settings = window.settings_window
+    for theme in ('Темная', 'Светлая'):
+        if window.current_theme != theme:
+            window.toggle_theme()
+        for scale in (80, 110, 125, 150, 200):
+            window.set_ui_scale_percent(scale)
+            settings._set_settings_page(PAGE_APPLICATION)
+            settle(app)
+            page, panel = settings.settings_general_page, settings.settings_action_panel
+            assert panel is settings.application_action_panel
+            scroll = settings.application_settings_scroll
+            buttons = [getattr(settings, name) for name in (
+                'clear_cache_btn', 'reset_btn', 'update_btn', 'export_settings_btn',
+                'import_settings_btn', 'create_bug_report_btn', 'engines_button', 'hotkeys_button')]
+            context = (locale, theme, scale)
+            # The seven program tools remain, alongside the unified Engines
+            # entry. Six grid units provide three columns, then two halves.
+            assert panel.layout().rowCount() == 3 and panel.layout().columnCount() == 6
+            assert len(panel.findChildren(QtWidgets.QAbstractButton)) == len(buttons) == 8
+            for index in range(panel.layout().count()):
+                row, column, row_span, column_span = panel.layout().getItemPosition(index)
+                assert row_span == 1
+                assert column_span == (3 if row == 2 else 2)
+            assert page.rect().contains(rect_in(panel, page)), context
+            assert not settings.application_settings_scroll.isAncestorOf(panel)
+            assert scroll.horizontalScrollBar().maximum() == 0, context
+            footer_position = rect_in(panel, page)
+            scroll.ensureWidgetVisible(settings.update_check_on_launch_checkbox, 0, 0)
+            settle(app)
+            assert scroll.viewport().rect().contains(rect_in(
+                settings.update_check_on_launch_checkbox, scroll.viewport())), context
+            assert rect_in(panel, page) == footer_position
+            for button in buttons:
+                assert button.isVisible(), (context, button.text())
+                assert panel.rect().contains(rect_in(button, panel)), (context, button.text())
+                font, area = button.label_layout()
+                metrics = QFontMetrics(font)
+                assert metrics.horizontalAdvance(button.text()) <= area.width(), (context, button.text())
+                assert metrics.height() <= area.height(), (context, button.text())
+            assert settings.settings_pages.count() == PAGE_COUNT
+            assert settings.findChild(QtWidgets.QWidget, 'maintenancePage') is None
+            assert not hasattr(settings, 'maintenance_button')
+
+
+def test_general_tool_buttons_keep_their_existing_connected_actions(window, app):
+    # Patch before the first Settings construction: existing Qt signal
+    # connections retain their callable even if the attribute is later patched.
+    assert getattr(window, '_cached_settings_window', None) is None
+    bindings = (
+        ('clear_cache_btn', 'clear_all_cache'), ('reset_btn', 'reset_settings'),
+        ('update_btn', 'check_for_updates'), ('export_settings_btn', 'export_settings'),
+        ('import_settings_btn', 'import_settings'), ('hotkeys_button', 'show_hotkeys_screen'),
+        ('engines_button', 'show_ocr_language_manager'),
+    )
+    with ExitStack() as stack:
+        callbacks = [(button, stack.enter_context(mock.patch.object(SettingsWindow, handler)))
+                     for button, handler in bindings]
+        report = stack.enter_context(mock.patch.object(window, '_create_bug_report'))
+        window.show_settings()
+        settle(app)
+        settings = window.settings_window
+        for name, callback in callbacks:
+            button = getattr(settings, name)
+            assert button.isVisible()
+            button.click()
+            callback.assert_called_once()
+        settings.create_bug_report_btn.click()
+        report.assert_called_once_with(settings)
+
+
+@pytest.mark.parametrize('locale', ['en', 'ar'])
+def test_inline_updater_returns_directly_to_general_without_an_extra_tools_page(window, app, locale):
+    window.set_interface_language(locale)
+    window.show_settings()
+    settings = window.settings_window
+    for theme in ('Темная', 'Светлая'):
+        if window.current_theme != theme:
+            window.toggle_theme()
+        settle(app)
+        top_levels = set(app.topLevelWidgets())
+        settings._show_update_progress('Checking')
+        panel = settings._update_progress
+        settings._on_update_failed('Simulated offline update check')
+        settle(app)
+        panel.secondary.click()
+        settle(app)
+        assert set(app.topLevelWidgets()) == top_levels
+        assert settings._secondary_view_kind is None
+        assert settings.settings_pages.currentWidget() is settings.settings_general_page
+        assert settings.update_btn.isVisible() and settings.hotkeys_button.isVisible()
+
+
+@pytest.mark.parametrize('locale', ['ru', 'ar'])
+def test_companion_custom_image_row_scrolls_without_moving_its_actions(window, app, locale):
+    window.config.update(desktop_assistant_appearance='custom',
+                         desktop_assistant_image=main.resource_path(main.INTERFACE_LANGUAGE_OPTIONS[0]['icon']))
+    window.set_interface_language(locale)
+    window.show_settings()
+    settings = window.settings_window
+    for theme in ('Темная', 'Светлая'):
+        if window.current_theme != theme:
+            window.toggle_theme()
+        for scale in (80, 200):
+            window.set_ui_scale_percent(scale)
+            settings._set_settings_page(PAGE_COMPANION)
+            settle(app)
+            page = settings.settings_assistant_page
+            scroll = settings.assistant_settings_scroll
+            footer = settings.assistant_action_panel
+            row = page.custom_image_row
+            assert row.isVisible()
+            assert page.mascot_preview.height() >= 110
+            assert scroll.verticalScrollBar().maximum() > 0
+            original = rect_in(footer, page)
+            scroll.ensureWidgetVisible(row, 0, 0)
+            settle(app)
+            assert scroll.viewport().rect().contains(rect_in(row, scroll.viewport()))
+            assert page.rect().contains(original)
+            assert not scroll.isAncestorOf(footer)
+            assert rect_in(footer, page) == original
+

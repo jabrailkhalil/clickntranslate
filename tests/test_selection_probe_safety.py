@@ -73,7 +73,10 @@ def test_clipboard_restored_on_success_and_exception(previous, failure):
           mock.patch('pyperclip.paste', side_effect=paste), mock.patch('time.sleep')):
         text = selection_platform._read_selection_via_copy()
     assert text == ('Selected text' if failure is None else '')
-    assert state[0] == previous
+    # Without native sequence identity an unreadable clipboard cannot safely
+    # be overwritten: it may already contain a newer user copy. The dedicated
+    # preservation tests also cover restoration through native identity.
+    assert state[0] == ('Selected text' if failure == 'read' else previous)
     assert keys[-2:] == [(0x43, 2), (0x11, 2)]
 
 
@@ -82,6 +85,32 @@ def test_lost_foreground_aborts_before_changing_clipboard():
           mock.patch.object(platform_support, 'copy_text') as copy):
         assert selection_platform._read_selection_via_copy(validate_target=lambda: False) == ''
     copy.assert_not_called()
+
+
+@pytest.mark.parametrize('replace', [False, True])
+def test_failed_selection_clipboard_clear_never_translates_previous_contents(replace):
+    import main
+    from test_translation_result_ui import _SelectionHarness, _immediate_thread
+    harness = _SelectionHarness({})
+    user32 = SimpleNamespace(keybd_event=mock.Mock())
+    with (mock.patch.multiple(platform_support, IS_WINDOWS=True, IS_MAC=False, IS_LINUX=False),
+          mock.patch.object(main.ctypes, 'windll', SimpleNamespace(user32=user32), create=True),
+          mock.patch.object(main.threading, 'Thread', _immediate_thread),
+          mock.patch.object(main.time, 'sleep'),
+          mock.patch.object(main, '_windows_foreground_window', return_value=42),
+          mock.patch.object(main.pyperclip, 'paste', return_value='Unrelated previous clipboard'),
+          mock.patch.object(platform_support, 'copy_text', return_value=False) as clear,
+          mock.patch.object(main, 'simulate_copy') as copy,
+          mock.patch('translater.translate_text') as translate,
+          mock.patch.object(main, 'notify_copy_failed') as notify,
+          mock.patch.object(main, 'save_translation_history') as history):
+        harness._launch_translate_selection(replace_selection=replace)
+    clear.assert_called_once_with('')
+    copy.assert_not_called()
+    translate.assert_not_called()
+    history.assert_not_called()
+    notify.assert_called_once_with(harness.config)
+    assert not harness.shown_dialogs
 
 
 def test_selection_clear_hides_button_and_discards_pending_text(controller):

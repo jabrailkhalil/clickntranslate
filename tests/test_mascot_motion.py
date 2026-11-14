@@ -19,6 +19,26 @@ def test_frame_cadence_and_clockwise_cardinal_selection():
     assert [look_index(a) for a in (0, 90, 180, 270, 360, -90)] == [0, 4, 8, 12, 0, 12]
 
 
+def test_idle_has_long_rest_but_clicks_and_translation_react_immediately():
+    from assistant_motion import IDLE_REST_SECONDS
+    from assistant_sprites import ROWS
+    pet = PetMotion('click')
+    for _ in range(39):
+        pet.advance(.25)
+        assert pet.seconds(pet.action()) == 0
+    pet.time = IDLE_REST_SECONDS + .35
+    assert frame_index(ROWS['idle'][1], pet.seconds('idle')) == 1
+    pet.greet()
+    assert pet.action() == 'wave' and pet.seconds('wave') == 0
+    pet.advance(.15)
+    assert pet.seconds('wave') == pytest.approx(.15)
+    pet.set_activity('busy')
+    assert pet.action() == 'work' and pet.seconds('work') == 0
+    pet.set_activity('idle')
+    pet.time = IDLE_REST_SECONDS + sum(ROWS['idle'][1])/1000 + .5
+    assert pet.seconds('idle') == 0
+
+
 @pytest.mark.parametrize('extent', [60, 84, 150])
 @pytest.mark.parametrize('speed', [20, 40, 100])
 def test_legacy_speed_and_size_never_move_the_pet(extent, speed):
@@ -44,7 +64,11 @@ def render(mascot, **kwargs):
 def test_whole_frames_animate_without_using_directional_gaits(app, mascot):
     poses = [render(mascot, action='wave', time=t) for t in (0., .15, .3, .45)]
     assert len({image.cacheKey() for image in poses}) == 4
-    assert poses[0] != poses[1]
+    if mascot == 'click':
+        assert poses[0] != poses[1]
+    else:
+        assert poses[0] == poses[1]  # one calm blink, no size-changing gesture
+        assert poses[2] == poses[3]
     assert render(mascot, action='walk') == render(mascot, action='idle')
     assert render(mascot, action='idle', facing=-1) == render(mascot, action='idle')
     assert skin(mascot) is skin(mascot)
@@ -193,13 +217,13 @@ def test_display_mode_and_event_reactions_persist_without_manual_emotion_choices
     assert page.mascot_preview.motion.reactions is False
 
 @pytest.mark.parametrize('state', ['idle', 'waving', 'jumping', 'running', 'waiting', 'review', 'failed'])
-def test_explicit_native_reaction_plays_once_then_waits_for_menu_choice(state):
+def test_menu_holds_a_steady_body_instead_of_playing_an_explicit_reaction(state):
     pet = PetMotion('click')
     pet.menu_open = True
     assert pet.play(state)
-    assert pet.seconds(pet.action()) == 0
+    assert pet.action() == 'idle'
     for _ in range(10): pet.advance(.2)
-    assert pet.action() == 'waiting'
+    assert pet.action() == 'idle'
     pet.menu_open = False
     assert pet.action() == 'idle'
     assert not pet.play('sleep') and not pet.play('running-right')

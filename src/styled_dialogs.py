@@ -13,6 +13,7 @@ import math
 import os
 import re
 import sys
+from functools import lru_cache
 from pathlib import Path
 
 from PyQt5 import QtCore, QtGui, QtWidgets, sip
@@ -105,7 +106,7 @@ TOOLTIP_WRAP_WIDTH = 240
 def tooltip_text(text, width: int = TOOLTIP_WRAP_WIDTH) -> str:
     """Return tooltip markup that wraps consistently at a readable width."""
     value = str(text or "")
-    if not value:
+    if not tooltip_has_text(value):
         return ""
     if len(value) <= TOOLTIP_WRAP_THRESHOLD and "\n" not in value:
         return value
@@ -115,6 +116,27 @@ def tooltip_text(text, width: int = TOOLTIP_WRAP_WIDTH) -> str:
     return f'<qt><div style="width:{int(width)}px">{escaped}</div></qt>'
 
 
+def _tooltip_plain_text(value):
+    """Visible tooltip copy, without HTML chrome or direction-only content."""
+    return _cached_tooltip_plain_text(str(value or ''))
+
+
+@lru_cache(maxsize=1024)
+def _cached_tooltip_plain_text(text):
+    if re.search(r'<(?:qt|html|body|div|span|p|br|b|i|strong|em|a|table)\b', text, re.I):
+        document = QtGui.QTextDocument()
+        document.setHtml(text)
+        text = document.toPlainText()
+    return text
+
+
+def tooltip_has_text(value):
+    # A language direction mark is useful around real copy, but cannot form a
+    # tooltip on its own. Painting it produced the empty grey bubbles.
+    text = _tooltip_plain_text(value)
+    return bool(text.strip(' \t\r\n\u00a0\u200b\u200c\u200d\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069'))
+
+
 def _ensure_control_tooltip(widget):
     """Fill missing control hints without overwriting dedicated explanations.
 
@@ -122,7 +144,7 @@ def _ensure_control_tooltip(widget):
     composite controls inherit their parent's explanation.
     """
     generated = widget.property('automaticHoverHint')
-    if widget.toolTip() and widget.toolTip() != generated:
+    if tooltip_has_text(widget.toolTip()) and widget.toolTip() != generated:
         return
     if not isinstance(widget, (QtWidgets.QAbstractButton, QtWidgets.QComboBox,
                               QtWidgets.QLineEdit, QtWidgets.QAbstractSpinBox,
@@ -130,25 +152,25 @@ def _ensure_control_tooltip(widget):
                               QtWidgets.QTextEdit, QtWidgets.QPlainTextEdit)):
         return
     text = widget.accessibleDescription() or widget.accessibleName()
-    if not text and isinstance(widget, QtWidgets.QLineEdit):
+    if not tooltip_has_text(text) and isinstance(widget, QtWidgets.QLineEdit):
         parent = widget.parentWidget()
         while parent is not None:
-            if parent.toolTip():
+            if tooltip_has_text(parent.toolTip()):
                 text = parent.toolTip()
                 break
             parent = parent.parentWidget()
-    if not text and isinstance(widget, QtWidgets.QAbstractButton):
+    if not tooltip_has_text(text) and isinstance(widget, QtWidgets.QAbstractButton):
         text = widget.text().replace('&&', '\0').replace('&', '').replace('\0', '&')
-    if not text:
+    if not tooltip_has_text(text):
         root = widget.parentWidget()
         if root is not None:
             label = next((label for label in root.findChildren(
                           QtWidgets.QLabel, options=QtCore.Qt.FindDirectChildrenOnly)
                           if label.buddy() is widget), None)
             text = label.text().rstrip(':： ') if label is not None else ''
-    if not text and isinstance(widget, QtWidgets.QComboBox):
+    if not tooltip_has_text(text) and isinstance(widget, QtWidgets.QComboBox):
         text = widget.currentData(QtCore.Qt.ToolTipRole) or widget.currentText()
-    if not text and hasattr(widget, 'placeholderText'):
+    if not tooltip_has_text(text) and hasattr(widget, 'placeholderText'):
         text = widget.placeholderText()
     value = str(text or '')
     if not value.startswith('<qt>'):
@@ -242,11 +264,7 @@ def _hover_tooltip_document(widget, anchor):
     Smaller QToolTip CSS therefore does not give us predictable bubble bounds.
     Keep Qt's hover lifetime, but own both text layout and painting explicitly.
     """
-    text = widget.text()
-    if re.search(r'<(?:qt|html|body|div|span|p|br|b|i|strong|em|a|table)\b', text, re.I):
-        source = QtGui.QTextDocument()
-        source.setHtml(text)
-        text = source.toPlainText()
+    text = _tooltip_plain_text(widget.text())
     owner = widget.property('_q_stylesheet_parent')
     factor = interface_scale_factor(widget=owner if isinstance(owner, QtWidgets.QWidget) else widget)
     font = QtGui.QFontDatabase.systemFont(QtGui.QFontDatabase.GeneralFont)
@@ -275,6 +293,9 @@ def _hover_tooltip_document(widget, anchor):
 def _paint_hover_tooltip(widget):
     # Reused QTipLabels can change text without a Show or Resize event. Layout
     # at paint time too, so a long hint cannot leave its size on the next one.
+    if not tooltip_has_text(widget.text()):
+        widget.hide()
+        return
     document = _fit_hover_tooltip(widget, QtGui.QCursor.pos())
     if document is None:
         return
@@ -366,22 +387,26 @@ def _apply_rounded_popup_mask(widget, radius: float = 8.0) -> None:
     try:
         if sip.isdeleted(widget):
             return
-        if sys.platform == 'darwin':
-            # Cocoa now composites the translucent surface correctly. A
-            # logical-pixel QRegion would cut its antialiased Retina edge
-            # into visible two-pixel steps.
-            # No mask was installed on Cocoa, so no native operation is
-            # needed here (including for a queued update after tip disposal).
+        from rounded_windows import uses_alpha_surface
+        if uses_alpha_surface(widget):
+            if not widget.mask().isEmpty():
+                widget.clearMask()
             return
         rect = widget.rect()
         if rect.width() < 2 or rect.height() < 2:
             return
-        path = QtGui.QPainterPath()
-        if _is_tooltip(widget) or isinstance(widget, StatusPopup):
+        if _is_tooltip(widget):
             radius = 4.0
-        path.addRoundedRect(QtCore.QRectF(rect), radius, radius)
-        polygon = path.toFillPolygon().toPolygon()
-        widget.setMask(QtGui.QRegion(polygon))
+        else:
+            radius = float(widget.property('roundedPopupRadius') or radius)
+        from rounded_windows import rounded_clip_region
+        # The painter stores its geometry on the popup. Do not substitute a
+        # different radius here: that cuts away the visible curved outline.
+        inset = widget.property('roundedPopupInset')
+        stroke = widget.property('roundedPopupStroke')
+        inset = .5 if inset is None else float(inset)
+        stroke = 1. if stroke is None else float(stroke)
+        widget.setMask(rounded_clip_region(rect, radius, inset=inset, stroke_width=stroke))
     except (AttributeError, RuntimeError):
         # The shared QTipLabel can be destroyed before the queued pass runs.
         return
@@ -393,8 +418,8 @@ _TOOLTIP_FILTER = None
 class StatusPopup(QtWidgets.QLabel):
     """A non-activating status tip with a painted, translucent surface."""
 
-    def __init__(self):
-        super().__init__(None, QtCore.Qt.ToolTip | QtCore.Qt.WindowStaysOnTopHint
+    def __init__(self, parent=None):
+        super().__init__(parent, QtCore.Qt.ToolTip | QtCore.Qt.WindowStaysOnTopHint
                          | QtCore.Qt.FramelessWindowHint)
         self.setProperty('clickntranslateRoundedPopup', True)
         self.setAttribute(QtCore.Qt.WA_TranslucentBackground, True)
@@ -405,8 +430,12 @@ class StatusPopup(QtWidgets.QLabel):
     def _refresh_theme(self):
         from ui_scaling import desktop_control_scale
         from window_appearance import scaled_stylesheet
-        screen = QtWidgets.QApplication.screenAt(QtGui.QCursor.pos()) or self.screen()
+        screen = (getattr(self, '_placement_screen', None)
+                  or QtWidgets.QApplication.screenAt(QtGui.QCursor.pos()) or self.screen())
         factor = desktop_control_scale(screen)
+        self.setProperty('roundedPopupRadius', round(4*factor))
+        self.setProperty('roundedPopupInset', 0.)
+        self.setProperty('roundedPopupStroke', 0.)
         set_widget_stylesheet(self, scaled_stylesheet(
             tooltip_stylesheet().replace('QToolTip', 'QLabel'), factor))
 
@@ -428,26 +457,45 @@ class StatusPopup(QtWidgets.QLabel):
 class CopyNotificationPopup(StatusPopup):
     """Quiet copy confirmation that also works without system notifications."""
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        # A confirmation is independent of hover tips and their native lifetime.
+        # Tool windows stay out of the taskbar; these flags also prevent a copy
+        # confirmation from stealing focus from the user's current application.
+        self.setWindowFlags(QtCore.Qt.Tool | QtCore.Qt.WindowStaysOnTopHint
+                            | QtCore.Qt.FramelessWindowHint | QtCore.Qt.WindowDoesNotAcceptFocus)
         self.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, True)
         self.setWordWrap(False)
         self._dismiss = QtCore.QTimer(self)
         self._dismiss.setSingleShot(True)
         self._dismiss.timeout.connect(self.hide)
 
-    def show_message(self, message, duration_ms=1800):
-        self._refresh_theme()
-        self.setText('✓  ' + str(message))
-        screen = (QtWidgets.QApplication.screenAt(QtGui.QCursor.pos())
+    def show_message(self, message, duration_ms=3000, anchor=None, *, success=True):
+        anchor_rect = None
+        if isinstance(anchor, QtWidgets.QWidget) and not sip.isdeleted(anchor) and anchor.isVisible():
+            from ui_scaling import widget_global_rect
+            anchor_rect = widget_global_rect(anchor)
+        screen = (QtWidgets.QApplication.screenAt(anchor_rect.center()) if anchor_rect else None)
+        screen = (screen or QtWidgets.QApplication.screenAt(QtGui.QCursor.pos())
                   or QtWidgets.QApplication.primaryScreen())
         if screen is None:
             return
+        self._placement_screen = screen
+        self._refresh_theme()
+        self.setText(('✓  ' if success else '') + str(message))
         bounds = screen.availableGeometry().adjusted(18, 18, -18, -18)
         from ui_scaling import desktop_control_scale
-        self.setMaximumWidth(min(round(360 * desktop_control_scale(screen)), bounds.width()))
+        factor = desktop_control_scale(screen)
+        self.setMaximumWidth(min(round(360 * factor), bounds.width()))
         self.adjustSize()
-        self.move(bounds.right() - self.width() + 1, bounds.bottom() - self.height() + 1)
+        destination = bounds
+        if anchor_rect:
+            inset = round(12 * factor)
+            destination = anchor_rect.adjusted(inset, inset, -inset, -inset)
+        x = destination.right() - self.width() + 1
+        y = destination.bottom() - self.height() + 1
+        self.move(max(bounds.left(), min(x, bounds.right() - self.width() + 1)),
+                  max(bounds.top(), min(y, bounds.bottom() - self.height() + 1)))
         self.show()
         self.raise_()
         # Repeated copies extend the current notice instead of an older timer
@@ -675,6 +723,11 @@ class AccentControlStyle(QtWidgets.QProxyStyle):
     )
 
     def drawPrimitive(self, element, option, painter, widget=None):
+        if (element == QtWidgets.QStyle.PE_FrameFocusRect and isinstance(widget, QtWidgets.QAbstractButton)
+                and hasattr(QtWidgets.QApplication.instance(), '_keyboard_navigation')):
+            # KeyboardNavigation paints one accent outline. The native dotted
+            # rectangle can otherwise remain around a mouse-clicked checkbox.
+            return
         if element == QtWidgets.QStyle.PE_IndicatorArrowDown:
             self._draw_chevron(option, painter)
             return
@@ -985,11 +1038,10 @@ class StyledMessageBox(QtWidgets.QMessageBox):
 
     def _apply_style(self):
         dark = getattr(self, "_dark", True)
-        background = "#101114" if dark else "#efecf2"
-        panel = "#17181d" if dark else "#f5f2f7"
-        text = "#f5f5f7" if dark else "#17171a"
-        muted = "#b8b8c2" if dark else "#55545e"
-        border = "#33313c" if dark else "#d7d3df"
+        from classic_style import classic_palette
+        c = classic_palette(dark)
+        background, panel, text, muted, border = (c[key] for key in
+            ('background', 'field', 'text', 'muted', 'border'))
         button = "#211f28" if dark else "#e8e3ec"
         button_hover = "#322d3d" if dark else "#dcd4e3"
         qss = f"""
@@ -1566,11 +1618,10 @@ class SilentStyledMessageBox(QtWidgets.QDialog):
 
     def _apply_style(self):
         dark = self._dark
-        background = "#101114" if dark else "#efecf2"
-        panel = "#17181d" if dark else "#f5f2f7"
-        text = "#f5f5f7" if dark else "#17171a"
-        muted = "#b8b8c2" if dark else "#55545e"
-        border = "#33313c" if dark else "#d7d3df"
+        from classic_style import classic_palette
+        c = classic_palette(dark)
+        background, panel, text, muted, border = (c[key] for key in
+            ('background', 'field', 'text', 'muted', 'border'))
         qss = f"""
             QDialog#styledMessageBox {{ background: {background}; color: {text}; border: 1px solid {border}; }}
             QFrame#styledMessageTitleBar {{ background: {panel}; border: none; border-bottom: 1px solid {border}; }}

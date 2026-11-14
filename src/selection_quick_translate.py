@@ -198,6 +198,9 @@ class SelectionQuickTranslateController(QtCore.QObject):
         self._last_button_selection = None
         self._mode = mode if mode in ("button", "automatic") else "button"
         self.clear_auto_dedupe()
+        if enabled and platform_support.IS_WINDOWS:
+            from windows_selection import prepare_windows_selection
+            prepare_windows_selection()
         self.set_active(bool(enabled))
 
     def clear_auto_dedupe(self):
@@ -244,6 +247,12 @@ class SelectionQuickTranslateController(QtCore.QObject):
 
                 'pt': 'Ative a acessibilidade para tradução de seleção rápida',
                 'it': "Abilita l'accessibilità per la traduzione rapida della selezione",
+
+                'ar': 'فعّل تسهيلات الاستخدام للترجمة السريعة للنص المحدد',
+
+                'tr': 'Hızlı seçim çevirisi için Erişilebilirliği açın',
+                'hi': 'त्वरित चयन अनुवाद के लिए सुलभता चालू करें',
+                'id': 'Aktifkan Aksesibilitas untuk terjemahan pilihan cepat',
             }
         }
         localized = messages.get(message_key, {})
@@ -341,10 +350,22 @@ class SelectionQuickTranslateController(QtCore.QObject):
             clipboard = QtWidgets.QApplication.clipboard()
             primary_text = clipboard.text(clipboard.Selection) if clipboard.supportsSelection() else ""
         request = dict(revision=self._revision, target=target, clicked=clicked_text)
-        task = _SelectionProbe(request, primary_text)
-        task.signals.completed.connect(self._probe_finished)
-        self._inflight = task
-        QtCore.QThreadPool.globalInstance().start(task)
+        task = None
+        try:
+            task = _SelectionProbe(request, primary_text)
+            task.signals.completed.connect(self._probe_finished)
+            self._inflight = task
+            QtCore.QThreadPool.globalInstance().start(task)
+        except (OSError, RuntimeError):
+            if task is not None:
+                task.cancelled.set()
+            self._inflight = None
+            self._probe_again = False
+            self._queued_click = ""
+            self._dismiss_selection()
+            self._last_button_selection = None
+            self.clear_auto_dedupe()
+            logger.warning('Selection probe could not start', exc_info=True)
 
     @QtCore.pyqtSlot(object)
     def _probe_finished(self, result):

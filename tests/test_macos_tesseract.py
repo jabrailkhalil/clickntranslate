@@ -79,14 +79,14 @@ def test_mac_install_button_starts_worker_and_failure_keeps_selected_engine(mac,
         _easyocr_install_in_progress=False, _hymt_install_in_progress=False,
         _tesseract_cancel_requested=mock.Mock(), ocr_engine_combo=mock.Mock(),
         _set_parent_topmost_for_tesseract_install=mock.Mock(), _show_tesseract_progress=mock.Mock(),
-        _install_macos_tesseract_worker=mock.Mock(), _show_linux_tesseract_hint=mock.Mock(),
+        _install_tesseract_worker=mock.Mock(), _show_linux_tesseract_hint=mock.Mock(),
         _finish_tesseract_install_state=mock.Mock(), _hide_tesseract_progress=mock.Mock(),
         _restore_settings_view=mock.Mock(), save_ocr_engine=mock.Mock(),
     )
     thread = mock.Mock()
     monkeypatch.setattr(sw.threading, 'Thread', thread)
     sw.SettingsWindow.start_tesseract_install(owner)
-    thread.assert_called_once_with(target=owner._install_macos_tesseract_worker, daemon=True)
+    thread.assert_called_once_with(target=owner._install_tesseract_worker, daemon=True)
     thread.return_value.start.assert_called_once()
     owner._show_linux_tesseract_hint.assert_not_called()
     warning = mock.Mock()

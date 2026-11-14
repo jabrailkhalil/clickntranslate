@@ -55,6 +55,8 @@ if (-not $SkipPyInstaller) {
     if (-not (Test-Path -LiteralPath $python)) {
         throw "Python environment not found: $python"
     }
+    & $python (Join-Path $repoRoot 'tools/prepare_rapidocr_models.py')
+    if ($LASTEXITCODE -ne 0) { throw 'PP-OCRv5 model preparation failed.' }
     & $python -m PyInstaller (Join-Path $repoRoot "tools/packaging/ClicknTranslate.spec") --clean --noconfirm
     if ($LASTEXITCODE -ne 0) {
         throw "PyInstaller build failed with exit code $LASTEXITCODE."

@@ -138,6 +138,37 @@ def test_area_worker_skips_the_second_translator_only_for_direct_mode(config, di
     assert translate.call_count == (0 if direct else 1)
 
 
+@pytest.mark.parametrize('enabled', [False, True])
+def test_api_ocr_fallback_joins_wrapped_lines_before_the_text_translator(config, enabled):
+    from api_ocr import ApiOCRWorker
+    from test_ocr_paragraphs import REPORTED_LINES
+    source = '\n'.join(REPORTED_LINES) + '\n\n1. First item\ncontinues\n2. Second item'
+    expected = (' '.join(REPORTED_LINES) + '\n\n1. First item continues\n\n2. Second item'
+                if enabled else source)
+    config['api_providers']['openai']['direct'] = False
+    config['ocr_join_paragraphs'] = enabled
+    config['translator_engine'] = 'Google'
+    worker = ApiOCRWorker('openai', Image.new('RGB', (40, 20)), 'en', 'ar', config)
+    delivered = []
+    worker.result_ready.connect(delivered.append)
+    response = json.dumps({'source': source, 'translation': None})
+    with (mock.patch.object(api, '_text_response', return_value=response),
+          mock.patch('translater.translate_text', return_value='ترجمة') as translate):
+        worker.run()
+    assert translate.call_args.args == (expected, 'en', 'ar')
+    assert delivered == [api.VisionResult(expected, 'ترجمة')]
+
+
+def test_api_copy_keeps_recognized_lines_with_paragraph_option_enabled(config):
+    source = 'First line\nsecond line\n\nAnother paragraph'
+    config['api_providers']['openai']['direct'] = False
+    config['ocr_join_paragraphs'] = True
+    with mock.patch.object(api, '_text_response', return_value=json.dumps({
+            'source': source, 'translation': None})):
+        result = api.recognize('openai', Image.new('RGB', (40, 20)), 'en', None, config)
+    assert result == api.VisionResult(source, None)
+
+
 def test_fullscreen_direct_result_does_not_run_text_translation(config):
     from PyQt5.QtCore import QObject,pyqtSignal
     from ocr import FullScreenTranslateOverlay

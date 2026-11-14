@@ -1,0 +1,475 @@
+"""App-owned immutable generations and crash-safe component activation."""
+from contextlib import contextmanager
+import hashlib
+import json
+import os
+from pathlib import Path
+import shutil
+import sqlite3
+import stat
+import tempfile
+import time
+import uuid
+import zipfile
+import threading
+
+from component_catalog import ComponentError, SAFE_ID, SHA256, safe_relative, runtime_command
+from component_download import ComponentDownloader
+
+_MAINTENANCE_LOCK = threading.Lock()
+_MAINTENANCE_ROOTS = set()
+_MAINTENANCE_RUNNING = False
+_MAINTENANCE_DONE = threading.Event()
+_MAINTENANCE_DONE.set()
+
+
+def _schedule_collection(root):
+    """Coalesce optional deletion outside recognition/result delivery."""
+    global _MAINTENANCE_RUNNING
+    with _MAINTENANCE_LOCK:
+        _MAINTENANCE_ROOTS.add(root)
+        _MAINTENANCE_DONE.clear()
+        if _MAINTENANCE_RUNNING:
+            return
+        _MAINTENANCE_RUNNING = True
+    def collect():
+        global _MAINTENANCE_RUNNING
+        while True:
+            with _MAINTENANCE_LOCK:
+                if not _MAINTENANCE_ROOTS:
+                    _MAINTENANCE_RUNNING = False
+                    _MAINTENANCE_DONE.set()
+                    return
+                target = _MAINTENANCE_ROOTS.pop()
+            try:
+                store = ComponentStore(target)
+                with store.lock():
+                    store.collect_unused()
+            except (ComponentError, OSError, sqlite3.Error):
+                pass  # the durable marker remains for the next store operation
+    try:
+        threading.Thread(target=collect, name='Component-maintenance', daemon=True).start()
+    except (OSError, RuntimeError):
+        # Cleanup is optional; never replace a recognition result or its
+        # original failure with a thread-launch error. Durable markers and
+        # pending roots remain available for the next lease/operation.
+        with _MAINTENANCE_LOCK:
+            _MAINTENANCE_RUNNING = False
+            _MAINTENANCE_DONE.set()
+
+
+@contextmanager
+def _file_lock(path, shared=False):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    stream = open(path, 'a+b')
+    try:
+        if os.name == 'nt':
+            import ctypes
+            from ctypes import wintypes
+            import msvcrt
+            if os.fstat(stream.fileno()).st_size == 0:
+                stream.write(b'0')
+                stream.flush()
+            # CRT read locks are exclusive on Windows. LockFileEx is required
+            # for genuinely shared leases held by concurrent OCR requests.
+            class Overlapped(ctypes.Structure):
+                _fields_ = [('Internal', ctypes.c_size_t), ('InternalHigh', ctypes.c_size_t),
+                            ('Offset', wintypes.DWORD), ('OffsetHigh', wintypes.DWORD),
+                            ('hEvent', wintypes.HANDLE)]
+            overlapped = Overlapped()
+            lock_file = ctypes.WinDLL('kernel32', use_last_error=True).LockFileEx
+            lock_file.argtypes = [wintypes.HANDLE, wintypes.DWORD, wintypes.DWORD,
+                                 wintypes.DWORD, wintypes.DWORD, ctypes.POINTER(Overlapped)]
+            lock_file.restype = wintypes.BOOL
+            if not lock_file(msvcrt.get_osfhandle(stream.fileno()), 1 | (0 if shared else 2),
+                             0, 1, 0, ctypes.byref(overlapped)):
+                raise ctypes.WinError(ctypes.get_last_error())
+        else:
+            import fcntl
+            fcntl.flock(stream.fileno(), (fcntl.LOCK_SH if shared else fcntl.LOCK_EX) | fcntl.LOCK_NB)
+    except OSError as exc:
+        stream.close()
+        raise ComponentError('operation_busy') from exc
+    try:
+        yield
+    finally:
+        stream.close()
+
+
+def file_digest(path):
+    digest = hashlib.sha256()
+    with open(path, 'rb') as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b''):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+class ComponentStore:
+    def __init__(self, root):
+        self.root = Path(root).resolve()
+        # Torch ships deeply nested license directories. Use extended Win32
+        # paths for the complete store, including extraction, SQLite and GC,
+        # without requiring a machine-wide LongPathsEnabled registry change.
+        if os.name == 'nt' and not str(self.root).startswith('\\\\?\\'):
+            value = str(self.root)
+            self.root = Path('\\\\?\\UNC\\'+value[2:] if value.startswith('\\\\') else '\\\\?\\'+value)
+
+    @contextmanager
+    def lock(self):
+        """One writer across all app/installer processes, with immediate feedback."""
+        self.root.mkdir(parents=True, exist_ok=True)
+        with _file_lock(self.root / 'install.lock'):
+            yield
+
+    @contextmanager
+    def database(self):
+        db = None
+        try:
+            try:
+                self.root.mkdir(parents=True, exist_ok=True)
+                db = sqlite3.connect(str(self.root / 'state.sqlite'), timeout=5)
+                db.execute('PRAGMA synchronous=FULL')
+                db.executescript('''
+                    CREATE TABLE IF NOT EXISTS active(component TEXT PRIMARY KEY, generation TEXT, previous TEXT);
+                    CREATE TABLE IF NOT EXISTS operations(id TEXT PRIMARY KEY, component TEXT, generation TEXT, phase TEXT);
+                ''')
+            except (sqlite3.Error, OSError) as exc:
+                raise ComponentError('installed_component_damaged', 'state database') from exc
+            try:
+                with db:
+                    yield db
+            except sqlite3.Error as exc:
+                raise ComponentError('installed_component_damaged', 'state database') from exc
+        finally:
+            if db is not None:
+                db.close()
+
+    def generation(self, name):
+        if not SAFE_ID.fullmatch(str(name or '')):
+            raise ComponentError('invalid_generation')
+        parent = self.root / 'generations'
+        folder = (parent / name).resolve()
+        if not folder.is_relative_to(parent.resolve()) or folder == parent.resolve():
+            raise ComponentError('invalid_generation')
+        return folder
+
+    @contextmanager
+    def lease(self, generation):
+        folder = self.generation(generation)
+        try:
+            with _file_lock(self.root / 'leases' / (generation + '.lock'), shared=True):
+                if not folder.is_dir():
+                    raise ComponentError('component_removed')
+                yield
+        finally:
+            if (self.root / 'gc-pending').exists():
+                _schedule_collection(self.root)
+
+    def collect_unused(self):
+        """Called under writer lock; preserve active/previous and running workers."""
+        with self.database() as db:
+            keep = {r[0] for r in db.execute('SELECT generation FROM active')}
+            keep.update(r[0] for r in db.execute('SELECT previous FROM active') if r[0])
+            keep.update(r[0] for r in db.execute('SELECT generation FROM operations'))
+        incomplete = False
+        for folder in (self.root / 'generations').glob('*'):
+            if not folder.is_dir() or folder.name in keep or not SAFE_ID.fullmatch(folder.name):
+                continue
+            if not (folder / 'receipt.json').is_file():
+                continue  # unregistered files are not silently treated as ours
+            try:
+                checked = self.generation(folder.name)
+                with _file_lock(self.root / 'leases' / (folder.name + '.lock')):
+                    shutil.rmtree(checked)
+            except (ComponentError, OSError):
+                incomplete = True
+        referenced = set()
+        for receipt_path in (self.root / 'generations').glob('*/receipt.json'):
+            try:
+                files = json.loads(receipt_path.read_text(encoding='utf-8'))['files']
+                if (not isinstance(files, list) or not files
+                        or any(not isinstance(item, dict) or not isinstance(item.get('sha256'), str)
+                               or not SHA256.fullmatch(item['sha256']) for item in files)):
+                    return  # unknown inventory: keep objects until it can be repaired
+                referenced.update(item['sha256'] for item in files)
+            except (ValueError, OSError, KeyError, TypeError):
+                return  # unknown receipt: preserve cache rather than guessing
+        for path in (self.root / 'objects').glob('*'):
+            if path.name not in referenced and path.is_file():
+                try:
+                    checked = self.object_path(path.name)
+                    if not checked.is_symlink():
+                        checked.unlink()
+                except (ComponentError, OSError):
+                    incomplete = True
+        marker = self.root / 'gc-pending'
+        if incomplete:
+            marker.touch()
+        else:
+            marker.unlink(missing_ok=True)
+
+    def active(self, component):
+        description = self.describe(component)
+        if description:
+            try:
+                return dict(description, command=runtime_command(description['folder'], description['receipt']))
+            except (KeyError, TypeError, ValueError) as exc:
+                raise ComponentError('installed_component_damaged', component) from exc
+        return None
+
+    def describe(self, component):
+        """Read the saved selection even if its interpreter needs repair."""
+        try:
+            if not (self.root / 'state.sqlite').is_file():
+                return None
+            with self.database() as db:
+                row = db.execute('SELECT generation FROM active WHERE component=?', (component,)).fetchone()
+            if not row:
+                return None
+            folder = self.generation(row[0])
+            receipt = json.loads((folder / 'receipt.json').read_text(encoding='utf-8'))
+            if (not isinstance(receipt, dict) or receipt.get('component') != component
+                    or receipt.get('generation') != row[0]):
+                raise ValueError('receipt mismatch')
+            return {'folder': folder, 'receipt': receipt}
+        except (OSError, ValueError, KeyError) as exc:
+            raise ComponentError('installed_component_damaged', component) from exc
+
+    def recover(self):
+        """Run under lock: abandoned candidates never replaced the active pointer."""
+        with self.database() as db:
+            rows = db.execute('SELECT id, generation, phase FROM operations').fetchall()
+            live = {r[0] for r in db.execute('SELECT generation FROM active')}
+            live.update(r[0] for r in db.execute('SELECT previous FROM active') if r[0])
+            for operation, generation, phase in rows:
+                if generation not in live:
+                    folder = self.generation(generation)
+                    if folder.exists():
+                        shutil.rmtree(folder)
+                db.execute('DELETE FROM operations WHERE id=?', (operation,))
+
+    def object_path(self, digest):
+        from component_catalog import SHA256
+        if not SHA256.fullmatch(digest):
+            raise ComponentError('invalid_artifact')
+        return self.root / 'objects' / digest
+
+    def obtain(self, digest, artifact, download, check_cancel):
+        path = self.object_path(digest)
+        if path.is_symlink():
+            raise ComponentError('invalid_artifact', 'cache link')
+        if path.is_file() and path.stat().st_size == artifact['size'] and file_digest(path) == digest:
+            return path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        partial = self.root / 'downloads' / digest
+        partial.parent.mkdir(parents=True, exist_ok=True)
+        if partial.is_symlink():
+            raise ComponentError('invalid_artifact', 'download link')
+        if partial.is_file() and partial.stat().st_size == artifact['size']:
+            if file_digest(partial) == digest:
+                os.replace(partial, path)
+                ComponentDownloader.complete(partial)
+                return path
+            partial.unlink()
+            ComponentDownloader.complete(partial)
+        last_error = None
+        for url in artifact['urls']:
+            check_cancel()
+            try:
+                if isinstance(download, ComponentDownloader):
+                    download.artifact(url, str(partial), artifact)
+                else:
+                    download(url, str(partial))
+                check_cancel()
+                if partial.stat().st_size != artifact['size'] or file_digest(partial) != digest:
+                    partial.unlink(missing_ok=True)
+                    raise ComponentError('checksum_mismatch', digest)
+                os.replace(partial, path)
+                return path
+            except ComponentError:
+                raise
+            except Exception as exc:
+                check_cancel()  # cancellation is never swallowed as a mirror error
+                last_error = exc
+        raise ComponentError('download_failed', type(last_error).__name__) from last_error
+
+    @staticmethod
+    def extract(archive, destination, limit, check_cancel=lambda: None):
+        """Restrict paths, Windows device names, links, collisions and zip bombs."""
+        destination.mkdir(parents=True, exist_ok=True)
+        with zipfile.ZipFile(archive) as bundle:
+            entries = bundle.infolist()
+            if len(entries) > 100000 or sum(i.file_size for i in entries) > limit:
+                raise ComponentError('unsafe_archive', 'expanded size')
+            names = set()
+            for info in entries:
+                check_cancel()
+                safe_relative(info.orig_filename.rstrip('/'))
+                name = info.filename.rstrip('/')
+                safe_relative(name)
+                for part in name.split('/'):
+                    device = part.split('.')[0].upper()
+                    if part.endswith((' ', '.')) or device in {'CON', 'PRN', 'AUX', 'NUL', *('COM'+str(n) for n in range(1,10)), *('LPT'+str(n) for n in range(1,10))}:
+                        raise ComponentError('unsafe_archive', 'reserved path')
+                mode = info.external_attr >> 16
+                if stat.S_ISLNK(mode) or name.casefold() in names:
+                    raise ComponentError('unsafe_archive', 'link/duplicate')
+                names.add(name.casefold())
+                target = destination.joinpath(*name.split('/'))
+                if info.is_dir():
+                    target.mkdir(parents=True, exist_ok=True)
+                else:
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    with bundle.open(info) as source, open(target, 'xb') as output:
+                        while True:
+                            check_cancel()
+                            block = source.read(1024 * 1024)
+                            if not block:
+                                break
+                            output.write(block)
+                        output.flush()
+                        os.fsync(output.fileno())
+                    if mode & stat.S_IXUSR:
+                        target.chmod(target.stat().st_mode | stat.S_IXUSR)
+
+    def install(self, catalog, bundle, download, validate, check_cancel=lambda: None, progress=lambda *_: None):
+        """The caller holds lock, including catalog refresh and candidate selection."""
+        self.recover()
+        try:
+            old = self.active(bundle['component'])
+        except ComponentError:
+            old = None
+        if (old and old['receipt']['bundle'] == bundle['id']
+                and old['receipt']['files'] == bundle['files']
+                and old['receipt']['languages'] == bundle['languages']):
+            try:
+                validate(old['folder'], old['receipt'])
+                return old
+            except ComponentError as error:
+                if error.code not in ('validation_failed','installed_component_damaged','inference_failed'):
+                    raise
+                # Repair an identical but damaged installation from verified
+                # objects. Do not retain this known-broken generation as rollback.
+                # If rebuilding fails, its active pointer is still untouched.
+                old = None
+        expanded = sum(catalog['artifacts'][f['sha256']].get('unpacked_size', catalog['artifacts'][f['sha256']]['size']) for f in bundle['files'])
+        compressed = sum(catalog['artifacts'][f['sha256']]['size'] for f in bundle['files'] if not self.object_path(f['sha256']).exists())
+        if shutil.disk_usage(self.root).free < expanded + compressed + 64 * 1024**2:
+            raise ComponentError('not_enough_space')
+        generation = uuid.uuid4().hex
+        folder = self.generation(generation)
+        receipt = {**bundle, 'bundle': bundle['id'], 'generation': generation, 'installed_at': int(time.time()),
+                   'artifacts': {item['sha256']: catalog['artifacts'][item['sha256']] for item in bundle['files']}}
+        with self.database() as db:
+            db.execute('INSERT INTO operations VALUES (?,?,?,?)', (generation, bundle['component'], generation, 'preparing'))
+        committed = False
+        try:
+            folder.mkdir(parents=True)
+            for index, item in enumerate(bundle['files']):
+                check_cancel()
+                progress(index, len(bundle['files']))
+                artifact = catalog['artifacts'][item['sha256']]
+                source = self.obtain(item['sha256'], artifact, download, check_cancel)
+                target = folder / safe_relative(item['destination'])
+                if item['kind'] == 'zip':
+                    self.extract(source, target, artifact['unpacked_size'], check_cancel)
+                elif item['kind'] == 'zip_member':
+                    # Preserve the original authenticated upstream ZIP while
+                    # installing one declared member into the shared model dir.
+                    # The normal extractor validates all paths, links and limits.
+                    with tempfile.TemporaryDirectory(prefix='.unpack_', dir=folder) as temporary:
+                        unpacked = Path(temporary)
+                        self.extract(source, unpacked, artifact['unpacked_size'], check_cancel)
+                        member = unpacked / safe_relative(item['member'])
+                        if not member.is_file():
+                            raise ComponentError('unsafe_archive', 'declared member is missing')
+                        check_cancel()
+                        target.parent.mkdir(parents=True, exist_ok=True)
+                        os.replace(member, target)
+                else:
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    with open(source, 'rb') as original, open(target, 'wb') as output:
+                        while True:
+                            check_cancel()
+                            block = original.read(1024 * 1024)
+                            if not block:
+                                break
+                            output.write(block)
+                        output.flush()
+                        os.fsync(output.fileno())
+            check_cancel()
+            validate(folder, receipt)
+            check_cancel()
+            with open(folder / 'receipt.json', 'w', encoding='utf-8') as output:
+                json.dump(receipt, output, ensure_ascii=False, indent=2)
+                output.flush()
+                os.fsync(output.fileno())
+            with self.database() as db:
+                row = db.execute('SELECT generation,previous FROM active WHERE component=?', (bundle['component'],)).fetchone()
+                previous = row[0] if row and old else row[1] if row else None
+                db.execute('INSERT OR REPLACE INTO active VALUES (?,?,?)', (bundle['component'], generation, previous))
+                db.execute('DELETE FROM operations WHERE id=?', (generation,))
+            committed = True
+            try:
+                self.collect_unused()
+            except (OSError, ComponentError):
+                try:
+                    (self.root / 'gc-pending').touch()
+                except OSError:
+                    pass  # Optional cleanup cannot report a committed install as failed.
+            return self.active(bundle['component'])
+        except BaseException:
+            if committed:
+                raise  # never delete a generation after its active pointer was committed
+            # Keep the durable operation for startup recovery if deletion fails.
+            try:
+                shutil.rmtree(folder)
+                with self.database() as db:
+                    db.execute('DELETE FROM operations WHERE id=?', (generation,))
+            except OSError:
+                pass
+            raise
+
+    def remove(self, component):
+        """Deactivate, then free only files not held by another component/worker."""
+        with self.lock():
+            with self.database() as db:
+                db.execute('DELETE FROM active WHERE component=?', (component,))
+            self.collect_unused()
+
+    def remove_languages(self, component, languages, validate, check_cancel=lambda: None, progress=lambda *_: None):
+        """Caller holds the writer lock. Pure deletion needs no metadata/network.
+
+        Only files from the active, previously authenticated plan can be kept;
+        this operation cannot add an artifact or change its runtime version.
+        """
+        active = self.active(component)
+        if not active:
+            raise ComponentError('component_removed')
+        receipt = active['receipt']
+        selected = set(receipt['languages']) - set(languages)
+        files = receipt['files']
+        if selected != set(receipt['languages']) and not any('language' in item for item in files):
+            raise ComponentError('component_repair_required')
+        bundle = dict(receipt, languages=sorted(selected), files=[item for item in files
+                         if 'language' not in item or item['language'] in selected])
+        if 'artifacts' not in receipt:
+            raise ComponentError('component_repair_required')
+        def unavailable(*_):
+            raise ComponentError('component_cache_missing')
+        return self.install({'artifacts':receipt['artifacts']}, bundle, unavailable,
+                            validate, check_cancel, progress)
+
+    def rollback(self, component, validate, catalog):
+        with self.lock(), self.database() as db:
+            row = db.execute('SELECT generation, previous FROM active WHERE component=?', (component,)).fetchone()
+            if not row or not row[1]:
+                raise ComponentError('no_previous_version')
+            folder = self.generation(row[1])
+            receipt = json.loads((folder / 'receipt.json').read_text(encoding='utf-8'))
+            allowed = any(item['id'] == receipt['bundle'] and item['component'] == component
+                          and not item.get('revoked') for item in catalog['bundles'])
+            if not allowed:
+                raise ComponentError('previous_version_not_approved')
+            validate(folder, receipt)
+            db.execute('UPDATE active SET generation=?,previous=? WHERE component=?', (row[1], row[0], component))

@@ -1,9 +1,12 @@
 """Arrange program and translation preferences in the fixed settings viewport."""
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QSize
+from PyQt5 import sip
 from PyQt5.QtWidgets import (
-    QCheckBox, QFrame, QGridLayout, QLabel,
-    QScrollArea, QVBoxLayout, QWidget,
+    QBoxLayout, QCheckBox, QFrame, QGridLayout, QHBoxLayout, QLabel, QLayout,
+    QScrollArea, QSizePolicy, QVBoxLayout, QWidget,
 )
+from settings_sections import PAGE_OCR, section_text
+from settings_metrics import SETTINGS_ROW_GAP, SETTINGS_ROW_HEIGHT
 
 
 CAPTIONS = {
@@ -16,6 +19,12 @@ CAPTIONS = {
 
     'pt': ('Tradução e OCR', 'Opções de OCR', 'Tradução rápida'),
     'it': ('Traduzione e OCR', "Opzioni dell'OCR", 'Traduzione veloce'),
+
+    'ar': ('الترجمة والتعرف على النص', 'خيارات التعرف على النص', 'الترجمة السريعة'),
+
+    'tr': ('Çeviri ve OCR', 'OCR seçenekleri', 'Hızlı çeviri'),
+    'hi': ('अनुवाद और OCR', 'OCR विकल्प', 'त्वरित अनुवाद'),
+    'id': ('Terjemahan dan OCR', 'Opsi OCR', 'Terjemahan cepat'),
 }
 
 COMPACT = {
@@ -41,6 +50,28 @@ COMPACT = {
      'Traduzione di selezione rapida',
      'Mostra un pulsante',
      'Traduci adesso'),
+
+    'ar': ('استعادة الحافظة',
+     'إغلاق النتيجة بالنقر خارجها',
+     'الترجمة السريعة للنص المحدد',
+     'إظهار زر',
+     'الترجمة الآن'),
+
+    'tr': ('Panoyu geri yükle',
+     'Dışarı tıklanınca sonucu kapat',
+     'Hızlı seçim çevirisi',
+     'Düğme göster',
+     'Şimdi çevir'),
+    'hi': ('क्लिपबोर्ड बहाल करें',
+     'बाहर क्लिक पर परिणाम बंद करें',
+     'त्वरित चयन अनुवाद',
+     'बटन दिखाएँ',
+     'अभी अनुवाद करें'),
+    'id': ('Pulihkan papan klip',
+     'Tutup hasil saat klik di luar',
+     'Terjemahan pilihan cepat',
+     'Tampilkan tombol',
+     'Terjemahkan sekarang'),
 }
 
 
@@ -53,181 +84,499 @@ PARAGRAPH_TEXT = {
     'zh': ('将 OCR 行合并为段落', '翻译屏幕文字前，合并段落内因排版产生的换行。保留可见的段落间距、分栏和列表项。适合书籍和对话；关闭后保留原始行布局。'),
     'pt': ('Unir linhas OCR em parágrafos', 'Antes de traduzir o texto capturado, une as linhas de cada parágrafo. Mantém separados os espaços visíveis entre blocos, as colunas e os itens de listas. Útil para livros e diálogos; desative para manter as linhas originais.'),
     'it': ('Unisci le righe OCR in paragrafi', 'Prima di tradurre il testo acquisito, unisce le righe di ogni paragrafo. Mantiene separati spazi visibili tra blocchi, colonne e voci degli elenchi. Utile per libri e dialoghi; disattiva per mantenere le righe originali.'),
+
+    'ar': ('دمج أسطر OCR في فقرات',
+     'يدمج الأسطر الملتفة داخل الفقرة قبل ترجمة النص الملتقط. تبقى الفواصل المرئية والأعمدة وعناصر '
+     'القوائم منفصلة. مفيد للكتب والحوارات؛ عطّله للحفاظ على توزيع الأسطر الأصلي.'),
+
+    'tr': ('OCR satırlarını paragraflarda birleştir',
+     'Yakalanan metni çevirmeden önce aynı paragraftaki satırları birleştirir. Boşluklar, sütunlar ve '
+     'liste öğeleri ayrı kalır. Kitap ve diyaloglar için yararlıdır; özgün satır düzeni için kapatın.'),
+    'hi': ('OCR पंक्तियाँ अनुच्छेद में जोड़ें',
+     'कैप्चर किए टेक्स्ट के अनुवाद से पहले अनुच्छेद की टूटी पंक्तियाँ जोड़ता है। खाली जगह, कॉलम और '
+     'सूची बिंदु अलग रहते हैं। किताबों और संवादों में उपयोगी; मूल पंक्तियाँ रखने के लिए बंद करें।'),
+    'id': ('Gabung baris OCR menjadi paragraf',
+     'Sebelum menerjemahkan, gabungkan baris terbungkus dalam satu paragraf. Jarak, kolom, dan butir '
+     'daftar tetap terpisah. Berguna untuk buku dan dialog; nonaktifkan untuk tata baris asli.'),
 }
 
 
-def organize(settings, general_layout, form, updates_layout, dim_row):
-    from settings_window import DropDownCombo, settings_text
-    from styled_dialogs import tooltip_text, install_accent_controls
+# The compact Dynamic column keeps full explanations in the existing hints.
+DYNAMIC_COMPACT = {
+    'en': ('Interval:', 'Opacity:', 'Pause when inactive', 'Pause / Stop toolbar'),
+    'ru': ('Интервал:', 'Непрозрачность:', 'Пауза, если окно неактивно', 'Панель паузы и остановки'),
+    'es': ('Intervalo:', 'Opacidad:', 'Pausa si la ventana está inactiva', 'Barra Pausa / Detener'),
+    'de': ('Intervall:', 'Deckkraft:', 'Pause bei inaktivem Fenster', 'Pause-/Stopp-Leiste'),
+    'fr': ('Intervalle :', 'Opacité :', 'Pause si fenêtre inactive', 'Barre Pause / Arrêt'),
+    'zh': ('检测间隔：', '背景不透明度：', '窗口未激活时暂停', '显示暂停/停止工具栏'),
+    'pt': ('Intervalo:', 'Opacidade:', 'Pausar com o app inativo', 'Barra Pausar / Parar'),
+    'it': ('Intervallo:', 'Opacità:', 'Pausa con l’app inattiva', 'Barra Pausa / Interrompi'),
+    'ar': ('الفاصل:', 'عتامة الخلفية:', 'إيقاف مؤقت عند عدم النشاط', 'شريط الإيقاف المؤقت والإيقاف'),
+    'tr': ('Aralık:', 'Opaklık:', 'Etkin değilken duraklat', 'Duraklat / Durdur çubuğu'),
+    'hi': ('जाँच अंतराल:', 'अपारदर्शिता:', 'ऐप निष्क्रिय हो तो विराम', 'विराम / रोकें टूलबार'),
+    'id': ('Interval:', 'Opasitas:', 'Jeda saat aplikasi tidak aktif', 'Bilah Jeda / Hentikan'),
+}
 
-    lang = settings.parent.current_interface_language
-    captions = CAPTIONS.get(lang, CAPTIONS['en'])
-    compact = COMPACT.get(lang, COMPACT['en'])
-    checkbox_height = settings.autostart_checkbox.height()
-    # Detach layout items, retaining the existing controls and their signals.
-    while form.count():
-        form.takeAt(0)
-    while updates_layout.count():
-        updates_layout.takeAt(0)
-    general = settings.settings_general_page
-    program_flags = (
-        settings.autostart_checkbox, settings.start_minimized_checkbox,
-        settings.copy_history_checkbox, settings.history_checkbox,
-        settings.button_tooltips_checkbox, settings.update_check_on_launch_checkbox,
-    )
-    for row, flag in enumerate(program_flags):
-        flag.setParent(general)
-        flag.setObjectName('settingsPageCheckbox')
-        form.addWidget(flag, row, 0, Qt.AlignLeft)
-    for row, label, control in (
-        (0, settings.result_window_label, settings.result_window_control),
-        (1, settings.ui_scale_label, settings.ui_scale_control),
-        (2, settings.translation_font_label, settings.translation_font_control),
-    ):
-        for widget in (label, control):
-            widget.setParent(general)
-        form.addWidget(label, row, 1)
-        form.addWidget(control, row, 2)
-    settings.translation_font_preview.setParent(general)
-    form.addWidget(settings.translation_font_preview, 3, 2, 2, 1, Qt.AlignVCenter)
-    # Program maintenance and shortcuts stay on the program page.
-    action_grid = settings.settings_action_panel.layout()
-    for button in (settings.ocr_languages_btn, settings.copy_history_btn,
-                   settings.translation_history_btn):
-        action_grid.removeWidget(button)
-    for column, button in enumerate((settings.export_settings_btn,
-                                    settings.import_settings_btn,
-                                    settings.create_bug_report_btn)):
-        button.setParent(settings.settings_action_panel)
-        action_grid.addWidget(button, 1, column)
-    settings.settings_transfer_panel.hide()
 
-    # A real scroll viewport is the fallback for long translations, fonts and
-    # expanded OCR options. No control is laid out behind the action panel.
-    scroll = QScrollArea(settings.settings_updates_page)
-    scroll.setObjectName('translationSettingsScroll')
+def _empty(layout):
+    while layout.count():
+        layout.takeAt(0)
+
+
+def _scroll(page, content, name):
+    """Only the body scrolls; action buttons keep one predictable position."""
+    scroll = QScrollArea(page)
+    scroll.setObjectName(name)
     scroll.setFrameShape(QFrame.NoFrame)
     scroll.setWidgetResizable(True)
     scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-    content = QWidget()
-    content.setObjectName('translationSettingsContent')
-    body = QVBoxLayout(content)
-    body.setContentsMargins(0, 0, 0, 0)
-    body.setSpacing(0)
-    grid = QGridLayout()
+    scroll.setMinimumSize(0, 0)
+    scroll.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Ignored)
+    content.setObjectName(name + 'Content')
+    content.setMinimumWidth(0)
+    if content.layout() is not None:
+        content.layout().setSizeConstraint(QLayout.SetMinimumSize)
+    scroll.setWidget(content)
+    scroll.viewport().setAutoFillBackground(False)
+    scroll.setStyleSheet('QScrollArea { background:transparent; border:none; } '
+                        'QWidget#' + content.objectName() + ' { background:transparent; border:none; }')
+    return scroll
+
+
+def _panel(settings, parent, rows):
+    """All categories use the same connected action grid and physical edges."""
+    panel = QWidget(parent)
+    panel.setObjectName('settingsActionPanel')
+    panel.setAttribute(Qt.WA_StyledBackground, True)
+    height = 29
+    panel.setFixedHeight(len(rows) * height + max(0, len(rows)-1) + 2)
+    grid = QGridLayout(panel)
+    grid.setContentsMargins(1, 1, 1, 1)
+    grid.setHorizontalSpacing(0)
+    grid.setVerticalSpacing(1)
+    from math import lcm
+    columns = lcm(*(len(row) for row in rows))
+    for column in range(columns):
+        grid.setColumnStretch(column, 1)
+    for row, buttons in enumerate(rows):
+        for column, button in enumerate(buttons):
+            button.setParent(panel)
+            button.setFixedHeight(height)
+            button.setMinimumWidth(0)
+            button.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
+            grid.addWidget(button, row, column * (columns // len(buttons)),
+                           1, columns // len(buttons))
+    return panel
+
+
+def _new_action(settings, key, hint, callback):
+    from settings_window import OpticallyCenteredPushButton
+    from styled_dialogs import tooltip_text
+    lang = settings.parent.current_interface_language
+    button = OpticallyCenteredPushButton(section_text(lang, key))
+    button.setToolTip(tooltip_text(section_text(lang, hint)))
+    button.setAccessibleName(section_text(lang, key))
+    button.setAccessibleDescription(section_text(lang, hint))
+    button.clicked.connect(callback)
+    return button
+
+
+def _flag(control):
+    control.setObjectName('settingsPageCheckbox')
+    control.setFixedHeight(SETTINGS_ROW_HEIGHT)
+    control.setStyleSheet('margin:0; padding:0;')
+    return control
+
+
+def _form(content):
+    grid = QGridLayout(content)
     grid.setContentsMargins(0, 0, 0, 0)
-    grid.setHorizontalSpacing(8)
-    grid.setVerticalSpacing(0)
+    grid.setHorizontalSpacing(10)
+    grid.setVerticalSpacing(SETTINGS_ROW_GAP)
     grid.setColumnStretch(0, 1)
-    body.addLayout(grid)
+    return grid
+
+
+def _fit_dynamic_flag(control, width):
+    """Keep long localized labels readable beside the compact options column."""
+    original = control.property('dynamicFlagLabel')
+    if original is None:
+        original = control.text()
+        control.setProperty('dynamicFlagLabel', original)
+    control.setText(original)
+    control.ensurePolished()
+    metrics = control.fontMetrics()
+    chrome = control.sizeHint().width() - metrics.horizontalAdvance(original)
+    available = max(1, width-chrome)
+    lines, line = [], ''
+    for word in original.split():
+        candidate = word if not line else line+' '+word
+        if line and metrics.horizontalAdvance(candidate) > available:
+            lines.append(line)
+            line = word
+        else:
+            line = candidate
+    if line:
+        lines.append(line)
+    control.setText('\n'.join(lines))
+    control.setAccessibleName(original)
+    control.setFixedHeight(max(SETTINGS_ROW_HEIGHT, control.sizeHint().height()+2))
+
+
+def fit_dynamic_flags(settings):
+    # Histories and the hotkey editor temporarily replace and destroy the
+    # category pages. Their Python attributes survive until init_ui rebuilds
+    # them; a theme change must not measure those deleted Qt controls.
+    panel = getattr(settings, 'game_flags_panel', None)
+    if panel is None or sip.isdeleted(panel):
+        return
+    for control in (settings.game_pause_inactive_checkbox, settings.game_manual_output_checkbox,
+                    settings.game_toolbar_checkbox, settings.game_remember_template_checkbox):
+        _fit_dynamic_flag(control, 294)
+
+
+def _wrap_mode_pages(settings):
+    # Transfer the existing layouts and controls intact: signals and values
+    # retain a single owner, including the optional custom-image row.
+    page = settings.settings_game_page
+    grid = page.layout()
+    for control in (settings.game_languages_label, settings.game_language_row, settings.game_language_controls,
+                    settings.game_source_combo, settings.game_target_combo,
+                    settings.game_swap_button, settings.game_scan_interval_label,
+                    settings.game_interval_controls, settings.game_overlay_opacity_label,
+                    settings.game_opacity_controls):
+        control.setFixedHeight(SETTINGS_ROW_HEIGHT)
+    for control in (settings.game_pause_inactive_checkbox, settings.game_show_original_checkbox,
+                    settings.game_manual_output_checkbox, settings.game_toolbar_checkbox,
+                    settings.game_remember_template_checkbox):
+        _flag(control)
+    content = QWidget()
+    content.setLayout(grid)
+    _empty(grid)
+    for column in range(3):
+        grid.setColumnStretch(column, 0)
+        grid.setColumnMinimumWidth(column, 0)
+    for row in range(12):
+        grid.setRowStretch(row, 0)
+        grid.setRowMinimumHeight(row, 0)
+    grid.setColumnStretch(0, 1)
+    grid.setHorizontalSpacing(18)
+    grid.setVerticalSpacing(0)
+    # Flags stay together; the whole options form starts at the same top edge
+    # in the trailing column, instead of continuing underneath them.
+    settings.game_flags_panel = QWidget(content)
+    flags = QVBoxLayout(settings.game_flags_panel)
+    flags.setContentsMargins(0, 0, 0, 0)
+    flags.setSpacing(SETTINGS_ROW_GAP)
+    settings.game_flags_panel.setMinimumWidth(294)
+    from text_direction import ui_directional_text
+    language = settings.parent.current_interface_language
+    compact = [ui_directional_text(value, language) for value in
+               DYNAMIC_COMPACT.get(language, DYNAMIC_COMPACT['en'])]
+    settings.game_scan_interval_label.setText(compact[0])
+    settings.game_overlay_opacity_label.setText(compact[1])
+    settings.game_pause_inactive_checkbox.setText(compact[2])
+    settings.game_toolbar_checkbox.setText(compact[3])
+    for checkbox in (settings.game_pause_inactive_checkbox,
+            settings.game_manual_output_checkbox, settings.game_toolbar_checkbox,
+            settings.game_remember_template_checkbox):
+        _fit_dynamic_flag(checkbox, 294)
+        flags.addWidget(checkbox)
+    grid.addWidget(settings.game_flags_panel, 0, 0, Qt.AlignTop)
+
+    settings.game_options_panel = QWidget(content)
+    settings.game_options_panel.setFixedWidth(350)
+    options = QVBoxLayout(settings.game_options_panel)
+    options.setContentsMargins(0, 0, 0, 0)
+    options.setSpacing(SETTINGS_ROW_GAP)
+    grid.addWidget(settings.game_options_panel, 0, 1, Qt.AlignTop)
+    grid.setRowStretch(1, 1)
+    header = settings.game_language_row.layout()
+    _empty(header)
+    # QBoxLayout mirrors LeftToRight automatically for an RTL parent. Forcing
+    # RightToLeft here would mirror this one row twice.
+    header.setDirection(QBoxLayout.LeftToRight)
+    header.setSpacing(8)
+    settings.game_language_row.setFixedHeight(SETTINGS_ROW_HEIGHT)
+    settings.game_language_controls.setFixedSize(214, SETTINGS_ROW_HEIGHT)
+    settings.game_language_controls.layout().setSpacing(4)
+    for combo in (settings.game_source_combo, settings.game_target_combo):
+        combo.setFixedWidth(90)
+        combo.setIconSize(QSize(18, 18))
+    settings.game_swap_button.setFixedSize(26, SETTINGS_ROW_HEIGHT)
+    labels = (settings.game_languages_label, settings.game_scan_interval_label,
+              settings.game_overlay_opacity_label, settings.game_template_label)
+    for label in labels:
+        label.setStyleSheet('font-size:14px; margin:0; padding:0;')
+        label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        label.setFixedSize(128, SETTINGS_ROW_HEIGHT)
+    header.addWidget(settings.game_languages_label)
+    header.addWidget(settings.game_language_controls)
+    options.addWidget(settings.game_language_row)
+
+    settings.game_numeric_options = QWidget(settings.game_options_panel)
+    numbers = QVBoxLayout(settings.game_numeric_options)
+    numbers.setContentsMargins(0, 0, 0, 0)
+    numbers.setSpacing(SETTINGS_ROW_GAP)
+    for label, control in (
+            (settings.game_scan_interval_label, settings.game_interval_controls),
+            (settings.game_overlay_opacity_label, settings.game_opacity_controls)):
+        group = QWidget(settings.game_numeric_options)
+        group.setFixedHeight(SETTINGS_ROW_HEIGHT)
+        line = QHBoxLayout(group)
+        line.setContentsMargins(0, 0, 0, 0)
+        line.setSpacing(8)
+        label.setBuddy(control)
+        line.addWidget(label)
+        control.setFixedWidth(214)
+        line.addWidget(control)
+        numbers.addWidget(group)
+    options.addWidget(settings.game_numeric_options)
+
+    settings.game_template_actions = QWidget(settings.game_options_panel)
+    settings.game_template_actions.setFixedHeight(SETTINGS_ROW_HEIGHT)
+    template_row = QHBoxLayout(settings.game_template_actions)
+    template_row.setContentsMargins(0, 0, 0, 0)
+    template_row.setSpacing(8)
+    settings.game_template_label.show()
+    template_row.addWidget(settings.game_template_label)
+    template_fields = QWidget(settings.game_template_actions)
+    settings.game_template_controls = template_fields
+    template_fields.setFixedSize(214, SETTINGS_ROW_HEIGHT)
+    fields = QHBoxLayout(template_fields)
+    fields.setContentsMargins(0, 0, 0, 0)
+    fields.setSpacing(6)
+    settings.game_template_combo.setFixedWidth(180)
+    fields.addWidget(settings.game_template_combo)
+    fields.addWidget(settings.game_delete_template_button)
+    template_row.addWidget(template_fields)
+    options.addWidget(settings.game_template_actions)
+    settings.game_settings_content = content
+    settings.game_settings_scroll = _scroll(page, content, 'dynamicSettingsScroll')
+    root = QVBoxLayout(page)
+    root.setContentsMargins(0, 0, 0, 0)
+    root.setSpacing(4)
+    root.addWidget(settings.game_settings_scroll, 1)
+    settings.game_action_panel = _panel(settings, page,
+        ((settings.game_help_button, settings.game_launch_button),))
+    root.addWidget(settings.game_action_panel)
+
+    page = settings.settings_assistant_page
+    old_root = page.layout()
+    old_root.removeWidget(page.menu_buttons)
+    content = QWidget()
+    content.setLayout(old_root)
+    settings.assistant_settings_content = content
+    settings.assistant_settings_scroll = _scroll(page, content, 'companionSettingsScroll')
+    root = QVBoxLayout(page)
+    root.setContentsMargins(0, 0, 0, 0)
+    root.setSpacing(4)
+    root.addWidget(settings.assistant_settings_scroll, 1)
+    settings.assistant_action_panel = QWidget(page)
+    settings.assistant_action_panel.setObjectName('assistantMenuFooter')
+    settings.assistant_action_panel.setFixedHeight(34)
+    settings.assistant_action_panel.setStyleSheet('QWidget#assistantMenuFooter { background:transparent; border:0; }')
+    footer = QHBoxLayout(settings.assistant_action_panel)
+    footer.setContentsMargins(0, 1, 0, 1)
+    footer.addStretch(1)
+    page.menu_buttons.setFixedWidth(max(230, page.menu_buttons.fontMetrics().horizontalAdvance(page.menu_buttons.text())+32))
+    footer.addWidget(page.menu_buttons)
+    footer.addStretch(1)
+    root.addWidget(settings.assistant_action_panel)
+
+
+def organize(settings, general_layout, form, updates_layout, dim_row):
+    from settings_window import settings_text
+    from styled_dialogs import tooltip_text
+
+    lang = settings.parent.current_interface_language
+    compact = COMPACT.get(lang, COMPACT['en'])
+    _empty(form)
+    _empty(updates_layout)
+    _empty(dim_row)
+    _empty(general_layout)
+
+    # Application: six program preferences and one coherent display column.
+    general = settings.settings_general_page
+    content = QWidget()
+    content.setLayout(form)
+    form.setVerticalSpacing(SETTINGS_ROW_GAP)
+    for row, control in enumerate((settings.autostart_checkbox,
+            settings.start_minimized_checkbox, settings.copy_history_checkbox,
+            settings.history_checkbox, settings.button_tooltips_checkbox,
+            settings.update_check_on_launch_checkbox)):
+        control.setParent(content)
+        form.addWidget(_flag(control), row, 0, Qt.AlignLeft)
+    for row, label, control in (
+            (0, settings.ui_scale_label, settings.ui_scale_control),
+            (1, settings.translation_font_label, settings.translation_font_control)):
+        label.setParent(content)
+        control.setParent(content)
+        label.setStyleSheet('margin:0; padding:0; font-size:14px;')
+        label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        form.addWidget(label, row, 1)
+        form.addWidget(control, row, 2)
+    settings.translation_font_preview.setParent(content)
+    form.addWidget(settings.translation_font_preview, 2, 2, 2, 1, Qt.AlignVCenter)
+    form.setRowStretch(6, 1)
+    settings.application_settings_content = content
+    settings.application_settings_scroll = _scroll(general, content, 'applicationSettingsScroll')
+    general_layout.addWidget(settings.application_settings_scroll, 1)
+
+    # Program tools remain directly in this tab. Reuse the original controls
+    # and signals, with one grid owning all three rows and their dividers.
+    old_panel = settings.settings_action_panel
+    from engine_center import text as center_text
+    from settings_window import OpticallyCenteredPushButton
+    settings.engines_button = OpticallyCenteredPushButton(center_text(lang, 'title'), general)
+    settings.engines_button.setAccessibleName(center_text(lang, 'title'))
+    settings.engines_button.setToolTip(tooltip_text(center_text(lang, 'intro')))
+    settings.engines_button.clicked.connect(lambda _checked=False: settings.show_ocr_language_manager())
+    settings.application_action_panel = _panel(settings, general, (
+        (settings.clear_cache_btn, settings.reset_btn, settings.update_btn),
+        (settings.export_settings_btn, settings.import_settings_btn,
+         settings.create_bug_report_btn),
+        (settings.engines_button, settings.hotkeys_button)))
+    settings.settings_action_panel = settings.application_action_panel
+    general_layout.addWidget(settings.application_action_panel)
+    old_panel.hide()
+    old_panel.deleteLater()
+    settings.settings_transfer_panel.hide()
+
+    # Translation owns result behaviour; OCR no longer competes for its rows.
+    page = settings.settings_updates_page
+    content = QWidget()
+    grid = _form(content)
     settings.translation_settings_grid = grid
-    flags = (
-        settings.copy_translated_checkbox, settings.replace_select_all_checkbox,
-        settings.restore_clipboard_checkbox,
-    )
+    for row, label, control in (
+            (0, settings.translator_engine_label, settings.translator_combo),
+            (1, settings.result_window_label, settings.result_window_control)):
+        label.setParent(content)
+        control.setParent(content)
+        label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        label.setStyleSheet('margin:0; padding:0; font-size:14px;')
+        control.setFixedSize(180, 28)
+        grid.addWidget(label, row, 1)
+        grid.addWidget(control, row, 2)
     settings.restore_clipboard_checkbox.setText(compact[0])
-    for row, flag in enumerate(flags):
-        flag.setParent(content)
-        flag.setObjectName('settingsPageCheckbox')
-        flag.setFixedHeight(checkbox_height)
-        grid.addWidget(flag, row, 0, Qt.AlignLeft)
-    settings.close_result_on_outside_click_checkbox = QCheckBox(
-        settings_text(lang, 'close_result_window_on_outside_click'), content)
+    settings.close_result_on_outside_click_checkbox = QCheckBox(compact[1], content)
     close_flag = settings.close_result_on_outside_click_checkbox
-    close_flag.setText(compact[1])
-    close_flag.setChecked(settings.parent.config.get('close_result_window_on_outside_click') is True)
+    close_flag.setChecked(settings.parent.config.get('close_result_window_on_outside_click', True) is True)
     close_flag.setToolTip(tooltip_text(settings_text(lang, 'close_result_window_on_outside_click_tooltip')))
     close_flag.toggled.connect(lambda checked: settings.auto_save_setting(
         'close_result_window_on_outside_click', bool(checked)))
-    close_flag.setObjectName('settingsPageCheckbox')
-    close_flag.setFixedHeight(checkbox_height)
-    grid.addWidget(close_flag, 3, 0, 1, 3, Qt.AlignLeft)
-    paragraph_label, paragraph_hint = PARAGRAPH_TEXT.get(lang, PARAGRAPH_TEXT['en'])
-    settings.ocr_join_paragraphs_checkbox = QCheckBox(paragraph_label, content)
-    paragraph_flag = settings.ocr_join_paragraphs_checkbox
-    paragraph_flag.setObjectName('settingsPageCheckbox')
-    paragraph_flag.setChecked(settings.parent.config.get('ocr_join_paragraphs') is True)
-    paragraph_flag.setToolTip(tooltip_text(paragraph_hint))
-    paragraph_flag.setAccessibleDescription(paragraph_hint)
-    paragraph_flag.setFixedHeight(checkbox_height)
-    paragraph_flag.toggled.connect(lambda checked: settings.auto_save_setting('ocr_join_paragraphs', bool(checked)))
-    grid.addWidget(paragraph_flag, 4, 0, 1, 3, Qt.AlignLeft)
-    for row, label, control in (
-        (0, settings.ocr_engine_label, settings.ocr_engine_combo),
-        (1, settings.translator_engine_label, settings.translator_combo),
-    ):
-        for widget in (label, control):
-            widget.setParent(content)
-        grid.addWidget(label, row, 1)
-        grid.addWidget(control, row, 2)
+    for row, control in enumerate((settings.copy_translated_checkbox,
+            settings.replace_select_all_checkbox, settings.restore_clipboard_checkbox,
+            close_flag)):
+        control.setParent(content)
+        grid.addWidget(_flag(control), row, 0, 1, 1 if row < 3 else 3, Qt.AlignLeft)
+    from capture_memory_settings import make_control, text as memory_text
+    settings.capture_memory_label = QLabel(memory_text(lang, 'label'), content)
+    settings.capture_memory_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+    settings.capture_memory_label.setStyleSheet('font-size:14px; margin:0; padding:0;')
+    settings.capture_memory_modes = make_control(settings, content)
+    settings.capture_memory_modes.setFixedSize(180, 28)
+    settings.capture_memory_label.setBuddy(settings.capture_memory_modes)
+    settings.capture_memory_label.setToolTip(tooltip_text(memory_text(lang, 'hint')))
+    grid.addWidget(settings.capture_memory_label, 2, 1)
+    grid.addWidget(settings.capture_memory_modes, 2, 2)
     settings.provider_routing_note = QLabel(content)
     settings.provider_routing_note.setObjectName('assistantNote')
-    settings.provider_routing_note.setWordWrap(False)
     settings.provider_routing_note.setFixedHeight(28)
-    settings.provider_routing_note.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+    settings.provider_routing_note.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
     def open_image_api(_link):
         from api_providers import VISION_ENGINES
         from provider_settings import show_provider_settings
         show_provider_settings(settings, VISION_ENGINES.get(settings.parent.config.get('ocr_engine')))
     settings.provider_routing_note.linkActivated.connect(open_image_api)
-    grid.addWidget(settings.provider_routing_note, 2, 1, 1, 2, Qt.AlignTop)
+    grid.addWidget(settings.provider_routing_note, 4, 0, 1, 3)
+    grid.setRowStretch(5, 1)
+    settings.translation_settings_content = content
+    settings.translation_settings_scroll = _scroll(page, content, 'translationSettingsScroll')
+    updates_layout.setSpacing(4)
+    updates_layout.addWidget(settings.translation_settings_scroll, 1)
+    # One entry point belongs to Application. These aliases keep existing
+    # guide/task integrations bound to that same widget, not duplicate routes.
+    settings.translation_offline_button = settings.engines_button
+    settings.translation_api_button = settings.engines_button
+    settings.translation_action_panel = _panel(settings, page, (
+        (settings.copy_history_btn, settings.translation_history_btn),))
+    updates_layout.addWidget(settings.translation_action_panel)
+
+    # OCR has its own complete form and package/API routes.
+    settings.settings_ocr_page = QWidget(settings)
+    settings.settings_ocr_page.setObjectName('settingsOcrPage')
+    root = QVBoxLayout(settings.settings_ocr_page)
+    root.setContentsMargins(0, 0, 0, 0)
+    root.setSpacing(4)
+    content = QWidget()
+    grid = _form(content)
+    settings.ocr_settings_grid = grid
+    settings.ocr_engine_label.setParent(content)
+    settings.ocr_engine_label.setText('OCR:')
+    settings.ocr_engine_label.setToolTip(section_text(lang, 'recognition').rstrip(':： '))
+    settings.ocr_engine_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+    settings.ocr_engine_label.setStyleSheet('margin:0; padding:0; font-size:14px;')
+    settings.ocr_engine_combo.setParent(content)
+    settings.ocr_engine_combo.setFixedSize(180, 28)
+    grid.addWidget(settings.ocr_engine_label, 0, 1)
+    grid.addWidget(settings.ocr_engine_combo, 0, 2)
+    caption, hint = PARAGRAPH_TEXT.get(lang, PARAGRAPH_TEXT['en'])
+    settings.ocr_join_paragraphs_checkbox = QCheckBox(caption, content)
+    paragraph_flag = settings.ocr_join_paragraphs_checkbox
+    paragraph_flag.setChecked(settings.parent.config.get('ocr_join_paragraphs', True) is True)
+    paragraph_flag.setToolTip(tooltip_text(hint))
+    paragraph_flag.setAccessibleDescription(hint)
+    paragraph_flag.toggled.connect(lambda checked: settings.auto_save_setting('ocr_join_paragraphs', bool(checked)))
+    for row, control in enumerate((paragraph_flag, settings.keep_visible_checkbox,
+                                   settings.freeze_screen_checkbox)):
+        control.setParent(content)
+        grid.addWidget(_flag(control), row, 0, 1, 1 if row == 0 else 3, Qt.AlignLeft)
+    settings.dim_screen_during_ocr_checkbox.setParent(content)
+    grid.addWidget(_flag(settings.dim_screen_during_ocr_checkbox), 3, 0, 1, 3, Qt.AlignLeft)
+    dim_controls = QWidget(content)
+    settings.ocr_dimming_options = dim_controls
+    dim_controls.setFixedHeight(28)
+    dim_layout = QHBoxLayout(dim_controls)
+    rtl = settings.layoutDirection() == Qt.RightToLeft
+    dim_layout.setContentsMargins(0 if rtl else 30, 0, 30 if rtl else 0, 0)
+    dim_layout.setSpacing(8)
+    settings.ocr_dim_strength_label = QLabel(section_text(lang, 'dim_strength'), dim_controls)
+    settings.ocr_dim_strength_label.setStyleSheet('font-size:14px; margin:0; padding:0;')
+    settings.ocr_dim_strength_label.setBuddy(settings.ocr_dim_strength_control)
+    settings.ocr_dim_strength_label.setToolTip(settings.ocr_dim_strength_control.toolTip())
+    dim_layout.addWidget(settings.ocr_dim_strength_label)
+    dim_layout.addWidget(settings.ocr_dim_strength_control)
+    dim_layout.addStretch(1)
+    dim_controls.setEnabled(settings.dim_screen_during_ocr_checkbox.isChecked())
+    grid.addWidget(dim_controls, 4, 0, 1, 3)
+    settings.copy_notification_checkbox.setParent(content)
+    grid.addWidget(_flag(settings.copy_notification_checkbox), 5, 0, 1, 3, Qt.AlignLeft)
+    grid.setRowStretch(6, 1)
+    settings.ocr_settings_content = content
+    settings.ocr_settings_scroll = _scroll(settings.settings_ocr_page, content, 'ocrSettingsScroll')
+    root.addWidget(settings.ocr_settings_scroll, 1)
+    settings.ocr_languages_btn.hide()
+    settings.ocr_languages_btn = settings.engines_button
+    settings.ocr_api_button = settings.engines_button
+    settings._apply_language_package_task_status()
+    settings.ocr_action_panel = QWidget(settings.settings_ocr_page)
+    settings.ocr_action_panel.hide()
+    settings.settings_pages.addWidget(settings.settings_ocr_page)
+    assert settings.settings_pages.indexOf(settings.settings_ocr_page) == PAGE_OCR
+    settings.settings_ocr_page.hide()
+    _wrap_mode_pages(settings)
     from provider_settings import refresh_provider_routing
     refresh_provider_routing(settings)
 
-    for row, flag in ((5, settings.keep_visible_checkbox), (6, settings.freeze_screen_checkbox)):
-        flag.setParent(content)
-        flag.setObjectName('settingsPageCheckbox')
-        flag.setFixedHeight(checkbox_height)
-        grid.addWidget(flag, row, 0, 1, 3, Qt.AlignLeft)
-    # Dimming belongs to the same visible form, not an expanding subpage.
-    while dim_row.count():
-        dim_row.takeAt(0)
-    settings.dim_screen_during_ocr_checkbox.setParent(content)
-    settings.dim_screen_during_ocr_checkbox.setFixedHeight(checkbox_height)
-    grid.addWidget(settings.dim_screen_during_ocr_checkbox, 7, 0, Qt.AlignLeft)
-    from PyQt5.QtWidgets import QHBoxLayout
-    dim_controls = QWidget(content)
-    dim_controls.setFixedHeight(checkbox_height)
-    slider_row = QHBoxLayout(dim_controls)
-    slider_row.setContentsMargins(0, 0, 0, 0)
-    slider_row.addStretch(1)
-    slider_row.addWidget(settings.ocr_dim_strength_value)
-    slider_row.addWidget(settings.ocr_dim_strength_slider)
-    grid.addWidget(dim_controls, 7, 1, 1, 2)
-    settings.copy_notification_checkbox.setParent(content)
-    settings.copy_notification_checkbox.setFixedHeight(checkbox_height)
-    grid.addWidget(settings.copy_notification_checkbox, 8, 0, 1, 3, Qt.AlignLeft)
-    body.addStretch(1)
-    settings.translation_action_panel = QWidget(settings.settings_updates_page)
-    settings.translation_action_panel.setObjectName('settingsActionPanel')
-    settings.translation_action_panel.setFixedHeight(61)
-    tools = QGridLayout(settings.translation_action_panel)
-    tools.setContentsMargins(1, 1, 1, 1)
-    tools.setHorizontalSpacing(0)
-    tools.setVerticalSpacing(1)
-    tools.setColumnStretch(0, 1)
-    tools.setColumnStretch(1, 1)
-    settings.ocr_languages_btn.setParent(settings.translation_action_panel)
-    tools.addWidget(settings.ocr_languages_btn, 0, 0, 1, 2)
-    for column, button in enumerate((settings.copy_history_btn, settings.translation_history_btn)):
-        button.setParent(settings.translation_action_panel)
-        tools.addWidget(button, 1, column)
-    scroll.setWidget(content)
-    scroll.viewport().setAutoFillBackground(False)
-    updates_layout.addWidget(scroll)
-    updates_layout.addWidget(settings.translation_action_panel)
-    settings.translation_settings_scroll = scroll
-    # Plain container backgrounds follow the same palette as the other pages.
-    scroll.setStyleSheet('QScrollArea, QWidget#translationSettingsContent { background: transparent; border: none; }')
-    install_accent_controls(content, dark=settings.parent.current_theme != 'Светлая')
-    settings.settings_page_tabs[1].setText(captions[0])
-    settings.settings_page_tabs[1].setAccessibleName(captions[0])
-    settings.settings_page_tabs[1].setToolTip(tooltip_text(captions[0]))
-
 
 def reveal(settings, widget):
-    """Keep guide links valid after moving controls to their actual category."""
-    scroll = getattr(settings, 'translation_settings_scroll', None)
-    if scroll is not None and scroll.widget().isAncestorOf(widget):
-        settings._set_settings_page(1)
-        scroll.ensureWidgetVisible(widget)
+    """Guide links follow their control after category or secondary-page moves."""
+    for page, name in ((0, 'application_settings_scroll'), (1, 'translation_settings_scroll'),
+                       (4, 'ocr_settings_scroll'), (2, 'game_settings_scroll'),
+                       (3, 'assistant_settings_scroll')):
+        scroll = getattr(settings, name, None)
+        if scroll is not None and scroll.widget().isAncestorOf(widget):
+            settings._set_settings_page(page)
+            scroll.ensureWidgetVisible(widget)
+            return

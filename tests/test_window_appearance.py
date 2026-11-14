@@ -116,7 +116,8 @@ def test_open_dialogs_and_hardcoded_surfaces_follow_light_theme(appearance):
     appearance.refresh(theme='Светлая')
     appearance.app.processEvents()
     assert dialog.theme == 'Светлая'
-    assert '#ece7f0' in dialog.styleSheet()
+    from classic_style import classic_palette
+    assert classic_palette(False)['background'] in dialog.styleSheet()
     assert '#111216' not in legacy.styleSheet()
     assert '#ffffff' not in label.styleSheet()
     assert dialog.text_edit.palette().color(QtGui.QPalette.Text).lightness() < 100
@@ -250,7 +251,11 @@ def test_light_language_popup_has_a_visible_outline(appearance):
     image = popup.grab().toImage()
     edge = image.pixelColor(0, image.height() // 2)
     assert edge.lightness() < 175
-    assert 'border: 1px solid #897397' in popup.styleSheet()
+    # The shared popup paints its antialiased frame, rather than a QSS border.
+    for point in (QtCore.QPoint(0, image.height()//2), QtCore.QPoint(image.width()-1, image.height()//2),
+                  QtCore.QPoint(image.width()//2, 0), QtCore.QPoint(image.width()//2, image.height()-1)):
+        assert image.pixelColor(point).alpha() >= 240
+        assert image.pixelColor(point).name() == dialog.target_combo.popup_colors()['border']
     dialog.target_combo.hidePopup()
 
 

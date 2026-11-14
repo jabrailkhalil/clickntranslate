@@ -15,7 +15,12 @@ class DiagnosticJob(QObject):
         if self.running:
             return
         self.running = True
-        threading.Thread(target=self._run, name='ClicknTranslate diagnostics', daemon=True).start()
+        try:
+            threading.Thread(target=self._run, name='ClicknTranslate diagnostics', daemon=True).start()
+        except Exception as failure:
+            from diagnostics import _redact
+            self.running = False
+            self.finished.emit(None, _redact(failure))
 
     def _run(self):
         from diagnostics import create_bug_report, _redact

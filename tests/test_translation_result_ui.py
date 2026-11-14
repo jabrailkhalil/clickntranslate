@@ -14,7 +14,7 @@ import main  # noqa: E402
 import ocr  # noqa: E402
 import platform_support  # noqa: E402
 import translater  # noqa: E402
-from PyQt5.QtWidgets import QWidget  # noqa: E402
+from PyQt5.QtWidgets import QSizeGrip, QWidget  # noqa: E402
 
 
 def _immediate_thread(target=None, daemon=None, **_kwargs):
@@ -139,13 +139,16 @@ class TranslationResultUiTest(unittest.TestCase):
             self.assertEqual(dialog.title_label.text(), main.TRANSLATION_RESULT_DIALOG_TEXT[lang]["workspace_title"])
             self.assertGreaterEqual(
                 dialog.title_label.contentsRect().width(),
-                dialog.title_label.fontMetrics().horizontalAdvance(dialog.title_label.text()),
+                dialog.title_label.fontMetrics().boundingRect(dialog.title_label.text()).width(),
                 lang,
             )
             self.assertGreater(dialog.title_label.width(), 0, lang)
             self.assertTrue(dialog.windowFlags() & main.Qt.FramelessWindowHint)
             self.assertTrue(dialog.windowFlags() & main.Qt.WindowStaysOnTopHint)
             self.assertTrue(dialog.testAttribute(main.Qt.WA_TranslucentBackground))
+            for grip in dialog.findChildren(QSizeGrip):
+                bounds = main.QtCore.QRect(grip.mapTo(dialog.frame, main.QtCore.QPoint()), grip.size())
+                self.assertTrue(dialog.frame.rect().contains(bounds), (lang, bounds))
             self.assertGreaterEqual(dialog.width(), dialog.minimumSizeHint().width())
             self.assertFalse(dialog.copy_button.autoDefault())
             self.assertFalse(dialog.translate_button.autoDefault())
@@ -156,9 +159,9 @@ class TranslationResultUiTest(unittest.TestCase):
             for button in (dialog.copy_button, dialog.translate_button, dialog.close_button):
                 self.assertGreaterEqual(button.width(), button.sizeHint().width())
             if theme == "Темная":
-                self.assertIn("background: #111216", dialog.styleSheet())
+                self.assertIn("background: #111111", dialog.styleSheet())
             else:
-                self.assertIn("background: #ece7f0", dialog.styleSheet())
+                self.assertIn("background: #f0ecf3", dialog.styleSheet())
             dialog.close()
 
     def test_copy_button_works_without_closing_the_result(self):
@@ -285,6 +288,7 @@ class TranslationResultUiTest(unittest.TestCase):
             # The ordinary selection result window is enabled. Replacement is
             # still a separate seamless mode and must not inherit that UI.
             "result_window_hidden_modes": [],
+            "restore_clipboard_after_selection": True,
         })
         fake_user32 = SimpleNamespace(keybd_event=mock.Mock())
 
@@ -309,7 +313,8 @@ class TranslationResultUiTest(unittest.TestCase):
                 mock.patch.object(main, "save_translation_history"):
             harness.launch_translate_replace_selection()
 
-        replace.assert_called_once_with("Hola mundo", "Hello world", 42)
+        replace.assert_called_once_with("Hola mundo", "Hello world", 42,
+                                        clipboard_preservation=mock.ANY)
         self.assertEqual(copy.call_args_list, [mock.call(""), mock.call("Hola mundo")])
         history.assert_not_called()
         self.assertEqual(harness.shown_dialogs, [])
@@ -384,6 +389,7 @@ class TranslationResultUiTest(unittest.TestCase):
         harness = _SelectionHarness({
             "result_window_hidden_modes": [],
             "copy_translated_text": False,
+            "restore_clipboard_after_selection": True,
         })
         fake_user32 = SimpleNamespace(keybd_event=mock.Mock())
 
@@ -395,7 +401,7 @@ class TranslationResultUiTest(unittest.TestCase):
                 mock.patch.object(main.threading, "Thread", _immediate_thread), \
                 mock.patch.object(main.time, "sleep"), \
                 mock.patch.object(main, "simulate_copy"), \
-                mock.patch.object(main.pyperclip, "paste", side_effect=["Before", "Hola mundo"]), \
+                mock.patch.object(main.pyperclip, "paste", side_effect=["Before", "Hola mundo", "Hola mundo"]), \
                 mock.patch.object(translater, "translate_text", return_value="Hello world"), \
                 mock.patch.object(platform_support, "copy_text") as copy, \
                 mock.patch.object(main, "save_translation_history"):
@@ -404,11 +410,10 @@ class TranslationResultUiTest(unittest.TestCase):
         self.assertEqual(copy.call_args_list, [mock.call(""), mock.call("Before")])
         self.assertEqual(len(harness.shown_dialogs), 1)
 
-    def test_clipboard_restore_setting_can_leave_the_captured_selection(self):
+    def test_absent_clipboard_restore_setting_leaves_the_captured_selection(self):
         harness = _SelectionHarness({
             "result_window_hidden_modes": [],
             "copy_translated_text": False,
-            "restore_clipboard_after_selection": False,
         })
         fake_user32 = SimpleNamespace(keybd_event=mock.Mock())
 

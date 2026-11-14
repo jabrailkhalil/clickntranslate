@@ -33,7 +33,8 @@ def test_select_all_runs_only_for_enabled_replacement(enabled, replace, selected
     assert order == ([('all', 42)] if selected else []) + [('copy',)]
     assert replacement.call_count == int(replace)
     if replace:
-        replacement.assert_called_once_with('Chat draft', 'Translated draft', 42)
+        replacement.assert_called_once_with('Chat draft', 'Translated draft', 42,
+                                             clipboard_preservation=mock.ANY)
         assert not harness.shown_dialogs
 
 
@@ -82,7 +83,7 @@ def test_checkbox_saves_and_fits_translation_page(window, app, language):
     assert window.config['replace_selection_select_all'] is True
     assert box.width() >= box.sizeHint().width()
     origin = box.mapTo(settings, QtCore.QPoint())
-    panel = settings.ocr_languages_btn.mapTo(settings, QtCore.QPoint())
+    panel = settings.translation_action_panel.mapTo(settings, QtCore.QPoint())
     assert origin.y() + box.height() < panel.y()
 
 

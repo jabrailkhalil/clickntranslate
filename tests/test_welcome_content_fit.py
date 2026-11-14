@@ -37,7 +37,7 @@ def test_welcome_tick_contrasts_after_shared_theme_and_scaling(app, owner, theme
         appearance.deleteLater()
 
 
-@pytest.mark.parametrize('language', ['en', 'ru', 'de', 'es', 'fr', 'zh'])
+@pytest.mark.parametrize('language', tuple(main.INTERFACE_LANGUAGE_BY_CODE))
 def test_welcome_can_grow_for_wrapped_copy(app, owner, language):
     owner.current_interface_language = language
     dialog = main.WelcomeDialog(owner)
@@ -65,7 +65,7 @@ def test_welcome_can_grow_for_wrapped_copy(app, owner, language):
         dialog.deleteLater()
 
 
-@pytest.mark.parametrize('language', ['en', 'ru', 'de', 'es', 'fr', 'zh'])
+@pytest.mark.parametrize('language', tuple(main.INTERFACE_LANGUAGE_BY_CODE))
 def test_welcome_invites_support_in_each_language(app, owner, language):
     owner.current_interface_language = language
     dialog = main.WelcomeDialog(owner)
@@ -77,3 +77,49 @@ def test_welcome_invites_support_in_each_language(app, owner, language):
     finally:
         dialog.close()
         dialog.deleteLater()
+
+
+@pytest.mark.parametrize('language', tuple(main.INTERFACE_LANGUAGE_BY_CODE))
+@pytest.mark.parametrize('theme', ['Темная', 'Светлая'])
+@pytest.mark.parametrize('percent', [80, 150, 200])
+def test_release_bullets_fit_and_mirror_after_language_change(app, owner, language, theme, percent):
+    from window_appearance import install_window_appearance
+    owner.current_theme = theme
+    owner.current_interface_language = 'en'
+    appearance = install_window_appearance(app, percent, theme)
+    dialog = main.WelcomeDialog(owner)
+    try:
+        dialog.show()
+        app.processEvents()
+        dialog.checkbox.setChecked(True)
+        dialog.set_language(language)
+        for _ in range(5):
+            app.processEvents()
+        assert dialog.checkbox.isChecked()
+        assert dialog.layoutDirection() == (QtCore.Qt.RightToLeft if language == 'ar' else QtCore.Qt.LeftToRight)
+        assert len(dialog.feature_labels) == 5
+        assert [label.text() for label in dialog.feature_labels] == list(main.welcome_text(language)['features'])
+        assert not dialog.findChildren(QtWidgets.QLabel, 'welcomeChip')
+        labels = dialog.feature_labels + [dialog.findChild(QtWidgets.QLabel, name)
+                    for name in ('welcomeTitle', 'welcomeBody', 'welcomeSupport')]
+        rectangles = []
+        for label in labels:
+            assert label.height() >= label.heightForWidth(label.width()), (
+                language, theme, percent, label.text(), label.size())
+            rect = QtCore.QRect(label.mapTo(dialog, QtCore.QPoint()), label.size())
+            assert dialog.rect().contains(rect), (language, theme, percent, rect, dialog.rect())
+        for label in dialog.feature_labels:
+            rect = QtCore.QRect(label.mapTo(dialog, QtCore.QPoint()), label.size())
+            if rectangles:
+                assert rectangles[-1].bottom() < rect.top()
+            rectangles.append(rect)
+        for control in (dialog.checkbox, dialog.skip_btn, dialog.guide_btn):
+            assert dialog.rect().contains(QtCore.QRect(control.mapTo(dialog, QtCore.QPoint()), control.size()))
+    finally:
+        dialog.close()
+        dialog.deleteLater()
+        app.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)
+        app.removeEventFilter(appearance)
+        del app._dialog_appearance
+        app.setProperty('ui_theme', None)
+        appearance.deleteLater()

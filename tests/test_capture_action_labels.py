@@ -107,16 +107,82 @@ def test_ocr_missing_language_dialog_uses_selected_interface_language(isolated, 
         overlay.deleteLater()
 
 
-@pytest.mark.parametrize('language', LANGUAGES)
-def test_ocr_translation_error_dialog_uses_selected_interface_language(isolated, language):
+@pytest.mark.parametrize('language', ('en', 'ru', 'es', 'de', 'fr', 'zh', 'pt', 'it', 'ar', 'tr', 'hi', 'id'))
+def test_ocr_translation_error_dialog_uses_selected_interface_language(isolated, app, monkeypatch, language):
+    import main
+    from PyQt5 import sip
+
     config, _ = isolated
     config['interface_language'] = language
+    monkeypatch.setattr(main, 'get_cached_config', lambda: config)
+    history = mock.Mock()
+    copy = mock.Mock()
+    monkeypatch.setattr(main, 'save_translation_history', history)
+    monkeypatch.setattr(ocr, 'save_translation_history', mock.Mock())
+    monkeypatch.setattr(main.platform_support, 'copy_text', copy)
+    created = []
+    original_show = main.show_translation_dialog
+
+    def show_result(*args, **kwargs):
+        result = original_show(*args, **kwargs)
+        created.append(result)
+        return result
+
     overlay = ocr.ScreenCaptureOverlay('translate', defer_show=True)
     try:
-        with mock.patch('translater.translate_text', side_effect=RuntimeError('engine failed')):
-            with mock.patch.object(ocr.QMessageBox, 'warning') as dialog:
-                assert not overlay._handle_ocr_result_inner('Hello')
-                dialog.assert_called_once_with(None, ocr.ocr_ui_text(language, 'translation_failed'), 'engine failed')
+        with (mock.patch('translater.translate_text', side_effect=[RuntimeError('engine failed'), 'Recovered translation']) as translate,
+              mock.patch.object(main, 'show_translation_dialog', side_effect=show_result) as shown,
+              mock.patch.object(overlay, 'close', wraps=overlay.close) as close_overlay,
+              mock.patch.object(ocr.QMessageBox, 'warning') as warning):
+            overlay.show()
+            app.processEvents()
+            assert overlay.isVisible()
+            overlay.handle_ocr_result('Hello')
+            for _ in range(200):
+                if created and overlay._area_translation_worker is None:
+                    break
+                QTest.qWait(10)
+            shown.assert_called_once()
+            result = created[0]
+            assert result.isVisible() and result.lang == language
+            assert result.source_edit.toPlainText() == 'Hello'
+            assert not result.source_edit.isReadOnly()
+            assert result.source_panel.isVisible() and not result._source_collapsed
+            assert result.text_edit.toPlainText() == ''
+            assert result.source_code == 'en' and result.target_code == 'ru'
+            assert result.engine_combo.currentData() == 'google'
+            assert result.window_engine == config['translator_engine'] == 'Google'
+            assert result._status_message == 'Google: ' + main.doc_text(language, 'provider_unavailable_online')
+            assert result.status_label.isVisible() and result.status_label.toolTip()
+            assert result.translate_button.isEnabled() and not result.copy_button.isEnabled()
+            close_overlay.assert_called_once()
+            assert not overlay.isVisible()
+            assert not overlay._ocr_in_progress and overlay._area_translation_worker is None
+            warning.assert_not_called()
+            history.assert_not_called()
+            copy.assert_not_called()
+
+            result.translate_button.click()
+            for _ in range(200):
+                if result.text_edit.toPlainText() == 'Recovered translation' and not result._retranslating:
+                    break
+                QTest.qWait(10)
+            assert translate.call_count == 2
+            assert translate.call_args.args == ('Hello', 'en', 'ru')
+            assert translate.call_args.kwargs['engine'] == 'google'
+            assert result.source_edit.toPlainText() == 'Hello'
+            assert result.text_edit.toPlainText() == 'Recovered translation'
+            assert result.translate_button.isEnabled() and result.copy_button.isEnabled()
+            assert result._status_message == result.text['ready']
+            history.assert_called_once_with('Hello', 'Recovered translation', 'ru')
+            warning.assert_not_called()
+            copy.assert_not_called()
+            assert config['translator_engine'] == 'Google'
     finally:
+        for result in created:
+            if not sip.isdeleted(result):
+                result.close()
         overlay.close()
         overlay.deleteLater()
+        app.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)
+        app.processEvents()

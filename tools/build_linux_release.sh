@@ -39,6 +39,7 @@ echo "Click'n'Translate $VERSION ($ARCH)"
 # --- 1. PyInstaller ----------------------------------------------------------
 if [ "$SKIP_PYINSTALLER" -eq 0 ]; then
     echo "[1/4] Building with PyInstaller..."
+    (cd "$REPO_DIR" && "$PYTHON" tools/prepare_rapidocr_models.py)
     (cd "$REPO_DIR" && "$PYTHON" -m PyInstaller tools/packaging/ClicknTranslate-linux.spec --clean --noconfirm)
 fi
 

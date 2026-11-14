@@ -3,7 +3,7 @@ import re as _re
 import runpy as _runpy
 import sys as _sys
 
-from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_submodules
+from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_submodules, copy_metadata
 
 from pathlib import Path as _Path
 import sys as _spec_sys
@@ -42,8 +42,10 @@ if _engine_python:
 
 
 gui_datas = [(str(_SOURCE_ROOT / 'icons'), 'icons')]
+gui_datas += [(str(_SOURCE_ROOT / 'component_root.json'), '.')]
 gui_binaries = []
 gui_hiddenimports = [
+    'tuf.ngclient', 'securesystemslib.signer._crypto_signer',
     'winrt.windows.media.ocr',
     'winrt.windows.globalization',
     'winrt.windows.graphics.imaging',
@@ -75,6 +77,8 @@ for package_name in (
     gui_binaries += package_binaries
     gui_hiddenimports += package_hiddenimports
 gui_hiddenimports += collect_submodules('winrt')
+gui_hiddenimports += collect_submodules('comtypes')
+gui_datas += copy_metadata('comtypes')
 
 argos_hiddenimports = [
     'argostranslate.package',
@@ -154,9 +158,11 @@ def _stdlib_hiddenimports():
 # GUI startup path free of ONNX/OpenCV imports. EasyOCR remains an optional
 # runtime because its torch payload is substantially larger.
 ocr_worker_datas = collect_data_files(
-    'rapidocr_onnxruntime',
-    includes=['**/*.onnx', '**/*.yaml', '**/*.yml', '**/*.json', '**/*.txt'],
+    'rapidocr',
+    includes=['**/*.yaml', '**/*.yml', '**/*.json', '**/*.txt'],
 )
+from rapidocr_models import bundled_model_data
+ocr_worker_datas += bundled_model_data(_PROJECT_ROOT)
 ocr_worker_binaries = []
 ocr_worker_hiddenimports = [
     'timeit',
@@ -180,11 +186,14 @@ ocr_worker_hiddenimports = [
     'pstats',
     'configparser',
 ]
-ocr_worker_hiddenimports += collect_submodules('rapidocr_onnxruntime')
+ocr_worker_hiddenimports += collect_submodules('rapidocr', filter=lambda name:
+    not name.startswith(('rapidocr.inference_engine.pytorch', 'rapidocr.inference_engine.paddle',
+                         'rapidocr.inference_engine.tensorrt', 'rapidocr.inference_engine.openvino',
+                         'rapidocr.inference_engine.mnn')))
 ocr_worker_hiddenimports += [
     'PIL',
     'numpy',
-    'rapidocr_onnxruntime',
+    'rapidocr', 'omegaconf', 'colorlog', 'bidi.algorithm',
     'onnxruntime',
     'cv2',
     'pyclipper',

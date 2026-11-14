@@ -300,7 +300,8 @@ class ArgosPackageDownloadTest(unittest.TestCase):
 
 
 class ArgosErrorReportingTest(unittest.TestCase):
-    def test_unavailable_runtime_is_not_reported_as_missing_package(self):
+    @mock.patch.object(translater, '_argos_worker_path', return_value='')
+    def test_unavailable_runtime_is_not_reported_as_missing_package(self, _legacy_path):
         error = ModuleNotFoundError("No module named 'torch'")
         with no_translation_cache():
             with mock.patch.object(translater, "get_cached_translator_config", return_value={"translator_engine": "argos"}):

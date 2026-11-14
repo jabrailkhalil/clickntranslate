@@ -130,23 +130,259 @@ COPY = {
      "Una richiesta riconosce e traduce un'immagine utilizzando il modello scelto. Salva e seleziona "
      'utilizza questo servizio anche per il testo semplice. Le chiavi rimangono nel vault di sistema e '
      'non vengono esportate. Il servizio cloud potrebbe addebitare costi per le richieste.'),
+
+ 'ar': ('إعدادات الترجمة والنتيجة',
+  'الإعدادات العامة: بدء التشغيل والسجل والتلميحات والتحقق من التحديثات ونافذة النتيجة وحجم الواجهة '
+  'وحجم نص الترجمة مع معاينة.',
+  'الترجمة والتعرف على النص: المحركات والالتقاط ونسخ النص واستبداله. يزيل دمج أسطر OCR في فقرات '
+  'التفاف الأسطر المرئي في النص المتصل قبل ترجمته.',
+  'حزم اللغات ← API',
+  'في علامة API ضمن حزم اللغات، اختر خدمة وأدخل مفتاحها ومعرّف النموذج. يختار «حفظ واختيار» الخدمة '
+  'للترجمة؛ ويختارها وضع التعرف أيضًا لمحرك OCR. خدمات API اختيارية.',
+  'نص النتيجة',
+  'في الإعدادات العامة، تغيّر أسهم نص النتيجة حجم خط الترجمة وتحدّث المعاينة فورًا. يغيّر مقياس '
+  'الواجهة حجم الواجهة كلها بشكل مستقل.',
+  'إغلاق النتائج',
+  'خيار إغلاق النتيجة بالنقر خارجها موجود في الترجمة والتعرف على النص. فعّله لإغلاق نافذة الترجمة '
+  'عند استخدام تطبيق آخر. معطّل افتراضيًا.',
+  'بدء ترجمة النص المحدد',
+  'النافذة الرئيسية ← التحديد ← إعدادات اللغات، أو ضبط الاختصارات ← وضع التحديد. يختار إعداد «بعد '
+  'التحديد» الاختصار أو زرًا بجوار النص أو الترجمة الفورية. هذه طرق تشغيل للوضع نفسه وبنفس اللغات '
+  'والمترجم.',
+  'يتعرف طلب واحد على نص الصورة ويترجمه باستخدام النموذج المختار. يستخدم «حفظ واختيار» الخدمة نفسها '
+  'للنص العادي أيضًا. تبقى المفاتيح في مخزن النظام ولا تُصدَّر. قد تفرض الخدمة السحابية رسومًا على '
+  'الطلبات.'),
+
+ 'tr': ('Çeviri ve sonuç ayarları',
+  'Genel: başlangıç, geçmiş, ipuçları, güncelleme denetimi, sonuç penceresi, arayüz ölçeği ve '
+  'önizlemeli sonuç metin boyutu.',
+  'Çeviri ve OCR: motorlar, yakalama, metni kopyalama ve değiştirme. OCR satırlarını paragraflarda '
+  'birleştir, çeviriden önce bağlantılı metindeki görsel satır sonlarını kaldırır.',
+  'Dil paketleri → API',
+  'Dil paketleri içindeki API sekmesinde hizmet seçip anahtar ve model kimliğini girin. Kaydet ve '
+  'seç çeviri için kullanır; tanıma modu OCR için de seçer. API hizmetleri isteğe bağlıdır.',
+  'Sonuç metni',
+  'Genel bölümündeki Sonuç metni okları çeviri yazı tipini değiştirir; önizleme hemen güncellenir. '
+  'Ölçek tüm arayüzü ayrı değiştirir.',
+  'Sonuçları kapatma',
+  'Dışarı tıklanınca sonucu kapat, Çeviri ve OCR bölümündedir. Başka uygulama kullanırken çeviri '
+  'penceresini kapatmak için açın. Varsayılan olarak kapalıdır.',
+  'Seçim çevirisini başlatma',
+  'Ana pencere → Seçim → dil ayarları veya Kısayolları ayarla → Seçim modu. Seçimden sonra, '
+  'kısayol, metnin yanındaki düğme veya anında çeviri seçilir. Hepsi aynı modu, dilleri ve '
+  'çevirmeni kullanır.',
+  'Tek istek seçili modelle görüntüyü tanır ve çevirir. Kaydet ve seç düz metin için de bu hizmeti '
+  'kullanır. Anahtarlar sistem kasasında kalır, dışa aktarılmaz. Bulut hizmeti ücret alabilir.'),
+ 'hi': ('अनुवाद और परिणाम सेटिंग्स',
+  'सामान्य: स्टार्टअप, इतिहास, संकेत, अपडेट जाँच, परिणाम विंडो, इंटरफ़ेस स्केल और उदाहरण सहित '
+  'परिणाम टेक्स्ट आकार।',
+  'अनुवाद और OCR: इंजन, कैप्चर, टेक्स्ट कॉपी और बदलना। OCR पंक्तियाँ अनुच्छेद में जोड़ें अनुवाद से '
+  'पहले जुड़े टेक्स्ट के दृश्य पंक्ति-विराम हटाता है।',
+  'भाषा पैकेज → API',
+  'भाषा पैकेज के API टैब में सेवा चुनकर कुंजी और मॉडल ID डालें। सहेजें और चुनें से अनुवाद में उपयोग '
+  'होगा; पहचान मोड उसे OCR में भी चुनता है। API सेवाएँ वैकल्पिक हैं।',
+  'परिणाम टेक्स्ट',
+  'सामान्य में परिणाम टेक्स्ट के तीर अनुवाद फ़ॉन्ट बदलते हैं और उदाहरण तुरंत बदलता है। स्केल पूरे '
+  'इंटरफ़ेस को अलग बदलता है।',
+  'परिणाम बंद करना',
+  'बाहर क्लिक पर परिणाम बंद करें अनुवाद और OCR में है। दूसरे ऐप पर क्लिक से अनुवाद विंडो बंद करने '
+  'के लिए चालू करें। डिफ़ॉल्ट में बंद है।',
+  'चयन अनुवाद शुरू करना',
+  'मुख्य विंडो → चयन → भाषा सेटिंग्स, या शॉर्टकट सेट करें → चयन मोड। चयन के बाद में शॉर्टकट, पास का '
+  'बटन या तुरंत अनुवाद चुनें। ये उसी मोड, भाषाओं और अनुवादक को शुरू करने के तरीके हैं।',
+  'एक अनुरोध चुने मॉडल से इमेज पहचानता और अनुवाद करता है। सहेजें और चुनें इसी सेवा को साधारण '
+  'टेक्स्ट के लिए भी लगाता है। कुंजियाँ सिस्टम भंडार में हैं, निर्यात नहीं होतीं। क्लाउड सेवा शुल्क '
+  'ले सकती है।'),
+ 'id': ('Pengaturan terjemahan dan hasil',
+  'Umum: mulai, riwayat, petunjuk, pemeriksaan pembaruan, jendela hasil, skala antarmuka, dan '
+  'ukuran teks hasil dengan pratinjau.',
+  'Terjemahan dan OCR: mesin, tangkapan, penyalinan dan penggantian teks. Gabung baris OCR menjadi '
+  'paragraf menghapus pembungkusan baris sebelum menerjemahkan.',
+  'Paket bahasa → API',
+  'Di tab API pada Paket bahasa, pilih layanan dan masukkan kunci serta ID model. Simpan dan pilih '
+  'memakainya untuk terjemahan; mode pengenalan juga memilihnya untuk OCR. Layanan API opsional.',
+  'Teks hasil',
+  'Di Umum, panah Teks hasil mengubah font terjemahan dan pratinjau langsung diperbarui. Skala '
+  'mengubah seluruh antarmuka secara terpisah.',
+  'Menutup hasil',
+  'Tutup hasil saat klik di luar ada di Terjemahan dan OCR. Aktifkan untuk menutup jendela saat '
+  'memakai aplikasi lain. Bawaan nonaktif.',
+  'Memulai terjemahan pilihan',
+  'Jendela utama → Pilihan → pengaturan bahasa, atau Atur pintasan → Mode pilihan. Setelah memilih '
+  'menentukan pintasan, tombol dekat teks, atau terjemahan langsung. Semuanya memicu mode, bahasa, '
+  'dan penerjemah yang sama.',
+  'Satu permintaan mengenali dan menerjemahkan gambar dengan model pilihan. Simpan dan pilih juga '
+  'memakai layanan ini untuk teks biasa. Kunci tetap di brankas sistem dan tidak diekspor. Layanan '
+  'cloud dapat mengenakan biaya.'),
 }
 
 
+LAYOUT_COPY = {
+ 'ru': (
+    'Приложение: запуск, истории, подсказки, проверка обновлений, язык интерфейса, масштаб и размер текста результата. Обслуживание и резервные копии — в «Данные и обновления».',
+    'Перевод: переводчик, окно результата, копирование и замена текста. OCR: распознавание, объединение строк в абзацы и захват экрана. Кнопки офлайн-пакетов и API находятся внизу соответствующего раздела.',
+    'На вкладке «Приложение» стрелки «Текст результата» меняют шрифт перевода. Пример ниже обновляется сразу. «Масштаб» отдельно меняет весь интерфейс.',
+    '«Закрывать результат кликом снаружи» находится во вкладке «Перевод» и включено по умолчанию. Выключите, чтобы окно результата оставалось открытым при переходе в другое приложение.',
+    'Приложение → Данные и обновления: проверка обновлений, очистка кэша, сброс, экспорт и импорт настроек, отчёт об ошибке. «Назад» возвращает к настройкам приложения.',
+ ),
+ 'en': (
+    'Application: startup, histories, tooltips, update checks, interface language, scale and result text size. Maintenance and backups are in Data and updates.',
+    'Translation: translator, result window, copying and replacing text. OCR: recognition, joining lines into paragraphs and screen capture. Offline packages and API buttons are at the bottom of the relevant section.',
+    'In Application, Result text arrows change the translation font and update the preview immediately. Scale changes the entire interface separately.',
+    'Close result on outside click is in Translation and is on by default. Turn it off to keep the result window open when switching to another app.',
+    'Application → Data and updates: check updates, clear cache, reset, export or import settings, and create a bug report. Back returns to application settings.',
+ ),
+ 'es': (
+    'Aplicación: inicio, historiales, ayudas, actualizaciones, idioma de interfaz, escala y tamaño del resultado. Mantenimiento y copias de seguridad están en Datos y actualizaciones.',
+    'Traducción: traductor, ventana de resultado, copia y reemplazo. OCR: reconocimiento, unión de líneas en párrafos y captura. Los botones de paquetes sin conexión y API están al pie del apartado correspondiente.',
+    'En Aplicación, las flechas de Texto del resultado cambian la fuente y actualizan la vista previa. Escala cambia toda la interfaz por separado.',
+    'Cerrar resultado al pulsar fuera está en Traducción y está activado de forma predeterminada. Desactívalo para mantener el resultado abierto al cambiar de aplicación.',
+    'Aplicación → Datos y actualizaciones: buscar versiones, borrar caché, restablecer, exportar o importar ajustes y crear un informe de error. Atrás vuelve a los ajustes de la aplicación.',
+ ),
+ 'de': (
+    'Anwendung: Start, Verläufe, Hinweise, Updateprüfung, Oberflächensprache, Skalierung und Ergebnistextgröße. Wartung und Sicherungen finden Sie unter Daten und Updates.',
+    'Übersetzung: Übersetzer, Ergebnisfenster, Kopieren und Ersetzen. OCR: Erkennung, Zeilen zu Absätzen verbinden und Bildschirmaufnahme. Offline-Pakete und API öffnen Sie unten im jeweiligen Bereich.',
+    'Unter Anwendung ändern die Pfeile bei Ergebnistext die Übersetzungsschrift und sofort die Vorschau. Skalierung passt die gesamte Oberfläche separat an.',
+    'Ergebnis bei Außenklick schließen finden Sie unter Übersetzung. Die Option ist standardmäßig an. Ausschalten, um das Ergebnis beim Wechsel zu einer anderen App offen zu halten.',
+    'Anwendung → Daten und Updates: Updates suchen, Cache leeren, Einstellungen zurücksetzen, exportieren oder importieren und Fehlerberichte erstellen. Zurück führt zu den Anwendungseinstellungen.',
+ ),
+ 'fr': (
+    'Application : démarrage, historiques, aides, mises à jour, langue, échelle et taille du résultat. Entretien et sauvegardes se trouvent dans Données et mises à jour.',
+    'Traduction : moteur, fenêtre de résultat, copie et remplacement. OCR : reconnaissance, regroupement en paragraphes et capture. Les boutons des modules hors ligne et de l’API sont au bas de la rubrique correspondante.',
+    'Dans Application, les flèches de Texte du résultat changent la police et actualisent immédiatement l’exemple. Échelle règle séparément toute l’interface.',
+    'Fermer le résultat au clic extérieur se trouve dans Traduction et est activé par défaut. Désactivez cette option pour garder le résultat ouvert en changeant d’application.',
+    'Application → Données et mises à jour : rechercher une version, vider le cache, réinitialiser, exporter ou importer les réglages et créer un rapport. Retour ramène aux réglages de l’application.',
+ ),
+ 'zh': (
+    '程序：启动、历史记录、提示、更新检查、界面语言、缩放和译文大小。维护及备份位于“数据与更新”。',
+    '翻译：翻译引擎、结果窗口、复制与替换。OCR：文字识别、将行合并为段落及屏幕截取。离线包和 API 按钮位于对应页面底部。',
+    '在“程序”中，“结果文字”两侧箭头调整译文字体，并立即更新示例。“缩放”单独调整整个界面。',
+    '“点击外部关闭结果”位于“翻译”，默认开启。关闭此选项后，切换到其他程序时结果窗口仍会保持打开。',
+    '程序 → 数据与更新：检查更新、清除缓存、重置、导出或导入设置，以及生成问题报告。“返回”回到程序设置。',
+ ),
+ 'pt': (
+    'Aplicativo: inicialização, históricos, dicas, atualizações, idioma, escala e tamanho do resultado. A manutenção e os backups ficam em Dados e atualizações.',
+    'Tradução: tradutor, janela de resultado, cópia e substituição. OCR: reconhecimento, união de linhas em parágrafos e captura. Os botões de pacotes offline e API ficam na parte inferior da seção correspondente.',
+    'Em Aplicativo, as setas de Texto do resultado alteram a fonte e atualizam o exemplo imediatamente. Escala ajusta toda a interface separadamente.',
+    'Fechar resultado ao clicar fora fica em Tradução e vem ativado por padrão. Desative para manter o resultado aberto ao mudar de aplicativo.',
+    'Aplicativo → Dados e atualizações: buscar atualizações, limpar cache, redefinir, exportar ou importar configurações e criar um relatório. Voltar retorna às configurações do aplicativo.',
+ ),
+ 'it': (
+    'Applicazione: avvio, cronologie, suggerimenti, aggiornamenti, lingua, scala e dimensione del risultato. Manutenzione e backup sono in Dati e aggiornamenti.',
+    'Traduzione: traduttore, finestra del risultato, copia e sostituzione. OCR: riconoscimento, unione delle righe in paragrafi e acquisizione. I pulsanti per pacchetti offline e API sono in fondo alla sezione corrispondente.',
+    'In Applicazione, le frecce di Testo del risultato cambiano il carattere e aggiornano subito l’esempio. Scala regola separatamente tutta l’interfaccia.',
+    'Chiudi risultato con clic esterno si trova in Traduzione ed è attivo per impostazione predefinita. Disattivalo per mantenere il risultato aperto quando passi a un’altra applicazione.',
+    'Applicazione → Dati e aggiornamenti: cerca aggiornamenti, svuota la cache, ripristina, esporta o importa impostazioni e crea un rapporto. Indietro torna alle impostazioni dell’applicazione.',
+ ),
+ 'ar': (
+    'التطبيق: بدء التشغيل والسجلات والتلميحات والتحديثات ولغة الواجهة ومقياسها وحجم نص النتيجة. الصيانة والنسخ الاحتياطية ضمن البيانات والتحديثات.',
+    'الترجمة: المترجم ونافذة النتيجة ونسخ النص واستبداله. OCR: التعرف على النص ودمج الأسطر في فقرات والتقاط الشاشة. توجد أزرار الحزم دون اتصال وAPI أسفل القسم المناسب.',
+    'في التطبيق، تغيّر أسهم نص النتيجة خط الترجمة وتحدّث المعاينة فورًا. يغيّر المقياس حجم الواجهة كلها بشكل مستقل.',
+    'خيار إغلاق النتيجة بالنقر خارجها موجود في الترجمة ومفعّل افتراضيًا. عطّله لإبقاء نافذة النتيجة مفتوحة عند الانتقال إلى تطبيق آخر.',
+    'التطبيق ← البيانات والتحديثات: البحث عن تحديثات ومسح التخزين المؤقت وإعادة الضبط وتصدير الإعدادات أو استيرادها وإنشاء تقرير مشكلة. يعيدك الرجوع إلى إعدادات التطبيق.',
+ ),
+ 'tr': (
+    'Uygulama: başlangıç, geçmişler, ipuçları, güncellemeler, arayüz dili, ölçek ve sonuç yazısı boyutu. Bakım ve yedekler Veriler ve güncellemeler içindedir.',
+    'Çeviri: çevirmen, sonuç penceresi, kopyalama ve değiştirme. OCR: tanıma, satırları paragraflarda birleştirme ve ekran yakalama. Çevrimdışı paket ve API düğmeleri ilgili bölümün altındadır.',
+    'Uygulama bölümünde Sonuç metni okları çeviri yazı tipini ve örneği hemen değiştirir. Ölçek tüm arayüzü ayrı ayarlar.',
+    'Dışarı tıklanınca sonucu kapat, Çeviri bölümündedir ve varsayılan olarak açıktır. Başka uygulamaya geçerken sonuç penceresini açık tutmak için kapatın.',
+    'Uygulama → Veriler ve güncellemeler: güncelleme ara, önbelleği temizle, ayarları sıfırla, dışa veya içe aktar ve hata raporu oluştur. Geri, uygulama ayarlarına döner.',
+ ),
+ 'hi': (
+    'ऐप: शुरुआत, इतिहास, संकेत, अपडेट जाँच, इंटरफ़ेस भाषा, स्केल और परिणाम टेक्स्ट का आकार। रखरखाव और बैकअप डेटा और अपडेट में हैं।',
+    'अनुवाद: अनुवादक, परिणाम विंडो, कॉपी और बदलना। OCR: पहचान, पंक्तियाँ अनुच्छेद में जोड़ना और स्क्रीन कैप्चर। ऑफ़लाइन पैकेज और API के बटन संबंधित अनुभाग के नीचे हैं।',
+    'ऐप में परिणाम टेक्स्ट के तीर अनुवाद का फ़ॉन्ट बदलते हैं और उदाहरण तुरंत बदलता है। स्केल पूरे इंटरफ़ेस को अलग बदलता है।',
+    'बाहर क्लिक पर परिणाम बंद करें अनुवाद में है और डिफ़ॉल्ट में चालू है। दूसरे ऐप पर जाने पर परिणाम विंडो खुली रखने के लिए इसे बंद करें।',
+    'ऐप → डेटा और अपडेट: अपडेट जाँचें, कैश साफ़ करें, सेटिंग्स रीसेट, निर्यात या आयात करें और समस्या रिपोर्ट बनाएँ। वापस से ऐप की सेटिंग्स खुलती हैं।',
+ ),
+ 'id': (
+    'Aplikasi: mulai, riwayat, petunjuk, pembaruan, bahasa antarmuka, skala dan ukuran teks hasil. Pemeliharaan dan cadangan ada di Data dan pembaruan.',
+    'Terjemahan: penerjemah, jendela hasil, penyalinan dan penggantian teks. OCR: pengenalan, penggabungan baris menjadi paragraf dan tangkapan layar. Tombol paket offline dan API ada di bawah bagian terkait.',
+    'Di Aplikasi, panah Teks hasil mengubah font terjemahan dan langsung memperbarui contoh. Skala mengubah seluruh antarmuka secara terpisah.',
+    'Tutup hasil saat klik di luar ada di Terjemahan dan aktif secara bawaan. Nonaktifkan agar jendela hasil tetap terbuka saat beralih aplikasi.',
+    'Aplikasi → Data dan pembaruan: periksa versi, bersihkan cache, reset, ekspor atau impor pengaturan dan buat laporan masalah. Kembali membuka pengaturan aplikasi.',
+ ),
+}
+
+APPLICATION_SUMMARY = {
+ 'ru': 'Приложение: запуск, истории, подсказки, проверка обновлений, масштаб и размер текста результата. Кэш, сброс, обновление, экспорт, импорт, отчёт и горячие клавиши доступны кнопками внизу этой вкладки. Язык интерфейса меняется через флаг вверху слева.',
+ 'en': 'Application: startup, histories, tooltips, update checks, scale and result text size. Cache, reset, update, export, import, bug report and hotkeys are buttons at the bottom of this page. Change UI language with the flag at the top left.',
+ 'es': 'Aplicación: inicio, historiales, ayudas, actualizaciones, escala y tamaño del resultado. Caché, restablecer, actualizar, exportar, importar, informes y atajos están en los botones inferiores. Cambia el idioma de interfaz con la bandera de arriba a la izquierda.',
+ 'de': 'Anwendung: Start, Verläufe, Hinweise, Updateprüfung, Skalierung und Ergebnistextgröße. Cache, Zurücksetzen, Update, Export, Import, Fehlerbericht und Tastenkürzel sind direkt unten verfügbar. Die Oberflächensprache wird über die Flagge oben links geändert.',
+ 'fr': 'Application : démarrage, historiques, aides, mises à jour, échelle et taille du résultat. Cache, réinitialisation, mise à jour, export, import, rapport et raccourcis sont accessibles en bas. Le drapeau en haut à gauche change la langue de l’interface.',
+ 'zh': '程序：启动、历史记录、提示、更新检查、缩放和译文大小。缓存、重置、更新、导出、导入、问题报告及快捷键按钮均位于此页面底部。通过左上角的国旗更改界面语言。',
+ 'pt': 'Aplicativo: inicialização, históricos, dicas, atualizações, escala e tamanho do resultado. Cache, redefinição, atualização, exportação, importação, relatório e atalhos ficam nos botões inferiores. Altere o idioma da interface pela bandeira no canto superior esquerdo.',
+ 'it': 'Applicazione: avvio, cronologie, suggerimenti, aggiornamenti, scala e dimensione del risultato. Cache, ripristino, aggiornamento, esportazione, importazione, rapporto e scorciatoie sono nei pulsanti in fondo. Cambia la lingua dalla bandiera in alto a sinistra.',
+ 'ar': 'التطبيق: بدء التشغيل والسجلات والتلميحات والتحديثات ومقياس الواجهة وحجم نص النتيجة. أزرار التخزين المؤقت وإعادة الضبط والتحديث والتصدير والاستيراد والتقرير والاختصارات أسفل الصفحة. غيّر لغة الواجهة من العلم أعلى اليسار.',
+ 'tr': 'Uygulama: başlangıç, geçmişler, ipuçları, güncellemeler, ölçek ve sonuç yazısı boyutu. Önbellek, sıfırlama, güncelleme, dışa ve içe aktarma, rapor ve kısayollar alttaki düğmelerdedir. Arayüz dilini sol üstteki bayraktan değiştirin.',
+ 'hi': 'ऐप: शुरुआत, इतिहास, संकेत, अपडेट जाँच, स्केल और परिणाम टेक्स्ट आकार। कैश, रीसेट, अपडेट, निर्यात, आयात, रिपोर्ट और शॉर्टकट के बटन नीचे हैं। इंटरफ़ेस की भाषा ऊपर बाईं ओर के झंडे से बदलें।',
+ 'id': 'Aplikasi: mulai, riwayat, petunjuk, pembaruan, skala dan ukuran teks hasil. Tombol cache, reset, pembaruan, ekspor, impor, laporan dan pintasan ada di bawah. Ubah bahasa antarmuka melalui bendera di kiri atas.',
+}
+
+
+DYNAMIC_PAGE_HINTS = {
+ 'en': 'In {tab}, choose languages, the scan interval, background opacity and saved area templates.',
+ 'ru': 'Во вкладке «{tab}» выберите языки, интервал проверки, непрозрачность фона и сохранённые шаблоны областей.',
+ 'es': 'En {tab}, elige idiomas, intervalo de lectura, opacidad del fondo y plantillas de zonas guardadas.',
+ 'de': 'Unter {tab} Sprachen, Scanintervall, Hintergrunddeckkraft und gespeicherte Bereichsvorlagen wählen.',
+ 'fr': 'Dans {tab}, choisissez les langues, l’intervalle de lecture, l’opacité du fond et les modèles de zones enregistrés.',
+ 'zh': '在“{tab}”中选择语言、扫描间隔、背景不透明度和已保存的区域模板。',
+ 'pt': 'Em {tab}, escolha os idiomas, o intervalo de leitura, a opacidade do fundo e os modelos de áreas salvos.',
+ 'it': 'In {tab}, scegli lingue, intervallo di scansione, opacità dello sfondo e modelli di aree salvati.',
+ 'ar': 'في {tab}، اختر اللغتين والفاصل بين عمليات الفحص وعتامة الخلفية وقوالب المناطق المحفوظة.',
+ 'tr': '{tab} bölümünde dilleri, tarama aralığını, arka plan opaklığını ve kayıtlı alan şablonlarını seçin.',
+ 'hi': '{tab} में भाषाएँ, जाँच अंतराल, पृष्ठभूमि की अपारदर्शिता और सहेजे क्षेत्र टेम्पलेट चुनें।',
+ 'id': 'Di {tab}, pilih bahasa, interval pemindaian, opasitas latar, dan templat area tersimpan.',
+}
+
+
+for _locale, _layout_copy in LAYOUT_COPY.items():
+    _copy = list(COPY[_locale])
+    for _index, _value in zip((1, 2, 6, 8), _layout_copy):
+        _copy[_index] = _value
+    _copy[1] = APPLICATION_SUMMARY[_locale]
+    _copy.append(APPLICATION_SUMMARY[_locale])
+    COPY[_locale] = tuple(_copy)
+
+
 def guide_updates(language):
+    from settings_sections import PAGE_APPLICATION, PAGE_TRANSLATION, PAGE_DYNAMIC, page_caption, section_text
+    from result_presentation_text import text as presentation_text
     c = COPY.get(language, COPY['en'])
-    return {key: (c[i], c[i+1]) for key, i in (
-        ('api_connections', 3), ('result_text', 5), ('result_behavior', 7), ('selection_behavior', 9))}
+    entries = {key: (c[i], c[i+1]) for key, i in (
+        ('result_text', 5), ('result_behavior', 7), ('selection_behavior', 9))}
+    entries.update({
+        'result_window': (presentation_text(language, 'label').rstrip(':： '),
+                          presentation_text(language, 'help')),
+        'api_connections': (page_caption(language, PAGE_TRANSLATION) + ' → ' + section_text(language, 'api'), c[4]),
+        'settings_page_main': (page_caption(language, PAGE_APPLICATION), c[1]),
+        'settings_page_updates': (page_caption(language, PAGE_TRANSLATION), c[2]),
+        'settings_page_game': (page_caption(language, PAGE_DYNAMIC), DYNAMIC_PAGE_HINTS.get(
+            language, DYNAMIC_PAGE_HINTS['en']).format(tab=page_caption(language, PAGE_DYNAMIC))),
+        'actions_panel': (page_caption(language, PAGE_APPLICATION), c[12]),
+    })
+    return entries
 
 
 def update_help(content):
+    from html import escape
     from selection_options import TEXT
+    from result_presentation_text import text as presentation_text
     for lang, sections in content.items():
         c = COPY.get(lang, COPY['en'])
         for index, (title, items) in enumerate(sections):
             if any("OCR</span>" in item for item in items) and any('span' in item for item in items[2:]):
                 sections[index] = (c[0], [c[1], c[2], *items])
-        sections.append((c[3], [c[4], c[11]]))
+        from settings_sections import section_text
+        sections.append((guide_updates(lang)['api_connections'][0], [c[4], c[11]]))
         sections.append((c[5], [c[6]]))
         sections.append((c[7], [c[8]]))
+        result_label = presentation_text(lang, 'label').rstrip(':： ')
+        sections.append((result_label, ["<span class='item-title'>" + escape(result_label) +
+            '</span>: ' + presentation_text(lang, 'help') + '<br>' + '<br>'.join(
+                escape(presentation_text(lang, mode)) for mode in ('selection', 'area', 'main'))]))
         sections.append((c[9], [c[10], TEXT.get(lang, TEXT['en'])[5]]))
+        from settings_sections import PAGE_APPLICATION, page_caption
+        sections.append((page_caption(lang, PAGE_APPLICATION), [c[12]]))
+        from image_input import image_text
+        sections.append((image_text(lang, 'open'), [image_text(lang, 'hint')]))

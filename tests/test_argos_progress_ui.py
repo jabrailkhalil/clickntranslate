@@ -138,9 +138,9 @@ class ArgosProgressUiTest(unittest.TestCase):
             self.assertFalse(dialog.install_button.autoDefault())
             self.assertIn("argosRouteCard", dialog.styleSheet())
             if theme == "Темная":
-                self.assertIn("background: #111216", dialog.styleSheet())
+                self.assertIn("background: #111111", dialog.styleSheet())
             else:
-                self.assertIn("background: #ece7f0", dialog.styleSheet())
+                self.assertIn("background: #f0ecf3", dialog.styleSheet())
             dialog.close()
 
     def test_package_prompt_buttons_return_the_expected_result(self):
@@ -181,9 +181,9 @@ class ArgosProgressUiTest(unittest.TestCase):
             self.assertGreaterEqual(dialog.close_button.width(), dialog.close_button.sizeHint().width())
             self.assertFalse(dialog.close_button.autoDefault())
             if theme == "Темная":
-                self.assertIn("background: #111216", dialog.styleSheet())
+                self.assertIn("background: #111111", dialog.styleSheet())
             else:
-                self.assertIn("background: #ece7f0", dialog.styleSheet())
+                self.assertIn("background: #f0ecf3", dialog.styleSheet())
             dialog.close()
 
     def test_translation_error_dialog_has_localized_fallback_for_empty_error(self):

@@ -7,14 +7,21 @@ from pathlib import Path
 
 class TestLanguages(unittest.TestCase):
     def test_all_translation_languages_have_bundled_decodable_flags(self):
-        from PIL import Image
+        from PyQt5 import QtWidgets
+        from icon_rendering import load_icon
+        app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
         root=Path(__file__).resolve().parents[1]/'src'
         for language in languages.LANGUAGES:
             with self.subTest(language=language.code):
                 icon=languages.language_icon_path(language.code)
                 self.assertTrue(icon)
-                with Image.open(root/icon) as image:
-                    image.verify()
+                # Use the application's vector decoder, not Pillow's raster
+                # readers. A large rendered flag also catches a tiny fallback.
+                image = load_icon(str(root/icon)).pixmap(192, 192).toImage()
+                self.assertFalse(image.isNull())
+                self.assertGreaterEqual(image.width(), 180)
+                self.assertGreaterEqual(image.height(), 160)
+                self.assertGreater(image.pixelColor(image.width()//2, image.height()//2).alpha(), 0)
 
     def test_language_lists_include_more_than_ru_en(self):
         codes = {language.code for language in languages.LANGUAGES}

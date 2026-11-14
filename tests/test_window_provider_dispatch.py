@@ -21,7 +21,7 @@ PROVIDERS = (
 def test_window_selection_reaches_exact_backend(workspaces, owner, monkeypatch, key, function_name):
     import translater
     cache = SimpleNamespace(get=mock.Mock(return_value=None), save=mock.Mock())
-    monkeypatch.setattr(translater, '_TranslationCache', lambda *args: cache)
+    monkeypatch.setattr(translater, '_TranslationCache', lambda *args, **kwargs: cache)
     calls = {}
     for provider_key, name in PROVIDERS:
         calls[name] = mock.Mock(return_value='Result from ' + provider_key)
@@ -48,8 +48,9 @@ def test_result_and_document_api_choices_reach_the_selected_backend(workspaces, 
     import main
     import translater
     import api_providers
-    cache=SimpleNamespace(get=mock.Mock(return_value=None),save=mock.Mock())
-    monkeypatch.setattr(translater,'_TranslationCache',lambda *args:cache)
+    cache=SimpleNamespace(get=mock.Mock(return_value=None),save=mock.Mock(),config=owner.config,
+                          connection_key=mock.Mock(return_value='test-secret'))
+    monkeypatch.setattr(translater,'_TranslationCache',lambda *args,**kwargs:cache)
     translate=mock.Mock(return_value='API result')
     monkeypatch.setattr(api_providers,'translate',translate)
     dialog,_,jobs=workspaces

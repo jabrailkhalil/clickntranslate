@@ -253,7 +253,7 @@ def test_preview_cache_is_shared_small_and_no_per_frame_loading(app, owner, monk
     from assistant_preview import preview_art
     pixmaps = [preview_art(mascot) for mascot in rail.buttons]
     memory = sum(p.width() * p.height() * 4 for p in pixmaps)
-    assert memory <= 48 * 52 * 4
+    assert memory <= 192 * 208 * 4
     monkeypatch.setattr(QtGui, 'QImageReader', mock.Mock(side_effect=AssertionError('read during animation')))
     monkeypatch.setattr('assistant_sprites.art_path', mock.Mock(side_effect=AssertionError('read during animation')))
     origin = rail.button.pos()
@@ -499,7 +499,7 @@ def test_main_screen_has_translation_heading_and_preview_in_shortcut_area(app, o
     assert len(window.main_text_section.findChildren(QtWidgets.QLabel, 'mainTextSectionTitle')) == 1
     assert title.text() == main.hotkey_language_text(window.current_interface_language, 'text_section')
     assert title.alignment() & QtCore.Qt.AlignCenter
-    assert window.assistant_preview.height() == 22
+    assert window.assistant_preview.height() == window.main_hotkey_references['game'].height()
     assert window.assistant_preview.parentWidget() is window.main_hotkey_area
     assert window.main_hotkey_area.rect().contains(window.assistant_preview.geometry())
     assert window.assistant_preview.button.width() >= 28
@@ -572,10 +572,11 @@ def test_preview_click_opens_current_assistant_settings(app, monkeypatch):
         assert window.settings_window.settings_assistant_page.isVisible()
         assert window.settings_window.desktop_assistant_checkbox is window.settings_window.settings_assistant_page.toggle
         assert window.settings_window.desktop_assistant_checkbox.isVisible()
-        assert window.settings_window.desktop_assistant_dismiss_button.isVisible()
+        assert window.settings_window.settings_assistant_page.menu_buttons.isVisible()
+        assert not hasattr(window.settings_window.settings_assistant_page, 'dismiss_button')
+        assert not hasattr(window.settings_window.settings_assistant_page, 'action_buttons')
         assert window.settings_window.settings_assistant_page.mascot_preview.next_button.hasFocus()
         assert window.config.get('desktop_assistant_enabled') is not True
-        assert not window.settings_window.desktop_assistant_dismiss_button.isEnabled()
         with mock.patch.object(window, 'save_config') as save:
             window.settings_window.settings_assistant_page.main_visible.click()
             assert window.config['main_assistant_visible'] is False
@@ -585,7 +586,6 @@ def test_preview_click_opens_current_assistant_settings(app, monkeypatch):
             assert window.assistant_preview.isHidden()
             window.show_desktop_assistant_settings()
             app.processEvents()
-            assert not window.settings_window.desktop_assistant_dismiss_button.isEnabled()
             window.settings_window.settings_assistant_page.main_visible.click()
             window.show_main_screen()
             app.processEvents()

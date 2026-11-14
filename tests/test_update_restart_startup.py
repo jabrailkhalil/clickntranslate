@@ -13,15 +13,15 @@ def test_restart_skips_welcome_without_changing_the_users_preference(monkeypatch
     def config(owner):
         load(owner)
         owner.config['show_update_info'] = True
-        for key in tuple(owner.config):
-            if key.endswith('_hotkey'):
-                owner.config[key] = ''
 
     monkeypatch.setattr(main.sys, 'argv', [main.sys.argv[0], argument])
     monkeypatch.setattr(main, 'LAYOUT_EDITOR_MODE', False)
     monkeypatch.setattr(main.DarkThemeApp, 'load_config', config)
     with mock.patch.object(main, 'WelcomeDialog') as welcome, \
+         mock.patch.object(main, 'HotkeyListenerThread'), \
          mock.patch.object(main.DarkThemeApp, 'create_tray_icon'), \
+         mock.patch.object(main.DarkThemeApp, '_start_deferred_autostart_sync'), \
+         mock.patch.object(main.DarkThemeApp, '_maybe_check_updates_on_launch'), \
          mock.patch.object(main.DarkThemeApp, '_sync_desktop_assistant'), \
          mock.patch.object(main.DarkThemeApp, '_sync_selection_quick_translate'), \
          mock.patch.object(main.DarkThemeApp, 'sync_autostart_state', return_value=False):

@@ -31,21 +31,20 @@ def test_header_anchor_uses_viewport_coordinates_after_moving_between_monitors(w
 
 
 @pytest.mark.parametrize('bounds', [QtCore.QRect(1920, 0, 1920, 1080), QtCore.QRect(-1600, -200, 1600, 900)])
-def test_flag_menu_stays_with_its_anchor_on_the_selected_monitor(window, app, bounds):
+def test_flag_picker_stays_inside_the_app_on_the_selected_monitor(window, app, bounds):
     window._ui_scale_controller.available_geometry.return_value = bounds
     window.move(bounds.topLeft() + QtCore.QPoint(80, 80))
     app.processEvents()
-    screen = SimpleNamespace(availableGeometry=lambda: bounds)
-    with (mock.patch.object(QtWidgets.QApplication, 'screenAt', return_value=screen),
-          mock.patch.object(main, 'prepare_native_popup') as prepare,
+    with (mock.patch.object(main, 'prepare_native_popup') as prepare,
           mock.patch.object(main.QMenu, 'exec_', return_value=None) as popup):
         window.show_interface_language_menu()
-    point = popup.call_args.args[0]
-    assert prepare.call_args.args[1] == point
-    assert bounds.contains(point)
-    flag = widget_global_rect(window.flag_button)
-    assert abs(point.x()-flag.left()) <= 4
-    assert point.y() >= flag.bottom()
+    app.processEvents()
+    popup.assert_not_called()
+    prepare.assert_not_called()
+    picker = window._interface_language_picker
+    assert picker.window() is window.ui_root
+    assert bounds.contains(widget_global_rect(picker))
+    assert window.geometry().contains(widget_global_rect(picker))
 
 
 def test_menu_opens_above_a_low_anchor_and_clamps_to_negative_screen_origin(window):
@@ -104,7 +103,13 @@ def test_real_native_menu_follows_window_on_each_connected_screen(window, app, s
                     QCursor.setPos(widget_global_rect(window.flag_button).center())
                     QTest.mouseClick(controller.view.viewport(), QtCore.Qt.LeftButton,
                                      pos=controller.map_widget_to_view(window.flag_button))
-                    anchor = widget_global_rect(window.flag_button).bottomLeft()
+                    app.processEvents()
+                    geometry = widget_global_rect(window._interface_language_picker)
+                    assert bounds.contains(geometry)
+                    assert window.windowHandle().screen().name() == screen.name()
+                    visited.append((geometry, screen.name(), geometry.topLeft()))
+                    window._close_interface_language_picker()
+                    continue
                 elif route == 'text':
                     anchor = widget_global_point(window.text_input, QtCore.QPoint(20, 20))
                     window._show_text_input_context_menu(QtCore.QPoint(20, 20))

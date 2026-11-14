@@ -144,9 +144,16 @@ def test_settings_missing_provider_does_not_persist_an_unusable_choice(window, a
     target = window.config['main_translation_target_language']
     window.show_settings()
     settings = window.settings_window
+    # Model the installed provider disappearing after the ready-only list was
+    # populated. A provider already missing at opening has no selectable row.
+    with mock.patch.object(settings, '_ready_engine_inventory', return_value=(
+            {'Windows'}, {'google', 'argos', 'lingva'})):
+        settings._refresh_ready_engine_choices()
+    index = settings.translator_combo.findData('argos')
+    assert index >= 0
     with (mock.patch.object(availability, 'offer_provider_recovery', return_value=choice),
           mock.patch.object(settings, 'show_ocr_language_manager') as install):
-        settings.translator_combo.setCurrentIndex(settings.translator_combo.findData('argos'))
+        settings.translator_combo.setCurrentIndex(index)
     expected = 'lingva' if choice == 'lingva' else 'google'
     assert window.config['translator_engine'].lower() == expected
     assert settings.translator_combo.currentData() == expected

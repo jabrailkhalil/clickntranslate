@@ -61,6 +61,7 @@ def test_home_shortcut_uses_only_small_static_asset(window, app):
         preview = window.assistant_preview
         app.processEvents()
         preview.grab()
-        assert preview.art.size() == QtCore.QSize(48, 52)
+        assert preview.art.size() == QtCore.QSize(192, 208)
+        assert preview.button.value_label.pixmap().devicePixelRatio() >= 2
         assert atlas.cache_info().currsize == 0
         assert not preview.timer.isActive()

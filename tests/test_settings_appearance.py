@@ -195,17 +195,15 @@ class CheckBoxIndicatorTest(unittest.TestCase):
             for language in ("ru", "en", "de", "fr", "es", "zh", "pt", "it"):
                 parent.current_interface_language = language
                 settings.update_language()
-                settings._set_settings_page(1)
-                self.app.processEvents()
-
-                for box in (
-                    settings.keep_visible_checkbox,
-                    settings.freeze_screen_checkbox,
-                    settings.dim_screen_during_ocr_checkbox,
-                    settings.restore_clipboard_checkbox,
-                    settings.copy_notification_checkbox,
-                    settings.update_check_on_launch_checkbox,
+                for page, box in (
+                    (4, settings.keep_visible_checkbox),
+                    (4, settings.freeze_screen_checkbox),
+                    (4, settings.dim_screen_during_ocr_checkbox),
+                    (1, settings.restore_clipboard_checkbox),
+                    (4, settings.copy_notification_checkbox),
+                    (0, settings.update_check_on_launch_checkbox),
                 ):
+                    settings._set_settings_page(page)
                     box.setChecked(True)
                     self.app.processEvents()
                     option = QStyleOptionButton()
@@ -294,6 +292,8 @@ class DropDownPlacementTest(unittest.TestCase):
         try:
             for name in ("ocr_engine_combo", "translator_combo", "result_window_control"):
                 combo = getattr(settings, name)
+                settings._set_settings_page(4 if name == 'ocr_engine_combo' else 1)
+                self.app.processEvents()
                 combo.showPopup()
                 self.app.processEvents()
                 popup = combo.view().window()
@@ -450,11 +450,9 @@ class LanguagePackageTabsTest(unittest.TestCase):
         return parent, settings, dialog
 
     def _bars(self, dialog):
-        return (
-            ("sections", dialog.tabs),
-            ("ocr", dialog.ocr_tabs),
-            ("translation", dialog.translation_tabs),
-        )
+        # OCR/translation engines use selectors; only the three sections are
+        # visible tabs. Hidden compatibility bars do not describe painted UI.
+        return (("sections", dialog.tabs),)
 
     def test_each_tab_is_wide_enough_for_its_own_label(self):
         for lang in ("en", "ru", "es", "de", "fr", "zh", "pt", "it"):
@@ -475,6 +473,15 @@ class LanguagePackageTabsTest(unittest.TestCase):
                     # fixed width, so that is what they have to fit inside.
                     total = sum(bar.tabRect(i).width() for i in range(bar.count()))
                     self.assertLessEqual(total, dialog.width() - 24, (lang, name))
+                for section, combo in enumerate(dialog._engine_selectors):
+                    dialog.tabs.setCurrentIndex(section)
+                    self.app.processEvents()
+                    self.assertTrue(combo.isVisible())
+                    metrics = QFontMetrics(combo.font())
+                    for index in range(combo.count()):
+                        self.assertGreaterEqual(combo.width() - 40,
+                                                metrics.horizontalAdvance(combo.itemText(index)),
+                                                (lang, section, combo.itemText(index)))
             finally:
                 dialog.close()
                 settings.close()
@@ -505,6 +512,11 @@ class LanguagePackageTabsTest(unittest.TestCase):
             table = dialog.windows_table or dialog.tesseract_table
             if table is None or table.rowCount() == 0:
                 self.skipTest("no package table on this platform")
+            dialog.tabs.setCurrentIndex(0)
+            dialog.ocr_tabs.setCurrentWidget(table.parentWidget())
+            for _ in range(3):
+                self.app.processEvents()
+            self.assertTrue(table.isVisible())
             inner = table.height() - table.horizontalHeader().height() - 2 * table.frameWidth()
             self.assertGreater(inner, 0)
             self.assertEqual(inner % table.rowHeight(0), 0)
@@ -524,11 +536,12 @@ class LanguagePackageTabsTest(unittest.TestCase):
         parent, settings, dialog = self._dialog()
         try:
             for name, tab_widget in self._bars(dialog):
-                style = tab_widget.tabBar().styleSheet()
-                selected = style.split("::tab:selected")[1].split("}")[0]
-                # A heavier selected tab would outgrow the width already
-                # measured for it.
-                self.assertNotIn("font-weight", selected, name)
+                bar = tab_widget.tabBar()
+                widths = [bar.tabRect(index).width() for index in range(bar.count())]
+                for index in range(bar.count()):
+                    tab_widget.setCurrentIndex(index)
+                    self.app.processEvents()
+                    self.assertEqual([bar.tabRect(row).width() for row in range(bar.count())], widths, name)
         finally:
             dialog.close()
             settings.close()
@@ -558,7 +571,7 @@ class PopupFrameTest(unittest.TestCase):
         return parent, settings
 
     def test_every_picker_knows_its_popup_colour(self):
-        for theme, expected in (("Темная", "#20212a"), ("Светлая", "#f1edf4")):
+        for theme, expected in (("Темная", "#17181d"), ("Светлая", "#e9e4ed")):
             parent, settings = self._settings(theme)
             try:
                 for name in ("ocr_engine_combo", "translator_combo", "result_window_control"):
@@ -577,8 +590,10 @@ class PopupFrameTest(unittest.TestCase):
             self.app.processEvents()
             popup = combo.view().window()
 
-            self.assertIn("#20212a", popup.styleSheet())
-            self.assertTrue(popup.autoFillBackground())
+            image = popup.grab().toImage()
+            self.assertEqual(image.pixelColor(image.width()//2, 2).name(), '#17181d')
+            self.assertEqual(image.pixelColor(image.width()//2, 2).alpha(), 255)
+            self.assertEqual(image.pixelColor(0, 0).alpha(), 0)
             combo.hidePopup()
             self.app.processEvents()
         finally:
@@ -590,13 +605,13 @@ class PopupFrameTest(unittest.TestCase):
         parent, settings = self._settings()
         try:
             combo = settings.ocr_engine_combo
-            self.assertEqual(combo._popup_background, "#20212a")
+            self.assertEqual(combo._popup_background, "#17181d")
 
             parent.current_theme = "Светлая"
             settings.apply_theme()
             self.app.processEvents()
 
-            self.assertEqual(combo._popup_background, "#f1edf4")
+            self.assertEqual(combo._popup_background, "#e9e4ed")
         finally:
             settings.close()
             parent.close()

@@ -2,6 +2,7 @@
 
 import os
 import threading
+import time
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 from types import SimpleNamespace
 from unittest import mock
@@ -73,8 +74,12 @@ def test_worker_thread_delivers_result_to_the_gui(app, workspace, monkeypatch):
     monkeypatch.setattr(translater, 'translate_text', mock.Mock(return_value='Ответ из рабочего потока'))
     responses = QSignalSpy(workspace._retranslated_signal)
     workspace.translate_button.click()
-    if not responses:
-        assert responses.wait(3000)
+    deadline = time.monotonic() + 3
+    # A fast worker may emit between a count check and QSignalSpy.wait().
+    # Wait for the observed state rather than requiring another emission.
+    while not responses and time.monotonic() < deadline:
+        QTest.qWait(10)
+    assert len(responses) == 1
     app.processEvents()
     assert workspace.text_edit.toPlainText() == 'Ответ из рабочего потока'
     assert workspace.translate_button.isEnabled()
