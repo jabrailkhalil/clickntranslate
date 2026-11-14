@@ -6718,6 +6718,11 @@ class OcrLanguageManagerDialog(QDialog):
 
     def _populate_engine_menu(self, tabs):
         menu = tabs._tools_menu
+        # QToolButton opens this menu internally, bypassing the explicit popup
+        # preparation used by context menus. Select the button's current
+        # monitor before QMenu clamps its position in the native popup loop.
+        from ui_scaling import prepare_native_popup
+        prepare_native_popup(menu, widget_global_rect(tabs._tools_button).center())
         menu.clear()
         page = tabs.currentWidget()
         table = page.findChild(PackageTable) if page is not None else None
