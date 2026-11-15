@@ -10,6 +10,7 @@ import platform_support
 import selection_platform
 import translater
 from test_translation_result_ui import _SelectionHarness, _immediate_thread
+from selection_test_support import editable_editor
 
 
 class FakeClipboard:
@@ -27,7 +28,7 @@ class FakeClipboard:
 
 
 @pytest.fixture
-def clipboard(monkeypatch):
+def clipboard(monkeypatch, editable_editor):
     value = FakeClipboard()
     monkeypatch.setattr(platform_support, "IS_WINDOWS", True)
     monkeypatch.setattr(platform_support, "IS_MAC", False)

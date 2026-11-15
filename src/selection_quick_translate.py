@@ -109,7 +109,9 @@ class _SelectionProbe(QtCore.QRunnable):
         try:
             if validate():
                 result['text'] = read_selected_text(
-                    allow_copy_fallback=not platform_support.IS_LINUX,
+                    # Passive detection (including the button's recheck) must
+                    # never send application shortcuts or change the clipboard.
+                    allow_copy_fallback=False,
                     primary_text=self.primary_text, validate_target=validate).strip()
         except Exception:
             logger.debug('Selection probe failed', exc_info=True)
@@ -344,7 +346,8 @@ class SelectionQuickTranslateController(QtCore.QObject):
         if self._pending_text and self._pending_target != target:
             self._dismiss_selection()
         # Qt clipboard access stays on its owning thread. CLI fallbacks and
-        # Accessibility/UIA/Ctrl+C reads run in the bounded worker below.
+        # Accessibility/UIA reads run in the bounded worker below. Copy-key
+        # compatibility belongs only to explicitly invoked selection actions.
         primary_text = None
         if platform_support.IS_LINUX:
             clipboard = QtWidgets.QApplication.clipboard()

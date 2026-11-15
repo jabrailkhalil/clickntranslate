@@ -73,7 +73,13 @@ class SelectionTriggerControl(QWidget):
         for text, code in zip(labels[1:4], ('hotkey', 'button', 'automatic')):
             self.combo.addItem(text, code)
         self.label.setBuddy(self.combo)
-        self.setToolTip(tooltip_text(labels[5]))
+        help_text = labels[5]
+        import platform_support
+        if platform_support.IS_WINDOWS:
+            from selection_safety_text import PASSIVE_SELECTION_HELP
+            help_text += '\n\n' + PASSIVE_SELECTION_HELP.get(
+                owner.current_interface_language, PASSIVE_SELECTION_HELP['en'])
+        self.setToolTip(tooltip_text(help_text))
         layout.addWidget(self.label)
         layout.addWidget(self.combo, 1)
         self.refresh()

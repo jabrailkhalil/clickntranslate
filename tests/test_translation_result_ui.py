@@ -14,6 +14,8 @@ import main  # noqa: E402
 import ocr  # noqa: E402
 import platform_support  # noqa: E402
 import translater  # noqa: E402
+import pytest
+from selection_test_support import editable_editor
 from PyQt5.QtWidgets import QSizeGrip, QWidget  # noqa: E402
 
 
@@ -110,6 +112,7 @@ class _PairMemoryParent(QWidget):
         self.save_count += 1
 
 
+@pytest.mark.usefixtures('editable_editor')
 class TranslationResultUiTest(unittest.TestCase):
     def setUp(self):
         history = mock.patch.object(main, "save_translation_history")
@@ -314,7 +317,7 @@ class TranslationResultUiTest(unittest.TestCase):
             harness.launch_translate_replace_selection()
 
         replace.assert_called_once_with("Hola mundo", "Hello world", 42,
-                                        clipboard_preservation=mock.ANY)
+                                        clipboard_preservation=mock.ANY, expected_edit_target=mock.ANY)
         self.assertEqual(copy.call_args_list, [mock.call(""), mock.call("Hola mundo")])
         history.assert_not_called()
         self.assertEqual(harness.shown_dialogs, [])

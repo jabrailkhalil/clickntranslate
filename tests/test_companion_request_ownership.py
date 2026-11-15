@@ -10,6 +10,8 @@ import main
 import translater
 from desktop_assistant import DesktopAssistant
 import test_companion_persistent_panel as persistent
+from selection_test_support import editable_editor
+from windows_selection import WindowsEditTarget
 
 
 class RequestOwner(persistent.FakeOwner):
@@ -32,7 +34,7 @@ class RequestOwner(persistent.FakeOwner):
 
 
 @pytest.fixture
-def requests(monkeypatch, request):
+def requests(monkeypatch, request, editable_editor):
     # The existing palette fixture replaces native foreground calls before
     # constructing the helper. The selection text below is already supplied;
     # no clipboard, key injection, OS worker, or SDK is ever invoked.
@@ -58,6 +60,9 @@ def requests(monkeypatch, request):
     monkeypatch.setattr(main, 'copy_result_text', mock.Mock(return_value=True))
     monkeypatch.setattr(main, 'replace_selected_text_in_foreground', mock.Mock(return_value=(True, 'replaced')))
     value = request.getfixturevalue('palette')
+    monkeypatch.setattr(main, '_windows_foreground_window', value.native.foreground)
+    editable_editor.side_effect = lambda expected: (
+        WindowsEditTarget(expected, 77, (expected, 1, 8)) if value.native.current == expected else None)
     owner = value.owner
     owner.config.update(interface_language='en', theme='Темная', copy_translated_text=False)
     owner.next_source = 'First source'

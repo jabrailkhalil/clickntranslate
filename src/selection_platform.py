@@ -45,7 +45,9 @@ def read_primary_selection(app=None, *, use_qt=True):
 
 
 def read_selected_text(*, allow_copy_fallback=False, primary_text=None, validate_target=None):
-    """Best-effort selected text in the foreground application."""
+    """Read a selection; copy-key compatibility requires an explicit action."""
+    if validate_target is not None and not validate_target():
+        return ""
     if platform_support.IS_LINUX:
         if primary_text is not None:
             return primary_text.strip() or read_primary_selection(use_qt=False)
@@ -58,6 +60,8 @@ def read_selected_text(*, allow_copy_fallback=False, primary_text=None, validate
         from windows_selection import read_windows_selected_text
 
         text = read_windows_selected_text()
+        if validate_target is not None and not validate_target():
+            return ""
         if text or not allow_copy_fallback:
             return text
         return _read_selection_via_copy(validate_target=validate_target)

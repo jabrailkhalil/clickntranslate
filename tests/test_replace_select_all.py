@@ -10,6 +10,9 @@ import platform_support
 import translater
 from test_translation_result_ui import _SelectionHarness, _immediate_thread
 from test_desktop_ux import app, window
+from selection_test_support import editable_editor
+
+pytestmark = pytest.mark.usefixtures('editable_editor')
 
 
 @pytest.mark.parametrize('enabled,replace,selected', [(False, True, False), (True, True, True), (True, False, False)])
@@ -21,7 +24,7 @@ def test_select_all_runs_only_for_enabled_replacement(enabled, replace, selected
           mock.patch.object(main.threading, 'Thread', _immediate_thread),
           mock.patch.object(main.time, 'sleep'),
           mock.patch.object(main, '_windows_foreground_window', return_value=42),
-          mock.patch.object(main, 'select_all_text_in_foreground', side_effect=lambda target: order.append(('all', target)) or True) as select_all,
+          mock.patch.object(main, 'select_all_text_in_foreground', side_effect=lambda target, **kwargs: order.append(('all', target)) or True) as select_all,
           mock.patch.object(main, 'simulate_copy', side_effect=lambda: order.append(('copy',))),
           mock.patch.object(main.pyperclip, 'paste', return_value='Chat draft'),
           mock.patch.object(platform_support, 'copy_text'),
@@ -34,7 +37,7 @@ def test_select_all_runs_only_for_enabled_replacement(enabled, replace, selected
     assert replacement.call_count == int(replace)
     if replace:
         replacement.assert_called_once_with('Chat draft', 'Translated draft', 42,
-                                             clipboard_preservation=mock.ANY)
+                                             clipboard_preservation=mock.ANY, expected_edit_target=mock.ANY)
         assert not harness.shown_dialogs
 
 

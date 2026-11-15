@@ -12,6 +12,7 @@ import platform_support
 import translater
 from test_selection_clipboard_preservation import FakeClipboard
 from test_translation_result_ui import _SelectionHarness, _immediate_thread
+from selection_test_support import editable_editor
 
 
 class SelectionRequest(_SelectionHarness):
@@ -23,7 +24,7 @@ class SelectionRequest(_SelectionHarness):
 
 
 @pytest.fixture
-def capture(monkeypatch):
+def capture(monkeypatch, editable_editor):
     clipboard = FakeClipboard()
     state = SimpleNamespace(clipboard=clipboard, foreground=42)
     state.read = mock.Mock(side_effect=clipboard.paste)
@@ -47,6 +48,7 @@ def capture(monkeypatch):
     monkeypatch.setattr(main.threading, 'Thread', state.thread)
     monkeypatch.setattr(main.time, 'sleep', lambda _: None)
     monkeypatch.setattr(main, 'save_translation_history', mock.Mock())
+    monkeypatch.setattr(main, 'save_copy_history', mock.Mock())
     monkeypatch.setattr(main, 'notify_copy_failed', mock.Mock())
     monkeypatch.setattr(translater, 'translate_text', state.provider)
     monkeypatch.setattr(assistant_text, 'assistant_text', lambda language, key: f'{language}:{key}')
@@ -196,10 +198,10 @@ def test_busy_clipboard_reports_completion_without_sending_ctrl_c(capture):
     assert capture.clipboard.text == 'Clipboard before selection'
 
 
-def test_hotkey_without_a_target_keeps_its_existing_path_and_no_panel_completion(capture):
+def test_hotkey_pins_its_source_window_without_panel_completion(capture):
     owner = SelectionRequest()
     assert owner.launch_translate_selection() is True
-    capture.foreground_read.assert_not_called()
+    assert capture.foreground_read.call_count >= 2
     capture.copy_shortcut.assert_called_once_with()
     assert len(owner.shown_dialogs) == 1
     assert owner.finished == []
@@ -236,7 +238,7 @@ def test_replacement_uses_the_explicit_source_instead_of_a_later_focus_snapshot(
 def test_select_all_revalidates_focus_before_copying(capture, monkeypatch):
     owner = SelectionRequest(replace_selection_select_all=True)
 
-    def select_all(_target):
+    def select_all(_target, **_kwargs):
         capture.foreground = 99
         return True
 

@@ -27,6 +27,10 @@ class IUIAutomationTextPattern:
     pass
 
 
+class IUIAutomationValuePattern:
+    pass
+
+
 class CUIAutomation:
     pass
 
@@ -58,23 +62,44 @@ class Automation(COMValue):
         self.state.fail('element')
         return None if self.state.empty == 'element' else Element(self.state, 'element')
 
+    def CompareElements(self, first, second):
+        self.state.fail('compare')
+        return self.state.same_focus
+
 
 class Element(COMValue):
+    CurrentIsPassword = property(lambda self: self.state.password)
+    CurrentIsEnabled = property(lambda self: self.state.enabled)
+    CurrentHasKeyboardFocus = property(lambda self: self.state.focused)
+    CurrentProcessId = property(lambda self: self.state.process_id)
+    CurrentControlType = property(lambda self: self.state.control_type)
+
+    def GetRuntimeId(self):
+        self.state.fail('identity')
+        return self.state.runtime_id
+
     def GetCurrentPattern(self, pattern_id):
-        assert pattern_id == 10014
+        assert pattern_id in (10002, 10014, 10032)
         self.state.fail('pattern')
+        if pattern_id == 10032 and not self.state.text_edit_pattern:
+            return None
+        if pattern_id == 10002 and not self.state.value_pattern:
+            return None
         return None if self.state.empty == 'pattern' else Unknown(self.state, 'IUnknown')
 
 
 class Unknown(COMValue):
     def QueryInterface(self, interface):
-        assert interface is IUIAutomationTextPattern
+        assert interface in (IUIAutomationTextPattern, IUIAutomationValuePattern)
         self.state.queries.append(interface)
         self.state.fail('qi')
         return Pattern(self.state, 'text-pattern')
 
 
 class Pattern(COMValue):
+    CurrentIsReadOnly = property(lambda self: self.state.readonly)
+    DocumentRange = property(lambda self: TextRange(self.state, 'document-range'))
+
     def GetSelection(self):
         self.state.fail('selection')
         return None if self.state.empty == 'ranges' else Ranges(self.state, 'ranges')
@@ -93,6 +118,14 @@ class Ranges(COMValue):
 
 
 class TextRange(COMValue):
+    def CompareEndpoints(self, start, other, end):
+        assert start == 0 and end == 1 and other is self
+        return 0 if self.state.empty == 'caret' else -1
+
+    def GetAttributeValue(self, attribute):
+        assert attribute == 40015
+        return self.state.readonly
+
     def GetText(self, limit):
         assert limit == -1
         self.state.fail('text')
@@ -104,6 +137,10 @@ class Scenario:
         self.local = threading.local()
         self.events, self.live, self.queries, self.interfaces, self.modules = [], {}, [], [], []
         self.exits = []
+        self.password, self.enabled, self.focused = False, True, True
+        self.same_focus, self.value_pattern, self.readonly = True, True, False
+        self.text_edit_pattern = True
+        self.control_type, self.process_id, self.runtime_id = 50004, 77, (42, 1, 8)
         self.first_import, self.import_error, self.fail_at, self.empty, self.init_failure = False, False, None, None, None
         self.api = SimpleNamespace(CoInitializeEx=NativeCall(self.initialize),
                                    CoUninitialize=NativeCall(self.uninitialize))
@@ -166,7 +203,8 @@ class Scenario:
         self.modules.append(name)
         self.fail('typelib')
         return SimpleNamespace(CUIAutomation=CUIAutomation, IUIAutomation=IUIAutomation,
-                               IUIAutomationTextPattern=IUIAutomationTextPattern)
+                               IUIAutomationTextPattern=IUIAutomationTextPattern,
+                               IUIAutomationValuePattern=IUIAutomationValuePattern)
 
 
 @pytest.fixture
@@ -357,7 +395,7 @@ def test_failed_first_bootstrap_cannot_adopt_a_later_foreign_import(scenario, mo
 
 
 @pytest.mark.parametrize('enabled', [False, True])
-def test_quick_feature_prepares_backend_only_when_enabled_without_disabling_fallback(monkeypatch, enabled):
+def test_quick_feature_prepares_backend_only_when_enabled(monkeypatch, enabled):
     prepare = mock.Mock(return_value=False)
     monkeypatch.setattr(selection, 'prepare_windows_selection', prepare, raising=False)
     monkeypatch.setattr(platform_support, 'IS_WINDOWS', True)

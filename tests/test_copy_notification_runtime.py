@@ -10,6 +10,7 @@ import main
 from settings_window import settings_text
 from ui_scaling import widget_global_rect
 from test_desktop_ux import app, window
+from selection_test_support import editable_editor
 
 
 def settle(app):
@@ -173,7 +174,7 @@ def test_failed_clipboard_write_never_announces_success_or_records_a_copy(runtim
 
 
 @pytest.mark.parametrize('mode', ['selection', 'replacement'])
-def test_clipboard_only_selection_failure_keeps_the_finished_translation(runtime, app, monkeypatch, mode):
+def test_clipboard_only_selection_failure_keeps_the_finished_translation(runtime, app, monkeypatch, mode, editable_editor):
     from test_translation_result_ui import _SelectionHarness, _immediate_thread
     harness = _SelectionHarness({'result_window_hidden_modes': ['selection']})
     user32 = SimpleNamespace(keybd_event=mock.Mock())

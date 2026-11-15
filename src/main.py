@@ -1114,7 +1114,12 @@ def simulate_paste():
     ctypes.windll.user32.keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0)
 
 
-def select_all_text_in_foreground(expected_target):
+def _windows_edit_target(expected_window):
+    from windows_selection import read_windows_edit_target
+    return read_windows_edit_target(expected_window)
+
+
+def select_all_text_in_foreground(expected_target, *, expected_edit_target=None):
     """Select the whole input only while the requested replacement target owns focus."""
     if platform_support.IS_MAC:
         from macos_desktop import same_foreground_target, send_edit_shortcut
@@ -1122,6 +1127,9 @@ def select_all_text_in_foreground(expected_target):
     if not platform_support.IS_WINDOWS or not expected_target:
         return False
     if _windows_foreground_window() != expected_target:
+        return False
+    editor = _windows_edit_target(expected_target)
+    if editor is None or (expected_edit_target is not None and editor != expected_edit_target):
         return False
     user32 = ctypes.windll.user32
     try:
@@ -1131,7 +1139,8 @@ def select_all_text_in_foreground(expected_target):
     finally:
         user32.keybd_event(0x41, 0, 0x0002, 0)
         user32.keybd_event(0x11, 0, 0x0002, 0)
-    return _windows_foreground_window() == expected_target
+    return (_windows_foreground_window() == expected_target
+            and _windows_edit_target(expected_target) == editor)
 
 
 def _windows_foreground_window():
@@ -1139,7 +1148,10 @@ def _windows_foreground_window():
     if not platform_support.IS_WINDOWS:
         return 0
     try:
-        return int(ctypes.windll.user32.GetForegroundWindow() or 0)
+        foreground = ctypes.windll.user32.GetForegroundWindow
+        foreground.argtypes = []
+        foreground.restype = wintypes.HWND
+        return int(foreground() or 0)
     except Exception:
         return 0
 
@@ -1165,7 +1177,8 @@ def _wait_for_clipboard_change(previous, timeout=0.8):
 
 
 def replace_selected_text_in_foreground(original_text, translated_text,
-                                        expected_window_handle, *, clipboard_preservation=None):
+                                        expected_window_handle, *, clipboard_preservation=None,
+                                        expected_edit_target=None):
     """Safely replace a still-active Windows text selection.
 
     Translation can take seconds. During that time the user may switch windows
@@ -1184,6 +1197,18 @@ def replace_selected_text_in_foreground(original_text, translated_text,
         still_focused = lambda: bool(expected) and _windows_foreground_window() == expected
     if not still_focused():
         return False, "focus_changed"
+    if platform_support.IS_WINDOWS:
+        editor = _windows_edit_target(expected)
+        if editor is None:
+            return False, "not_editable"
+        if expected_edit_target is not None and editor != expected_edit_target:
+            return False, "editor_changed"
+    else:
+        editor = None
+
+    def same_editor():
+        return still_focused() and (not platform_support.IS_WINDOWS
+                                   or _windows_edit_target(expected) == editor)
 
     if clipboard_preservation is not None:
         clipboard_preservation.preserve_current_if_changed()
@@ -1193,10 +1218,12 @@ def replace_selected_text_in_foreground(original_text, translated_text,
     if clipboard_preservation is not None:
         clipboard_preservation.claim(marker)
     previous = _clipboard_sequence_number()
+    if not same_editor():
+        return False, "editor_changed"
     simulate_copy()
     changed = _wait_for_clipboard_change(previous)
 
-    if not still_focused():
+    if not same_editor():
         return False, "focus_changed"
     try:
         selected_now = str(pyperclip.paste() or "")
@@ -1211,10 +1238,7 @@ def replace_selected_text_in_foreground(original_text, translated_text,
         return False, "clipboard_unavailable"
     if clipboard_preservation is not None:
         clipboard_preservation.claim(translated_text)
-    if not still_focused():
-        return False, "focus_changed"
-    time.sleep(0.04)
-    if not still_focused():
+    if not same_editor():
         return False, "focus_changed"
     if platform_support.IS_MAC:
         from macos_desktop import send_edit_shortcut
@@ -13192,10 +13216,15 @@ class DarkThemeApp(QMainWindow):
             else self._selected_text_translation_pair()
         )
         replace_selection = bool(replace_selection and (platform_support.IS_WINDOWS or platform_support.IS_MAC))
-        # Capture this before translation starts. The worker verifies it again
-        # immediately before pasting, after also re-copying the same selection.
+        if platform_support.IS_WINDOWS and replace_selection:
+            # Lazy preparation on the GUI thread; no model or automation
+            # object is started at application launch or in a pool worker.
+            from windows_selection import prepare_windows_selection
+            prepare_windows_selection()
+        # Every explicit Windows capture stays bound to its original window,
+        # including a normal hotkey whose caller has no companion target.
         selection_window = (expected_target if expected_target is not None
-                            else _windows_foreground_window()) if replace_selection else 0
+                            else _windows_foreground_window()) if platform_support.IS_WINDOWS else 0
         if platform_support.IS_MAC and replace_selection:
             from macos_desktop import foreground_target
             selection_window = expected_target if expected_target is not None else foreground_target()
@@ -13205,6 +13234,7 @@ class DarkThemeApp(QMainWindow):
             lang = self.config.get("interface_language", "ru")
             clipboard_preservation = None
             translation_received = False
+            edit_target = None
 
             def owner_deleted():
                 return isinstance(self, QtCore.QObject) and sip.isdeleted(self)
@@ -13247,16 +13277,14 @@ class DarkThemeApp(QMainWindow):
                     clipboard_preservation.restore()
 
             def expected_target_is_active():
-                # Hotkeys retain their existing behavior. A companion action
-                # identifies its source before its own panel can take focus.
                 if request_cancelled():
                     restore_captured_clipboard(force=True)
                     return False
-                if expected_target is None:
+                if expected_target is None and not platform_support.IS_WINDOWS:
                     return True
                 try:
                     if platform_support.IS_WINDOWS:
-                        matches = bool(expected_target) and _windows_foreground_window() == expected_target
+                        matches = bool(selection_window) and _windows_foreground_window() == selection_window
                     elif platform_support.IS_MAC:
                         from macos_desktop import same_foreground_target
                         matches = same_foreground_target(expected_target)
@@ -13273,9 +13301,31 @@ class DarkThemeApp(QMainWindow):
                 hide_status()
                 return False
 
+            def reject_editor_target():
+                restore_captured_clipboard(force=True)
+                from selection_safety_text import edit_target_unavailable
+                show_status(edit_target_unavailable(lang))
+                time.sleep(1.5)
+                hide_status()
+                return False
+
+            def editor_is_active():
+                if not (platform_support.IS_WINDOWS and replace_selection):
+                    return True
+                if edit_target is not None and _windows_edit_target(selection_window) == edit_target:
+                    return True
+                return reject_editor_target()
+
             try:
                 if request_cancelled():
                     return
+                if platform_support.IS_WINDOWS and replace_selection:
+                    if not expected_target_is_active():
+                        return
+                    edit_target = _windows_edit_target(selection_window)
+                    if edit_target is None:
+                        reject_editor_target()
+                        return
                 preloaded = str(preloaded_text or "").strip()
                 if preloaded:
                     text = preloaded
@@ -13295,7 +13345,11 @@ class DarkThemeApp(QMainWindow):
                     if not expected_target_is_active():
                         return
                     if (replace_selection and self.config.get("replace_selection_select_all") is True):
-                        if not select_all_text_in_foreground(selection_window):
+                        if not select_all_text_in_foreground(
+                                selection_window, **({'expected_edit_target': edit_target}
+                                                    if platform_support.IS_WINDOWS else {})):
+                            if platform_support.IS_WINDOWS and expected_target_is_active():
+                                reject_editor_target()
                             return
                         time.sleep(0.08)
                         if not expected_target_is_active():
@@ -13304,7 +13358,7 @@ class DarkThemeApp(QMainWindow):
                     clipboard_preservation = ClipboardPreservation(
                         pyperclip.paste, platform_support.copy_text, _clipboard_sequence_number)
                     # Clear clipboard, then Ctrl+C to capture selection
-                    if not expected_target_is_active():
+                    if not expected_target_is_active() or not editor_is_active():
                         return
                     if platform_support.copy_text("") is False:
                         # A busy clipboard must never make an unrelated old
@@ -13312,7 +13366,7 @@ class DarkThemeApp(QMainWindow):
                         notify_copy_failed(self.config)
                         return
                     clipboard_preservation.claim("")
-                    if not expected_target_is_active():
+                    if not expected_target_is_active() or not editor_is_active():
                         return
                     simulate_copy()
                     if not expected_target_is_active():
@@ -13383,6 +13437,7 @@ class DarkThemeApp(QMainWindow):
                     replacement_succeeded, _reason = replace_selected_text_in_foreground(
                         text, translated, selection_window,
                         clipboard_preservation=clipboard_preservation,
+                        **({'expected_edit_target': edit_target} if platform_support.IS_WINDOWS else {}),
                     )
                     # Ctrl+V needs the translation in the clipboard. On a safe
                     # fallback we put it there explicitly, so the user never

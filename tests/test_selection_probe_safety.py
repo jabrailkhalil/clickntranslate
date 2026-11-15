@@ -13,6 +13,7 @@ import mode_coordinator
 import platform_support
 import selection_platform
 import selection_quick_translate as quick
+from selection_test_support import editable_editor
 
 
 def wait_probe(controller):
@@ -88,7 +89,7 @@ def test_lost_foreground_aborts_before_changing_clipboard():
 
 
 @pytest.mark.parametrize('replace', [False, True])
-def test_failed_selection_clipboard_clear_never_translates_previous_contents(replace):
+def test_failed_selection_clipboard_clear_never_translates_previous_contents(replace, editable_editor):
     import main
     from test_translation_result_ui import _SelectionHarness, _immediate_thread
     harness = _SelectionHarness({})
