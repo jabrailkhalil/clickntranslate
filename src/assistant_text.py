@@ -551,6 +551,26 @@ for _locale in ASSISTANT_TEXT:
         _PANEL_MESSAGES[_locale]))
 
 
+_IMAGE_ACTIONS = {
+    'en': ('Remove this image', 'Hidden until you enable On desktop in Companion settings again.'),
+    'ru': ('Удалить эту картинку', 'Скрыт, пока вы снова не включите «На рабочем столе» в настройках компаньона.'),
+    'es': ('Eliminar esta imagen', 'Oculto hasta que actives En el escritorio en los ajustes del compañero.'),
+    'de': ('Dieses Bild entfernen', 'Ausgeblendet, bis Auf dem Desktop in den Begleiter-Einstellungen wieder aktiviert wird.'),
+    'fr': ('Supprimer cette image', 'Masqué jusqu’à la réactivation de Sur le bureau dans les paramètres du compagnon.'),
+    'zh': ('删除此图片', '保持隐藏，直到在伙伴设置中重新启用桌面显示。'),
+    'pt': ('Remover esta imagem', 'Oculto até ativar Na área de trabalho nas configurações do companheiro.'),
+    'it': ('Rimuovi questa immagine', 'Nascosto finché non riattivi Sul desktop nelle impostazioni del compagno.'),
+    'ar': ('إزالة هذه الصورة', 'يبقى مخفيًا حتى تعيد تفعيل العرض على سطح المكتب في إعدادات الرفيق.'),
+    'tr': ('Bu resmi kaldır', 'Yoldaş ayarlarında Masaüstünde seçeneğini yeniden açana kadar gizlenir.'),
+    'hi': ('यह चित्र हटाएँ', 'साथी सेटिंग में डेस्कटॉप पर विकल्प दोबारा चालू करने तक छिपा रहेगा।'),
+    'id': ('Hapus gambar ini', 'Tersembunyi sampai Di desktop diaktifkan lagi di pengaturan pendamping.'),
+}
+for _locale, (_remove, _hide) in _IMAGE_ACTIONS.items():
+    from settings_sections import page_caption, PAGE_COMPANION
+    _hide += '\n' + page_caption(_locale, PAGE_COMPANION) + ' → ' + ASSISTANT_TEXT[_locale]['enabled']
+    ASSISTANT_TEXT[_locale].update(remove_image=_remove, hide_hint=_hide, dismiss_hint=_hide)
+
+
 def assistant_text(language, key):
     return ASSISTANT_TEXT.get(language, ASSISTANT_TEXT['en']).get(key, ASSISTANT_TEXT['en'].get(key, key))
 

@@ -38,7 +38,9 @@ def assert_pair_flags(dialog, locale):
 
 
 @pytest.mark.parametrize('locale', tuple(main.INTERFACE_LANGUAGE_BY_CODE))
-def test_result_document_and_pair_editor_keep_flags_after_repopulation(window, app, locale):
+def test_result_document_and_pair_editor_keep_flags_after_repopulation(window, app, locale, monkeypatch):
+    # This test checks flags, not the host's optional Windows OCR installation.
+    monkeypatch.setattr('ocr.installed_ocr_language_codes', lambda *args, **kwargs: ['en', 'ru'])
     window.config['translator_engine'] = 'Google'
     window.set_interface_language(locale)
     result = main.TranslationResultDialog(window, 'Translation', auto_copy=False, lang=locale,

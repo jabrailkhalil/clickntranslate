@@ -179,6 +179,39 @@ def test_settings_tab_arrows_follow_visual_order(window, app):
         assert settings._settings_page_index == page
 
 
+@pytest.mark.parametrize('locale', ['en', 'ar'])
+def test_settings_tabs_have_one_inset_focus_cue_and_arrows_leave_the_tab_row(window, app, locale):
+    window.set_interface_language(locale)
+    window.show_settings()
+    app.processEvents()
+    settings = window.settings_window
+    root = window.ui_root
+    tab = settings.settings_page_tabs[0]
+    keyboard.focus_control(tab)
+    app.processEvents()
+    ring = root._keyboard_focus_ring
+    bounds = QtCore.QRect(tab.mapTo(root, QtCore.QPoint()), tab.size())
+    assert ring.geometry() == bounds.adjusted(3, 3, -3, -3)
+    assert 'keyboardFocus' not in tab.styleSheet()
+    assert len(root.findChildren(keyboard._FocusRing)) == 1
+    from pathlib import Path
+    import sys
+    window.grab().save(str(Path(sys.argv[0]).parent / f'settings-tab-focus-{locale}.png'))
+    target = keyboard.spatial_target(root, tab, QtCore.Qt.Key_Down)
+    assert target is not None and target is not tab
+    QTest.keyClick(tab, QtCore.Qt.Key_Down)
+    assert focused(root) is target
+    # Preserve editing: the same arrows navigate text once an editor is reached.
+    window.show_main_screen()
+    keyboard.focus_control(window.text_input)
+    window.text_input.setPlainText('abcd')
+    cursor = window.text_input.textCursor()
+    cursor.setPosition(2)
+    window.text_input.setTextCursor(cursor)
+    QTest.keyClick(window.text_input, QtCore.Qt.Key_Left)
+    assert window.text_input.textCursor().position() == 1
+
+
 def test_enter_opens_combo_and_escape_only_closes_its_popup(window, app):
     window.show_settings()
     settings = window.settings_window

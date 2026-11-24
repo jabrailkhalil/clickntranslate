@@ -284,6 +284,11 @@ def _hover_tooltip_document(widget, anchor):
     if screen is not None:
         width = min(width, max(1, screen.availableGeometry().width() - 2 * padding.x() - 8))
     document.setTextWidth(width)
+    # QTextDocument aligns RTL paragraphs against its layout width. Keeping
+    # that width at the wrap limit while shrinking the window to idealWidth()
+    # placed short Arabic hints entirely to the right of their visible bubble.
+    # Measure and paint with the same final content width in every direction.
+    document.setTextWidth(max(1, math.ceil(document.idealWidth())))
     widget.setProperty('tooltip_padding', padding)
     size = QtCore.QSize(math.ceil(document.idealWidth()) + 2 * padding.x(),
                         math.ceil(document.size().height()) + 2 * padding.y())
@@ -653,6 +658,18 @@ class AccentControlStyle(QtWidgets.QProxyStyle):
         else:
             super().__init__()
         self.dark = bool(dark)
+
+    def subElementRect(self, element, option, widget=None):
+        rect = super().subElementRect(element, option, widget)
+        if (element == QtWidgets.QStyle.SE_CheckBoxIndicator
+                and isinstance(widget, QtWidgets.QCheckBox) and '\n' in widget.text()):
+            # A wrapped description belongs to the first text line. Centering
+            # its indicator over the complete two/three-line paragraph made
+            # the row appear to start at a different height from its neighbour.
+            lines = widget.text().count('\n') + 1
+            offset = round((lines - 1) * option.fontMetrics.lineSpacing() / 2)
+            rect.moveTop(max(option.rect.top(), rect.top() - offset))
+        return rect
 
     def _draw_chevron(self, option, painter):
         """The drop-down marker for combo boxes.

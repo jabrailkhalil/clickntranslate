@@ -512,7 +512,7 @@ def test_main_screen_has_translation_heading_and_preview_in_shortcut_area(app, o
     window.deleteLater()
 
 
-def test_desktop_dismissal_preserves_main_preview_and_saved_preferences(app, owner):
+def test_desktop_dismissal_preserves_main_preview_and_saves_disabled_preference(app, owner):
     class AssistantStub:
         def __init__(self):
             self.disposed = False
@@ -528,12 +528,13 @@ def test_desktop_dismissal_preserves_main_preview_and_saved_preferences(app, own
     app.processEvents()
     assert owner.assistant_preview.isVisible()
     owner._sync_desktop_assistant = lambda: main.DarkThemeApp._sync_desktop_assistant(owner)
+    owner.set_desktop_assistant_enabled = lambda enabled: main.DarkThemeApp.set_desktop_assistant_enabled(owner, enabled)
     main.DarkThemeApp.dismiss_desktop_assistant_until_restart(owner)
-    assert owner.config['desktop_assistant_enabled'] is True
+    assert owner.config['desktop_assistant_enabled'] is False
     assert owner._desktop_assistant is None
-    assert owner._desktop_assistant_suppressed_until_restart is True
+    assert not getattr(owner, '_desktop_assistant_suppressed_until_restart', False)
     assert owner.assistant_preview.isVisible()
-    owner.save_config.assert_not_called()
+    owner.save_config.assert_called_once()
 
 
 def test_title_flag_is_smaller_and_left_aligned(app, monkeypatch):

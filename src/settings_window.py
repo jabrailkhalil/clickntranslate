@@ -363,7 +363,7 @@ def _populate_grouped_translator_combo(
     installed = {str(engine).lower() for engine in (installed_engines or ())}
     engines_by_index = []
     visible_groups = []
-    for kind in ("offline", "online", "api"):
+    for kind in ("online", "offline", "api"):
         combo.addItem(f"  {groups.get(kind, 'API')}", None)
         header_index = combo.count() - 1
         engines_by_index.append(None)
@@ -1486,7 +1486,6 @@ class SettingsPageTabButton(OpticallyCenteredPushButton):
             QPushButton:checked, QPushButton:checked:hover,
             QPushButton:checked[pointerHover="false"]:hover {{
                 color:{active}; }}
-            QPushButton[keyboardFocus="true"]:focus {{ border-color:{colors['focus']}; }}
             QPushButton:disabled {{ color:{colors['disabled']}; background:transparent; }}
         """)
 
@@ -6385,6 +6384,21 @@ def _package_controls(table):
             *getattr(table, '_package_engine_actions', ())]
 
 
+def _package_mutation_busy(owner):
+    """Language packs and engine bundles share one mutation lane."""
+    app_owner = getattr(owner, 'parent', None)
+    if not callable(app_owner) and app_owner is not None:
+        if (getattr(app_owner, '_main_translation_running', False)
+                and getattr(app_owner, '_argos_install_required', False)):
+            return True
+    if any(getattr(owner, '_' + engine + '_install_in_progress', False)
+           for engine in ('tesseract', 'rapidocr', 'easyocr', 'hymt')):
+        return True
+    dialog = getattr(owner, '_language_manager_dialog', None)
+    return bool(dialog is not None and not sip.isdeleted(dialog)
+                and getattr(dialog, '_install_in_progress', False))
+
+
 class OcrLanguageManagerDialog(QDialog):
     _runtime_probe_ready = QtCore.pyqtSignal(object)
     _package_sizes_ready = QtCore.pyqtSignal(object)
@@ -6626,9 +6640,22 @@ class OcrLanguageManagerDialog(QDialog):
             language_manager_text(self.lang, "show_progress")
         )
         self.task_show_button.setObjectName("languagePackageTaskShow")
+        self.task_show_button.setFixedHeight(30)
         self.task_show_button.clicked.connect(self._restore_task_progress)
         self.task_show_button.hide()
         bottom.addWidget(self.task_show_button)
+        self.task_progress = QProgressBar(self.content_widget)
+        self.task_progress.setObjectName('languagePackageTaskProgress')
+        self.task_progress.setFixedWidth(90)
+        self.task_progress.setFixedHeight(18)
+        self.task_progress.hide()
+        bottom.addWidget(self.task_progress)
+        self.task_cancel_button = QPushButton(settings_text(self.lang, 'cancel'), self.content_widget)
+        self.task_cancel_button.setObjectName('languagePackageTaskCancel')
+        self.task_cancel_button.setFixedHeight(30)
+        self.task_cancel_button.clicked.connect(self._cancel_active_task)
+        self.task_cancel_button.hide()
+        bottom.addWidget(self.task_cancel_button)
         bottom.addStretch()
         self.download_access_btn = EngineActivationButton(center_text(self.lang, 'connection'), self.content_widget)
         self.download_access_btn.captions = tuple(center_text(self.lang, key) for key in ('connection', 'back'))
@@ -6681,6 +6708,12 @@ class OcrLanguageManagerDialog(QDialog):
         self._initial_catalog_timer.start(0)
         self._ensure_engine_table(self._active_engine_table())
         self._refresh_activation()
+        if self._packages_busy():
+            self._set_package_actions_busy(True)
+        previous_task = dict(getattr(owner, '_language_package_task_state', {}) or {})
+        if previous_task.get('text'):
+            self._show_task_status(previous_task['text'], previous_task.get('percent'),
+                                   previous_task.get('kind', 'idle'))
 
     def _owner_app(self):
         owner_parent = getattr(self.owner, "parent", None)
@@ -6763,6 +6796,7 @@ class OcrLanguageManagerDialog(QDialog):
             QTableWidget {{ background:{c['field']}; alternate-background-color:{c['field']}; color:{c['text']}; gridline-color:{c['border']}; selection-background-color:{c['selected']}; selection-color:{c['text']}; font-family:'Segoe UI'; font-size:14px; border:1px solid {c['border']}; border-radius:0; }}
             QTableWidget::item {{ color:{c['text']}; background:{c['field']}; }}
             QTableWidget::item:disabled {{ color:{c['muted']}; }}
+            QTableWidget::indicator {{ width:18px; height:18px; }}
             QTableWidget::item:selected, QTableWidget::item:selected:!active {{ background:{c['selected']}; color:{c['text']}; }}
             QTableCornerButton::section, QHeaderView::section {{ background:{c['header']}; color:{c['text']}; border:0; padding:5px; font-size:13px; font-weight:600; }}
             QPushButton#languagePackageAction {{ min-height:18px; }}
@@ -6771,6 +6805,8 @@ class OcrLanguageManagerDialog(QDialog):
             QLabel#languagePackageEmptyBody {{ color:{c['muted']}; font-size:13px; }}
             QLineEdit {{ background:{c['field']}; color:{c['text']}; border:1px solid {c['border']}; border-radius:7px; padding:4px 9px; font-size:14px; }}
             QLineEdit:focus {{ border-color:{c['accent']}; }}
+            QProgressBar#languagePackageTaskProgress {{ background:{c['field']}; color:{c['text']}; border:1px solid {c['border']}; border-radius:4px; text-align:center; font-size:11px; }}
+            QProgressBar#languagePackageTaskProgress::chunk {{ background:{c['accent']}; border-radius:3px; }}
         """ + tooltip_stylesheet(dark) + standard_buttons(dark, compact=True))
         install_accent_controls(self, dark)
         if self.api_page is not None:
@@ -6922,13 +6958,18 @@ class OcrLanguageManagerDialog(QDialog):
         and capping it again shaves a row off on every pass. QTableView owns its
         viewport margins for its headers, so those are not free for this.
         """
-        if table.rowCount() <= 0 or table.maximumHeight() < cls._MAX_WIDGET_HEIGHT:
+        if table.rowCount() <= 0:
+            return
+        if (table.maximumHeight() < cls._MAX_WIDGET_HEIGHT
+                and table.height() >= table.maximumHeight()):
             return
         row_height = table.rowHeight(0) or table.verticalHeader().defaultSectionSize()
-        chrome = table.horizontalHeader().height() + 2 * table.frameWidth()
-        if table.horizontalScrollBar().isVisible():
-            chrome += table.horizontalScrollBar().height()
-        available = table.height() - chrome
+        # Use the actual viewport. Fractional native scaling can round the
+        # header/frame independently, leaving a fraction of the last row if
+        # their nominal sizes are added instead. A newly visible footer may
+        # also allocate less height than a cap measured on the first frame.
+        available = table.viewport().height()
+        chrome = table.height() - available
         if row_height <= 0 or available < row_height:
             return
         table.setMaximumHeight((available // row_height) * row_height + chrome)
@@ -6964,6 +7005,8 @@ class OcrLanguageManagerDialog(QDialog):
             self.show_api()
         self._ensure_engine_table(self._active_engine_table())
         self._refresh_activation()
+        if self._packages_busy():
+            self._set_package_actions_busy(True)
         # A page is laid out when it is first shown, so its table can only be
         # measured after switching to it.
         QtCore.QTimer.singleShot(0, self._snap_visible_table)
@@ -7003,7 +7046,7 @@ class OcrLanguageManagerDialog(QDialog):
             engine = table._package_engine if table is not None else online or ''
             active = ready and provider_id(config.get(key)) == engine
             button.setText(center_text(self.lang, 'active' if active else 'activate'))
-            button.setEnabled(ready and not active and not self._install_in_progress)
+            button.setEnabled(ready and not active and not self._packages_busy())
             button.setToolTip(tooltip_text(center_text(self.lang, 'setup_first')) if not ready
                               else tooltip_text(button.text()))
 
@@ -7249,6 +7292,7 @@ class OcrLanguageManagerDialog(QDialog):
             layout.addWidget(filter_edit)
 
         table = PackageTable(page)
+        table.rows_fitted.connect(lambda target=table: self._snap_table_to_whole_rows(target))
         table.setColumnCount(5)
         table.setHorizontalHeaderLabels((header_labels or [
             "",
@@ -7264,7 +7308,6 @@ class OcrLanguageManagerDialog(QDialog):
         table.setSelectionBehavior(QAbstractItemView.SelectRows)
         table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         table.setAlternatingRowColors(False)
-        table.setIconSize(QtCore.QSize(22, 22))
         table.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
         table.setHorizontalScrollMode(QAbstractItemView.ScrollPerPixel)
         table.verticalScrollBar().setSingleStep(24)
@@ -7375,7 +7418,7 @@ class OcrLanguageManagerDialog(QDialog):
         removable = bool(self._highlighted_installed_codes(table))
         for button in getattr(table, '_package_action_buttons', ()):
             install = button.property('packageAction') == 'install'
-            button.setEnabled(not self._install_in_progress and (pending if install else removable))
+            button.setEnabled(not self._packages_busy() and (pending if install else removable))
             button.setToolTip(tooltip_text(center_text(self.lang, 'install_hint' if install else 'remove_hint')))
 
     def _set_engine_missing_state(self, table, missing, engine_name=""):
@@ -7811,9 +7854,16 @@ class OcrLanguageManagerDialog(QDialog):
         button.setText(caption)
         if isinstance(button, QWidget):
             button.setAccessibleName(caption)
-        button.setToolTip(tooltip_text(center_text(self.lang, 'check_help')))
+        help_text = (center_text(self.lang, 'update') + ': ' + str(plan.get('available', ''))
+                     + '\n' + format_size(plan['size'])
+                     if isinstance(plan, dict) and not plan.get('current', True)
+                     else center_text(self.lang, 'check_help'))
+        button.setToolTip(tooltip_text(help_text))
 
     def _request_update_check(self, table, button, install):
+        if self._packages_busy():
+            self._restore_task_progress()
+            return
         plan = button.property('packageUpdatePlan')
         if isinstance(plan, dict) and not plan.get('current', True):
             button.setProperty('packageUpdatePlan', None)
@@ -7862,8 +7912,8 @@ class OcrLanguageManagerDialog(QDialog):
             if button.property('packageAction') != 'update':
                 continue
             button.setProperty('packageUpdateChecking', False)
-            button.setEnabled(not self._install_in_progress)
-            if self._install_in_progress and button.property('packageBusyWasEnabled') is not None:
+            button.setEnabled(not self._packages_busy())
+            if self._packages_busy() and button.property('packageBusyWasEnabled') is not None:
                 button.setProperty('packageBusyWasEnabled', True)
             button.setProperty('packageUpdatePlan', None if 'error' in plan else plan)
             self._set_update_button_caption(button)
@@ -7875,6 +7925,7 @@ class OcrLanguageManagerDialog(QDialog):
                 center_text(self.lang, 'installed') + ': ' + (plan['installed'] or '—') + '\n' +
                 center_text(self.lang, 'available') + ': ' + plan['available'])
         label.setText(getattr(table, '_package_summary', '') + '\n' + table._package_update_status)
+        label.setToolTip(tooltip_text(label.text()))
         label.show()
 
     @QtCore.pyqtSlot(object)
@@ -8493,6 +8544,9 @@ class OcrLanguageManagerDialog(QDialog):
         The confirmation, the deletion and the engine-selector fallback all live
         in SettingsWindow already; this only routes to them and refreshes.
         """
+        if self._packages_busy():
+            self._restore_task_progress()
+            return
         remover = getattr(self.owner, remove_method, None)
         if remover is None:
             return
@@ -8955,7 +9009,7 @@ class OcrLanguageManagerDialog(QDialog):
         success_message="",
         failure_key="install_failed",
     ):
-        if self._install_in_progress:
+        if self._packages_busy():
             # A second servicing/download operation must never be queued behind
             # the user's back. Bring the existing work back instead; checkbox
             # selections in every table remain untouched for a later click.
@@ -8983,18 +9037,58 @@ class OcrLanguageManagerDialog(QDialog):
             lambda text, name=title: self._on_task_backgrounded(name, text)
         )
         self._clear_task_status()
-        self._publish_owner_task_status(
+        self._show_task_status(
             f"{title}: {language_manager_text(self.lang, 'preparing')}",
             kind="running",
         )
         self.progress_dialog.show()
         self.progress_dialog.center_on_owner()
         self.progress_dialog.bring_to_front()
-        threading.Thread(target=worker_func, args=(codes,), daemon=True).start()
+        try:
+            threading.Thread(target=worker_func, args=(codes,), daemon=True).start()
+        except Exception as error:
+            self._on_language_task_finished(str(title), str(error))
+
+    def _packages_busy(self):
+        return self._install_in_progress or _package_mutation_busy(self.owner)
+
+    def _engine_task(self):
+        for engine, attr in (('tesseract', 'progress'), ('rapidocr', 'rapidocr_progress'),
+                             ('easyocr', 'easyocr_progress'), ('hymt', 'hymt_progress')):
+            if getattr(self.owner, '_' + engine + '_install_in_progress', False):
+                return engine, getattr(self.owner, attr, None)
+        app_owner = self._owner_app()
+        if (getattr(app_owner, '_main_translation_running', False)
+                and getattr(app_owner, '_argos_install_required', False)):
+            return 'argos', getattr(app_owner, '_argos_progress', None)
+        return None, None
+
+    def _cancel_active_task(self):
+        engine, progress = self._engine_task()
+        if engine == 'argos':
+            if not getattr(self._owner_app(), '_argos_cancel_enabled', False):
+                return
+            self._owner_app()._request_argos_install_cancel()
+        elif engine is not None:
+            getattr(self.owner, '_request_' + engine + '_install_cancel')()
+        elif self._install_in_progress:
+            self._request_install_cancel()
+        if self._packages_busy():
+            self.task_cancel_button.setEnabled(False)
+            self.task_cancel_button.setText(language_manager_text(self.lang, 'canceling'))
+
+    def _show_engine_task_status(self, engine, text, percent=None, kind='running'):
+        """Report owner's bundle job in the same persistent footer as packs."""
+        busy = self._packages_busy()
+        if busy != getattr(self, '_package_actions_busy', False):
+            self._set_package_actions_busy(busy)
+            self._refresh_activation()
+        self._show_task_status(f'{engine}: {text}', percent, kind)
 
     def _set_package_actions_busy(self, busy):
         """Allow one package mutation at a time without discarding selections."""
         busy = bool(busy)
+        self._package_actions_busy = busy
         help_text = language_manager_text(self.lang, "task_busy_help")
         buttons = [
             button
@@ -9039,9 +9133,11 @@ class OcrLanguageManagerDialog(QDialog):
         # Closing the package manager must not terminate an active Windows
         # servicing task. Keep the dialog object alive and let the user work
         # in the main window while the background worker finishes.
-        if self._install_in_progress:
-            if self.progress_dialog is not None:
-                self.progress_dialog._continue_in_background()
+        if self._packages_busy():
+            _engine, engine_progress = self._engine_task()
+            progress = engine_progress or self.progress_dialog
+            if progress is not None:
+                progress._continue_in_background()
             self.hide()
             return
         super().reject()
@@ -9050,9 +9146,11 @@ class OcrLanguageManagerDialog(QDialog):
         # The visible Back button calls accept(), while the title-bar close
         # button calls reject(). Both routes must mean the same thing during a
         # long Windows servicing operation: keep it running in the background.
-        if self._install_in_progress:
-            if self.progress_dialog is not None:
-                self.progress_dialog._continue_in_background()
+        if self._packages_busy():
+            _engine, engine_progress = self._engine_task()
+            progress = engine_progress or self.progress_dialog
+            if progress is not None:
+                progress._continue_in_background()
             self.hide()
             return
         super().accept()
@@ -9114,8 +9212,9 @@ class OcrLanguageManagerDialog(QDialog):
             self.task_show_button.show()
 
     def _restore_task_progress(self):
-        dialog = self.progress_dialog
-        if dialog is None or not self._install_in_progress:
+        _engine, engine_progress = self._engine_task()
+        dialog = engine_progress or self.progress_dialog
+        if dialog is None or not self._packages_busy():
             return
         if getattr(self, "task_show_button", None) is not None:
             self.task_show_button.hide()
@@ -9151,7 +9250,7 @@ class OcrLanguageManagerDialog(QDialog):
             "done": "#8fd39b" if self._is_dark_theme() else "#2f7d43",
             "failed": "#e0879a" if self._is_dark_theme() else "#b03a52",
         }
-        label.setStyleSheet(
+        set_widget_stylesheet(label,
             f"color: {colors.get(kind, colors['running'])}; font-size: 12px; font-weight: 600;"
         )
         # Paint to the current available width. A guessed minimum of 320px
@@ -9162,6 +9261,26 @@ class OcrLanguageManagerDialog(QDialog):
             full_detail = f"{full_detail}\n\n{language_manager_text(self.lang, 'task_busy_help')}"
         label.setToolTip(tooltip_text(full_detail))
         label.setVisible(bool(summary))
+        running = kind == 'running' and self._packages_busy()
+        self.task_progress.setVisible(running)
+        self.task_cancel_button.setVisible(running)
+        if running:
+            self.task_progress.setRange(0, 0 if percent is None else 100)
+            if percent is not None:
+                self.task_progress.setValue(int(percent))
+            self.task_progress.setToolTip(tooltip_text(full_detail))
+            engine, _progress = self._engine_task()
+            event_owner = self._owner_app() if engine == 'argos' else self.owner
+            event = (getattr(event_owner, '_' + engine + '_cancel_requested', None)
+                     if engine else self._cancel_requested)
+            canceling = bool(event is not None and event.is_set())
+            cancellable = engine != 'argos' or getattr(event_owner, '_argos_cancel_enabled', False)
+            self.task_cancel_button.setEnabled(not canceling and cancellable)
+            self.task_cancel_button.setText(language_manager_text(self.lang, 'canceling') if canceling
+                                            else settings_text(self.lang, 'cancel'))
+            self.task_show_button.show()
+        else:
+            self.task_show_button.hide()
         self._publish_owner_task_status(summary, percent=percent, kind=kind)
 
     def _clear_task_status(self):
@@ -9172,6 +9291,8 @@ class OcrLanguageManagerDialog(QDialog):
         button = getattr(self, "task_show_button", None)
         if button is not None:
             button.hide()
+        self.task_progress.hide()
+        self.task_cancel_button.hide()
 
     def _finish_language_task(self, engine, error="", canceled=False):
         if not error:
@@ -12604,6 +12725,9 @@ class SettingsWindow(QWidget):
             "kind": str(kind or "idle"),
         }
         self._apply_language_package_task_status()
+        publish = getattr(self.parent, 'set_engine_task_status', None)
+        if callable(publish):
+            publish(dict(self._language_package_task_state))
 
     def _apply_language_package_task_status(self):
         button = getattr(self, "ocr_languages_btn", None)
@@ -12631,12 +12755,15 @@ class SettingsWindow(QWidget):
             suffix = " · !"
         else:
             suffix = ""
-        button.setText(base + suffix)
+        if button.text() != base + suffix:
+            button.setText(base + suffix)
+        old_done = button.property("packageTaskDone")
         button.setProperty("packageTaskDone", kind == "done")
         # Dynamic Qt properties do not automatically trigger a stylesheet
         # recalculation.
-        button.style().unpolish(button)
-        button.style().polish(button)
+        if old_done != (kind == "done"):
+            button.style().unpolish(button)
+            button.style().polish(button)
         help_text = (center_text(lang, 'intro') if button is getattr(self, 'engines_button', None)
                      else section_text(lang, 'ocr_packages_hint'))
         detail = str(state.get("text") or "").strip()
@@ -12673,7 +12800,7 @@ class SettingsWindow(QWidget):
                 stale = dialog.lang != getattr(self.parent, "current_interface_language", "en")
             except RuntimeError:
                 stale = True
-            if stale and not getattr(dialog, "_install_in_progress", False):
+            if stale and not _package_mutation_busy(self):
                 try:
                     dialog.close()
                     dialog.deleteLater()
@@ -12689,7 +12816,7 @@ class SettingsWindow(QWidget):
                 if not sip.isdeleted(self.parent) and callable(schedule):
                     schedule(0)
             dialog.finished.connect(resume_guide)
-        elif not getattr(dialog, "_install_in_progress", False):
+        elif not _package_mutation_busy(self):
             dialog.refresh_all()
             dialog._start_runtime_probe()
             if dialog.argos_table.isVisible():
@@ -15616,7 +15743,7 @@ finally {
             # Never pull the window out from under a running install: it owns
             # the progress dialog and the worker's cancel flag. It will be
             # rebuilt the next time it is opened instead.
-            if getattr(dialog, "_install_in_progress", False):
+            if _package_mutation_busy(self):
                 return
             was_visible = dialog.isVisible()
             sections = (
@@ -16259,17 +16386,25 @@ finally {
     def start_download_thread(self):
         self.start_tesseract_install()
 
+    def _report_engine_task(self, engine, text, percent=None, kind='running'):
+        """Publish the real bundle progress independently of its popup window."""
+        name = {'hymt': 'Hy-MT', 'rapidocr': 'RapidOCR', 'easyocr': 'EasyOCR',
+                'tesseract': 'Tesseract', 'argos': 'Argos'}[engine]
+        dialog = getattr(self, '_language_manager_dialog', None)
+        if dialog is not None and not sip.isdeleted(dialog):
+            dialog._show_engine_task_status(name, text, percent, kind)
+        else:
+            self.set_language_package_task_status(f'{name}: {text}', percent=percent, kind=kind)
+
     def start_tesseract_install(self, progress_owner=None, *, select_on_success=True):
-        if (
-            self._tesseract_install_in_progress
-            or self._rapidocr_install_in_progress
-            or self._easyocr_install_in_progress
-            or self._hymt_install_in_progress
-        ):
+        if _package_mutation_busy(self):
             return
         lang = self.parent.current_interface_language
         config = getattr(self.parent,'config',{}) or {}
         self.previous_ocr_engine = config.get('ocr_engine') or getattr(self,'previous_ocr_engine',None) or platform_support.default_ocr_engine()
+        progress = getattr(self, 'progress', None)
+        if progress is not None:
+            progress._user_minimized = False
         self._tesseract_install_in_progress = True
         self._tesseract_install_phase = "starting"
         self._tesseract_cancel_requested.clear()
@@ -16280,7 +16415,10 @@ finally {
         self._set_parent_topmost_for_tesseract_install(False)
         self._show_tesseract_progress(engine_text(lang, "preparing", engine="Tesseract"), 0)
         worker = self._install_tesseract_worker
-        threading.Thread(target=worker, daemon=True).start()
+        try:
+            threading.Thread(target=worker, daemon=True).start()
+        except Exception as error:
+            self._on_tesseract_install_failed(str(error))
 
     def _install_macos_tesseract_worker(self):
         from macos_tesseract import install
@@ -16355,6 +16493,7 @@ finally {
                                      QtCore.Q_ARG(str, str(error)))
 
     def _show_tesseract_progress(self, text, percent=0, determinate=True):
+        self._report_engine_task('tesseract', text, percent if determinate else None)
         lang = self.parent.current_interface_language
         if not hasattr(self, "progress") or self.progress is None:
             self.progress = TesseractInstallProgressDialog(
@@ -16422,9 +16561,12 @@ finally {
 
     @QtCore.pyqtSlot(str)
     def _on_tesseract_install_ready(self, tesseract_path):
+        backgrounded = bool(getattr(getattr(self, 'progress', None), '_user_minimized', False))
         self._finish_tesseract_install_state()
+        self._report_engine_task('tesseract', engine_text(self.parent.current_interface_language, 'done'), kind='done')
         self._hide_tesseract_progress()
-        self._restore_settings_view()
+        if not backgrounded:
+            self._restore_settings_view()
         tessdata_dir = os.path.join(os.path.dirname(tesseract_path), "tessdata")
         from component_runtime import tesseract_generation
         if os.path.isdir(tessdata_dir) and not tesseract_generation(tesseract_path):
@@ -16434,6 +16576,8 @@ finally {
             self._set_ocr_combo_silently("Tesseract")
             self.save_ocr_engine("Tesseract")
         lang = self.parent.current_interface_language
+        if backgrounded:
+            return
         QMessageBox.information(
             self,
             "Tesseract",
@@ -16442,9 +16586,12 @@ finally {
 
     @QtCore.pyqtSlot(str)
     def _on_tesseract_install_failed(self, error):
+        backgrounded = bool(getattr(getattr(self, 'progress', None), '_user_minimized', False))
         self._finish_tesseract_install_state()
+        self._report_engine_task('tesseract', str(error), kind='failed')
         self._hide_tesseract_progress()
-        self._restore_settings_view()
+        if not backgrounded:
+            self._restore_settings_view()
         if not platform_support.IS_MAC and getattr(self,'_component_tesseract_select_on_success',True):
             prev_engine = self.previous_ocr_engine or platform_support.default_ocr_engine()
             self._set_ocr_combo_silently(prev_engine)
@@ -16454,6 +16601,8 @@ finally {
             if callable(restore):
                 restore(getattr(self,'previous_ocr_engine',None) or (getattr(self.parent,'config',{}) or {}).get('ocr_engine') or platform_support.default_ocr_engine())
         lang = self.parent.current_interface_language
+        if backgrounded:
+            return
         QMessageBox.warning(
             self,
             engine_text(lang, "error_title", engine="Tesseract"),
@@ -16462,14 +16611,19 @@ finally {
 
     @QtCore.pyqtSlot()
     def _on_tesseract_install_cancelled(self):
+        backgrounded = bool(getattr(getattr(self, 'progress', None), '_user_minimized', False))
         self._finish_tesseract_install_state()
+        self._report_engine_task('tesseract', language_manager_text(self.parent.current_interface_language, 'canceled'), kind='idle')
         self._hide_tesseract_progress()
-        self._restore_settings_view()
+        if not backgrounded:
+            self._restore_settings_view()
         if getattr(self,'_component_tesseract_select_on_success',True):
             prev_engine = self.previous_ocr_engine or platform_support.default_ocr_engine()
             self._set_ocr_combo_silently(prev_engine)
             self.save_ocr_engine(prev_engine)
         lang = self.parent.current_interface_language
+        if backgrounded:
+            return
         QMessageBox.information(
             self,
             engine_text(lang, "cancelled_title"),
@@ -16736,16 +16890,14 @@ finally {
                                    check_cancel, progress_callback)
 
     def start_rapidocr_install(self, progress_owner=None, *, select_on_success=True):
-        if (
-            self._rapidocr_install_in_progress
-            or self._tesseract_install_in_progress
-            or self._easyocr_install_in_progress
-            or self._hymt_install_in_progress
-        ):
+        if _package_mutation_busy(self):
             return
         lang = self.parent.current_interface_language
         config = getattr(self.parent,'config',{}) or {}
         self.previous_ocr_engine = config.get('ocr_engine') or getattr(self,'previous_ocr_engine',None) or platform_support.default_ocr_engine()
+        progress = getattr(self, 'rapidocr_progress', None)
+        if progress is not None:
+            progress._user_minimized = False
         self._rapidocr_install_in_progress = True
         self._rapidocr_install_phase = "starting"
         self._rapidocr_cancel_requested.clear()
@@ -16760,7 +16912,10 @@ finally {
             0,
             False
         )
-        threading.Thread(target=self._install_rapidocr_worker, daemon=True).start()
+        try:
+            threading.Thread(target=self._install_rapidocr_worker, daemon=True).start()
+        except Exception as error:
+            self._on_rapidocr_install_failed(str(error))
 
     def _install_rapidocr_worker(self):
         temp_dir = ""
@@ -16905,6 +17060,7 @@ finally {
             self._rapidocr_temp_dir = ""
 
     def _show_rapidocr_progress(self, text, percent=0, determinate=True):
+        self._report_engine_task('rapidocr', text, percent if determinate else None)
         lang = self.parent.current_interface_language
         if self.rapidocr_progress is None:
             self.rapidocr_progress = TesseractInstallProgressDialog(
@@ -16981,14 +17137,19 @@ finally {
 
     @QtCore.pyqtSlot()
     def _on_rapidocr_install_ready(self):
+        backgrounded = bool(getattr(getattr(self, 'rapidocr_progress', None), '_user_minimized', False))
         self._finish_rapidocr_install_state()
+        self._report_engine_task('rapidocr', engine_text(self.parent.current_interface_language, 'done'), kind='done')
         self._hide_rapidocr_progress()
-        self._restore_settings_view()
+        if not backgrounded:
+            self._restore_settings_view()
         self._reset_rapidocr_runtime_cache(clear_modules=True)
         if getattr(self,'_component_rapidocr_select_on_success',True):
             self._set_ocr_combo_silently(RAPIDOCR_ENGINE_DISPLAY)
             self.save_ocr_engine(RAPIDOCR_ENGINE_DISPLAY)
         lang = self.parent.current_interface_language
+        if backgrounded:
+            return
         QMessageBox.information(
             self,
             RAPIDOCR_ENGINE_DISPLAY,
@@ -16997,9 +17158,12 @@ finally {
 
     @QtCore.pyqtSlot(str)
     def _on_rapidocr_install_failed(self, error):
+        backgrounded = bool(getattr(getattr(self, 'rapidocr_progress', None), '_user_minimized', False))
         self._finish_rapidocr_install_state()
+        self._report_engine_task('rapidocr', str(error), kind='failed')
         self._hide_rapidocr_progress()
-        self._restore_settings_view()
+        if not backgrounded:
+            self._restore_settings_view()
         if not platform_support.IS_MAC and getattr(self,'_component_rapidocr_select_on_success',True):
             prev_engine = self.previous_ocr_engine or platform_support.default_ocr_engine()
             self._set_ocr_combo_silently(prev_engine)
@@ -17009,6 +17173,8 @@ finally {
             if callable(restore):
                 restore(getattr(self,'previous_ocr_engine',None) or (getattr(self.parent,'config',{}) or {}).get('ocr_engine') or platform_support.default_ocr_engine())
         lang = self.parent.current_interface_language
+        if backgrounded:
+            return
         QMessageBox.warning(
             self,
             engine_text(lang, "error_title", engine="RapidOCR"),
@@ -17017,14 +17183,19 @@ finally {
 
     @QtCore.pyqtSlot()
     def _on_rapidocr_install_cancelled(self):
+        backgrounded = bool(getattr(getattr(self, 'rapidocr_progress', None), '_user_minimized', False))
         self._finish_rapidocr_install_state()
+        self._report_engine_task('rapidocr', language_manager_text(self.parent.current_interface_language, 'canceled'), kind='idle')
         self._hide_rapidocr_progress()
-        self._restore_settings_view()
+        if not backgrounded:
+            self._restore_settings_view()
         if getattr(self,'_component_rapidocr_select_on_success',True):
             prev_engine = self.previous_ocr_engine or platform_support.default_ocr_engine()
             self._set_ocr_combo_silently(prev_engine)
             self.save_ocr_engine(prev_engine)
         lang = self.parent.current_interface_language
+        if backgrounded:
+            return
         QMessageBox.information(
             self,
             engine_text(lang, "cancelled_title"),
@@ -17046,16 +17217,14 @@ finally {
             raise EasyOCRInstallCancelledError("EasyOCR installation canceled by user.")
 
     def start_easyocr_install(self, progress_owner=None, *, select_on_success=True):
-        if (
-            self._easyocr_install_in_progress
-            or self._rapidocr_install_in_progress
-            or self._tesseract_install_in_progress
-            or self._hymt_install_in_progress
-        ):
+        if _package_mutation_busy(self):
             return
         lang = self.parent.current_interface_language
         config = getattr(self.parent,'config',{}) or {}
         self.previous_ocr_engine = config.get('ocr_engine') or getattr(self,'previous_ocr_engine',None) or platform_support.default_ocr_engine()
+        progress = getattr(self, 'easyocr_progress', None)
+        if progress is not None:
+            progress._user_minimized = False
         self._easyocr_install_in_progress = True
         self._easyocr_install_phase = "starting"
         self._easyocr_cancel_requested.clear()
@@ -17070,7 +17239,10 @@ finally {
             0,
             False
         )
-        threading.Thread(target=self._install_easyocr_worker, daemon=True).start()
+        try:
+            threading.Thread(target=self._install_easyocr_worker, daemon=True).start()
+        except Exception as error:
+            self._on_easyocr_install_failed(str(error))
 
     def _prepare_easyocr_models(self):
         """An explicit Mac engine install also prepares the active OCR language."""
@@ -17228,6 +17400,7 @@ finally {
             self._easyocr_temp_dir = ""
 
     def _show_easyocr_progress(self, text, percent=0, determinate=True):
+        self._report_engine_task('easyocr', text, percent if determinate else None)
         lang = self.parent.current_interface_language
         if self.easyocr_progress is None:
             self.easyocr_progress = TesseractInstallProgressDialog(
@@ -17304,14 +17477,19 @@ finally {
 
     @QtCore.pyqtSlot()
     def _on_easyocr_install_ready(self):
+        backgrounded = bool(getattr(getattr(self, 'easyocr_progress', None), '_user_minimized', False))
         self._finish_easyocr_install_state()
+        self._report_engine_task('easyocr', engine_text(self.parent.current_interface_language, 'done'), kind='done')
         self._hide_easyocr_progress()
-        self._restore_settings_view()
+        if not backgrounded:
+            self._restore_settings_view()
         self._reset_easyocr_runtime_cache(clear_modules=True)
         if getattr(self,'_component_easyocr_select_on_success',True):
             self._set_ocr_combo_silently(EASYOCR_ENGINE_DISPLAY)
             self.save_ocr_engine(EASYOCR_ENGINE_DISPLAY)
         lang = self.parent.current_interface_language
+        if backgrounded:
+            return
         QMessageBox.information(
             self,
             EASYOCR_ENGINE_DISPLAY,
@@ -17320,9 +17498,12 @@ finally {
 
     @QtCore.pyqtSlot(str)
     def _on_easyocr_install_failed(self, error):
+        backgrounded = bool(getattr(getattr(self, 'easyocr_progress', None), '_user_minimized', False))
         self._finish_easyocr_install_state()
+        self._report_engine_task('easyocr', str(error), kind='failed')
         self._hide_easyocr_progress()
-        self._restore_settings_view()
+        if not backgrounded:
+            self._restore_settings_view()
         if not platform_support.IS_MAC and getattr(self,'_component_easyocr_select_on_success',True):
             prev_engine = self.previous_ocr_engine or platform_support.default_ocr_engine()
             self._set_ocr_combo_silently(prev_engine)
@@ -17332,6 +17513,8 @@ finally {
             if callable(restore):
                 restore(getattr(self,'previous_ocr_engine',None) or (getattr(self.parent,'config',{}) or {}).get('ocr_engine') or platform_support.default_ocr_engine())
         lang = self.parent.current_interface_language
+        if backgrounded:
+            return
         QMessageBox.warning(
             self,
             engine_text(lang, "error_title", engine="EasyOCR"),
@@ -17340,14 +17523,19 @@ finally {
 
     @QtCore.pyqtSlot()
     def _on_easyocr_install_cancelled(self):
+        backgrounded = bool(getattr(getattr(self, 'easyocr_progress', None), '_user_minimized', False))
         self._finish_easyocr_install_state()
+        self._report_engine_task('easyocr', language_manager_text(self.parent.current_interface_language, 'canceled'), kind='idle')
         self._hide_easyocr_progress()
-        self._restore_settings_view()
+        if not backgrounded:
+            self._restore_settings_view()
         if getattr(self,'_component_easyocr_select_on_success',True):
             prev_engine = self.previous_ocr_engine or platform_support.default_ocr_engine()
             self._set_ocr_combo_silently(prev_engine)
             self.save_ocr_engine(prev_engine)
         lang = self.parent.current_interface_language
+        if backgrounded:
+            return
         QMessageBox.information(
             self,
             engine_text(lang, "cancelled_title"),
@@ -17355,15 +17543,13 @@ finally {
         )
 
     def start_hymt_install(self, progress_owner=None, *, select_on_success=True):
-        if (
-            self._hymt_install_in_progress
-            or self._tesseract_install_in_progress
-            or self._rapidocr_install_in_progress
-            or self._easyocr_install_in_progress
-        ):
+        if _package_mutation_busy(self):
             return
         lang = self.parent.current_interface_language
         self.previous_translator_engine = (getattr(self.parent,'config',{}) or {}).get('translator_engine') or getattr(self,'previous_translator_engine',None) or 'google'
+        progress = getattr(self, 'hymt_progress', None)
+        if progress is not None:
+            progress._user_minimized = False
         self._hymt_install_in_progress = True
         self._hymt_install_phase = "starting"
         self._hymt_cancel_requested.clear()
@@ -17376,7 +17562,10 @@ finally {
             engine_text(lang, "preparing", engine="Hy-MT"),
             0
         )
-        threading.Thread(target=self._install_hymt_worker, daemon=True).start()
+        try:
+            threading.Thread(target=self._install_hymt_worker, daemon=True).start()
+        except Exception as error:
+            self._on_hymt_install_failed(str(error))
 
     def _get_hymt_download_plan(self, is_x64=True):
         if platform_support.IS_MAC:
@@ -17628,6 +17817,7 @@ finally {
             self._hymt_temp_dir = ""
 
     def _show_hymt_progress(self, text, percent=0, determinate=True):
+        self._report_engine_task('hymt', text, percent if determinate else None)
         lang = self.parent.current_interface_language
         if self.hymt_progress is None:
             self.hymt_progress = TesseractInstallProgressDialog(
@@ -17696,14 +17886,19 @@ finally {
 
     @QtCore.pyqtSlot()
     def _on_hymt_install_ready(self):
+        backgrounded = bool(getattr(getattr(self, 'hymt_progress', None), '_user_minimized', False))
         self._finish_hymt_install_state()
+        self._report_engine_task('hymt', engine_text(self.parent.current_interface_language, 'done'), kind='done')
         self._hide_hymt_progress()
-        self._restore_settings_view()
+        if not backgrounded:
+            self._restore_settings_view()
         self._reset_hymt_runtime_cache()
         if getattr(self,'_component_hymt_select_on_success',True):
             self._set_translator_combo_silently(HYMT_ENGINE_KEY)
             self.auto_save_setting("translator_engine", HYMT_ENGINE_KEY)
         lang = self.parent.current_interface_language
+        if backgrounded:
+            return
         QMessageBox.information(
             self,
             HYMT_ENGINE_DISPLAY,
@@ -17712,14 +17907,19 @@ finally {
 
     @QtCore.pyqtSlot(str)
     def _on_hymt_install_failed(self, error):
+        backgrounded = bool(getattr(getattr(self, 'hymt_progress', None), '_user_minimized', False))
         self._finish_hymt_install_state()
+        self._report_engine_task('hymt', str(error), kind='failed')
         self._hide_hymt_progress()
-        self._restore_settings_view()
+        if not backgrounded:
+            self._restore_settings_view()
         if not platform_support.IS_MAC and getattr(self,'_component_hymt_select_on_success',True):
             prev_engine = self.previous_translator_engine or "google"
             self._set_translator_combo_silently(prev_engine)
             self.auto_save_setting("translator_engine", prev_engine)
         lang = self.parent.current_interface_language
+        if backgrounded:
+            return
         QMessageBox.warning(
             self,
             engine_text(lang, "error_title", engine="Hy-MT"),
@@ -17728,14 +17928,19 @@ finally {
 
     @QtCore.pyqtSlot()
     def _on_hymt_install_cancelled(self):
+        backgrounded = bool(getattr(getattr(self, 'hymt_progress', None), '_user_minimized', False))
         self._finish_hymt_install_state()
+        self._report_engine_task('hymt', language_manager_text(self.parent.current_interface_language, 'canceled'), kind='idle')
         self._hide_hymt_progress()
-        self._restore_settings_view()
+        if not backgrounded:
+            self._restore_settings_view()
         if getattr(self,'_component_hymt_select_on_success',True):
             prev_engine = self.previous_translator_engine or "google"
             self._set_translator_combo_silently(prev_engine)
             self.auto_save_setting("translator_engine", prev_engine)
         lang = self.parent.current_interface_language
+        if backgrounded:
+            return
         QMessageBox.information(
             self,
             engine_text(lang, "cancelled_title"),
@@ -17744,7 +17949,7 @@ finally {
 
     def remove_hymt_engine(self):
         lang = self.parent.current_interface_language
-        if self._hymt_install_in_progress:
+        if _package_mutation_busy(self):
             self._request_hymt_install_cancel()
             return
         hymt_dir = self._local_hymt_dir()
@@ -17793,7 +17998,7 @@ finally {
 
     def remove_rapidocr_engine(self):
         lang = self.parent.current_interface_language
-        if self._rapidocr_install_in_progress:
+        if _package_mutation_busy(self):
             self._request_rapidocr_install_cancel()
             return
         rapidocr_dir = self._local_rapidocr_dir()
@@ -17830,7 +18035,7 @@ finally {
 
     def remove_easyocr_engine(self):
         lang = self.parent.current_interface_language
-        if self._easyocr_install_in_progress:
+        if _package_mutation_busy(self):
             self._request_easyocr_install_cancel()
             return
         easyocr_dir = self._local_easyocr_dir()
@@ -17867,7 +18072,7 @@ finally {
 
     def remove_tesseract_engine(self):
         lang = self.parent.current_interface_language
-        if self._tesseract_install_in_progress:
+        if _package_mutation_busy(self):
             self._request_tesseract_install_cancel()
             return
         tesseract_dir = self._local_tesseract_dir()

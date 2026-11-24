@@ -165,6 +165,51 @@ def test_actual_tooltip_has_visible_localized_ink_in_both_themes(app,locale,dark
         app.setProperty('ui_theme',old_theme);install_tooltip_style(app,_uses_dark_theme())
 
 
+@pytest.mark.parametrize('locale', ['en','ru','es','de','fr','zh','pt','it','ar','tr','hi','id'])
+@pytest.mark.parametrize('dark', [True, False])
+@pytest.mark.parametrize('factor', [1., 1.6, 2.])
+def test_short_tab_tooltip_rtl_glyphs_fit_the_actual_bubble(app, locale, dark, factor):
+    """Short RTL text used to be aligned outside a bubble sized to idealWidth."""
+    from settings_sections import PAGE_DYNAMIC, page_caption
+    from styled_dialogs import _uses_dark_theme, _hover_tooltip_document
+    old_theme = app.property('ui_theme')
+    owner = QtWidgets.QWidget()
+    owner.setProperty('ui_effective_scale', factor)
+    button = QtWidgets.QPushButton(page_caption(locale, PAGE_DYNAMIC), owner)
+    button.setGeometry(10, 10, 130, 30)
+    owner.resize(240, 80)
+    owner.show()
+    app.processEvents()
+    try:
+        app.setProperty('ui_theme', 'Темная' if dark else 'Светлая')
+        install_tooltip_style(app, dark)
+        button.setToolTip(tooltip_text(button.text()))
+        anchor = button.mapToGlobal(button.rect().center())
+        QtWidgets.QToolTip.showText(anchor, button.toolTip(), button)
+        QTest.qWait(20)
+        tip = next(item for item in app.topLevelWidgets()
+                   if item.metaObject().className() == 'QTipLabel' and item.isVisible())
+        document, size = _hover_tooltip_document(tip, anchor)
+        padding = tip.property('tooltip_padding')
+        assert document.textWidth() <= size.width() - 2 * padding.x()
+        picture = tip.grab()
+        image = picture.toImage()
+        # Exclude the frame: a grey outline alone is not a readable tooltip.
+        ink = sum(1 for y in range(padding.y(), image.height()-padding.y())
+                  for x in range(padding.x(), image.width()-padding.x())
+                  if image.pixelColor(x,y).alpha() > 100 and
+                  (image.pixelColor(x,y).lightness() > 180 if dark else image.pixelColor(x,y).lightness() < 100))
+        assert ink > 20, (locale, dark, factor, size, button.toolTip())
+        if locale in ('ar', 'en') and factor == 1.6:
+            picture.save(str(Path(sys.argv[0]).parent / f'short-tab-tooltip-{locale}-{dark}.png'))
+    finally:
+        QtWidgets.QToolTip.hideText()
+        owner.close()
+        owner.deleteLater()
+        app.setProperty('ui_theme', old_theme)
+        install_tooltip_style(app, _uses_dark_theme())
+
+
 def test_popup_row_tooltip_respects_disabled_hover_help(app):
     from combo_popup import PopupRowDelegate
     old=app.property('buttonTooltipsEnabled')

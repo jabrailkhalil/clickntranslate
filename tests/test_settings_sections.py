@@ -272,8 +272,8 @@ def test_general_tool_buttons_keep_their_existing_connected_actions(window, app)
     assert getattr(window, '_cached_settings_window', None) is None
     bindings = (
         ('clear_cache_btn', 'clear_all_cache'), ('reset_btn', 'reset_settings'),
-        ('update_btn', 'check_for_updates'), ('export_settings_btn', 'export_settings'),
-        ('import_settings_btn', 'import_settings'), ('hotkeys_button', 'show_hotkeys_screen'),
+        ('update_btn', 'check_for_updates'), ('export_settings_btn', 'request_export_settings'),
+        ('import_settings_btn', 'request_import_settings'), ('hotkeys_button', 'show_hotkeys_screen'),
         ('engines_button', 'show_ocr_language_manager'),
     )
     with ExitStack() as stack:
@@ -315,7 +315,7 @@ def test_inline_updater_returns_directly_to_general_without_an_extra_tools_page(
 
 
 @pytest.mark.parametrize('locale', ['ru', 'ar'])
-def test_companion_custom_image_row_scrolls_without_moving_its_actions(window, app, locale):
+def test_companion_custom_image_gallery_fits_without_scroll(window, app, locale):
     window.config.update(desktop_assistant_appearance='custom',
                          desktop_assistant_image=main.resource_path(main.INTERFACE_LANGUAGE_OPTIONS[0]['icon']))
     window.set_interface_language(locale)
@@ -334,11 +334,11 @@ def test_companion_custom_image_row_scrolls_without_moving_its_actions(window, a
             row = page.custom_image_row
             assert row.isVisible()
             assert page.mascot_preview.height() >= 110
-            assert scroll.verticalScrollBar().maximum() > 0
+            assert scroll.verticalScrollBar().maximum() == 0
             original = rect_in(footer, page)
-            scroll.ensureWidgetVisible(row, 0, 0)
-            settle(app)
-            assert scroll.viewport().rect().contains(rect_in(row, scroll.viewport()))
+            assert footer.rect().contains(rect_in(row, footer))
+            for control in (page.image_combo, page.remove_image, page.appearance_buttons['custom']):
+                assert row.rect().contains(rect_in(control, row))
             assert page.rect().contains(original)
             assert not scroll.isAncestorOf(footer)
             assert rect_in(footer, page) == original

@@ -364,6 +364,7 @@ def _wrap_mode_pages(settings):
     page = settings.settings_assistant_page
     old_root = page.layout()
     old_root.removeWidget(page.menu_buttons)
+    old_root.removeWidget(page.custom_image_row)
     content = QWidget()
     content.setLayout(old_root)
     settings.assistant_settings_content = content
@@ -378,10 +379,13 @@ def _wrap_mode_pages(settings):
     settings.assistant_action_panel.setStyleSheet('QWidget#assistantMenuFooter { background:transparent; border:0; }')
     footer = QHBoxLayout(settings.assistant_action_panel)
     footer.setContentsMargins(0, 1, 0, 1)
-    footer.addStretch(1)
+    footer.setSpacing(8)
+    page.gallery_footer_layout = footer
+    footer.addStretch(0)
+    footer.addWidget(page.custom_image_row, 1)
     page.menu_buttons.setFixedWidth(max(230, page.menu_buttons.fontMetrics().horizontalAdvance(page.menu_buttons.text())+32))
     footer.addWidget(page.menu_buttons)
-    footer.addStretch(1)
+    footer.addStretch(0)
     root.addWidget(settings.assistant_action_panel)
 
 
@@ -406,7 +410,9 @@ def organize(settings, general_layout, form, updates_layout, dim_row):
             settings.history_checkbox, settings.button_tooltips_checkbox,
             settings.update_check_on_launch_checkbox)):
         control.setParent(content)
-        form.addWidget(_flag(control), row, 0, Qt.AlignLeft)
+        # The display fields end above these rows. Let long localized help /
+        # update captions use the free space instead of widening column zero.
+        form.addWidget(_flag(control), row, 0, 1, 3 if row >= 4 else 1, Qt.AlignLeft)
     for row, label, control in (
             (0, settings.ui_scale_label, settings.ui_scale_control),
             (1, settings.translation_font_label, settings.translation_font_control)):

@@ -222,9 +222,10 @@ def test_closing_document_requests_cancellation(monkeypatch):
     dialog = main.DocumentTranslationDialog(owner)
     try:
         dialog.translation_running = True
-        dialog._translation_cancel_event = threading.Event()
+        cancel = dialog._translation_cancel_event = threading.Event()
         dialog.reject()
-        assert dialog._translation_cancel_event.is_set()
+        assert cancel.is_set()
+        assert dialog._translation_cancel_event is None
     finally:
         dialog.translation_running = False
         dialog.close()
@@ -359,11 +360,11 @@ def test_document_provider_list_groups_online_and_only_installed_offline(monkeyp
     )
     dialog._populate_provider_combo("argos")
     offline_header = dialog.provider_combo.findText("  Offline")
-    assert offline_header == 0
     online_header = dialog.provider_combo.findText("  Online")
-    assert online_header > offline_header
-    assert dialog.provider_combo.findData("argos") < online_header
-    assert dialog.provider_combo.findData("google") > online_header
+    assert online_header == 0
+    assert offline_header > online_header
+    assert dialog.provider_combo.findData("argos") > offline_header
+    assert online_header < dialog.provider_combo.findData("google") < offline_header
     assert not dialog.provider_combo.model().item(offline_header).isEnabled()
     assert dialog.provider_combo.currentData() == "argos"
     assert dialog.provider_combo.findData("hymt") == -1

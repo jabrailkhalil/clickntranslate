@@ -29,9 +29,9 @@ $versionSource = Join-Path ([System.IO.Path]::GetTempPath()) ("ClicknTranslateLa
 try {
     $versionCode = @"
 using System.Reflection;
-[assembly: AssemblyTitle("Click'n'Translate Launcher")]
+[assembly: AssemblyTitle("ClicknTranslate")]
 [assembly: AssemblyCompany("Jabrail Digital")]
-[assembly: AssemblyProduct("Click'n'Translate")]
+[assembly: AssemblyProduct("ClicknTranslate")]
 [assembly: AssemblyVersion("$Version")]
 [assembly: AssemblyFileVersion("$Version")]
 "@

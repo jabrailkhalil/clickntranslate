@@ -1,5 +1,6 @@
 """Interaction contracts for the personal desktop companion and Google Auto."""
 from unittest import mock
+from pathlib import Path
 
 import pytest
 from PyQt5 import QtCore, QtGui, QtWidgets
@@ -72,7 +73,10 @@ def test_custom_image_and_native_waiting_pose(window, tmp_path):
     companion_art('star').save(str(custom))
     with mock.patch.object(QtWidgets.QFileDialog, 'getOpenFileName', return_value=(str(custom), '')):
         page.appearance_buttons['custom'].click()
-    assert window.config['desktop_assistant_image'] == str(custom)
+    from companion_images import gallery_dir
+    saved = assistant_preferences(window.config)['desktop_assistant_image']
+    assert Path(saved).parent == gallery_dir()
+    assert Path(saved).read_bytes() == custom.read_bytes()
     assert page.mode_combo.currentData() == 'custom'
     page.choose_appearance('portrait')
     helper = window._desktop_assistant

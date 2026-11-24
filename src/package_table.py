@@ -11,14 +11,22 @@ class _PackageDelegate(QtWidgets.QStyledItemDelegate):
 
 
 class PackageTable(QtWidgets.QTableWidget):
+    rows_fitted = QtCore.pyqtSignal()
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setItemDelegate(_PackageDelegate(self))
+        # An invalid/default icon size stays at a platform's tiny 16px even
+        # when native dialog fonts scale. DialogAppearance scales this base
+        # exactly once; a graphics proxy supplies its own scene transform.
+        self.setIconSize(QtCore.QSize(22, 22))
+        self.setProperty('wholeRowTable', True)
         self.setWordWrap(False)
         self.setTextElideMode(QtCore.Qt.ElideRight)
         self._fit_timer = QtCore.QTimer(self)
         self._fit_timer.setSingleShot(True)
         self._fit_timer.timeout.connect(self.fit_columns)
+        self.iconSizeChanged.connect(self._icon_size_changed)
         self.verticalScrollBar().rangeChanged.connect(self._schedule_fit)
         # Qt normally gives the bar the full table height, including the
         # stationary header. Reserve that header height in its own layout so
@@ -30,6 +38,10 @@ class PackageTable(QtWidgets.QTableWidget):
 
     def _schedule_fit(self, *_):
         self._fit_timer.start(0)
+
+    def _icon_size_changed(self, *_):
+        self.setMaximumHeight(16777215)
+        self._schedule_fit()
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -92,4 +104,5 @@ class PackageTable(QtWidgets.QTableWidget):
             height = max(self.rowHeight(row) for row in range(self.rowCount()))
             for row in range(self.rowCount()):
                 self.setRowHeight(row, height)
+        self.rows_fitted.emit()
 

@@ -12,7 +12,7 @@ from engine_center import MAINTENANCE
 from settings_window import OcrLanguageManagerDialog
 from test_desktop_assistant import app
 from test_language_package_manager import _AppParent, _ManagerOwner
-from window_appearance import DialogAppearance
+from window_appearance import install_window_appearance
 
 
 def _rect_in(widget, parent):
@@ -35,7 +35,10 @@ def test_real_section_clicks_keep_navigation_and_footer_stationary(app, locale, 
     parent.current_theme = theme
     parent.config = deepcopy(main.DEFAULT_CONFIG)
     owner = _ManagerOwner(parent)
-    appearance = DialogAppearance(app, percent=percent, theme=theme)
+    previous_appearance = getattr(app, '_dialog_appearance', None)
+    previous_values = ((previous_appearance.percent, previous_appearance.theme)
+                       if previous_appearance is not None else None)
+    appearance = install_window_appearance(app, percent=percent, theme=theme)
     dialog = None
     with mock.patch.object(appearance, 'available_geometry', return_value=QtCore.QRect(0, 0, 3840, 2160)), \
          mock.patch.object(OcrLanguageManagerDialog, '_start_runtime_probe'), \
@@ -105,8 +108,12 @@ def test_real_section_clicks_keep_navigation_and_footer_stationary(app, locale, 
             if dialog is not None:
                 dialog.close()
                 dialog.deleteLater()
-            app.removeEventFilter(appearance)
-            appearance.deleteLater()
+            if previous_values is not None:
+                appearance.refresh(percent=previous_values[0], theme=previous_values[1])
+            else:
+                app.removeEventFilter(appearance)
+                del app._dialog_appearance
+                appearance.deleteLater()
             parent.deleteLater()
             app.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)
 
@@ -126,7 +133,10 @@ def test_language_action_buttons_stay_at_bottom_when_notes_wrap(app, theme, perc
     parent.config = deepcopy(main.DEFAULT_CONFIG)
     owner = _ManagerOwner(parent)
     owner.easyocr_status = (True, '')
-    appearance = DialogAppearance(app, percent=percent, theme=theme)
+    previous_appearance = getattr(app, '_dialog_appearance', None)
+    previous_values = ((previous_appearance.percent, previous_appearance.theme)
+                       if previous_appearance is not None else None)
+    appearance = install_window_appearance(app, percent=percent, theme=theme)
     dialog = None
     with mock.patch.object(appearance, 'available_geometry', return_value=QtCore.QRect(0, 0, 3840, 2160)), \
          mock.patch.object(OcrLanguageManagerDialog, '_start_runtime_probe'), \
@@ -164,7 +174,11 @@ def test_language_action_buttons_stay_at_bottom_when_notes_wrap(app, theme, perc
             if dialog is not None:
                 dialog.close()
                 dialog.deleteLater()
-            app.removeEventFilter(appearance)
-            appearance.deleteLater()
+            if previous_values is not None:
+                appearance.refresh(percent=previous_values[0], theme=previous_values[1])
+            else:
+                app.removeEventFilter(appearance)
+                del app._dialog_appearance
+                appearance.deleteLater()
             parent.deleteLater()
             app.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)

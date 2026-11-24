@@ -27,11 +27,15 @@ def test_region_pause_uses_its_own_reason_without_changing_resume_or_activity(ap
     button = QtWidgets.QToolButton()
     owner = SimpleNamespace(paused=False, language=locale, pause_button=button,
                             config={'ocr_engine': 'windows'},
+                            _ocr_generation=0, _revision=0, _translation_cancel=threading.Event(),
+                            _translation_busy=False, _deferred_translation=None,
+                            _active_ocr_worker=None, _active_capture_worker=None,
                             _set_status=mock.Mock())
     try:
         with mock.patch.object(game_mode, 'notify_current_activity') as activity:
             game_mode.GameTranslationOverlay._toggle_pause(owner)
             assert owner.paused
+            assert owner._ocr_generation == 1 and owner._revision == 1
             owner._set_status.assert_called_once_with('paused_manual', active=False)
             assert button.toolTip() == game_mode.game_text(locale, 'resume')
             activity.assert_called_once_with('idle', f'live:{id(owner)}', only_if_busy=True)
@@ -49,16 +53,20 @@ def test_region_pause_uses_its_own_reason_without_changing_resume_or_activity(ap
 @pytest.mark.parametrize('locale', LOCALES)
 def test_fullscreen_pause_caption_retains_cancel_and_resume_semantics(app, locale, readiness):
     button, label = QtWidgets.QPushButton(), QtWidgets.QLabel()
+    cancel = threading.Event()
     owner = SimpleNamespace(paused=False, language=locale, config={'ocr_engine': 'windows'},
         controls=SimpleNamespace(pause_button=button, label=label),
-        _settle_timer=mock.Mock(), _live=mock.Mock(), _translation_cancel=threading.Event(),
+        _settle_timer=mock.Mock(), _live=mock.Mock(), _translation_cancel=cancel,
+        _ocr_generation=0, _revision=0, _translation_busy=False, _deferred_translation=None,
+        _active_ocr_worker=None, _active_capture_worker=None,
         _status='Previous text', _status_is_error=True, _blocks=['old'],
         _last_frame=('old',), _pending_lines=['old'], update=mock.Mock(), _scan_once=mock.Mock())
     owner._set_status = MethodType(game_mode.GameFullscreenOverlay._set_status, owner)
     try:
         with mock.patch.object(game_mode, 'notify_current_activity') as activity:
             game_mode.GameFullscreenOverlay._toggle_pause(owner)
-            assert owner.paused and owner._translation_cancel.is_set()
+            assert owner.paused and cancel.is_set()
+            assert owner._translation_cancel is None and owner._ocr_generation == 1
             assert owner._blocks == [] and owner._pending_lines is None
             assert owner._status == '' and owner._status_is_error is False
             assert label.toolTip() == game_mode.game_text(locale, 'paused_manual')

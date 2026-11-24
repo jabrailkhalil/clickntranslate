@@ -35,6 +35,7 @@ node_modules/
 # Temporary files
 temp/
 /.tmp/
+/data/companion-images/
 /tools/data/
 /to gif/
 

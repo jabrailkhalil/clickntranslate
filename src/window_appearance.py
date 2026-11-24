@@ -257,7 +257,7 @@ class DialogAppearance(QtCore.QObject):
                     record = {'font': QtGui.QFont(widget.font()), 'minimum': widget.minimumSize(),
                               'maximum': widget.maximumSize(), 'style': widget.styleSheet(),
                               'last_style': widget.styleSheet(), 'geometry': widget.geometry()}
-                    if isinstance(widget, QtWidgets.QAbstractButton):
+                    if isinstance(widget, (QtWidgets.QAbstractButton, QtWidgets.QAbstractItemView)):
                         record['icon_size'] = widget.iconSize()
                     if isinstance(widget, QtWidgets.QSplitter):
                         record['handle_width'] = widget.handleWidth()
@@ -292,8 +292,9 @@ class DialogAppearance(QtCore.QObject):
                 widget.setFont(font)
                 widget.setMinimumSize(record['minimum'] * factor)
                 maximum = record['maximum']
-                widget.setMaximumSize(*(16777215 if value == 16777215 else round(value * factor)
-                                        for value in (maximum.width(), maximum.height())))
+                widget.setMaximumSize(*(16777215 if value == 16777215 or (
+                    dimension == 1 and widget.property('wholeRowTable')) else round(value * factor)
+                    for dimension, value in enumerate((maximum.width(), maximum.height()))))
                 if 'icon_size' in record:
                     widget.setIconSize(record['icon_size'] * factor)
                 if 'handle_width' in record:

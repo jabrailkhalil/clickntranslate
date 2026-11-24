@@ -375,7 +375,7 @@ exe = EXE(
     [],
     exclude_binaries=True,
     name='ClicknTranslate',
-    version=_version_info(_app_version, 'ClicknTranslateApp.exe', "Click'n'Translate desktop application"),
+    version=_version_info(_app_version, 'ClicknTranslateApp.exe', "ClicknTranslate"),
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

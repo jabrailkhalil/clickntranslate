@@ -34,8 +34,8 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
         # right behaviour for a user, but these tests are about the overlay
         # itself, so a machine (or a leftover config) without installed OCR
         # languages gets a deterministic pair instead.
-        # Patching the Tesseract lookup rather than installed_ocr_language_codes
-        # keeps the EasyOCR/RapidOCR filter tests running against the real thing.
+        # Patch the local backends, not installed_ocr_language_codes, so the
+        # EasyOCR/RapidOCR filtering tests still exercise their real routing.
         self._language_patch = None
         if not ocr.installed_ocr_language_codes():
             self._language_patch = mock.patch.object(
@@ -43,6 +43,10 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
             )
             self._language_patch.start()
             self.addCleanup(self._language_patch.stop)
+            windows_languages = mock.patch.object(
+                ocr, '_get_available_windows_ocr_language_tags', return_value=['en-US', 'ru-RU'])
+            windows_languages.start()
+            self.addCleanup(windows_languages.stop)
 
     def test_pytesseract_uses_the_system_environment_on_linux(self):
         original = mock.Mock(return_value={"stdin": object()})
@@ -1113,8 +1117,8 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
                 return object()
 
         with mock.patch.object(ocr, "_WINRT_AVAILABLE", True):
-            with mock.patch.object(ocr, "winrt_glob", SimpleNamespace(Language=Language)):
-                with mock.patch.object(ocr, "winrt_ocr", SimpleNamespace(OcrEngine=OcrEngine)):
+            with mock.patch.object(ocr, "winrt_glob", SimpleNamespace(Language=Language), create=True):
+                with mock.patch.object(ocr, "winrt_ocr", SimpleNamespace(OcrEngine=OcrEngine), create=True):
                     with mock.patch.object(
                         ocr,
                         "_get_available_windows_ocr_language_tags",

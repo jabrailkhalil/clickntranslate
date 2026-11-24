@@ -272,8 +272,9 @@ class KeyboardNavigation(QtCore.QObject):
         if ring is None or sip.isdeleted(ring):
             ring = root._keyboard_focus_ring = _FocusRing(root)
         geometry = QtCore.QRect(widget.mapTo(root, QtCore.QPoint()), widget.size())
-        if isinstance(widget, (QtWidgets.QCheckBox, QtWidgets.QRadioButton, QtWidgets.QLabel)):
-            geometry.adjust(-2, -2, 2, 2)
+        # One inset cue fits square tabs, rounded controls and joined buttons
+        # without drawing over their outer frame or neighbouring controls.
+        geometry.adjust(3, 3, -3, -3)
         ring.setGeometry(geometry.intersected(root.rect()))
         ring.show()
         ring.raise_()

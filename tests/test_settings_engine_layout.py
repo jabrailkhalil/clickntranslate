@@ -181,11 +181,11 @@ class SettingsEngineLayoutTest(unittest.TestCase):
             settings.show()
             self.app.processEvents()
 
-            self.assertEqual(settings.translator_combo.itemText(0).strip(), "Offline")
+            self.assertEqual(settings.translator_combo.itemText(0).strip(), "Online")
             self.assertFalse(settings.translator_combo.model().item(0).isEnabled())
             self.assertGreater(settings.translator_combo.findData("google"), 0)
             offline_header = settings.translator_combo.findText("  Offline")
-            self.assertEqual(offline_header, 0)
+            self.assertGreater(offline_header, settings.translator_combo.findData("google"))
             self.assertFalse(settings.translator_combo.model().item(offline_header).isEnabled())
             self.assertGreater(settings.translator_combo.findData("argos"), offline_header)
             self.assertEqual(settings._current_translator_engine_from_combo(), "argos")

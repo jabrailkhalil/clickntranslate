@@ -63,6 +63,9 @@ def assistant_preferences(config):
         values['desktop_assistant_appearance'] = 'portrait'
     if not isinstance(values['desktop_assistant_image'], str):
         values['desktop_assistant_image'] = ''
+    if values['desktop_assistant_image']:
+        from companion_images import resolve_image
+        values['desktop_assistant_image'] = resolve_image(values['desktop_assistant_image'])
     values['desktop_assistant_actions'] = normalized_assistant_actions(values['desktop_assistant_actions'])
     return values
 
@@ -290,15 +293,17 @@ class AssistantSettingsPage(QtWidgets.QWidget):
         custom_button.clicked.connect(self._choose_custom_image)
         self.appearance_buttons = {'custom': custom_button}
         image_row.addWidget(custom_button)
-        self.custom_image_name = QtWidgets.QLabel()
-        self.custom_image_name.setObjectName('assistantNote')
-        self.custom_image_name.setSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Preferred)
-        image_row.addWidget(self.custom_image_name, 1)
-        self.replace_image = QtWidgets.QPushButton(tr('change_image'))
-        self.replace_image.setToolTip(tr('choose_image'))
-        self.replace_image.setFixedHeight(28)
-        self.replace_image.clicked.connect(self._choose_custom_image)
-        image_row.addWidget(self.replace_image)
+        self.image_combo = DropDownCombo()
+        self.image_combo.setMinimumWidth(0)
+        self.image_combo.setSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Fixed)
+        self.image_combo.setFixedHeight(28)
+        self.image_combo.currentIndexChanged.connect(self._select_saved_image)
+        image_row.addWidget(self.image_combo, 1)
+        self.remove_image = QtWidgets.QToolButton()
+        self.remove_image.setText('×')
+        self.remove_image.setFixedSize(28, 28)
+        self.remove_image.clicked.connect(self._remove_saved_image)
+        image_row.addWidget(self.remove_image)
         root.addWidget(self.custom_image_row)
 
         root.addWidget(self.menu_buttons)
@@ -367,13 +372,44 @@ class AssistantSettingsPage(QtWidgets.QWidget):
         from ui_scaling import native_window_parent
         filename, _ = QtWidgets.QFileDialog.getOpenFileName(
             native_window_parent(self), assistant_text(self.language, 'choose_image'),
-            self.owner.config.get('desktop_assistant_image', ''),
+            assistant_preferences(self.owner.config)['desktop_assistant_image'],
             f"{assistant_text(self.language, 'image_files')} (*.png *.jpg *.jpeg *.webp *.bmp)")
         if not filename or not self._validate_custom_image(filename):
             self.refresh()
             return
-        self.owner.config['desktop_assistant_image'] = filename
+        from companion_images import import_image, image_reference
+        try:
+            self.owner.config['desktop_assistant_image'] = image_reference(import_image(filename))
+        except (OSError, ValueError) as error:
+            from styled_dialogs import StyledMessageBox
+            StyledMessageBox.warning(native_window_parent(self), assistant_text(self.language, 'choose_image'),
+                                     str(error))
+            self.refresh()
+            return
         self.choose_appearance('custom')
+
+    def _select_saved_image(self):
+        filename = self.image_combo.currentData()
+        if filename and self._validate_custom_image(filename):
+            from companion_images import image_reference
+            self.owner.config['desktop_assistant_image'] = image_reference(filename)
+            self.choose_appearance('custom')
+
+    def _remove_saved_image(self):
+        from companion_images import images, remove_image, image_reference
+        filename = self.owner.config.get('desktop_assistant_image', '')
+        if not filename:
+            return
+        try:
+            remove_image(filename)
+        except OSError as error:
+            from styled_dialogs import StyledMessageBox
+            StyledMessageBox.warning(self, assistant_text(self.language, 'remove_image'), str(error))
+            return
+        remaining = images()
+        self.owner.config['desktop_assistant_image'] = image_reference(remaining[0]) if remaining else ''
+        self.save('appearance', 'custom' if remaining else 'portrait')
+        self.refresh()
 
     def save(self, key, value):
         self.owner.config['desktop_assistant_' + key] = value
@@ -402,8 +438,9 @@ class AssistantSettingsPage(QtWidgets.QWidget):
         from button_styles import button_qss
         dark = self.owner.current_theme != 'Светлая'
         self.appearance_buttons['custom'].setIcon(header_icon('image_add', self.owner.current_theme))
-        for combo in (self.mode_combo,):
+        for combo in (self.mode_combo, self.image_combo):
             set_widget_stylesheet(combo, compact_combo_style(dark))
+        set_widget_stylesheet(self.remove_image, button_qss(dark, 'close', 'QToolButton', icon=True))
         surface = '#302938' if dark else '#e2d8ec'
         border = '#8c739f' if dark else '#927aa8'
         set_widget_stylesheet(self.menu_buttons,
@@ -433,8 +470,22 @@ class AssistantSettingsPage(QtWidgets.QWidget):
         self.mascot_preview.configure(mascot, appearance, values['desktop_assistant_image'])
         self.refresh_custom_icon()
         filename = values['desktop_assistant_image']
-        self.custom_image_name.setText(self.custom_image_name.fontMetrics().elidedText(
-            Path(filename).name if filename else '', QtCore.Qt.ElideMiddle, 190))
-        self.custom_image_name.setToolTip(filename)
+        from companion_images import images, display_name
+        files = [str(path) for path in images()]
+        if filename and filename not in files:
+            files.insert(0, filename)
+        with QtCore.QSignalBlocker(self.image_combo):
+            self.image_combo.clear()
+            for path in files:
+                self.image_combo.addItem(display_name(path), path)
+            self.image_combo.setCurrentIndex(self.image_combo.findData(filename))
+        self.image_combo.setToolTip(filename or assistant_text(self.language, 'choose_image'))
+        self.image_combo.setAccessibleName(assistant_text(self.language, 'custom'))
+        self.remove_image.setToolTip(assistant_text(self.language, 'remove_image'))
+        self.remove_image.setAccessibleName(assistant_text(self.language, 'remove_image'))
+        self.remove_image.setEnabled(bool(filename))
         self.custom_image_row.setVisible(mode == 'custom')
-        self.replace_image.setVisible(bool(filename))
+        footer = getattr(self, 'gallery_footer_layout', None)
+        if footer is not None:
+            for index in (0, 3):
+                footer.setStretch(index, 0 if mode == 'custom' else 1)

@@ -60,7 +60,7 @@ def test_category_tabs_switch_visible_providers_without_committing_a_selection(l
         combo.showPopup()
         app.processEvents()
         bar = combo._provider_category_bar
-        assert [bar.tabData(i) for i in range(bar.count())] == ['offline', 'online', 'api']
+        assert [bar.tabData(i) for i in range(bar.count())] == ['online', 'offline', 'api']
         assert bar.tabData(bar.currentIndex()) == 'online'
         for category in range(bar.count()):
             QtTest.QTest.mouseClick(bar, QtCore.Qt.LeftButton, pos=bar.tabRect(category).center())

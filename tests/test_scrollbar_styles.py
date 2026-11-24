@@ -70,6 +70,7 @@ def _rect(bar, part):
 @pytest.mark.parametrize('kind', ['scroll', 'table', 'list', 'editor', 'browser'])
 def test_scrollbars_are_slim_in_both_axes_and_keep_input(app, dark, kind):
     owner = QtWidgets.QWidget()
+    owner.setLayoutDirection(QtCore.Qt.LeftToRight)
     # Explicit owner theme takes precedence over the application's theme.
     owner.current_theme = 'Темная' if dark else 'Светлая'
     app.setProperty('ui_theme', 'Светлая' if dark else 'Темная')
@@ -98,7 +99,9 @@ def test_scrollbars_are_slim_in_both_axes_and_keep_input(app, dark, kind):
             assert color.name() == ('#aa91c9' if dark else '#7a5fa1')
             before = bar.value()
             end = point + (QtCore.QPoint(0, 30) if vertical else QtCore.QPoint(30, 0))
-            move = QtGui.QMouseEvent(QtCore.QEvent.MouseMove, end,
+            move = QtGui.QMouseEvent(QtCore.QEvent.MouseMove, QtCore.QPointF(end),
+                                    QtCore.QPointF(bar.mapTo(owner, end)),
+                                    QtCore.QPointF(bar.mapToGlobal(end)),
                                     QtCore.Qt.NoButton, QtCore.Qt.LeftButton, QtCore.Qt.NoModifier)
             app.sendEvent(bar, move)
             QTest.mouseRelease(bar, QtCore.Qt.LeftButton, pos=end)

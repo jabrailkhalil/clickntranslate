@@ -194,12 +194,14 @@ def test_mac_easyocr_install_error_does_not_select_another_ocr(monkeypatch):
         parent=SimpleNamespace(current_interface_language='ru'),
         _finish_easyocr_install_state=mock.Mock(), _hide_easyocr_progress=mock.Mock(),
         _restore_settings_view=mock.Mock(), save_ocr_engine=mock.Mock(),
+        _report_engine_task=mock.Mock(),
     )
     warning = mock.Mock()
     monkeypatch.setattr(sw.QMessageBox, 'warning', warning)
     sw.SettingsWindow._on_easyocr_install_failed(owner, 'download failed')
     owner.save_ocr_engine.assert_not_called()
     assert 'download failed' in warning.call_args.args[-1]
+    owner._report_engine_task.assert_called_once_with('easyocr', 'download failed', kind='failed')
 
 
 @pytest.mark.parametrize('code,expected', [('ru', ['ru', 'en']), ('en', ['en']),

@@ -82,6 +82,7 @@ def test_mac_install_button_starts_worker_and_failure_keeps_selected_engine(mac,
         _install_tesseract_worker=mock.Mock(), _show_linux_tesseract_hint=mock.Mock(),
         _finish_tesseract_install_state=mock.Mock(), _hide_tesseract_progress=mock.Mock(),
         _restore_settings_view=mock.Mock(), save_ocr_engine=mock.Mock(),
+        _report_engine_task=mock.Mock(),
     )
     thread = mock.Mock()
     monkeypatch.setattr(sw.threading, 'Thread', thread)
@@ -94,3 +95,4 @@ def test_mac_install_button_starts_worker_and_failure_keeps_selected_engine(mac,
     sw.SettingsWindow._on_tesseract_install_failed(owner, 'network failure')
     owner.save_ocr_engine.assert_not_called()
     assert 'network failure' in warning.call_args.args[-1]
+    owner._report_engine_task.assert_called_once_with('tesseract', 'network failure', kind='failed')

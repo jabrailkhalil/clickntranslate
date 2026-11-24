@@ -123,14 +123,14 @@ def test_latest_source_edit_takes_priority_over_an_earlier_result_edit(workspace
     assert workspace.text_edit.toPlainText() == 'Earlier result draft'
 
 
-def test_clearing_source_keeps_result_and_disables_empty_requests(workspace, requests):
+def test_clearing_source_clears_result_and_disables_empty_requests(workspace, requests):
     workspace.source_edit.clear()
     workspace.translate_button.click()
     workspace._start_retranslate()  # The keyboard shortcut has the same guard.
     assert not requests
     assert not workspace.translate_button.isEnabled()
-    assert workspace.copy_button.isEnabled()
-    assert workspace.text_edit.toPlainText() == 'Привет, мир'
+    assert not workspace.copy_button.isEnabled()
+    assert workspace.text_edit.toPlainText() == ''
 
 
 def test_swap_exchanges_the_edited_texts_as_well_as_languages(workspace, requests, monkeypatch):

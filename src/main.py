@@ -934,6 +934,19 @@ def _started_from_autostart():
     return "--autostart" in sys.argv
 
 
+def _should_start_in_shadow_mode(start_minimized, show_after_update=False):
+    return bool(start_minimized and _started_from_autostart() and not show_after_update)
+
+
+def _restore_same_install():
+    if _started_from_autostart():
+        return False
+    if any(item.get('same_path') for item in _running_clickntranslate_instances()):
+        _bring_existing_to_front()
+        return True
+    return False
+
+
 _startup_qt_app = None
 _show_after_instance_replacement = False
 
@@ -948,6 +961,7 @@ def _ensure_startup_application():
             QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
         app = QApplication([])
     _startup_qt_app = app
+    app.setApplicationName('ClicknTranslate')
     if not getattr(app, '_startup_appearance_ready', False):
         from ui_scaling import configure_interface_font
         from window_appearance import install_window_appearance
@@ -7744,6 +7758,13 @@ class TranslationResultDialog(QDialog):
         self._invalidate_request()
         self.source_text = current
         self._translate_edited_result = False
+        if not current.strip():
+            self.translated_text = ''
+            with QtCore.QSignalBlocker(self.text_edit):
+                self.text_edit.clear()
+            self._update_actions()
+            self._set_status('')
+            return
         self._update_actions()
         self._set_status(self.text["source_edited"])
 
@@ -9613,7 +9634,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self.provider_combo.clear()
         groups = PROVIDER_GROUP_TEXT.get(self.lang, PROVIDER_GROUP_TEXT["en"])
         visible_groups = []
-        for kind in ("offline", "online", "api"):
+        for kind in ("online", "offline", "api"):
             options = [
                 option
                 for option in TRANSLATION_PROVIDER_OPTIONS
@@ -11303,9 +11324,8 @@ class DarkThemeApp(QMainWindow):
             self._desktop_assistant = None
 
     def dismiss_desktop_assistant_until_restart(self):
-        """Dismiss the desktop companion; the main-window preference is separate."""
-        self._desktop_assistant_suppressed_until_restart = True
-        self._sync_desktop_assistant()
+        """Hide the desktop companion persistently; keep the main-menu choice."""
+        self.set_desktop_assistant_enabled(False)
         settings = self.settings_window or self._cached_settings_window
         button = getattr(settings, 'desktop_assistant_dismiss_button', None)
         if button is not None:
@@ -15233,6 +15253,13 @@ class DarkThemeApp(QMainWindow):
         engine_status_layout.setContentsMargins(0, 0, 8, 0)
         engine_status_layout.setSpacing(0)
         engine_status_layout.addWidget(translator_summary, 1)
+        self.main_engine_task_button = QPushButton(engine_status_panel)
+        self.main_engine_task_button.setObjectName('mainEngineTaskStatus')
+        self.main_engine_task_button.setMinimumWidth(0)
+        self.main_engine_task_button.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Expanding)
+        self.main_engine_task_button.clicked.connect(self._open_engine_task)
+        self.main_engine_task_button.hide()
+        engine_status_layout.addWidget(self.main_engine_task_button, 1)
 
         for column in range(2):
             hotkey_grid.setColumnStretch(column, 1)
@@ -15317,6 +15344,40 @@ class DarkThemeApp(QMainWindow):
         self._main_controls_theme = self.current_theme
         self._main_page_widgets = (self.main_text_section, self.main_shortcut_section, self.main_footer)
         self._main_page_key = self._main_page_signature()
+        self.set_engine_task_status(getattr(self, '_engine_task_state', {}))
+
+    def _open_engine_task(self):
+        self.show_settings()
+        self.settings_window.show_ocr_language_manager()
+
+    def set_engine_task_status(self, state):
+        """Expose background work on the main page and tray without polling."""
+        self._engine_task_state = dict(state or {})
+        state = self._engine_task_state
+        active = state.get('kind') in ('running', 'failed')
+        detail = str(state.get('text') or '')
+        tray = getattr(self, 'tray_icon', None)
+        if tray is not None:
+            tray.setToolTip('ClicknTranslate' + ('\n' + detail if active and detail else ''))
+        button = getattr(self, 'main_engine_task_button', None)
+        try:
+            if button is None:
+                return
+            button.setVisible(active)
+            summary = button.parentWidget().findChild(QLabel, 'mainTranslatorSummary')
+            if summary is not None:
+                summary.setVisible(not active)
+            if active:
+                from settings_window import language_manager_text
+                caption = language_manager_text(self.current_interface_language, 'task_packages_short')
+                percent = state.get('percent')
+                suffix = str(int(percent)) + '%' if percent is not None else language_manager_text(
+                    self.current_interface_language, 'task_installing_short')
+                button.setText(caption + ' · ' + ('!' if state.get('kind') == 'failed' else suffix))
+                button.setToolTip(tooltip_text(detail))
+                button.setAccessibleDescription(detail)
+        except RuntimeError:
+            pass  # Settings may currently own the page; state survives rebuild.
 
     def _fit_hotkey_mode_combo(self):
         """Measure full mode names before dividing the remaining language space."""
@@ -15451,6 +15512,23 @@ class DarkThemeApp(QMainWindow):
     def _remember_main_input(self, *_args):
         try:
             self._main_input_draft = self.text_input.toPlainText()
+            if not self._main_input_draft.strip():
+                # A pending reply belongs to the deleted source. Cancel it and
+                # drain its completion before allowing another request.
+                if getattr(self, '_main_translation_running', False):
+                    self._main_discard_result = True
+                    self._argos_cancel_requested.set()
+                self._main_result_snapshot = None
+                self._main_streamed_text = ''
+                self._main_result_progress = None
+                self._main_result_error = ''
+                self._update_main_preview_windows('')
+                result = getattr(self, 'main_result_view', None)
+                if result is not None:
+                    result.clear()
+                copy = getattr(self, 'main_result_copy_button', None)
+                if copy is not None:
+                    copy.setEnabled(False)
             self._refresh_main_result_caption()
         except RuntimeError:
             return  # The previous page's document can finish a queued layout.
@@ -16100,6 +16178,20 @@ class DarkThemeApp(QMainWindow):
         if not self._argos_progress.isVisible() and not getattr(self._argos_progress, "_user_minimized", False):
             self._argos_progress.show()
         self._argos_progress.bring_to_front()
+        if self._argos_install_required:
+            self._report_main_argos_package(str(text), percent if determinate else None)
+
+    def _report_main_argos_package(self, text, percent=None, kind='running'):
+        settings = self.settings_window or self._cached_settings_window
+        if settings is not None:
+            settings._report_engine_task('argos', text, percent, kind)
+            if kind != 'running':
+                dialog = getattr(settings, '_language_manager_dialog', None)
+                if dialog is not None:
+                    dialog._refresh_engine_table(dialog.argos_table)
+                    dialog._refresh_activation()
+        else:
+            self.set_engine_task_status(dict(text='Argos: ' + text, percent=percent, kind=kind))
 
     @QtCore.pyqtSlot(str)
     def _on_argos_status(self, message):
@@ -16147,12 +16239,19 @@ class DarkThemeApp(QMainWindow):
             self._argos_progress.close_button.setEnabled(False)
 
     def _finish_main_translation_state(self, translated_text=None, error=''):
+        package_task = self._argos_install_required
         self._update_main_preview_windows(translated_text, error=error)
         self._main_translation_running = False
         notify_activity(self, 'idle' if self._argos_cancel_requested.is_set() else 'error' if error else 'success')
         self._main_result_progress = None
         self._argos_install_required = False
         self._argos_cancel_enabled = False
+        if package_task:
+            from settings_window import engine_text, language_manager_text
+            canceled = self._argos_cancel_requested.is_set()
+            message = (error or language_manager_text(self.current_interface_language, 'canceled') if canceled
+                       else error or engine_text(self.current_interface_language, 'done'))
+            self._report_main_argos_package(message, kind='idle' if canceled else 'failed' if error else 'done')
         if getattr(self, "translate_button", None) is not None:
             try:
                 self._update_main_translate_button()
@@ -16222,6 +16321,14 @@ class DarkThemeApp(QMainWindow):
     def _start_main_translation(self, text, source_code, target_code, engine, package_installed=True):
         if self._main_translation_running:
             return
+        if engine == 'argos' and not package_installed:
+            from settings_window import _package_mutation_busy
+            settings = self.settings_window or self._cached_settings_window
+            if settings is not None and _package_mutation_busy(settings):
+                # Online/installed translators remain usable; another package
+                # mutation must finish or be cancelled before adding this one.
+                settings.show_ocr_language_manager('argos', source_code, target_code)
+                return
         if engine != 'argos':
             chosen = _resolve_translation_provider(self, engine, source_code, target_code, self.current_interface_language)
             if not chosen:
@@ -16232,6 +16339,7 @@ class DarkThemeApp(QMainWindow):
         pair_label = f"{source_code.upper()}→{target_code.upper()}"
 
         self._main_translation_running = True
+        self._main_discard_result = False
         self._main_provider_request_id = getattr(self, '_main_provider_request_id', 0) + 1
         provider_request_id = self._main_provider_request_id
         notify_activity(self, 'busy')
@@ -16298,6 +16406,9 @@ class DarkThemeApp(QMainWindow):
 
     @QtCore.pyqtSlot(str)
     def _on_main_translation_done(self, translated_text):
+        if getattr(self, '_main_discard_result', False):
+            self._finish_main_translation_state()
+            return
         error = '' if translated_text.strip() else ui_text(self.current_interface_language, 'translation_error')
         self._finish_main_translation_state(translated_text, error)
         source_text, source_code, target_code = self._main_active_request
@@ -16312,6 +16423,9 @@ class DarkThemeApp(QMainWindow):
     def _on_main_provider_unavailable(self, request_id, issue):
         if not self._main_translation_running or request_id != self._main_provider_request_id:
             return
+        if getattr(self, '_main_discard_result', False):
+            self._finish_main_translation_state()
+            return
         self._finish_main_translation_state(error=issue.message(self.current_interface_language))
         from translation_availability import offer_provider_recovery
         chosen = offer_provider_recovery(self, issue, TRANSLATION_PROVIDER_OPTIONS, self.current_interface_language)
@@ -16323,6 +16437,9 @@ class DarkThemeApp(QMainWindow):
 
     @QtCore.pyqtSlot(str)
     def _on_main_translation_error(self, error_text):
+        if getattr(self, '_main_discard_result', False):
+            self._finish_main_translation_state()
+            return
         self._main_result_error = str(error_text)
         self._finish_main_translation_state(error=error_text)
         if self._main_active_engine == 'argos':
@@ -16342,6 +16459,9 @@ class DarkThemeApp(QMainWindow):
 
     @QtCore.pyqtSlot()
     def _on_argos_translation_cancelled(self):
+        if getattr(self, '_main_discard_result', False):
+            self._finish_main_translation_state()
+            return
         self._finish_main_translation_state(error=ui_text(self.current_interface_language, 'argos_install_cancelled'))
         QMessageBox.information(
             self,
@@ -16592,6 +16712,8 @@ if __name__ == "__main__":
         from instance_lifecycle import WindowsInstanceGuard
         _instance_guard = WindowsInstanceGuard()
         if not _instance_guard.acquire():
+            if _restore_same_install():
+                sys.exit(0)
             if _started_from_autostart() or not _replace_existing_instance():
                 _bring_existing_to_front()
                 sys.exit(0)
@@ -16651,8 +16773,7 @@ if __name__ == "__main__":
         window.show()
         from layout_editor import start_layout_editor
         _layout_editor_panel = start_layout_editor(window)
-    elif (window.start_minimized and not show_after_update
-          and (not platform_support.IS_MAC or _started_from_autostart())):
+    elif _should_start_in_shadow_mode(window.start_minimized, show_after_update):
         window.minimize_to_tray()
     else:
         window.show()

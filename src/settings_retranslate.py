@@ -222,7 +222,7 @@ def _retranslate_companion(page, lang):
     page.language = lang
     for control, key in ((page.main_visible, 'main_visible_short'), (page.toggle, 'enabled'),
                          (page.topmost, 'topmost'), (page.reactions, 'reactions'),
-                         (page.menu_buttons, 'menu_buttons'), (page.replace_image, 'change_image')):
+                         (page.menu_buttons, 'menu_buttons')):
         control.setText(tr(key))
         control.setAccessibleName(tr('main_visible') if control is page.main_visible else tr(key))
     for control, key in ((page.main_visible, 'desktop_main'), (page.toggle, 'desktop_enabled'),
@@ -232,7 +232,6 @@ def _retranslate_companion(page, lang):
     page.menu_buttons.setToolTip(tr('menu_buttons_hint'))
     page.menu_buttons.setAccessibleDescription(tr('menu_buttons_hint'))
     page.menu_buttons.setFixedWidth(max(230, page.menu_buttons.fontMetrics().horizontalAdvance(page.menu_buttons.text())+32))
-    page.replace_image.setToolTip(tr('choose_image'))
     custom = page.findChild(QtWidgets.QToolButton, 'assistantAppearance')
     custom.setText(tr('custom'))
     custom.setToolTip(tr('choose_image'))

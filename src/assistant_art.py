@@ -75,6 +75,8 @@ def _read_custom_pixmap(path, modified):
 
 
 def load_custom_art(filename):
+    from companion_images import resolve_image
+    filename = resolve_image(filename)
     path = Path(filename)
     try:
         stat = path.stat()
