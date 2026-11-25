@@ -855,11 +855,14 @@ class TestMalformedReleaseResponses(unittest.TestCase):
             parent=types.SimpleNamespace(current_interface_language="en"),
             _update_cancel_requested=threading.Event(),
             _post_update_check_result=mock.Mock(),
+            _pick_checksum_url=mock.Mock(),
             _pick_update_asset=mock.Mock(side_effect=OSError("injected selection failure")))
         response = mock.Mock()
         response.json.return_value = {"tag_name": "v99.9.9", "assets": []}
         with mock.patch.object(sw.requests, "get", return_value=response):
             sw.SettingsWindow._check_latest_release_worker(owner)
+        owner._pick_update_asset.assert_called_once()
+        owner._pick_checksum_url.assert_not_called()
         owner._post_update_check_result.assert_called_once()
         self.assertEqual(owner._post_update_check_result.call_args.args[0]["status"], "error")
 
@@ -867,7 +870,7 @@ class TestMalformedReleaseResponses(unittest.TestCase):
         owner = types.SimpleNamespace(
             parent=types.SimpleNamespace(current_interface_language="en"),
             _update_cancel_requested=threading.Event(),
-            _post_update_check_result=mock.Mock(), _pick_update_asset=mock.Mock())
+            _post_update_check_result=mock.Mock(), _pick_update_asset=mock.Mock(), _pick_checksum_url=mock.Mock())
         response = mock.Mock()
         def cancelled_json():
             owner._update_cancel_requested.set()

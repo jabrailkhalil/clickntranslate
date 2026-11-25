@@ -198,7 +198,7 @@ DEFAULT_REPLACE_SELECTION_HOTKEY = "Ctrl+Shift+Q"
 DEFAULT_TOGGLE_WINDOW_HOTKEY = "Ctrl+Shift+Space"
 DEFAULT_GAME_HOTKEY = "Ctrl+Alt+G"
 HOTKEY_DEFAULTS_REVISION = 5
-STARTUP_NEWS_ID = "version-1.8-workflows"
+STARTUP_NEWS_ID = "version-1.8.3-engines"
 LAYOUT_EDITOR_MODE = "--layout-editor" in sys.argv
 
 # Defaults used by the normal application and by the developer-only visual
@@ -962,6 +962,7 @@ def _ensure_startup_application():
         app = QApplication([])
     _startup_qt_app = app
     app.setApplicationName('ClicknTranslate')
+    app.setApplicationVersion(APP_VERSION)
     if not getattr(app, '_startup_appearance_ready', False):
         from ui_scaling import configure_interface_font
         from window_appearance import install_window_appearance
@@ -3132,11 +3133,11 @@ WELCOME_TEXT = {'en': {'window': 'News',
         'guide': 'Show me around',
         'skip': 'Skip',
         'close': 'Start',
-        'features': ('Join wrapped OCR lines into paragraphs.',
-                     'Open, drop or paste images and documents.',
-                     'Reuse selected screen areas and saved dynamic layouts.',
-                     'Connect API providers for OCR and translation.',
-                     'More interface languages and keyboard navigation.')},
+        'features': ("Manage OCR engines, translators and API connections in one place.",
+                     "Track engine downloads in the background or cancel them.",
+                     "Save several pictures for your desktop companion.",
+                     "Detect selected text without sending a copy shortcut.",
+                     "Flags stay sharp when you enlarge the interface.")},
  'ru': {'window': 'Новости',
         'eyebrow': 'Что нового',
         'title': "Добро пожаловать в Click'n'Translate!",
@@ -3148,11 +3149,11 @@ WELCOME_TEXT = {'en': {'window': 'News',
         'guide': 'Пройти обучение',
         'skip': 'Пропустить',
         'close': 'Начать',
-        'features': ('Объединение строк OCR в абзацы.',
-                     'Открытие, перетаскивание и вставка изображений и документов.',
-                     'Запоминание выделенной области и шаблоны динамического перевода.',
-                     'Подключение API для распознавания и перевода.',
-                     'Новые языки интерфейса и управление с клавиатуры.')},
+        'features': ("Настраивайте движки OCR, переводчики и API в одном окне.",
+                     "Следите за загрузкой движков в фоне и отменяйте её при необходимости.",
+                     "Сохраняйте несколько своих картинок для компаньона.",
+                     "Фоновое обнаружение выделенного текста обходится без команды копирования.",
+                     "Флаги остаются чёткими при увеличении интерфейса.")},
  'es': {'window': 'Noticias',
         'eyebrow': 'Novedades',
         'title': "¡Bienvenido a Click'n'Translate!",
@@ -3164,11 +3165,11 @@ WELCOME_TEXT = {'en': {'window': 'News',
         'guide': 'Ver guía',
         'skip': 'Omitir',
         'close': 'Empezar',
-        'features': ('Une las líneas OCR de un párrafo.',
-                     'Abre, arrastra o pega imágenes y documentos.',
-                     'Reutiliza áreas seleccionadas y diseños dinámicos guardados.',
-                     'Conecta proveedores API para OCR y traducción.',
-                     'Más idiomas de interfaz y navegación con teclado.')},
+        'features': ("Gestiona los motores de OCR, los traductores y las conexiones API en un solo lugar.",
+                     "Sigue las descargas de motores en segundo plano o cancélalas.",
+                     "Guarda varias imágenes para tu compañero de escritorio.",
+                     "Detecta el texto seleccionado sin enviar un atajo de copia.",
+                     "Las banderas se ven nítidas al ampliar la interfaz.")},
  'de': {'window': 'Neuigkeiten',
         'eyebrow': 'Was ist neu?',
         'title': "Willkommen bei Click'n'Translate!",
@@ -3180,11 +3181,11 @@ WELCOME_TEXT = {'en': {'window': 'News',
         'guide': 'Tour starten',
         'skip': 'Überspringen',
         'close': 'Starten',
-        'features': ('Umgebrochene OCR-Zeilen zu Absätzen verbinden.',
-                     'Bilder und Dokumente öffnen, ablegen oder einfügen.',
-                     'Markierte Bereiche und gespeicherte dynamische Layouts wiederverwenden.',
-                     'API-Anbieter für OCR und Übersetzung anbinden.',
-                     'Mehr Oberflächensprachen und Tastaturbedienung.')},
+        'features': ("OCR-Engines, Übersetzer und API-Verbindungen an einem Ort verwalten.",
+                     "Engine-Downloads im Hintergrund verfolgen oder abbrechen.",
+                     "Mehrere eigene Bilder für den Desktop-Begleiter speichern.",
+                     "Markierten Text erkennen, ohne den Kopierbefehl auszulösen.",
+                     "Flaggen bleiben beim Vergrößern der Oberfläche scharf.")},
  'fr': {'window': 'Actualités',
         'eyebrow': 'Nouveautés',
         'title': "Bienvenue dans Click'n'Translate !",
@@ -3196,11 +3197,11 @@ WELCOME_TEXT = {'en': {'window': 'News',
         'guide': 'Voir le guide',
         'skip': 'Passer',
         'close': 'Commencer',
-        'features': ('Réunir les lignes OCR en paragraphes.',
-                     'Ouvrir, déposer ou coller des images et documents.',
-                     'Réutiliser les zones sélectionnées et les modèles dynamiques enregistrés.',
-                     'Connecter des API pour la reconnaissance et la traduction.',
-                     'Plus de langues d’interface et navigation au clavier.')},
+        'features': ("Gérez les moteurs OCR, les traducteurs et les connexions API au même endroit.",
+                     "Suivez les téléchargements de moteurs en arrière-plan ou annulez-les.",
+                     "Enregistrez plusieurs images pour votre compagnon de bureau.",
+                     "Détectez le texte sélectionné sans déclencher le raccourci de copie.",
+                     "Les drapeaux restent nets quand vous agrandissez l’interface.")},
  'zh': {'window': '更新',
         'eyebrow': '更新内容',
         'title': "欢迎使用 Click'n'Translate！",
@@ -3212,11 +3213,11 @@ WELCOME_TEXT = {'en': {'window': 'News',
         'guide': '开始引导',
         'skip': '跳过',
         'close': '开始',
-        'features': ('将 OCR 换行合并为段落。',
-                     '打开、拖放或粘贴图片和文档。',
-                     '重复使用所选区域和保存的动态翻译布局。',
-                     '连接 API 服务进行文字识别和翻译。',
-                     '更多界面语言和键盘导航。')},
+        'features': ("在同一个窗口管理 OCR 引擎、翻译服务和 API 连接。",
+                     "查看引擎在后台的下载进度，也可以取消下载。",
+                     "为桌面伙伴保存多张自定义图片。",
+                     "检测选中的文字时无需模拟复制快捷键。",
+                     "放大界面后，国旗图标依然清晰。")},
  'pt': {'window': 'Notícias',
         'eyebrow': 'Novidades',
         'title': "Bem-vindo ao Click'n'Translate!",
@@ -3228,11 +3229,11 @@ WELCOME_TEXT = {'en': {'window': 'News',
         'guide': 'Conhecer o aplicativo',
         'skip': 'Pular',
         'close': 'Iniciar',
-        'features': ('Unir linhas OCR em parágrafos.',
-                     'Abrir, arrastar ou colar imagens e documentos.',
-                     'Reutilizar áreas selecionadas e modelos dinâmicos salvos.',
-                     'Conectar APIs para reconhecimento e tradução.',
-                     'Mais idiomas de interface e navegação pelo teclado.')},
+        'features': ("Gerencie os mecanismos de OCR, os tradutores e as conexões de API em um só lugar.",
+                     "Acompanhe o download dos mecanismos em segundo plano ou cancele-o.",
+                     "Salve várias imagens para seu companheiro de área de trabalho.",
+                     "Detecte o texto selecionado sem acionar o atalho de cópia.",
+                     "As bandeiras continuam nítidas ao ampliar a interface.")},
  'it': {'window': 'Novità',
         'eyebrow': 'Novità',
         'title': "Benvenuto in Click'n'Translate!",
@@ -3244,11 +3245,11 @@ WELCOME_TEXT = {'en': {'window': 'News',
         'guide': 'Mostra la guida',
         'skip': 'Salta',
         'close': 'Avvia',
-        'features': ('Unisci le righe OCR in paragrafi.',
-                     'Apri, trascina o incolla immagini e documenti.',
-                     'Riutilizza aree selezionate e modelli dinamici salvati.',
-                     'Collega API per riconoscimento e traduzione.',
-                     'Più lingue dell’interfaccia e navigazione da tastiera.')},
+        'features': ("Gestisci motori OCR, traduttori e connessioni API in un’unica finestra.",
+                     "Segui i download dei motori in background o annullali.",
+                     "Salva più immagini per il tuo compagno sul desktop.",
+                     "Rileva il testo selezionato senza inviare il comando di copia.",
+                     "Le bandiere restano nitide quando ingrandisci l’interfaccia.")},
  'ar': {'window': 'الأخبار',
         'eyebrow': 'ما الجديد',
         'title': "مرحبًا بك في Click'n'Translate!",
@@ -3260,11 +3261,11 @@ WELCOME_TEXT = {'en': {'window': 'News',
         'guide': 'عرّفني على التطبيق',
         'skip': 'تخطي',
         'close': 'ابدأ',
-        'features': ('دمج أسطر OCR الملتفة في فقرات.',
-                     'فتح الصور والمستندات أو سحبها أو لصقها.',
-                     'إعادة استخدام المناطق المحددة وقوالب الترجمة الديناميكية المحفوظة.',
-                     'ربط خدمات API للتعرف على النص والترجمة.',
-                     'المزيد من لغات الواجهة والتنقل بلوحة المفاتيح.')},
+        'features': ("أدِر محرّكات التعرّف على النص والترجمة واتصالات API من مكان واحد.",
+                     "تابع تنزيل المحرّكات في الخلفية أو ألغِ التنزيل.",
+                     "احفظ عدة صور لرفيق سطح المكتب.",
+                     "اكتشف النص المحدّد دون إرسال اختصار النسخ.",
+                     "تبقى الأعلام واضحة عند تكبير الواجهة.")},
  'tr': {'window': 'Yenilikler',
         'eyebrow': 'Yenilikler',
         'title': "Click'n'Translate'e hoş geldiniz!",
@@ -3276,11 +3277,11 @@ WELCOME_TEXT = {'en': {'window': 'News',
         'guide': 'Bana tanıt',
         'skip': 'Atla',
         'close': 'Başlat',
-        'features': ('OCR satırlarını paragraflarda birleştirme.',
-                     'Görsel ve belgeleri açma, sürükleme veya yapıştırma.',
-                     'Seçilen alanları ve kayıtlı dinamik şablonları yeniden kullanma.',
-                     'OCR ve çeviri için API sağlayıcılarına bağlanma.',
-                     'Daha fazla arayüz dili ve klavyeyle gezinme.')},
+        'features': ("OCR motorlarını, çevirmenleri ve API bağlantılarını tek yerden yönetin.",
+                     "Motor indirmelerini arka planda takip edin veya iptal edin.",
+                     "Masaüstü arkadaşınız için birden fazla resim kaydedin.",
+                     "Seçili metni kopyalama kısayolunu tetiklemeden algılayın.",
+                     "Arayüzü büyüttüğünüzde bayraklar net kalır.")},
  'hi': {'window': 'नया क्या है',
         'eyebrow': 'नया क्या है',
         'title': "Click'n'Translate में आपका स्वागत है!",
@@ -3292,11 +3293,11 @@ WELCOME_TEXT = {'en': {'window': 'News',
         'guide': 'ऐप का परिचय दें',
         'skip': 'छोड़ें',
         'close': 'शुरू करें',
-        'features': ('OCR की टूटी पंक्तियों को अनुच्छेदों में जोड़ें।',
-                     'चित्र और दस्तावेज़ खोलें, खींचें या पेस्ट करें।',
-                     'चुने हुए क्षेत्र और सहेजे गए गतिशील टेम्पलेट फिर इस्तेमाल करें।',
-                     'OCR और अनुवाद के लिए API सेवाएँ जोड़ें।',
-                     'अधिक इंटरफ़ेस भाषाएँ और कीबोर्ड से नेविगेशन।')},
+        'features': ("OCR इंजन, अनुवादक और API कनेक्शन एक ही जगह प्रबंधित करें।",
+                     "इंजन डाउनलोड की प्रगति पृष्ठभूमि में देखें या डाउनलोड रद्द करें।",
+                     "अपने डेस्कटॉप साथी के लिए कई तस्वीरें सहेजें।",
+                     "कॉपी का शॉर्टकट चलाए बिना चुने गए टेक्स्ट का पता लगाएँ।",
+                     "इंटरफ़ेस बड़ा करने पर भी झंडे साफ़ दिखते हैं।")},
  'id': {'window': 'Berita',
         'eyebrow': 'Yang baru',
         'title': "Selamat datang di Click'n'Translate!",
@@ -3308,11 +3309,11 @@ WELCOME_TEXT = {'en': {'window': 'News',
         'guide': 'Tunjukkan panduan',
         'skip': 'Lewati',
         'close': 'Mulai',
-        'features': ('Gabungkan baris OCR menjadi paragraf.',
-                     'Buka, seret, atau tempel gambar dan dokumen.',
-                     'Gunakan kembali area pilihan dan templat dinamis tersimpan.',
-                     'Hubungkan layanan API untuk OCR dan terjemahan.',
-                     'Lebih banyak bahasa antarmuka dan navigasi papan ketik.')}}
+        'features': ("Kelola mesin OCR, penerjemah, dan koneksi API di satu tempat.",
+                     "Pantau unduhan mesin di latar belakang atau batalkan unduhan.",
+                     "Simpan beberapa gambar untuk pendamping desktop Anda.",
+                     "Deteksi teks yang dipilih tanpa menjalankan pintasan salin.",
+                     "Bendera tetap tajam saat antarmuka diperbesar.")}}
 
 
 def welcome_text(lang):
@@ -3327,7 +3328,7 @@ STARTUP_NEWS_TEXT = {
     language: {
         "window": copy["window"] + " · V{version}",
         "title": copy["eyebrow"],
-        "intro": copy["body"].format(version=APP_VERSION),
+        "intro": copy["body"],
         "continue": {'en': 'Got it', 'ru': 'Понятно', 'es': 'Entendido', 'de': 'Verstanden', 'fr': 'Compris', 'zh': '知道了',
             'pt': 'Entendi',
             'it': 'Capito',
@@ -3343,13 +3344,14 @@ STARTUP_NEWS_TEXT = {
 }
 
 
-def startup_news_text(lang):
-    return STARTUP_NEWS_TEXT.get(lang, STARTUP_NEWS_TEXT["en"])
+def startup_news_text(lang, version=APP_VERSION):
+    copy = STARTUP_NEWS_TEXT.get(lang, STARTUP_NEWS_TEXT["en"])
+    return {**copy, "intro": copy["intro"].format(version=version)}
 
 
 def startup_news_html(lang, version=APP_VERSION):
     from html import escape
-    text = startup_news_text(lang)
+    text = startup_news_text(lang, version)
     features = ''.join(f'<li>{escape(point)}</li>' for point in welcome_text(lang)['features'])
     return (
         f"<div style='line-height:1.35'>"
@@ -12102,7 +12104,7 @@ class DarkThemeApp(QMainWindow):
 
     def init_ui(self):
         self.title_bar = QLabel(self.ui_root)
-        self.title_bar.setText(INTERFACE_TEXT[self.current_interface_language]["title"])
+        self._refresh_title_bar()
         self.title_bar.setGeometry(0, 0, self.ui_root.width(), 40)
         self.title_bar.setAlignment(Qt.AlignCenter)
 
@@ -12326,7 +12328,11 @@ class DarkThemeApp(QMainWindow):
         if getattr(self, "_launch_update_checked", False):
             return
         self._launch_update_checked = True
-        threading.Thread(target=self._launch_update_worker, daemon=True).start()
+        try:
+            threading.Thread(target=self._launch_update_worker, daemon=True).start()
+        except RuntimeError:
+            self._launch_update_checked = False
+            logging.getLogger(__name__).debug("Could not start the optional update check", exc_info=True)
 
     def _maybe_show_startup_news(self):
         """Show this announcement once, independently of app version changes.
@@ -12369,25 +12375,15 @@ class DarkThemeApp(QMainWindow):
 
     def _launch_update_worker(self):
         try:
-            import requests
-
-            from settings_window import (
-                _is_newer_version,
-                _normalize_version,
-                _update_feed_api_url,
-                _update_request_headers,
-            )
-
-            url = _update_feed_api_url()
-            response = requests.get(url, headers=_update_request_headers(url, accept_json=True), timeout=15)
-            response.raise_for_status()
-            release = response.json()
-            latest = _normalize_version(release.get("tag_name") or release.get("name") or "")
+            if not platform_support.supports_in_app_update():
+                return
+            from settings_window import _check_desktop_update
+            offer = _check_desktop_update(APP_VERSION)
         except Exception:
             # A start-up check is a courtesy; a failed one says nothing.
             return
-        if latest and _is_newer_version(latest, APP_VERSION):
-            self._launch_update_signal.emit(latest)
+        if offer['status'] == 'ready':
+            self._launch_update_signal.emit(offer['latest_version'])
 
     @QtCore.pyqtSlot(str)
     def _on_launch_update_found(self, latest_version):
@@ -14095,12 +14091,18 @@ class DarkThemeApp(QMainWindow):
         self.flag_button.setToolTip(tooltip_text(label))
         self.flag_button.setAccessibleName(label)
 
+    def _refresh_title_bar(self):
+        title = INTERFACE_TEXT[self.current_interface_language]["title"]
+        if self.settings_window is not None:
+            title = f"{title} · v{APP_VERSION}"
+        self.title_bar.setText(title)
+
     def refresh_interface_language_ui(self):
         lang = self.current_interface_language
         from interface_direction import apply_interface_direction
         apply_interface_direction(lang, self, application=True)
         if hasattr(self, "title_bar"):
-            self.title_bar.setText(INTERFACE_TEXT[lang]["title"])
+            self._refresh_title_bar()
         if hasattr(self, "flag_button"):
             self.update_interface_language_button()
         if hasattr(self, "theme_button"):
@@ -14294,7 +14296,7 @@ class DarkThemeApp(QMainWindow):
         header.addWidget(title)
         version = QLabel(f'V{APP_VERSION}')
         version.setObjectName('helpVersionLabel')
-        version.setStyleSheet(f'font-size:12px; color:{colors["disabled"]};')
+        version.setStyleSheet('font-size:13px;')
         header.addWidget(version)
         header.addStretch(1)
         close = QToolButton()
@@ -14767,6 +14769,7 @@ class DarkThemeApp(QMainWindow):
         self.main_layout.setContentsMargins(14, 48, 14, 14)
         self.main_layout.setSpacing(8)
         self.settings_window = None
+        self._refresh_title_bar()
         self.set_settings_button_to_settings()
         if reuse:
             for widget in cached:
@@ -15435,6 +15438,7 @@ class DarkThemeApp(QMainWindow):
             elif getattr(settings, "_ui_theme", None) != self.current_theme:
                 settings.apply_theme()
         self.settings_window = settings
+        self._refresh_title_bar()
         self.main_layout.addWidget(self.settings_window)
         # Settings is a destination, not a remembered document position.  A
         # fresh visit always opens on the compact general page.
@@ -16195,7 +16199,7 @@ class DarkThemeApp(QMainWindow):
 
     @QtCore.pyqtSlot(str)
     def _on_argos_status(self, message):
-        if not self._argos_install_required:
+        if not self._argos_install_required or self._argos_cancel_requested.is_set():
             return
         pair_label = self._argos_active_pair
         message_lower = str(message or "").lower()
@@ -16215,7 +16219,7 @@ class DarkThemeApp(QMainWindow):
 
     @QtCore.pyqtSlot(str, int, int)
     def _on_argos_progress(self, pair_label, downloaded_bytes, total_bytes):
-        if not self._argos_install_required:
+        if not self._argos_install_required or self._argos_cancel_requested.is_set():
             return
         if pair_label:
             self._argos_active_pair = str(pair_label)
@@ -16229,7 +16233,8 @@ class DarkThemeApp(QMainWindow):
             self._show_argos_progress(text, determinate=False)
 
     def _request_argos_install_cancel(self):
-        if not self._main_translation_running or not self._argos_cancel_enabled:
+        if (not self._main_translation_running or not self._argos_cancel_enabled
+                or self._argos_cancel_requested.is_set()):
             return
         self._argos_cancel_requested.set()
         text = ui_text(self.current_interface_language, "argos_canceling")
@@ -16406,8 +16411,8 @@ class DarkThemeApp(QMainWindow):
 
     @QtCore.pyqtSlot(str)
     def _on_main_translation_done(self, translated_text):
-        if getattr(self, '_main_discard_result', False):
-            self._finish_main_translation_state()
+        if self._argos_cancel_requested.is_set():
+            self._on_argos_translation_cancelled()
             return
         error = '' if translated_text.strip() else ui_text(self.current_interface_language, 'translation_error')
         self._finish_main_translation_state(translated_text, error)
@@ -16423,10 +16428,13 @@ class DarkThemeApp(QMainWindow):
     def _on_main_provider_unavailable(self, request_id, issue):
         if not self._main_translation_running or request_id != self._main_provider_request_id:
             return
-        if getattr(self, '_main_discard_result', False):
-            self._finish_main_translation_state()
+        if self._argos_cancel_requested.is_set():
+            self._on_argos_translation_cancelled()
             return
+        background = self._argos_install_required and getattr(self._argos_progress, '_user_minimized', False)
         self._finish_main_translation_state(error=issue.message(self.current_interface_language))
+        if background:
+            return  # The download center already shows the failure and its cause.
         from translation_availability import offer_provider_recovery
         chosen = offer_provider_recovery(self, issue, TRANSLATION_PROVIDER_OPTIONS, self.current_interface_language)
         if chosen == 'install':
@@ -16437,11 +16445,14 @@ class DarkThemeApp(QMainWindow):
 
     @QtCore.pyqtSlot(str)
     def _on_main_translation_error(self, error_text):
-        if getattr(self, '_main_discard_result', False):
-            self._finish_main_translation_state()
+        if self._argos_cancel_requested.is_set():
+            self._on_argos_translation_cancelled()
             return
+        background = self._argos_install_required and getattr(self._argos_progress, '_user_minimized', False)
         self._main_result_error = str(error_text)
         self._finish_main_translation_state(error=error_text)
+        if background:
+            return
         if self._main_active_engine == 'argos':
             self._show_argos_translation_error(error_text, self._argos_active_pair)
         else:
@@ -16462,7 +16473,10 @@ class DarkThemeApp(QMainWindow):
         if getattr(self, '_main_discard_result', False):
             self._finish_main_translation_state()
             return
+        background = self._argos_install_required and getattr(self._argos_progress, '_user_minimized', False)
         self._finish_main_translation_state(error=ui_text(self.current_interface_language, 'argos_install_cancelled'))
+        if background:
+            return
         QMessageBox.information(
             self,
             "Argos",

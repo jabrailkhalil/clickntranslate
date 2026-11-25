@@ -1,0 +1,49 @@
+name: Release download table
+
+on:
+  workflow_call:
+    inputs:
+      release_id:
+        type: string
+        required: true
+    secrets:
+      VIRUSTOTAL_API_KEY:
+        required: false
+  workflow_dispatch:
+    inputs:
+      draft_tag:
+        description: Tag of the existing draft to refresh
+        type: string
+        required: true
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-download-table-${{ inputs.draft_tag || github.event.release.tag_name || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  table:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'release' && github.event.repository.default_branch || github.sha }}
+          persist-credentials: false
+      - name: Refresh the package links in the release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VIRUSTOTAL_API_KEY: ${{ secrets.VIRUSTOTAL_API_KEY }}
+          RELEASE_ID: ${{ inputs.release_id || github.event.release.id }}
+          DRAFT_TAG: ${{ inputs.draft_tag }}
+        run: |
+          mode=--refresh-draft
+          if [[ "$GITHUB_EVENT_NAME" == release ]]; then
+            mode=--refresh-published
+          elif [[ -n "$DRAFT_TAG" ]]; then
+            RELEASE_ID=$(gh release view --repo "$GITHUB_REPOSITORY" --json databaseId --jq .databaseId -- "$DRAFT_TAG")
+          fi
+          python3 tools/release_download_table.py --repository "$GITHUB_REPOSITORY" "$mode" "$RELEASE_ID"

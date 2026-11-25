@@ -40,6 +40,8 @@ class ArgosProgressUiTest(unittest.TestCase):
         dummy = SimpleNamespace(
             current_interface_language="ru",
             _main_translation_running=False,
+            settings_window=None,
+            _cached_settings_window=None,
             _argos_install_required=False,
             _argos_cancel_enabled=False,
             _argos_active_pair="",
@@ -200,6 +202,8 @@ class ArgosProgressUiTest(unittest.TestCase):
             current_theme="Темная",
             _argos_active_pair="RU→PT",
             _main_active_engine="argos",
+            _argos_cancel_requested=threading.Event(),
+            _argos_install_required=False,
             _finish_main_translation_state=mock.Mock(),
             _show_argos_translation_error=mock.Mock(),
         )

@@ -145,6 +145,59 @@ def test_failed_worker_launch_releases_busy_state(downloads):
     assert 'No worker available' in dialog.task_status_label.text()
 
 
+@pytest.mark.parametrize('terminal', ['success', 'failure', 'unavailable', 'cancelled'])
+def test_cancelled_background_argos_ignores_late_delivery(downloads, terminal):
+    settings, dialog = downloads
+    app = settings.parent
+    with (mock.patch('main.threading.Thread.start'),
+          mock.patch.object(app, '_present_main_translation_result') as present,
+          mock.patch.object(app, '_show_argos_translation_error') as error,
+          mock.patch('translation_availability.offer_provider_recovery') as recover,
+          mock.patch('main.QMessageBox.information') as notice):
+        app._start_main_translation('hello', 'en', 'es', 'argos', package_installed=False)
+        app._argos_progress._continue_in_background()
+        dialog.task_cancel_button.click()
+        assert app._argos_cancel_requested.is_set()
+        before = dialog.task_status_label.text()
+        app._on_argos_progress('EN→ES', 900, 1000)
+        app._on_argos_status('install')
+        after = dialog.task_status_label.text()
+        if terminal == 'success':
+            app._on_main_translation_done('hola')
+        elif terminal == 'failure':
+            app._on_main_translation_error('late network failure')
+        elif terminal == 'unavailable':
+            app._on_main_provider_unavailable(app._main_provider_request_id, mock.Mock())
+        else:
+            app._on_argos_translation_cancelled()
+        assert after == before
+        assert not app._main_translation_running
+        assert settings._language_package_task_state['kind'] == 'idle'
+        for modal_or_delivery in (present, error, recover, notice):
+            modal_or_delivery.assert_not_called()
+
+
+@pytest.mark.parametrize('provider_unavailable', [False, True])
+def test_background_argos_failure_stays_in_the_download_center(downloads, provider_unavailable):
+    settings, dialog = downloads
+    app = settings.parent
+    with (mock.patch('main.threading.Thread.start'),
+          mock.patch.object(app, '_show_argos_translation_error') as error,
+          mock.patch('translation_availability.offer_provider_recovery') as recover):
+        app._start_main_translation('hello', 'en', 'es', 'argos', package_installed=False)
+        app._argos_progress._continue_in_background()
+        if provider_unavailable:
+            issue = mock.Mock()
+            issue.message.return_value = 'Package download interrupted'
+            app._on_main_provider_unavailable(app._main_provider_request_id, issue)
+        else:
+            app._on_main_translation_error('Package download interrupted')
+    error.assert_not_called()
+    recover.assert_not_called()
+    assert settings._language_package_task_state['kind'] == 'failed'
+    assert 'Package download interrupted' in dialog.task_status_label.text()
+
+
 def test_current_version_check_remains_metadata_only(downloads):
     settings, dialog = downloads
     table = dialog.easyocr_table

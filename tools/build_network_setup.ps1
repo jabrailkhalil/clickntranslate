@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "1.8.2",
+    [string]$Version = "1.8.3",
     [Parameter(Mandatory = $true)][string]$SetupUrl,
     [Parameter(Mandatory = $true)][string]$SetupSha256,
     [string]$OutputPath = ""

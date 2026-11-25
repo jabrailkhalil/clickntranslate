@@ -31,6 +31,14 @@ def test_asset_is_exact_for_platform_format_and_architecture(kind, arch, expecte
     assert update.pick_asset(assets, kind, 'riscv64') is None
 
 
+@pytest.mark.parametrize('kind,name', [
+    ('macos', 'Click-n-Translate-9.0-macos-arm64-symbols.zip'),
+    ('linux-dir', 'Click-n-Translate-9.0-linux-arm64-models.tar.gz'),
+])
+def test_auxiliary_archive_is_not_a_system_update(kind, name):
+    assert update.pick_asset([asset(name)], kind, 'arm64') is None
+
+
 @pytest.mark.parametrize('name', ['../outside', '/tmp/outside', 'ok/../../outside'])
 def test_mac_zip_rejects_paths_before_ditto_runs(tmp_path, name):
     archive = tmp_path / 'app.zip'

@@ -2249,6 +2249,143 @@ def _is_newer_version(latest, current):
     # actual ordering instead of contributing extra numeric version parts.
     return Version(latest_version.public) > Version(current_version.public)
 
+
+def _desktop_update_asset(assets):
+    from release_assets import release_distribution
+
+    if not platform_support.IS_WINDOWS:
+        from posix_update import pick_asset, update_target
+        target = update_target()
+        kind = target[0] if target else ('macos' if platform_support.IS_MAC else 'appimage')
+        return pick_asset(assets, kind)
+
+    installed = _is_inno_installed_copy()
+    best, best_rank = None, ()
+    for asset in assets:
+        name = asset['name'].lower()
+        distribution = release_distribution(name, allow_unversioned=True)
+        if not distribution or distribution[0] != 'Windows' or distribution[2] not in ('x64', ''):
+            continue
+        executable = distribution[1] == 'Setup'
+        if (not _update_asset_download_url(asset)
+                or not (distribution[1] == 'Portable ZIP' or (installed and executable))):
+            continue
+        # Prefer a full installer for an installed copy, then an explicitly
+        # named Windows portable archive over the legacy ClicknTranslate.zip.
+        rank = (executable, 'installer' in name, 'win' in name, 'portable' in name,
+                any(arch in name for arch in ('x64', 'amd64', 'x86_64', 'x86-64', 'win64')))
+        if rank > best_rank:
+            best, best_rank = asset, rank
+    return best
+
+
+def _desktop_checksum_url(assets, asset_name):
+    if not asset_name:
+        return ''
+    name = asset_name.lower()
+    stem = re.sub(r'\.(tar\.gz|appimage|zip|exe)$', '', name)
+    by_name = {asset['name'].lower(): asset for asset in assets}
+    # macOS and Linux can share one manifest between two package formats.
+    # An exact per-file checksum has priority regardless of GitHub's ordering.
+    for base in (name, stem):
+        for suffix in ('.sha256', '.sha256.txt', '.sha256sum', '.sha256sum.txt'):
+            url = _update_asset_download_url(by_name.get(base + suffix, {}))
+            if url:
+                return url
+    return _update_asset_download_url(by_name.get(name + '.txt', {})) or ''
+
+
+def _desktop_release_offer(release, current_version, pick_asset=_desktop_update_asset,
+                           pick_checksum=_desktop_checksum_url):
+    """Describe an installable release using its metadata alone."""
+    from release_assets import release_distribution
+
+    if not isinstance(release, dict):
+        raise ValueError('The update server returned invalid release metadata.')
+    tag = release.get('tag_name') or release.get('name')
+    if not isinstance(tag, str) or not tag.strip():
+        raise ValueError('The release is missing its version.')
+    latest = _normalize_version(tag)
+    if not re.fullmatch(r'\d+(?:\.\d+){1,3}(?:[-+][0-9A-Za-z.-]+)?', latest):
+        raise ValueError('The release version is invalid.')
+    assets = release.get('assets', [])
+    if not isinstance(assets, list):
+        raise ValueError('The release asset list is invalid.')
+    for asset in assets:
+        if (not isinstance(asset, dict) or not isinstance(asset.get('name'), str)
+                or not asset['name'].strip()
+                or any(asset.get(key) is not None and not isinstance(asset[key], str)
+                       for key in ('url', 'browser_download_url'))):
+            raise ValueError('The release contains invalid asset metadata.')
+    if not _is_newer_version(latest, current_version):
+        return {'status': 'up_to_date', 'latest_version': latest}
+
+    uploaded = [asset for asset in assets
+                if asset.get('state', 'uploaded') == 'uploaded' and asset.get('size') != 0]
+    candidates = [asset for asset in uploaded
+                  if release_distribution(asset['name'], latest, allow_unversioned=True)]
+    asset = pick_asset(candidates)
+    while asset is not None:
+        url = _update_asset_download_url(asset)
+        checksum = pick_checksum(uploaded, asset['name'])
+        if url and checksum:
+            return {'status': 'ready', 'latest_version': latest, 'asset_name': asset['name'],
+                    'asset_url': url, 'checksum_url': checksum}
+        candidates.remove(asset)
+        asset = pick_asset(candidates)
+    return {'status': 'no_asset', 'latest_version': latest}
+
+
+def _check_desktop_update(current_version, *, timeout=15, cancelled=None,
+                          pick_asset=_desktop_update_asset, pick_checksum=_desktop_checksum_url):
+    url = _update_feed_api_url()
+    headers = _update_request_headers(url, accept_json=True)
+
+    def read(endpoint):
+        if cancelled and cancelled():
+            raise UpdateCancelledError('Update canceled by the user.')
+        response = requests.get(endpoint, headers=headers, timeout=timeout)
+        response.raise_for_status()
+        data = response.json()
+        if cancelled and cancelled():
+            raise UpdateCancelledError('Update canceled by the user.')
+        return data, response
+
+    release, _ = read(url)
+    offer = _desktop_release_offer(release, current_version, pick_asset, pick_checksum)
+    if offer['status'] != 'no_asset' or url != GITHUB_LATEST_RELEASE_API:
+        return offer
+
+    # Mobile and desktop packages can be published independently in this repository.
+    # Honour the release marked latest, including when the maintainer rolls it back.
+    latest = offer['latest_version']
+    best = current_version
+    seen = set()
+    page = 1
+    while True:
+        releases, response = read(f"{url.removesuffix('/latest')}?per_page=50&page={page}")
+        if not isinstance(releases, list):
+            raise ValueError('The update server returned invalid release history.')
+        new_tags = set()
+        for entry in releases:
+            if not isinstance(entry, dict) or entry.get('prerelease') or entry.get('draft'):
+                continue
+            tag = entry.get('tag_name')
+            if not isinstance(tag, str) or not re.fullmatch(r'v?\d+(?:\.\d+){1,3}', tag, re.IGNORECASE):
+                continue
+            new_tags.add(tag)
+            if tag in seen or not (_is_newer_version(tag, best) and _is_newer_version(latest, tag)):
+                continue
+            candidate = _desktop_release_offer(entry, current_version, pick_asset, pick_checksum)
+            if candidate['status'] == 'ready':
+                offer = candidate
+                best = candidate['latest_version']
+        if 'next' not in response.links or (new_tags and new_tags <= seen) or not releases:
+            return offer
+        seen.update(new_tags)
+        page += 1
+
+
 SETTINGS_TEXT = {
     "en": {
         "autostart": "Start with OS",
@@ -4347,7 +4484,7 @@ UPDATE_TEXT = {
         "canceling_wait": "Canceling the update...\nPlease wait.", "check_failed": "Failed to check for updates:\n{error}",
         "parse_failed": "Failed to parse update response.", "check_cancelled": "Update check was canceled.",
         "error_title": "Update error", "unknown_error": "Unknown update error.",
-        "up_to_date": "You already have the latest version: V{version}",
+        "up_to_date": "No updates available. Installed version {version}.",
         "no_asset": 'This release has no compatible update package for your installation yet. Try checking again later.',
         "invalid_url": "Invalid update asset URL.", "available_title": "Update available",
         "available_prompt": "New version found: V{latest}\nCurrent version: V{current}\n\nInstall now?",
@@ -4372,7 +4509,7 @@ UPDATE_TEXT = {
         "canceling_wait": "Отмена обновления...\nПожалуйста, подождите.", "check_failed": "Не удалось проверить обновления:\n{error}",
         "parse_failed": "Не удалось обработать ответ от сервера обновлений.", "check_cancelled": "Проверка обновлений отменена.",
         "error_title": "Ошибка обновления", "unknown_error": "Неизвестная ошибка обновления.",
-        "up_to_date": "У вас уже актуальная версия: V{version}",
+        "up_to_date": "Обновлений нет. Установлена версия {version}.",
         "no_asset": 'В этой версии пока нет подходящего пакета обновления для вашей установки. Повторите проверку позже.',
         "invalid_url": "Некорректный URL файла обновления.", "available_title": "Доступно обновление",
         "available_prompt": "Найдена новая версия: V{latest}\nТекущая версия: V{current}\n\nУстановить сейчас?",
@@ -4397,7 +4534,7 @@ UPDATE_TEXT = {
         "canceling_wait": "Cancelando la actualización...\nEspera.", "check_failed": "No se pudo buscar actualizaciones:\n{error}",
         "parse_failed": "No se pudo procesar la respuesta del servidor de actualizaciones.", "check_cancelled": "Se canceló la búsqueda de actualizaciones.",
         "error_title": "Error de actualización", "unknown_error": "Error de actualización desconocido.",
-        "up_to_date": "Ya tienes la versión más reciente: V{version}",
+        "up_to_date": "No hay actualizaciones disponibles. Tienes instalada la versión {version}.",
         "no_asset": 'Esta versión aún no tiene un paquete de actualización compatible con tu instalación. Vuelve a comprobarlo más tarde.',
         "invalid_url": "La URL del archivo de actualización no es válida.", "available_title": "Actualización disponible",
         "available_prompt": "Nueva versión: V{latest}\nVersión actual: V{current}\n\n¿Instalar ahora?",
@@ -4422,7 +4559,7 @@ UPDATE_TEXT = {
         "canceling_wait": "Update wird abgebrochen...\nBitte warten.", "check_failed": "Updates konnten nicht geprüft werden:\n{error}",
         "parse_failed": "Die Antwort des Update-Servers konnte nicht verarbeitet werden.", "check_cancelled": "Die Update-Prüfung wurde abgebrochen.",
         "error_title": "Update-Fehler", "unknown_error": "Unbekannter Update-Fehler.",
-        "up_to_date": "Du verwendest bereits die neueste Version: V{version}",
+        "up_to_date": "Keine Updates verfügbar. Installiert ist Version {version}.",
         "no_asset": 'Für diese Version gibt es noch kein passendes Update-Paket für deine Installation. Versuche es später erneut.',
         "invalid_url": "Die URL der Update-Datei ist ungültig.", "available_title": "Update verfügbar",
         "available_prompt": "Neue Version: V{latest}\nAktuelle Version: V{current}\n\nJetzt installieren?",
@@ -4447,7 +4584,7 @@ UPDATE_TEXT = {
         "canceling_wait": "Annulation de la mise à jour...\nVeuillez patienter.", "check_failed": "Impossible de rechercher les mises à jour :\n{error}",
         "parse_failed": "Impossible de traiter la réponse du serveur de mises à jour.", "check_cancelled": "La recherche de mises à jour a été annulée.",
         "error_title": "Erreur de mise à jour", "unknown_error": "Erreur de mise à jour inconnue.",
-        "up_to_date": "Vous utilisez déjà la dernière version : V{version}",
+        "up_to_date": "Aucune mise à jour disponible. La version {version} est installée.",
         "no_asset": 'Cette version ne propose pas encore de mise à jour compatible avec votre installation. Réessayez plus tard.',
         "invalid_url": "L’URL du fichier de mise à jour n’est pas valide.", "available_title": "Mise à jour disponible",
         "available_prompt": "Nouvelle version : V{latest}\nVersion actuelle : V{current}\n\nInstaller maintenant ?",
@@ -4472,7 +4609,7 @@ UPDATE_TEXT = {
         "canceling_wait": "正在取消更新...\n请稍候。", "check_failed": "无法检查更新：\n{error}",
         "parse_failed": "无法处理更新服务器的响应。", "check_cancelled": "已取消更新检查。",
         "error_title": "更新错误", "unknown_error": "未知更新错误。",
-        "up_to_date": "当前已是最新版本：V{version}",
+        "up_to_date": "暂无可用更新。已安装版本 {version}。",
         "no_asset": '此版本暂时没有适用于当前安装的更新包。请稍后重新检查。',
         "invalid_url": "更新文件 URL 无效。", "available_title": "有可用更新",
         "available_prompt": "发现新版本：V{latest}\n当前版本：V{current}\n\n现在安装吗？",
@@ -4505,7 +4642,7 @@ UPDATE_TEXT = {
      'check_cancelled': 'A verificação de atualização foi cancelada.',
      'error_title': 'Erro de atualização',
      'unknown_error': 'Erro de atualização desconhecido.',
-     'up_to_date': 'Você já tem a versão mais recente: V{version}',
+     'up_to_date': 'Nenhuma atualização disponível. A versão {version} está instalada.',
      'no_asset': 'Esta versão ainda não tem um pacote de atualização compatível com sua instalação. Tente verificar novamente mais tarde.',
      'invalid_url': 'URL de recurso de atualização inválido.',
      'available_title': 'Atualização disponível',
@@ -4547,7 +4684,7 @@ UPDATE_TEXT = {
      'check_cancelled': "Il controllo dell'aggiornamento è stato annullato.",
      'error_title': 'Errore di aggiornamento',
      'unknown_error': 'Errore di aggiornamento sconosciuto.',
-     'up_to_date': "Hai già l'ultima versione: V{version}",
+     'up_to_date': 'Nessun aggiornamento disponibile. È installata la versione {version}.',
      'no_asset': 'Questa versione non dispone ancora di un pacchetto di aggiornamento compatibile con la tua installazione. Riprova più tardi.',
      'invalid_url': 'URL della risorsa di aggiornamento non valido.',
      'available_title': 'Aggiornamento disponibile',
@@ -4588,7 +4725,7 @@ UPDATE_TEXT = {
      'check_cancelled': 'أُلغي التحقق من التحديثات.',
      'error_title': 'خطأ في التحديث',
      'unknown_error': 'خطأ غير معروف في التحديث.',
-     'up_to_date': 'لديك أحدث إصدار بالفعل: V{version}',
+     'up_to_date': 'لا توجد تحديثات متاحة. الإصدار المثبّت هو {version}.',
      'no_asset': 'لا يحتوي هذا الإصدار على حزمة تحديث متوافقة مع نسختك بعد. حاول التحقق لاحقًا.',
      'invalid_url': 'رابط ملف التحديث غير صالح.',
      'available_title': 'يتوفر تحديث',
@@ -4629,7 +4766,7 @@ UPDATE_TEXT = {
      'check_cancelled': 'Güncelleme denetimi iptal edildi.',
      'error_title': 'Güncelleme hatası',
      'unknown_error': 'Bilinmeyen güncelleme hatası.',
-     'up_to_date': 'Zaten en güncel sürümdesiniz: V{version}',
+     'up_to_date': 'Güncelleme yok. Yüklü sürüm {version}.',
      'no_asset': 'Bu sürümde kurulumunuza uygun güncelleme paketi henüz yok. Daha sonra denetleyin.',
      'invalid_url': 'Geçersiz güncelleme dosyası adresi.',
      'available_title': 'Güncelleme mevcut',
@@ -4665,7 +4802,7 @@ UPDATE_TEXT = {
      'check_cancelled': 'अपडेट जाँच रद्द हुई।',
      'error_title': 'अपडेट त्रुटि',
      'unknown_error': 'अज्ञात अपडेट त्रुटि।',
-     'up_to_date': 'आपके पास नवीनतम संस्करण है: V{version}',
+     'up_to_date': 'कोई अपडेट उपलब्ध नहीं है। संस्करण {version} इंस्टॉल है।',
      'no_asset': 'इस संस्करण में आपके इंस्टॉलेशन के अनुकूल अपडेट पैकेज अभी नहीं है। बाद में जाँचें।',
      'invalid_url': 'अपडेट फ़ाइल का URL अमान्य है।',
      'available_title': 'अपडेट उपलब्ध है',
@@ -4701,7 +4838,7 @@ UPDATE_TEXT = {
      'check_cancelled': 'Pemeriksaan pembaruan dibatalkan.',
      'error_title': 'Kesalahan pembaruan',
      'unknown_error': 'Kesalahan pembaruan tidak dikenal.',
-     'up_to_date': 'Anda sudah memakai versi terbaru: V{version}',
+     'up_to_date': 'Belum ada pembaruan. Versi {version} terpasang.',
      'no_asset': 'Rilis ini belum memiliki paket pembaruan yang cocok. Coba periksa lagi nanti.',
      'invalid_url': 'URL aset pembaruan tidak valid.',
      'available_title': 'Pembaruan tersedia',
@@ -14101,48 +14238,8 @@ class SettingsWindow(QWidget):
     def _check_latest_release_worker(self):
         lang = self.parent.current_interface_language
         try:
-            update_api_url = _update_feed_api_url()
-            headers = _update_request_headers(update_api_url, accept_json=True)
-            response = requests.get(update_api_url, headers=headers, timeout=20)
-            response.raise_for_status()
-            release = response.json()
-            if self._update_cancel_requested.is_set():
-                raise UpdateCancelledError("Update canceled by the user.")
-            if not isinstance(release, dict):
-                raise ValueError("The update server returned invalid release metadata.")
-            latest_tag = release.get("tag_name") or release.get("name")
-            if not isinstance(latest_tag, str) or not latest_tag.strip():
-                raise ValueError("The release is missing its version.")
-            latest_version = _normalize_version(latest_tag)
-            if not re.fullmatch(r"\d+(?:\.\d+){1,3}(?:[-+][0-9A-Za-z.-]+)?", latest_version):
-                raise ValueError("The release version is invalid.")
-            assets = release.get("assets", [])
-            if not isinstance(assets, list):
-                raise ValueError("The release asset list is invalid.")
-            for asset in assets:
-                if (not isinstance(asset, dict) or not isinstance(asset.get("name"), str)
-                        or not asset["name"].strip()
-                        or any(asset.get(key) is not None and not isinstance(asset[key], str)
-                               for key in ("url", "browser_download_url"))):
-                    raise ValueError("The release contains invalid asset metadata.")
-
-            if not _is_newer_version(latest_version, APP_VERSION):
-                payload = {"status": "up_to_date", "latest_version": latest_version}
-            else:
-                selected_asset = self._pick_update_asset(assets)
-                if not selected_asset:
-                    payload = {"status": "no_asset", "latest_version": latest_version}
-                else:
-                    asset_name = selected_asset["name"]
-                    asset_url = _update_asset_download_url(selected_asset)
-                    if not asset_url:
-                        payload = {"status": "invalid_asset", "latest_version": latest_version}
-                    else:
-                        payload = {
-                            "status": "ready", "latest_version": latest_version,
-                            "asset_name": asset_name, "asset_url": asset_url,
-                            "checksum_url": self._pick_checksum_url(assets, asset_name),
-                        }
+            payload = _check_desktop_update(APP_VERSION, timeout=20, cancelled=self._update_cancel_requested.is_set,
+                                            pick_asset=self._pick_update_asset, pick_checksum=self._pick_checksum_url)
         except UpdateCancelledError:
             payload = {"status": "cancelled"}
         except Exception as e:
@@ -14208,118 +14305,10 @@ class SettingsWindow(QWidget):
             self._on_update_failed(str(error))
 
     def _pick_update_asset(self, assets):
-        if not platform_support.IS_WINDOWS:
-            from posix_update import update_target, pick_asset
-            target = update_target()
-            if target is None:
-                # Still recognize the correct platform when announcing releases
-                # for an install managed outside the app.
-                kind = "macos" if platform_support.IS_MAC else "appimage"
-            else:
-                kind = target[0]
-            return pick_asset(assets, kind)
-
-        def is_32_bit_asset(name):
-            # Preserve both common x86-64 spellings before matching a bare
-            # x86 token. Legacy x64/win64 asset names continue to work too.
-            normalized = re.sub(r'x86[-_]64', 'x64', name)
-            return re.search(r'(?<![a-z0-9])(?:x86|ia32|i[3-6]86)(?![a-z0-9])', normalized) is not None
-
-        installed_copy = _is_inno_installed_copy()
-        if installed_copy:
-            setup_assets = []
-            for asset in assets:
-                name = (asset.get("name") or "").lower()
-                compact_name = name.replace("-", "").replace("_", "")
-                if (
-                    name.endswith(".exe")
-                    and "clickntranslate" in compact_name
-                    and not any(token in name for token in ("arm64", "aarch64", "x86-installer", "win32"))
-                    and not is_32_bit_asset(name)
-                    and ("setup" in name or "installer" in name)
-                    and (asset.get("browser_download_url") or asset.get("url"))
-                ):
-                    setup_assets.append(asset)
-            if setup_assets:
-                return sorted(
-                    setup_assets,
-                    key=lambda asset: (
-                        "installer" in (asset.get("name") or "").lower(),
-                        "win64" in (asset.get("name") or "").lower(),
-                        "x64" in (asset.get("name") or "").lower(),
-                    ),
-                    reverse=True,
-                )[0]
-
-        zip_assets = []
-        for asset in assets:
-            name = (asset.get("name") or "").lower()
-            if (
-                name.endswith(".zip")
-                and "bootstrap" not in name
-                and "update-bridge" not in name
-                and (asset.get("browser_download_url") or asset.get("url"))
-            ):
-                zip_assets.append(asset)
-        if not zip_assets:
-            return None
-
-        def _score(a):
-            name = (a.get("name") or "").lower()
-            compact_name = name.replace("-", "").replace("_", "")
-            if "clickntranslate" not in compact_name:
-                return -1
-            if is_32_bit_asset(name) or any(token in name for token in ("tesseract", "hymt", "hy-mt", "model", "runtime",
-                    "macos", "darwin", "linux", "arm64", "aarch64", "win32", "source", "verification", "signature")):
-                return -1
-            score = 0
-            if "clickntranslate" in compact_name:
-                score += 50
-            if re.search(r"clickntranslate-v?\d", name):
-                score += 30
-            if "win" in name or "windows" in name:
-                score += 20
-            if "x64" in name or "win64" in name:
-                score += 10
-            if "portable" in name:
-                score += 10
-            return score
-
-        candidates = [asset for asset in zip_assets if _score(asset) >= 0]
-        if not candidates:
-            return None
-        return sorted(candidates, key=_score, reverse=True)[0]
+        return _desktop_update_asset(assets)
 
     def _pick_checksum_url(self, assets, asset_name):
-        if not asset_name:
-            return ""
-        base_name = re.sub(r"\.(tar\.gz|appimage|zip|exe)$", "", asset_name.lower())
-        direct_name = f"{asset_name.lower()}"
-        direct_txt_name = f"{direct_name}.txt"
-        candidates = set()
-        candidates.update({
-            f"{base_name}.sha256",
-            f"{base_name}.sha256.txt",
-            f"{asset_name.lower()}.sha256",
-            f"{asset_name.lower()}.sha256.txt",
-            f"{base_name}.sha256sum",
-            f"{base_name}.sha256sum.txt",
-            direct_txt_name,
-        })
-
-        for asset in assets:
-            name = (asset.get("name") or "").lower()
-            if "sha256" not in name:
-                continue
-            if name == direct_name + ".sha256" or name == direct_name + ".sha256.txt" or name == direct_txt_name:
-                return _update_asset_download_url(asset) or ""
-            if ("." + base_name + ".") in name:
-                return _update_asset_download_url(asset) or ""
-        for asset in assets:
-            name = (asset.get("name") or "").lower()
-            if name in candidates:
-                return _update_asset_download_url(asset) or ""
-        return ""
+        return _desktop_checksum_url(assets, asset_name)
 
     def _read_checksum(self, checksum_path, archive_name):
         try:

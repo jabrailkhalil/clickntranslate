@@ -55,8 +55,9 @@ class _NewsOwner(QtWidgets.QWidget):
 def test_startup_news_is_localized_and_explains_user_benefits():
     from html import escape
     for language in main.INTERFACE_LANGUAGE_BY_CODE:
-        text = main.startup_news_text(language)
+        text = main.startup_news_text(language, "9.9.9")
         assert 'changes' not in text and 'promise' not in text
+        assert "9.9.9" in text["intro"]
         assert len(text['intro']) < 190
         assert text["continue"]
         assert '000' not in str(text)

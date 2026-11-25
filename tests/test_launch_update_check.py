@@ -63,9 +63,21 @@ class LaunchUpdateCheckTest(unittest.TestCase):
 
     def _run_worker(self, tag):
         app = _App()
-        with mock.patch("requests.get", return_value=_Response({"tag_name": tag})) as get:
+        name = 'ClicknTranslate-windows-x64.zip'
+        assets = [{'name': item, 'browser_download_url': 'https://example.invalid/' + item}
+                  for item in (name, name + '.sha256')]
+        with mock.patch.object(main.platform_support, 'IS_WINDOWS', True), \
+             mock.patch("requests.get", return_value=_Response({"tag_name": tag, "assets": assets})) as get:
             app._launch_update_worker()
         return app, get
+
+    def test_installation_managed_outside_the_app_does_not_check_on_launch(self):
+        app = _App()
+        with mock.patch.object(main.platform_support, 'supports_in_app_update', return_value=False), \
+             mock.patch('requests.get') as request:
+            app._launch_update_worker()
+        request.assert_not_called()
+        self.assertEqual(app.emitted, [])
 
     def test_a_newer_release_is_reported(self):
         app, get = self._run_worker("v99.9.9")
@@ -115,6 +127,18 @@ class LaunchCheckGatesTest(unittest.TestCase):
     def test_a_packaged_build_checks(self):
         started, _app = self._thread_starts()
         self.assertTrue(started)
+
+    def test_failed_worker_start_can_be_retried(self):
+        app = _App()
+        with mock.patch.object(main.threading, 'Thread') as thread, \
+             mock.patch.object(main.portable_paths, 'is_windows_packaged', return_value=False), \
+             mock.patch.object(main.sys, 'frozen', True, create=True):
+            thread.return_value.start.side_effect = [RuntimeError('thread unavailable'), None]
+            app._maybe_check_updates_on_launch()
+            self.assertFalse(app._launch_update_checked)
+            app._maybe_check_updates_on_launch()
+            self.assertTrue(app._launch_update_checked)
+            self.assertEqual(thread.return_value.start.call_count, 2)
 
     def test_a_dev_checkout_does_not_check(self):
         started, _app = self._thread_starts(frozen=False)

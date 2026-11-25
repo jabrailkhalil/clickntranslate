@@ -37,6 +37,40 @@ def window(app, tmp_path):
         app.processEvents()
 
 
+@pytest.mark.parametrize('language', main.INTERFACE_LANGUAGE_BY_CODE)
+def test_settings_and_faq_show_the_running_version(window, app, monkeypatch, language):
+    window.settings_button.click()
+    window.set_interface_language(language)
+    app.processEvents()
+    heading = window.title_bar
+    title = main.INTERFACE_TEXT[language]['title']
+    assert heading.text() == f'{title} · v{main.APP_VERSION}'
+    ink = heading.fontMetrics().boundingRect(heading.contentsRect(), int(heading.alignment()), heading.text())
+    for button in (window.flag_button, window.theme_button, window.document_button, window.help_button,
+                   window.settings_button, window.minimize_button, window.close_button):
+        assert not button.geometry().intersects(ink)
+    observed = []
+
+    def read_faq(dialog):
+        dialog.show()
+        app.processEvents()
+        label = dialog.findChild(QtWidgets.QLabel, 'helpVersionLabel')
+        if label is not None and label.isVisible():
+            observed.append(label.text())
+        dialog.close()
+        return QtWidgets.QDialog.Rejected
+
+    monkeypatch.setattr(main.CenteredFramelessDialog, 'exec_', read_faq)
+    window.help_button.click()
+    assert observed == [f'V{main.APP_VERSION}']
+    settings = window.settings_window
+    settings._on_update_check_result('{"status": "up_to_date", "latest_version": "1.8.2"}')
+    assert settings._update_progress.label.isVisible()
+    assert main.APP_VERSION in settings._update_progress.label.text()
+    window.settings_button.click()
+    assert heading.text() == title
+
+
 @pytest.mark.parametrize('dpi,dpr,expected', [(96, 1, 1), (144, 1, 1.5), (192, 1, 2), (96, 2, 1)])
 def test_desktop_controls_use_monitor_logical_dpi_not_double_dpr(dpi, dpr, expected):
     screen = SimpleNamespace(logicalDotsPerInch=lambda: dpi, devicePixelRatio=lambda: dpr)

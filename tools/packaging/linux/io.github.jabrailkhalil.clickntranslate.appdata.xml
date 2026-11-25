@@ -26,6 +26,9 @@
   <url type="bugtracker">https://github.com/jabrailkhalil/clickntranslate/issues</url>
   <url type="contact">https://t.me/jabrail_digital</url>
   <releases>
+    <release version="1.8.3" date="2026-11-25" type="development">
+      <description><p>Manage translation and OCR engines, track background downloads, and choose a custom companion image.</p></description>
+    </release>
     <release version="1.8.2" date="2026-10-22">
       <description><p>Separated program and translation settings and added in-app updates for portable Windows, macOS and Linux builds.</p></description>
     </release>
