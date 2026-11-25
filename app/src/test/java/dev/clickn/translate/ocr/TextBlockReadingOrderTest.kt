@@ -8,6 +8,53 @@ import org.junit.Test
 class TextBlockReadingOrderTest {
 
     @Test
+    fun horizontalMergedPageReadsWrappedColumnsWithinTheirSection() {
+        // Native LINE/PARAGRAPH provenance, like the engine's floating-window ALL input.
+        val heading = block("Heading", 8, 5, 600, 26)
+        fun line(text: String, x: Int, y: Int, parent: Int) =
+            block(text, x, y, x + 160, y + 20, granularity = TextRegionGranularity.LINE)
+                .copy(parentRegionId = parent)
+        val left = listOf(line("Левый столбец", 14, 100, 0), line("продолжение", 14, 129, 0))
+        val right = listOf(line("Right column", 324, 102, 1), line("continued", 324, 131, 1))
+        val footer = block("Footer", 8, 220, 600, 241)
+        val shuffled = listOf(right[1], footer, left[0], right[0], heading, left[1])
+        assertEquals((listOf(heading) + left + right + footer).map(TextBlock::text),
+            sortTextBlocksForMergedPage(shuffled, TextOrientation.HORIZONTAL_LTR).map(TextBlock::text))
+        assertEquals((listOf(heading) + right + left + footer).map(TextBlock::text),
+            sortTextBlocksForMergedPage(shuffled, TextOrientation.HORIZONTAL_RTL).map(TextBlock::text))
+        assertEquals(listOf(heading, left[0], right[0], left[1], right[1], footer),
+            sortTextBlocksForReading(shuffled, TextOrientation.HORIZONTAL_LTR))
+
+        // Without evidence of wrapped text, the same geometry could be a table.
+        val cells = shuffled.mapIndexed { i, item -> item.copy(parentRegionId = i) }
+        assertEquals(sortTextBlocksForReading(cells, TextOrientation.HORIZONTAL_LTR),
+            sortTextBlocksForMergedPage(cells, TextOrientation.HORIZONTAL_LTR))
+        val oneNativeParent = shuffled.map { it.copy(parentRegionId = 0) }
+        assertEquals(sortTextBlocksForReading(oneNativeParent, TextOrientation.HORIZONTAL_LTR),
+            sortTextBlocksForMergedPage(oneNativeParent, TextOrientation.HORIZONTAL_LTR))
+        assertEquals(emptyList<TextBlock>(), sortTextBlocksForMergedPage(emptyList()))
+    }
+
+    @Test
+    fun rtlMergedPagePreservesTheParagraphsAndTheirSourceBoxes() {
+        fun paragraph(text: String, x: Int, y: Int, id: Int): TextBlock =
+            block(text, x, y, x + 210, y + 55, TextOrientation.HORIZONTAL_RTL,
+                TextRegionGranularity.PARAGRAPH).copy(
+                parentRegionId = id,
+                sourceBoxes = listOf(block("", x, y, x + 210, y + 19).boundingBox,
+                    block("", x + 15, y + 32, x + 210, y + 51).boundingBox))
+        val right1 = paragraph("في الصباح", 500, 20, 8)
+        val left1 = paragraph("الجبال بعيدة", 40, 21, 9)
+        val right2 = paragraph("تشرق الشمس", 500, 90, 10)
+        val left2 = paragraph("والبحر قريب", 40, 96, 11)
+        val sorted = sortTextBlocksForMergedPage(listOf(left2, right2, left1, right1))
+        assertEquals(listOf(right1, right2, left1, left2).map(TextBlock::text), sorted.map(TextBlock::text))
+        listOf(right1, right2, left1, left2).zip(sorted).forEach { (source, result) ->
+            org.junit.Assert.assertSame(source, result)
+        }
+    }
+
+    @Test
     fun sort_horizontal_blocks_groups_same_line_before_sorting_left_to_right() {
         val blocks = listOf(
             block("7/2更新:", 39, 24, 252, 92),

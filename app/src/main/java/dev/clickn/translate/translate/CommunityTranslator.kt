@@ -3,6 +3,7 @@ package dev.clickn.translate.translate
 import dev.clickn.translate.data.Settings
 import dev.clickn.translate.data.TranslatorEngine
 import dev.clickn.translate.data.withApiTimeout
+import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
@@ -75,20 +76,25 @@ class CommunityTranslationClient @Inject constructor(
         val result = when (settings.translatorEngine) {
             TranslatorEngine.MYMEMORY -> {
                 check(payload["responseStatus"]?.jsonPrimitive?.content == "200") { "MyMemory rejected the request" }
-                decodeTranslationEntities(payload["responseData"]?.jsonObject?.get("translatedText")?.jsonPrimitive?.content.orEmpty())
+                (payload["responseData"] as? JsonObject)?.textAt("translatedText")?.let(::decodeTranslationEntities)
             }
-            TranslatorEngine.LIBRETRANSLATE -> payload["translatedText"]?.jsonPrimitive?.content.orEmpty()
+            TranslatorEngine.LIBRETRANSLATE -> payload.textAt("translatedText")
             TranslatorEngine.LINGVA -> {
                 check(payload["errors"] == null) { "Lingva rejected the request" }
-                payload["translation"]?.jsonPrimitive?.content
-                    ?: payload["data"]?.jsonObject?.get("translation")?.jsonObject?.get("target")?.jsonObject?.get("text")?.jsonPrimitive?.content.orEmpty()
+                val data = payload["data"] as? JsonObject
+                val translation = data?.get("translation") as? JsonObject
+                val targetText = translation?.get("target") as? JsonObject
+                payload.textAt("translation") ?: targetText?.textAt("text")
             }
             else -> error("Unsupported service")
         }
-        check(result.isNotBlank()) { "Service returned an empty translation" }
+        if (result.isNullOrBlank()) throw TranslationException("Empty service response")
         return result
     }
 }
+
+private fun JsonObject.textAt(key: String): String? =
+    (this[key] as? JsonPrimitive)?.takeIf { it.isString }?.content
 
 internal fun providerBaseUrl(value: String): HttpUrl {
     val url = value.trim().trimEnd('/').plus('/').toHttpUrlOrNull()
@@ -131,8 +137,10 @@ internal fun splitProviderText(value: String, byteLimit: Int): List<String> {
     return chunks
 }
 
-internal fun decodeTranslationEntities(value: String): String = Regex("&(#x[0-9a-fA-F]+|#[0-9]+|amp|lt|gt|quot|apos);?")
-    .replace(value) { match ->
+private val translationEntity = Regex("""&(#x[0-9a-fA-F]+|#[0-9]+|amp|lt|gt|quot|apos)(?:;|(?=\s|$))""")
+
+internal fun decodeTranslationEntities(value: String): String =
+    translationEntity.replace(value) { match ->
         when (val entity = match.groupValues[1]) {
             "amp" -> "&"; "lt" -> "<"; "gt" -> ">"; "quot" -> "\""; "apos" -> "'"
             else -> runCatching {
@@ -165,7 +173,14 @@ class CommunityTranslator @Inject constructor(
     }
     override fun translateStream(source: String, settings: Settings): Flow<String> = flow { translate(source, settings)?.let { emit(it) } }
     override suspend fun testConnection(settings: Settings): TestResult = try {
-        TestResult(true, transport.translate("Hello", settings.copy(sourceLang = "en")))
+        val target = providerLanguageCode(settings.targetLang)
+        val source = when (providerLanguageCode(settings.sourceLang)) {
+            "auto", target -> if (target == "en") "fr" else "en"
+            else -> settings.sourceLang
+        }
+        val locale = Locale.forLanguageTag(source)
+        val sample = locale.getDisplayLanguage(locale).ifBlank { source }
+        TestResult(true, transport.translate(sample, settings.copy(sourceLang = source)))
     } catch (cancelled: CancellationException) { throw cancelled }
     catch (error: Exception) { TestResult(false, error.message ?: "Service unavailable") }
 }

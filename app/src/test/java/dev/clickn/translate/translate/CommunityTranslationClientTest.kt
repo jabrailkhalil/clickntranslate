@@ -16,10 +16,13 @@ import org.junit.Test
 class CommunityTranslationClientTest {
     private val json = Json { ignoreUnknownKeys = true }
     private fun client(response: String, status: Int = 200, inspect: (Request) -> Unit = {}): CommunityTranslationClient =
+        client({ response }, status, inspect)
+
+    private fun client(response: () -> String, status: Int = 200, inspect: (Request) -> Unit = {}): CommunityTranslationClient =
         CommunityTranslationClient(OkHttpClient.Builder().addInterceptor { chain ->
             inspect(chain.request())
             Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(status).message("test")
-                .body(response.toResponseBody()).build()
+                .body(response().toResponseBody()).build()
         }.build(), json)
 
     @Test fun libreUsesOnlyItsOwnKeyAndSelectedHost() = runBlocking {
@@ -86,6 +89,15 @@ class CommunityTranslationClientTest {
         assertFalse(requested)
     }
 
+    @Test fun myMemoryPreservesQueryParametersAlongsideHtmlEntities() = runBlocking {
+        val link = "https://example.org/?id=1&amplitude=2&gtopic=3&amp=4&lt_title=5"
+        val response = """{"responseStatus":200,"responseData":{"translatedText":"Откройте $link &amp; A &lt; B &#39;x&#39; &amp C"}}"""
+        val translated = client(response).translate(
+            "Open $link", Settings(translatorEngine = TranslatorEngine.MYMEMORY, sourceLang = "en", targetLang = "ru"),
+        )
+        assertEquals("Откройте $link & A < B 'x' & C", translated)
+    }
+
     @Test fun malformedEmptyAndProviderErrorResponsesFail() = runBlocking {
         val cases = listOf(
             TranslatorEngine.LINGVA to """{"errors":[{"message":"Denied"}]}""",
@@ -106,6 +118,25 @@ class CommunityTranslationClientTest {
         val chunks = splitProviderText(text, 500)
         assertEquals(text, chunks.joinToString(""))
         chunks.forEach { assertTrue(it.toByteArray().size <= 500); assertFalse(it.last().isHighSurrogate()); assertFalse(it.first().isLowSurrogate()) }
+    }
+
+    @Test fun nonTextResultsReportAnInvalidResponseAndCanBeRetried() = runBlocking {
+        suspend fun verify(engine: TranslatorEngine, value: String, source: String = "Hello", payload: (String) -> String) {
+            var requests = 0
+            val transport = client({ payload(if (++requests == 1) value else JsonPrimitive(value).toString()) })
+            val translator = CommunityTranslator(transport, TranslationCache())
+            val settings = Settings(translatorEngine = engine, sourceLang = "en", targetLang = "fr")
+            val error = runCatching { translator.translate(source, settings) }.exceptionOrNull()
+            assertNotNull(engine.name, error)
+            assertEquals(TranslationFailureKind.INVALID_RESPONSE, describeTranslationFailure(error!!).kind)
+            assertEquals(value, translator.translate(source, settings))
+            assertEquals(value, translator.translate(source, settings))
+            assertEquals(2, requests)
+        }
+        verify(TranslatorEngine.MYMEMORY, "null") { """{"responseStatus":200,"responseData":{"translatedText":$it}}""" }
+        verify(TranslatorEngine.LIBRETRANSLATE, "false") { """{"translatedText":$it}""" }
+        verify(TranslatorEngine.LINGVA, "123") { """{"translation":$it}""" }
+        verify(TranslatorEngine.LINGVA, "null", "left/right") { """{"data":{"translation":{"target":{"text":$it}}}}""" }
     }
 
     @Test fun cancelledRequestCancelsTheHttpCall() = runBlocking {
@@ -137,5 +168,23 @@ class CommunityTranslationClientTest {
         translator.translate("Hello", settings)
         translator.translate("Hello", settings.copy(lingvaBaseUrl = "https://another.example"))
         assertEquals(2, requests)
+    }
+
+    @Test fun connectionTestUsesTheConfiguredPairAndNeverProbesEnglishIntoEnglish() = runBlocking {
+        val pairs = mutableListOf<String?>()
+        val samples = mutableListOf<String?>()
+        val transport = client("""{"responseStatus":200,"responseData":{"translatedText":"Test"}}""") {
+            pairs += it.url.queryParameter("langpair")
+            samples += it.url.queryParameter("q")
+        }
+        val translator = CommunityTranslator(transport, TranslationCache())
+        val settings = Settings(translatorEngine = TranslatorEngine.MYMEMORY, sourceLang = "de", targetLang = "en")
+        assertTrue(translator.testConnection(settings).success)
+        assertTrue(translator.testConnection(settings.copy(sourceLang = "auto")).success)
+        assertTrue(translator.testConnection(settings.copy(sourceLang = "en-US")).success)
+        assertTrue(translator.testConnection(settings.copy(sourceLang = "auto", targetLang = "de")).success)
+        assertEquals(listOf("de|en", "fr|en", "fr|en", "en|de"), pairs)
+        assertEquals("Deutsch", samples.first())
+        assertTrue(samples.all { !it.isNullOrBlank() })
     }
 }

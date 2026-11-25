@@ -29,8 +29,8 @@ internal fun sortTextBlocksForReading(
  * Ordinary OCR rendering deliberately keeps [sortTextBlocksForReading]'s conservative behavior.
  * A whole-page unit has stronger spatial evidence available: a blank horizontal tier separates
  * page sections, while a blank vertical tier separates columns inside a section. The cuts are
- * recursive and normalized by the median source-box thickness, so no device pixels, OCR text, or
- * model-specific region labels participate in the decision.
+ * normalized by source-box thickness. For horizontal layouts, native wrapped paragraphs
+ * distinguish prose columns from ordinary rows of controls or table cells.
  */
 internal fun sortTextBlocksForMergedPage(
     blocks: List<TextBlock>,
@@ -40,11 +40,43 @@ internal fun sortTextBlocksForMergedPage(
     return when (val orientation = resolveTextBlockReadingOrientation(blocks, orientationHint)) {
         TextOrientation.VERTICAL_RTL -> sortVerticalPageByWhitespace(blocks, leftToRight = false)
         TextOrientation.VERTICAL_LTR -> sortVerticalPageByWhitespace(blocks, leftToRight = true)
-        TextOrientation.HORIZONTAL_RTL -> sortHorizontal(blocks, leftToRight = false)
-        TextOrientation.HORIZONTAL_LTR,
+        TextOrientation.HORIZONTAL_RTL -> sortHorizontalPage(blocks, leftToRight = false)
+        TextOrientation.HORIZONTAL_LTR -> sortHorizontalPage(blocks, leftToRight = true)
         TextOrientation.STACKED,
         TextOrientation.UNKNOWN -> sortHorizontal(blocks, leftToRight = true)
     }
+}
+
+private fun sortHorizontalPage(blocks: List<TextBlock>, leftToRight: Boolean): List<TextBlock> {
+    val gutter = 4 * mangaHorizontalBandGapThresholdPx(blocks)
+    fun readColumns(section: List<TextBlock>): List<TextBlock>? {
+        val columns = splitByWhitespace(section, gutter, { it.boundingBox.left },
+            { it.boundingBox.right }, { it.boundingBox.top })
+        if (columns.size < 2 || !columns.all { it.hasWrappedParagraph() }) return null
+        // Side-by-side content must share a vertical band. Staggered sections read top to bottom.
+        if (columns.maxOf { column -> column.minOf { it.boundingBox.top } } >=
+            columns.minOf { column -> column.maxOf { it.boundingBox.bottom } }) return null
+        // A native paragraph crossing the gutter provides conflicting evidence for this cut.
+        val seen = mutableSetOf<Int>()
+        for (column in columns) {
+            if (column.mapNotNull { it.parentRegionId }.toSet().any { !seen.add(it) }) return null
+        }
+        return (if (leftToRight) columns else columns.asReversed()).flatMap { sortHorizontal(it, leftToRight) }
+    }
+    readColumns(blocks)?.let { return it }
+    val sections = splitByWhitespace(blocks, gutter, { it.boundingBox.top },
+        { it.boundingBox.bottom }, { it.boundingBox.left })
+    return if (sections.size == 1) sortHorizontal(blocks, leftToRight)
+    else sections.flatMap { section -> readColumns(section) ?: sortHorizontal(section, leftToRight) }
+}
+
+private fun List<TextBlock>.hasWrappedParagraph(): Boolean {
+    fun separateRows(boxes: List<android.graphics.Rect>) =
+        boxes.size > 1 && boxes.minOf { it.bottom } <= boxes.maxOf { it.top }
+    if (any { it.regionGranularity == TextRegionGranularity.PARAGRAPH && separateRows(it.sourceBoxes) }) return true
+    return filter { it.regionGranularity == TextRegionGranularity.LINE && it.parentRegionId != null }
+        .groupBy { it.parentRegionId }
+        .values.any { group -> separateRows(group.map { it.boundingBox }) }
 }
 
 /**

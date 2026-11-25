@@ -9,7 +9,10 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dagger.hilt.EntryPoints
 import dagger.hilt.android.internal.managers.ServiceComponentManager
+import dev.clickn.translate.capture.extractedCardText
+import dev.clickn.translate.data.MergeStrength
 import dev.clickn.translate.data.OcrEngineKind
+import dev.clickn.translate.data.RenderMode
 import dev.clickn.translate.data.Settings
 import dev.clickn.translate.service.CaptureService
 import dev.clickn.translate.service.CaptureService_GeneratedInjector
@@ -27,6 +30,36 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class AutomaticOcrParagraphIntegrationTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
+
+    @Test fun twoColumnPixelsReachTheExtractionCardInReadingOrder() = runBlocking {
+        val image = Bitmap.createBitmap(1400, 420, Bitmap.Config.ARGB_8888)
+        val settings = Settings(ocrEngine = OcrEngineKind.ML_KIT_LATIN,
+            sourceLang = "en", targetLang = "ru", renderMode = RenderMode.FLOATING_WINDOW,
+            mergeAdjacentBlocks = true, mergeStrength = MergeStrength.ALL)
+        try {
+            val canvas = Canvas(image)
+            canvas.drawColor(Color.WHITE)
+            val ink = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK; textSize = 40f }
+            val left = listOf("Quiet rivers flow", "through the valley", "toward the sea")
+            val right = listOf("Golden birds fly", "over the forest", "toward the hills")
+            left.forEachIndexed { i, line -> canvas.drawText(line, 70f, 130f + 49f * i, ink) }
+            right.forEachIndexed { i, line -> canvas.drawText(line, 780f, 137f + 49f * i, ink) }
+            val engine = applicationBoundOcrEngine()
+            val blocks = withTimeout(60_000) { engine.recognize(image, settings.ocrEngine, settings) }
+            val detail = blocks.joinToString { "${it.text} @${it.boundingBox} parent=${it.parentRegionId}" }
+            assertTrue("Unexpected OCR bounds: $detail", blocks.flatMap { it.sourceBoxes.ifEmpty { listOf(it.boundingBox) } }
+                .all { !it.isEmpty && it.left >= 0 && it.top >= 0 && it.right <= image.width && it.bottom <= image.height })
+            assertEquals(detail, (left + right).joinToString(" ").lowercase(),
+                extractedCardText(blocks, settings).trim().replace(Regex("\\s+"), " ").lowercase())
+            assertFalse(image.isRecycled)
+            canvas.drawColor(Color.WHITE)
+            val blank = withTimeout(60_000) { engine.recognize(image, settings.ocrEngine, settings) }
+            assertEquals("", extractedCardText(blank, settings))
+            assertFalse(image.isRecycled)
+        } finally {
+            if (!image.isRecycled) image.recycle()
+        }
+    }
 
     @Test fun ownedSilverAndGentlePageKeepsTwoIndependentCompleteParagraphs() = runBlocking {
         val settings = Settings(

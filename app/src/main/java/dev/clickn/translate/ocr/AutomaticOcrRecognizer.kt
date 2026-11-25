@@ -12,6 +12,7 @@ import dev.clickn.translate.data.OcrEngineKind
 import dev.clickn.translate.data.PaddleModelVersion
 import dev.clickn.translate.data.Settings
 import dev.clickn.translate.download.ModelReadinessChecker
+import dev.clickn.translate.translate.PageTranslationGroupingPolicy
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
@@ -78,8 +79,20 @@ class AutomaticOcrRecognizer @Inject constructor(
             }
             block.copy(recognizedLanguage = language)
         }
+        val wholePage = PageTranslationGroupingPolicy.shouldMergeAll(
+            settings.renderMode, settings.mergeAdjacentBlocks, settings.mergeStrength)
+        var nextPageParent = 0
         suspend fun tag(blocks: List<TextBlock>): List<TextBlock> {
             val tagged = tagLanguages(blocks)
+            if (wholePage) {
+                // Native parent 0 from two recognizers describes two unrelated regions.
+                // Scope parents per pass before mixing so wrapped columns retain their evidence.
+                val passParents = mutableMapOf<Int, Int>()
+                return tagged.map { block ->
+                    val parent = block.parentRegionId ?: return@map block
+                    block.copy(parentRegionId = passParents.getOrPut(parent) { nextPageParent++ })
+                }
+            }
             if (settings.mergeAdjacentBlocks) return tagged
             // Native parent IDs still belong to this one recognizer pass here. Preparing
             // after mixing would either lose that evidence or confuse equal IDs from two
@@ -172,9 +185,8 @@ class AutomaticOcrRecognizer @Inject constructor(
             }
         }
         Timber.tag("AutoOCR").i("bootstrap=regions passes=%d languages=%s blocks=%d", passes.size, groups.keys, result.size)
-        // Parent IDs are local to each OCR pass and cannot identify a shared parent after mixing passes.
-        return AutomaticOcrResult(result.map { it.copy(parentRegionId = null) }
-            .sortedWith(compareBy({ it.boundingBox.top }, { it.boundingBox.left })), usedManga)
+        val mixed = if (wholePage) result else result.map { it.copy(parentRegionId = null) }
+        return AutomaticOcrResult(mixed.sortedWith(compareBy({ it.boundingBox.top }, { it.boundingBox.left })), usedManga)
     }
 
     private fun overlaps(a: TextBlock, b: TextBlock): Boolean {

@@ -248,12 +248,17 @@ class MediaProjectionScreenshotter(
         val frameWidth = image.width
         val frameHeight = image.height
         val rowPadding = rowStride - pixelStride * frameWidth
-        val bmpWidth = frameWidth + rowPadding / pixelStride
         val bufferBytes = buffer.remaining()
+        // Image.Plane only guarantees bytes through the final pixel, even with a padded stride.
+        val shortLastRow = rowPadding > 0 && bufferBytes.toLong() < rowStride.toLong() * frameHeight
+        val pixels = if (shortLastRow) {
+            packImageRows(buffer, frameWidth * pixelStride, rowStride, frameHeight)
+        } else buffer
+        val bmpWidth = if (shortLastRow) frameWidth else frameWidth + rowPadding / pixelStride
         val raw = Bitmap.createBitmap(bmpWidth, frameHeight, Bitmap.Config.ARGB_8888)
         val output = try {
-            raw.copyPixelsFromBuffer(buffer)
-            if (rowPadding == 0) {
+            raw.copyPixelsFromBuffer(pixels)
+            if (bmpWidth == frameWidth) {
                 raw
             } else {
                 Bitmap.createBitmap(raw, 0, 0, frameWidth, frameHeight).also {

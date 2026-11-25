@@ -12,10 +12,23 @@ internal fun groupPaddleArabicTextRows(lines: List<PaddleArabicTextLine>): List<
         val hasArabic = row.any { TesseractTextPolicy.language(lines[it].text) == "ar" }
         val hasLatin = row.any { TesseractTextPolicy.language(lines[it].text) == "en" }
         if (row.size > 1 && hasArabic && hasLatin) {
-            listOf(row.sortedByDescending { lines[it].bounds.right })
+            // The row runs right to left, while a product name such as "Android Studio"
+            // can be split into several OCR boxes that still read left to right.
+            val logical = row.sortedByDescending { lines[it].bounds.right }.toMutableList()
+            var runStart = 0
+            for (i in 0..logical.size) {
+                if (i == logical.size || !isLtrFragment(lines[logical[i]].text)) {
+                    if (i - runStart > 1) logical.subList(runStart, i).reverse()
+                    runStart = i + 1
+                }
+            }
+            listOf(logical)
         } else row.map { listOf(it) }
     }.sortedWith(compareBy({ row -> row.minOf { lines[it].bounds.top } },
         { row -> -row.maxOf { lines[it].bounds.right } }))
+
+private fun isLtrFragment(text: String): Boolean =
+    TesseractTextPolicy.language(text) == "en" || (text.any(Char::isDigit) && text.none(Char::isLetter))
 
 /** Reuse the common immutable-box paragraph geometry, with Arabic column/alignment boundaries. */
 internal fun groupPaddleArabicParagraphRows(lines: List<PaddleArabicTextLine>): List<List<Int>> {

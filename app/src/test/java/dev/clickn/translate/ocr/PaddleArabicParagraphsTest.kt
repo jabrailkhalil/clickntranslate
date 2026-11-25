@@ -28,6 +28,26 @@ class PaddleArabicParagraphsTest {
         assertEquals(listOf(listOf(0, 1)), groupPaddleArabicTextRows(rows))
     }
 
+    @Test fun separateLatinWordsInArabicAreReadLeftToRightWithinTheirRun() {
+        // Visual order, left to right: اليوم | Android | Studio | نستخدم
+        val fragments = listOf(
+            line("Studio", 320, 100, 425, 170), line("اليوم", 10, 100, 110, 170),
+            line("نستخدم", 435, 100, 580, 170), line("Android", 120, 100, 310, 170),
+        )
+        val logical = groupPaddleArabicTextRows(fragments).single().map { fragments[it].text }
+        assertEquals(listOf("نستخدم", "Android", "Studio", "اليوم"), logical)
+    }
+
+    @Test fun aVersionNumberInAnEnglishNameStaysWithTheName() {
+        val fragments = listOf(
+            line("اليوم", 10, 100, 110, 170), line("Android", 120, 100, 260, 170),
+            line("Studio", 270, 100, 375, 170), line("2026", 385, 100, 465, 170),
+            line("نستخدم", 475, 100, 620, 170),
+        )
+        val logical = groupPaddleArabicTextRows(fragments).single().map { fragments[it].text }
+        assertEquals(listOf("نستخدم", "Android", "Studio", "2026", "اليوم"), logical)
+    }
+
     @Test fun aLargeHeadingCannotAbsorbSmallerBodyText() {
         val rows = listOf(line("عنوان", 450, 10, 900, 110), line("هذه بداية الفقرة", 100, 135, 900, 175))
         assertEquals(listOf(listOf(0), listOf(1)), groupPaddleArabicParagraphRows(rows))

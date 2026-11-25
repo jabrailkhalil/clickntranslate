@@ -303,6 +303,7 @@ class CaptureService : Service() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val mainScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val foregroundStart = CaptureForegroundStart(mainScope)
     private val captureLock = Mutex()
     private val screenshotLock = Mutex()
     private val sourceObservationCapture = SourceObservationCapture()
@@ -477,6 +478,7 @@ class CaptureService : Service() {
 
     private fun requestCaptureStop() {
         captureStopRequested = true
+        foregroundStart.cancel()
         stopSelf()
     }
 
@@ -496,8 +498,7 @@ class CaptureService : Service() {
     private fun failCaptureStart(error: Exception? = null) {
         if (captureStopRequested) return
         logRepository.error(LogRepository.Category.CAPTURE, getString(R.string.log_msg_capture_failed), error)
-        captureStopRequested = true
-        stopSelf()
+        requestCaptureStop()
     }
 
     private fun initializeCapture(intent: Intent) {
@@ -534,14 +535,12 @@ class CaptureService : Service() {
             useShizuku || useAccessibility -> android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
             else -> android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
         }
-            // Android 14+ HyperOS/MIUI 上常见 race：CaptureStartRequestActivity onActivityResult
-        // 收到 RESULT_OK 后立即 startForegroundService，此时 `android:project_media` app-op
-        // grant 尚未异步落地，startForeground 抛 SecurityException 闪退。
-        // workaround：捕获异常后 postDelayed 重试一次，给 op 200ms 落地时间；仍失败再 stopSelf。
-        if (!startForegroundCompat(fgType, intent)) {
-            return
-        }
+        startForegroundCompat(fgType) { openCaptureBackend(intent, backend) }
+    }
 
+    private fun openCaptureBackend(intent: Intent, backend: CaptureBackend) {
+        val useShizuku = backend == CaptureBackend.SHIZUKU
+        val useAccessibility = backend == CaptureBackend.ACCESSIBILITY
         if (useShizuku) {
             screenshotter = ShizukuScreenshotter()
             Timber.i("CaptureService started with Shizuku path")
@@ -861,53 +860,14 @@ class CaptureService : Service() {
         }
     }
 
-    /**
-     * 包裹 [ServiceCompat.startForeground]，处理 Android 14+ HyperOS/MIUI 上的 `android:project_media`
-     * app-op race：CaptureStartRequestActivity 拿到 RESULT_OK 后 op grant 是异步的，立刻 startForeground
-     * 可能在 op 还没落地时抛 `SecurityException`。
-     *
-     * 流程：
-     *  1) 直接尝试 startForeground —— 多数 ROM 正常工作
-     *  2) 抛 SecurityException → postDelayed 200ms 后重试一次（给 op 落地时间）
-     *  3) 重试成功 → 重新跑一遍 handleStart（cleanupCapture 幂等，重入安全）
-     *  4) 重试失败 → 弹 Toast 引导 + stopSelf
-     *
-     * @return true 代表 startForeground 同步成功，调用方可继续后续初始化；false 代表已进入异步
-     *  重试模式，调用方应立刻 return（避免在前台未确立时初始化截屏 / 悬浮窗）。
-     */
-    private fun startForegroundCompat(fgType: Int, originalIntent: Intent): Boolean {
-        val tryStart = {
-            ServiceCompat.startForeground(
-                this,
-                CaptureNotification.NOTIF_ID,
-                CaptureNotification.build(this),
-                fgType
-            )
-        }
-        return try {
-            tryStart()
-            true
-        } catch (se: SecurityException) {
-            Timber.w(se, "startForeground SecurityException; retry in 200ms")
-            mainScope.launch {
-                delay(200L)
-                if (captureStopRequested) return@launch
-                try {
-                    tryStart()
-                    Timber.i("startForeground retry succeeded; rerunning handleStart")
-                    handleStart(originalIntent)
-                } catch (e2: Exception) {
-                    Timber.e(e2, "startForeground retry also failed")
-                    logRepository.error(
-                        LogRepository.Category.CAPTURE,
-                        "startForeground SecurityException after retry: ${e2.message}",
-                        e2
-                    )
-                    failCaptureStart(e2)
-                }
-            }
-            false
-        }
+    private fun startForegroundCompat(fgType: Int, onReady: () -> Unit) {
+        foregroundStart.start(
+            promote = {
+                ServiceCompat.startForeground(this, CaptureNotification.NOTIF_ID, CaptureNotification.build(this), fgType)
+            },
+            onReady = onReady,
+            onRetryFailed = ::failCaptureStart,
+        )
     }
 
     private fun triggerOnce() {
@@ -5897,6 +5857,7 @@ class CaptureService : Service() {
 
     /** 释放截屏相关资源（不停 Service），用于 handleStart 重入时去重 + onDestroy 兜底。 */
     private fun cleanupCapture() {
+        foregroundStart.cancel()
         resumeLoopAfterOwnUi = false
         floatingButtonReady = false
         captureUiStartupJob?.cancel()
