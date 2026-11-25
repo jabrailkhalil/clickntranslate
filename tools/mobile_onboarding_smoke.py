@@ -54,6 +54,7 @@ class Journey:
         self.output = args.output
         self.remote = f"/data/local/tmp/clickntranslate-onboarding-{os.getpid()}.xml"
         self.stages = []
+        self.launches = []
         self.stage = "device"
         self.verified = False
         self.last_xml = b""
@@ -102,6 +103,8 @@ class Journey:
             point = action_point(tree, self.package, action) if action else None
             if set(expected) <= visible and (action is None or point):
                 (self.output / f"{stage}.xml").write_bytes(self.last_xml)
+                if stage in {"step-1", "step-3", "settings"}:
+                    (self.output / f"{stage}.png").write_bytes(self.run("exec-out", "screencap", "-p"))
                 self.stages.append(stage)
                 if point:
                     self.tap(point)
@@ -115,6 +118,10 @@ class Journey:
                           "-c", "android.intent.category.LAUNCHER", "-p", self.package)
         if b"Error:" in result or b"Status: ok" not in result:
             raise RuntimeError("Failed to open the package's launcher activity")
+        metrics = {"stage": self.stage}
+        for key, value in re.findall(r"^(LaunchState|TotalTime|WaitTime):\s*([^\r\n]+)", result.decode(), re.MULTILINE):
+            metrics[key] = int(value) if value.isdecimal() else value.strip()
+        self.launches.append(metrics)
 
     def execute(self):
         if self.run("shell", "getprop", "ro.kernel.qemu").strip() != b"1":
@@ -164,7 +171,7 @@ def main():
         parser.error("--serial must identify a disposable emulator-NNNN")
     args.output.mkdir(parents=True, exist_ok=True)
     journey = Journey(args)
-    report = {"serial": args.serial, "package": args.package, "stages": journey.stages}
+    report = {"serial": args.serial, "package": args.package, "stages": journey.stages, "launches": journey.launches}
     try:
         journey.execute()
         report["passed"] = True

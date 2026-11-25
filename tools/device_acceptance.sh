@@ -51,5 +51,6 @@ failure=0
 python3 tools/mobile_onboarding_smoke.py --serial "$serial" --output "$report/onboarding" || failure=1
 run_tests device-suite || failure=1
 run_tests screen-consent -e class dev.clickn.translate.capture.MediaProjectionConsentIntegrationTest -e projectionConsent true || failure=1
+adb -s "$serial" logcat -d -s ProjectionConsentTest:I > "$report/consent-timing.log"
 run_tests arabic-ocr -e class dev.clickn.translate.ocr.TesseractArabicOcrIntegrationTest -e downloadModels true || failure=1
 exit "$failure"

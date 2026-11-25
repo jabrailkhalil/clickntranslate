@@ -14,6 +14,7 @@ import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
 import android.provider.Settings
+import android.util.Log
 import android.view.Display
 import android.view.Gravity
 import android.view.View
@@ -40,6 +41,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.runBlocking
 import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
@@ -62,12 +64,14 @@ class MediaProjectionConsentIntegrationTest {
     private val context get() = instrumentation.targetContext
     private val ui get() = instrumentation.uiAutomation
     private val frames = AtomicInteger()
+    private val lastFrameMs = AtomicLong()
     private val phrases = mapOf("Blue door" to "Синяя дверь", "Green door" to "Зелёная дверь")
     private val recognized = ConcurrentHashMap.newKeySet<String>()
     private val frameObserver = object : Timber.Tree() {
         override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
             // Emitted after the production screenshotter converts an ImageReader image to a bitmap.
             if (tag == "VerticalDiag" && message.startsWith("mediaProjection frame image=")) {
+                lastFrameMs.set(SystemClock.elapsedRealtime())
                 frames.incrementAndGet()
             }
         }
@@ -83,8 +87,11 @@ class MediaProjectionConsentIntegrationTest {
             .find(shell("cmd appops get ${context.packageName} SYSTEM_ALERT_WINDOW"))?.groupValues?.get(1) ?: "default"
         val restoreOverlay = !Settings.canDrawOverlays(context)
         val oldFlags = ui.serviceInfo.flags
-        val peer = CompletableFuture<MediaProjection>()
+        val peerConsent = CompletableFuture<Intent>()
+        var competingProjection: MediaProjection? = null
         var peerLauncher: ActivityResultLauncher<Intent>? = null
+        val allowFirstResponse = CountDownLatch(1)
+        val firstResponseIssued = CountDownLatch(1)
         val settings = (context.applicationContext as ClickTranslateApp).settingsRepository
         val previous = runBlocking { settings.get() }
         val translator = MockWebServer()
@@ -96,6 +103,10 @@ class MediaProjectionConsentIntegrationTest {
                 val text = body.getString("q").replace(Regex("\\s+"), " ")
                 val match = phrases.entries.firstOrNull { text.contains(it.key, ignoreCase = true) }
                 if (match != null) recognized.add(match.key)
+                if (match?.key == "Blue door") {
+                    if (!allowFirstResponse.await(90, TimeUnit.SECONDS)) return MockResponse().setResponseCode(504)
+                    firstResponseIssued.countDown()
+                }
                 return MockResponse().setHeader("Content-Type", "application/json")
                     .setBody(JSONObject().put("translatedText", match?.value ?: text).toString())
             }
@@ -110,22 +121,22 @@ class MediaProjectionConsentIntegrationTest {
                 settings.update { it.copy(
                     ocrEngine = OcrEngineKind.ML_KIT_LATIN, sourceLang = "en", targetLang = "ru",
                     translatorEngine = TranslatorEngine.LIBRETRANSLATE, libreTranslateApiKey = "",
+                    apiTimeoutSeconds = 120,
                     libreTranslateBaseUrl = "http://127.0.0.1:${translator.port}", renderMode = RenderMode.FLOATING_WINDOW,
                 ) }
             }
 
             ActivityScenario.launch(MainActivity::class.java).use { home ->
-                home.onActivity { it.startActivity(CaptureStartRequestActivity.newIntent(it)) }
+                home.onActivity { activity ->
+                    activity.startActivity(CaptureStartRequestActivity.newIntent(activity))
+                }
                 chooseConsent(grant = false)
                 waitFor("denial returns to the app") { appInFront() && appCaptureReleased() }
                 assertFalse("Denial registered a system projection", ownsProjection())
 
-                val firstDisplay = grantAndTranslate(home, "Blue door")
-
-                // A second grant goes directly to Android, without calling the production stop action.
-                // Android must revoke the first projection when it starts this separate, consented token.
-                shell("input keyevent KEYCODE_BACK")
-                waitFor("return from Android Settings") { appInFront() }
+                val firstDisplay = grantCapture(home)
+                // Obtain independent consent now, but do not activate it. Returning to MainActivity
+                // to ask for permission during translation would cancel work before Android revoked it.
                 home.onActivity { activity ->
                     val manager = requireNotNull(activity.getSystemService(MediaProjectionManager::class.java))
                     peerLauncher = activity.activityResultRegistry.register(
@@ -133,30 +144,49 @@ class MediaProjectionConsentIntegrationTest {
                     ) { result ->
                         try {
                             check(result.resultCode == Activity.RESULT_OK) { "Independent consent was denied" }
-                            peer.complete(requireNotNull(manager.getMediaProjection(result.resultCode, requireNotNull(result.data))))
+                            peerConsent.complete(requireNotNull(result.data))
                         } catch (failure: Exception) {
-                            peer.completeExceptionally(failure)
+                            peerConsent.completeExceptionally(failure)
                         }
                     }
                     peerLauncher!!.launch(manager.createScreenCaptureIntent(MediaProjectionConfig.createConfigForDefaultDisplay()))
                 }
                 chooseConsent(grant = true)
-                val competingProjection = peer.get(25, TimeUnit.SECONDS)
+                val secondGrant = peerConsent.get(25, TimeUnit.SECONDS)
+                triggerTranslation(home, "Blue door", expectResult = false)
+                assertEquals("The pending request must belong to the first display", listOf(firstDisplay), captureDisplays())
+                assertTrue(CaptureServiceState.running.value && !MainCaptureUiVisibility.snapshot().visible)
+                assertEquals("First HTTP reply must still be withheld", 1L, firstResponseIssued.count)
+                // Activating the new token makes Android revoke the in-flight capture, without
+                // any activity transition, app stop command, or user navigation during that request.
+                val manager = requireNotNull(context.getSystemService(MediaProjectionManager::class.java))
+                competingProjection = requireNotNull(manager.getMediaProjection(Activity.RESULT_OK, secondGrant))
                 waitFor("Android revokes the old capture and the service releases its resources") { appCaptureReleased() }
                 // Only after observing the application's termination may the test retire its own token.
-                competingProjection.stop()
+                competingProjection?.stop()
                 waitFor("system projection grant cleared") { !ownsProjection() }
+                allowFirstResponse.countDown()
+                assertTrue("Withheld reply was not released", firstResponseIssued.await(5, TimeUnit.SECONDS))
+                val quietUntil = SystemClock.elapsedRealtime() + 1_500
+                do {
+                    assertTrue("Late HTTP result recreated capture resources or an overlay", appCaptureReleased())
+                    SystemClock.sleep(100)
+                } while (SystemClock.elapsedRealtime() < quietUntil)
 
-                val restartedDisplay = grantAndTranslate(home, "Green door")
+                shell("am start -W --activity-reorder-to-front -n ${context.packageName}/${MainActivity::class.java.name}")
+                waitFor("return from the launcher after the system stop") { appInFront() }
+                val restartedDisplay = grantCapture(home)
                 assertNotEquals("Restart reused the old display", firstDisplay, restartedDisplay)
+                triggerTranslation(home, "Green door", expectResult = true)
                 context.startService(CaptureService.stopIntent(context))
                 waitFor("normal stop outside the app removes service, display, thread, windows and grant") {
                     appCaptureReleased() && !ownsProjection()
                 }
             }
         } finally {
+            allowFirstResponse.countDown()
             instrumentation.runOnMainSync { peerLauncher?.unregister() }
-            if (peer.isDone && !peer.isCompletedExceptionally) peer.getNow(null)?.stop()
+            competingProjection?.stop()
             context.stopService(Intent(context, CaptureService::class.java))
             Timber.uproot(frameObserver)
             translator.shutdown()
@@ -164,6 +194,7 @@ class MediaProjectionConsentIntegrationTest {
                 settings.update { it.copy(
                     ocrEngine = previous.ocrEngine, sourceLang = previous.sourceLang, targetLang = previous.targetLang,
                     translatorEngine = previous.translatorEngine, libreTranslateApiKey = previous.libreTranslateApiKey,
+                    apiTimeoutSeconds = previous.apiTimeoutSeconds,
                     libreTranslateBaseUrl = previous.libreTranslateBaseUrl, renderMode = previous.renderMode,
                 ) }
             }
@@ -172,24 +203,32 @@ class MediaProjectionConsentIntegrationTest {
         }
     }
 
-    private fun grantAndTranslate(home: ActivityScenario<MainActivity>, source: String): Int {
+    private fun grantCapture(home: ActivityScenario<MainActivity>): Int {
         home.onActivity { it.startActivity(CaptureStartRequestActivity.newIntent(it)) }
         chooseConsent(grant = true)
         waitFor("running capture, virtual display and Android projection grant") {
             CaptureServiceState.running.value && serviceRunning() && captureDisplays().size == 1 && ownsProjection()
         }
-        val id = captureDisplays().single()
-        home.onActivity { it.startActivity(Intent(Settings.ACTION_SETTINGS)) }
-        waitFor("floating capture control over Android Settings") {
-            ui.rootInActiveWindow?.packageName?.toString() == "com.android.settings" && overlayCount() > 0
+        return captureDisplays().single()
+    }
+
+    private fun triggerTranslation(home: ActivityScenario<MainActivity>, source: String, expectResult: Boolean) {
+        // Android Settings can deliberately hide every application overlay. The launcher allows
+        // both the floating control and the controlled source to be composited into a real frame.
+        val launcher = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        home.onActivity { it.startActivity(launcher) }
+        waitFor("floating capture control over the launcher") {
+            !MainCaptureUiVisibility.snapshot().visible && overlayCount() > 0
         }
         withSourceCard(source) {
             val before = frames.get()
+            val startedMs = SystemClock.elapsedRealtime()
             context.startService(Intent(context, CaptureService::class.java).setAction(CaptureService.ACTION_TRIGGER_ONCE))
             waitFor("a fresh bitmap from the real screen capture action") { frames.get() > before }
             waitFor("local ML Kit reads '$source' and sends it to the loopback translator", 60_000) {
                 source in recognized
             }
+            if (!expectResult) return@withSourceCard
             val translated = phrases.getValue(source)
             waitFor("the real floating window shows '$translated'") {
                 var shown = false
@@ -198,8 +237,9 @@ class MediaProjectionConsentIntegrationTest {
                 }
                 shown
             }
+            Log.i("ProjectionConsentTest", "restart: trigger_to_bitmap_ms=${lastFrameMs.get() - startedMs} " +
+                "trigger_to_rendered_loopback_translation_ms=${SystemClock.elapsedRealtime() - startedMs}")
         }
-        return id
     }
 
     // A controlled source drawn on Android's real display, separate from the app's floating controls.
