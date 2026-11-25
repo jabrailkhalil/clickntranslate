@@ -13,7 +13,10 @@ package dev.clickn.translate.llm
 enum class LlmModelKind(
     val displayName: String,
     val fileName: String,
-    val downloadUrl: String,
+    val repositoryPath: String,
+    val revision: String,
+    val expectedSizeBytes: Long,
+    val expectedSha256: String,
     val approxSizeMb: Int,
     val targetLangMode: TargetLangMode,
     val onlySourceLangBcp47: String? = null,
@@ -31,7 +34,10 @@ enum class LlmModelKind(
     SAKURA_1_5B_Q4(
         displayName = "Sakura-1.5B Qwen2.5 (Q5KS)",
         fileName = "sakura-1.5b-qwen2.5-v1.0-Q5KS.gguf",
-        downloadUrl = "https://huggingface.co/shing3232/Sakura-1.5B-Qwen2.5-v1.0-GGUF-IMX/resolve/main/sakura-1.5b-qwen2.5-v1.0-Q5KS.gguf",
+        repositoryPath = "shing3232/Sakura-1.5B-Qwen2.5-v1.0-GGUF-IMX",
+        revision = "6b704808673c735e326dfa25fe6fe62ac6ebc401",
+        expectedSizeBytes = 1_259_173_504L,
+        expectedSha256 = "6722487146c594984e4d222cae0b926c9715ffff712afb5f348b603417c01680",
         approxSizeMb = 1260,
         targetLangMode = TargetLangMode.FIXED_ZH_CN,
         onlySourceLangBcp47 = "ja",
@@ -46,10 +52,17 @@ enum class LlmModelKind(
     HY_MT2_1_8B_Q4_K_M(
         displayName = "Hy-MT2-1.8B (Q4_K_M)",
         fileName = "Hy-MT2-1.8B-Q4_K_M.gguf",
-        downloadUrl = "https://huggingface.co/tencent/Hy-MT2-1.8B-GGUF/resolve/main/Hy-MT2-1.8B-Q4_K_M.gguf",
+        repositoryPath = "tencent/Hy-MT2-1.8B-GGUF",
+        revision = "a0c709d9fac510f2c807aa3af52872340dc37a4a",
+        expectedSizeBytes = 1_133_080_448L,
+        expectedSha256 = "dc5f44fcf1fa496ee7ad725982c0c8c553a4de00259b53af84c4b89fb0c06699",
         approxSizeMb = 1130,
         targetLangMode = TargetLangMode.FOLLOWS_SETTINGS,
     );
+
+    /** Immutable publisher commit; every downloaded byte is checked against the LFS object. */
+    val downloadUrl: String
+        get() = "https://huggingface.co/$repositoryPath/resolve/$revision/$fileName"
 
     enum class TargetLangMode {
         /** 跟 Settings 里 targetLang 走（多语种翻译模型用）。当前无此模式枚举值的 kind。 */

@@ -13,8 +13,15 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.asCoroutineDispatcher
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import org.junit.After
 
 class SettingsRepositoryBehaviorTest {
+    private val storageOwners = mutableMapOf<File, SettingsStorage>()
+
+    @After fun closeStorageOwners() = runBlocking {
+        storageOwners.values.forEach { it.closeAndJoin() }
+        storageOwners.clear()
+    }
     @Test fun shareEntireScreen_defaultsOffAndPersists_tableDriven() = runBlocking {
         for (saved in listOf(null, false, true)) {
             val root = Files.createTempDirectory("projection-scope-test").toFile()
@@ -620,13 +627,17 @@ class SettingsRepositoryBehaviorTest {
         assertEquals("concurrent-test", settings.apiKey)
     }
 
-    private fun fileBackedRepository(root: File, cipher: SettingsSecretCipher = PlainTestCipher): SettingsRepository =
-        SettingsRepository(FileBackedContext(root), cipher).apply {
+    private fun fileBackedRepository(root: File, cipher: SettingsSecretCipher = PlainTestCipher): SettingsRepository {
+        // Repository recreation retains the Application's one store owner. Cold-owner reopen
+        // is verified separately by SettingsStorageOwnershipTest.
+        val storage = storageOwners.getOrPut(root.canonicalFile) { SettingsStorage(FileBackedContext(root)) }
+        return SettingsRepository(FileBackedContext(root), cipher, storage.dataStore).apply {
             setDefaultPromptProvidersForTest(
                 prompt = { "default prompt" },
                 dictionaryPrompt = { "default dictionary prompt" },
             )
         }
+    }
 
     private class FileBackedContext(private val root: File) : ContextWrapper(null) {
         override fun getApplicationContext(): Context = this

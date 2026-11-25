@@ -13,6 +13,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
@@ -20,6 +22,9 @@ import kotlinx.coroutines.flow.flowOn
 import timber.log.Timber
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 
 /**
  * PaddleOCR PP-OCRv5 mobile 模型安装器。
@@ -59,6 +64,9 @@ class PaddleModelInstaller @Inject constructor(
         val rec = File(dir, FILE_REC)
         val keys = File(dir, PaddleModelInstaller.keysFileName(version))
         val files = InstalledFiles(det, rec, keys)
+        if (version == PaddleModelVersion.V5_ARABIC && PaddleArabicModelSpec.files.any { spec ->
+                File(dir, spec.fileName).length() != spec.bytes
+            }) return null
         return files.takeIf { it.allReady }
     }
 
@@ -107,7 +115,8 @@ class PaddleModelInstaller @Inject constructor(
         )
 
         for ((name, dest, urls) in plans) {
-            if (dest.exists() && dest.length() > 0) {
+            if (dest.exists() && dest.length() > 0 &&
+                (version != PaddleModelVersion.V5_ARABIC || validatePackFile(version, name, dest) == null)) {
                 send(Progress(name, "(already installed)", dest.length(), dest.length(), true))
                 continue
             }
@@ -116,7 +125,7 @@ class PaddleModelInstaller @Inject constructor(
             for (url in urls) {
                 val mirror = url.substringAfter("//").substringBefore("/")
                 try {
-                    downloadOne(url, dest, channel, name, mirror)
+                    downloadOne(url, dest, channel, name, mirror, version)
                     ok = true
                     send(Progress(name, mirror, dest.length(), dest.length(), true))
                     break
@@ -138,8 +147,9 @@ class PaddleModelInstaller @Inject constructor(
         channel: SendChannel<Progress>,
         name: String,
         mirror: String,
+        version: PaddleModelVersion,
     ) {
-        downloader.download(url, dest, { validateDownloadedFile(name, it) }) { downloaded, total ->
+        downloader.download(url, dest, { validatePackFile(version, name, it) }) { downloaded, total ->
             channel.trySend(Progress(name, mirror, downloaded, total, false))
         }
     }
@@ -176,14 +186,42 @@ class PaddleModelInstaller @Inject constructor(
             val name = queryDisplayName(uri) ?: continue
             val target = localImportTargetFileName(name, version) ?: continue
             try {
-                context.contentResolver.openInputStream(uri)?.use { input ->
-                    FileOutputStream(File(dir, target)).use { output ->
-                        input.copyTo(output)
+                if (version == PaddleModelVersion.V5_ARABIC) {
+                    // An incomplete or different local model must never replace a verified pack file.
+                    val staged = File.createTempFile("$target.", ".import", dir)
+                    try {
+                        val input = context.contentResolver.openInputStream(uri) ?: throw IOException("Cannot open model file")
+                        input.use { source ->
+                            FileOutputStream(staged).use { output ->
+                                val buffer = ByteArray(16_384)
+                                while (true) {
+                                    currentCoroutineContext().ensureActive()
+                                    val count = source.read(buffer)
+                                    if (count < 0) break
+                                    output.write(buffer, 0, count)
+                                }
+                            }
+                        }
+                        validatePackFile(version, target, staged)?.let { throw IOException(it) }
+                        currentCoroutineContext().ensureActive()
+                        Files.move(
+                            staged.toPath(), File(dir, target).toPath(),
+                            StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING,
+                        )
+                    } finally {
+                        staged.delete()
+                    }
+                } else {
+                    context.contentResolver.openInputStream(uri)?.use { input ->
+                        FileOutputStream(File(dir, target)).use { output ->
+                            input.copyTo(output)
+                        }
                     }
                 }
                 imported++
                 Timber.i("Imported $name → $target")
             } catch (t: Throwable) {
+                if (t is CancellationException) throw t
                 Timber.w(t, "Import failed: $name")
             }
         }
@@ -200,6 +238,13 @@ class PaddleModelInstaller @Inject constructor(
     }.getOrNull()
 
     companion object {
+        internal fun validatePackFile(version: PaddleModelVersion, name: String, file: File): String? {
+            validateDownloadedFile(name, file)?.let { return it }
+            if (version != PaddleModelVersion.V5_ARABIC) return null
+            val spec = PaddleArabicModelSpec.forFile(name) ?: return "unknown Arabic pack file"
+            return spec.validationError(file)
+        }
+
         internal fun validateDownloadedFile(name: String, file: File): String? {
             if (!file.isFile || file.length() == 0L) return "empty model file"
             val header = ByteArray(256)
@@ -317,6 +362,9 @@ class PaddleModelInstaller @Inject constructor(
         internal fun defaultModelUrls(version: PaddleModelVersion): ModelUrls = when (version) {
             PaddleModelVersion.V5_MOBILE -> ModelUrls(DEFAULT_DET_URLS, DEFAULT_REC_URLS, DEFAULT_KEYS_URLS)
             PaddleModelVersion.V5_KOREAN -> ModelUrls(DEFAULT_DET_URLS, V5_KOREAN_REC_URLS, V5_KOREAN_YML_URLS)
+            PaddleModelVersion.V5_ARABIC -> ModelUrls(
+                PaddleArabicModelSpec.detection.urls, PaddleArabicModelSpec.recognition.urls, PaddleArabicModelSpec.keys.urls,
+            )
             PaddleModelVersion.V6_TINY -> ModelUrls(V6_TINY_DET_URLS, V6_TINY_REC_URLS, V6_TINY_YML_URLS)
             PaddleModelVersion.V6_SMALL -> ModelUrls(V6_SMALL_DET_URLS, V6_SMALL_REC_URLS, V6_SMALL_YML_URLS)
             PaddleModelVersion.V6_MEDIUM -> ModelUrls(V6_MEDIUM_DET_URLS, V6_MEDIUM_REC_URLS, V6_MEDIUM_YML_URLS)

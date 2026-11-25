@@ -1,0 +1,170 @@
+{
+  "schema": 1,
+  "source": "Official upstream raw files; bytes preserved without text conversion",
+  "wrapperRepository": "https://github.com/adaptech-cz/Tesseract4Android",
+  "wrapperTag": "4.9.0",
+  "wrapperCommit": "15c534717b1cb58261b58d4e4c1200c7f81f668c",
+  "tessdataFastCommit": "65727574dfcd264acbb0c3e07860e4e9e9b22185",
+  "declaredEmbeddedVersions": {
+    "tesseract": "5.5.1",
+    "leptonica": "1.85.0",
+    "libjpeg": "9f",
+    "libpng": "1.6.48"
+  },
+  "files": [
+    {
+      "component": "Tesseract4Android",
+      "version": "4.9.0",
+      "file": "tesseract4android/LICENSE.txt",
+      "officialImmutableUrl": "https://raw.githubusercontent.com/adaptech-cz/Tesseract4Android/15c534717b1cb58261b58d4e4c1200c7f81f668c/LICENSE",
+      "bytes": 11357,
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+    },
+    {
+      "component": "Tesseract4Android",
+      "version": "4.9.0",
+      "file": "tesseract4android/README.md",
+      "officialImmutableUrl": "https://raw.githubusercontent.com/adaptech-cz/Tesseract4Android/15c534717b1cb58261b58d4e4c1200c7f81f668c/README.md",
+      "bytes": 6982,
+      "sha256": "6c88b5458deb45c9f994e7bcc115b07c2f884b5086d7bb0bcd0a00591e55aa7e"
+    },
+    {
+      "component": "Tesseract4Android",
+      "version": "4.9.0",
+      "file": "source-evidence/CMakeLists.txt",
+      "officialImmutableUrl": "https://raw.githubusercontent.com/adaptech-cz/Tesseract4Android/15c534717b1cb58261b58d4e4c1200c7f81f668c/tesseract4android/src/main/cpp/CMakeLists.txt",
+      "bytes": 1259,
+      "sha256": "c45842ec710f7f26ffdab1e63511f618c94c3868402bd47ce8fd17146f28fcea"
+    },
+    {
+      "component": "Tesseract",
+      "version": "5.5.1",
+      "file": "tesseract/LICENSE.txt",
+      "officialImmutableUrl": "https://raw.githubusercontent.com/adaptech-cz/Tesseract4Android/15c534717b1cb58261b58d4e4c1200c7f81f668c/tesseract4android/src/main/cpp/tesseract/src/LICENSE",
+      "bytes": 11358,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "component": "Tesseract",
+      "version": "5.5.1",
+      "file": "tesseract/AUTHORS.txt",
+      "officialImmutableUrl": "https://raw.githubusercontent.com/adaptech-cz/Tesseract4Android/15c534717b1cb58261b58d4e4c1200c7f81f668c/tesseract4android/src/main/cpp/tesseract/src/AUTHORS",
+      "bytes": 787,
+      "sha256": "720862b7253993b348fe15f37ed6e0d4feb0fc8df8324284d75975d54dd29923"
+    },
+    {
+      "component": "Tesseract",
+      "version": "5.5.1",
+      "file": "source-evidence/tesseract-VERSION.txt",
+      "officialImmutableUrl": "https://raw.githubusercontent.com/adaptech-cz/Tesseract4Android/15c534717b1cb58261b58d4e4c1200c7f81f668c/tesseract4android/src/main/cpp/tesseract/src/VERSION",
+      "bytes": 6,
+      "sha256": "db74d0caf81f43029fa28ce9888695d0b54d0a99003e6042823c9bc914897865"
+    },
+    {
+      "component": "Leptonica",
+      "version": "1.85.0",
+      "file": "leptonica/LICENSE.txt",
+      "officialImmutableUrl": "https://raw.githubusercontent.com/adaptech-cz/Tesseract4Android/15c534717b1cb58261b58d4e4c1200c7f81f668c/tesseract4android/src/main/cpp/leptonica/src/leptonica-license.txt",
+      "bytes": 1521,
+      "sha256": "87829abb5bbb00b55a107365da89e9a33f86c4250169e5a1e5588505be7d5806"
+    },
+    {
+      "component": "libjpeg",
+      "version": "9f",
+      "file": "libjpeg/README-LICENSE.txt",
+      "officialImmutableUrl": "https://raw.githubusercontent.com/adaptech-cz/Tesseract4Android/15c534717b1cb58261b58d4e4c1200c7f81f668c/tesseract4android/src/main/cpp/libjpeg/src/README",
+      "bytes": 18719,
+      "sha256": "7c25493a9f64fed34d01445467341bda77bc1cdbeccbe33558659ef173fb9ff2"
+    },
+    {
+      "component": "libpng",
+      "version": "1.6.48",
+      "file": "libpng/LICENSE.txt",
+      "officialImmutableUrl": "https://raw.githubusercontent.com/adaptech-cz/Tesseract4Android/15c534717b1cb58261b58d4e4c1200c7f81f668c/tesseract4android/src/main/cpp/libpng/src/LICENSE",
+      "bytes": 5345,
+      "sha256": "16d9daaafbf63a31a5bdc91d4600972548fef5aaa1244202393288dbd079c49a"
+    },
+    {
+      "component": "tessdata_fast",
+      "version": "65727574dfcd264acbb0c3e07860e4e9e9b22185",
+      "file": "tessdata_fast/LICENSE.txt",
+      "officialImmutableUrl": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/LICENSE",
+      "bytes": 11358,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "component": "tessdata_fast",
+      "version": "65727574dfcd264acbb0c3e07860e4e9e9b22185",
+      "file": "tessdata_fast/README.md",
+      "officialImmutableUrl": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/README.md",
+      "bytes": 3955,
+      "sha256": "5196105c05ef1eb4b690878ab01629f8638e4eb96202787cde345ec5bb1031a5"
+    },
+    {
+      "component": "Tesseract4Android",
+      "version": "4.9.0",
+      "file": "tesseract4android/COPYRIGHT-SOURCE-HEADER.txt",
+      "officialImmutableUrl": "https://raw.githubusercontent.com/adaptech-cz/Tesseract4Android/15c534717b1cb58261b58d4e4c1200c7f81f668c/tesseract4android/src/main/java/com/googlecode/tesseract/android/TessBaseAPI.java",
+      "kind": "Complete leading upstream copyright/license comment, reproduced verbatim; not an upstream NOTICE filename",
+      "sourceFileSha256": "348becf2a7b5ea358f195484334e57593960832e661804286dd1e0de8221bc3a",
+      "bytes": 683,
+      "sha256": "06b54c122c05bf420162460c6b270cac4a8b4b29ec949eaffe67c44ed8168882"
+    },
+    {
+      "component": "tessdata_best",
+      "version": "e12c65a915945e4c28e237a9b52bc4a8f39a0cec",
+      "file": "tessdata_best/LICENSE.txt",
+      "officialImmutableUrl": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_best/e12c65a915945e4c28e237a9b52bc4a8f39a0cec/LICENSE",
+      "bytes": 10173,
+      "sha256": "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9"
+    },
+    {
+      "component": "tessdata_best",
+      "version": "e12c65a915945e4c28e237a9b52bc4a8f39a0cec",
+      "file": "tessdata_best/README.md",
+      "officialImmutableUrl": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_best/e12c65a915945e4c28e237a9b52bc4a8f39a0cec/README.md",
+      "bytes": 470,
+      "sha256": "08c87523fb799c5bae6380f6ffa1a823494ab78f63906d7255dddd7671f94a5f"
+    }
+  ],
+  "upstreamNoticeSearch": [
+    {
+      "repository": "adaptech-cz/Tesseract4Android",
+      "commit": "15c534717b1cb58261b58d4e4c1200c7f81f668c",
+      "treeApiUrl": "https://api.github.com/repos/adaptech-cz/Tesseract4Android/git/trees/15c534717b1cb58261b58d4e4c1200c7f81f668c?recursive=1",
+      "truncated": false,
+      "noticePaths": []
+    },
+    {
+      "repository": "tesseract-ocr/tessdata_fast",
+      "commit": "65727574dfcd264acbb0c3e07860e4e9e9b22185",
+      "treeApiUrl": "https://api.github.com/repos/tesseract-ocr/tessdata_fast/git/trees/65727574dfcd264acbb0c3e07860e4e9e9b22185?recursive=1",
+      "truncated": false,
+      "noticePaths": []
+    },
+    {
+      "repository": "tesseract-ocr/tessdata_best",
+      "commit": "e12c65a915945e4c28e237a9b52bc4a8f39a0cec",
+      "treeApiUrl": "https://api.github.com/repos/tesseract-ocr/tessdata_best/git/trees/27af2938bbbe8fe12bc5aa024e05722d1cf72807?recursive=1",
+      "truncated": false,
+      "noticePaths": []
+    }
+  ],
+  "tessdataBestCommit": "e12c65a915945e4c28e237a9b52bc4a8f39a0cec",
+  "models": [
+    {
+      "language": "ara",
+      "repository": "tesseract-ocr/tessdata_best",
+      "revision": "e12c65a915945e4c28e237a9b52bc4a8f39a0cec",
+      "bytes": 12603724,
+      "sha256": "ab9d157d8e38ca00e7e39c7d5363a5239e053f5b0dbdb3167dde9d8124335896"
+    },
+    {
+      "language": "eng",
+      "repository": "tesseract-ocr/tessdata_fast",
+      "revision": "65727574dfcd264acbb0c3e07860e4e9e9b22185",
+      "bytes": 4113088,
+      "sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2"
+    }
+  ]
+}

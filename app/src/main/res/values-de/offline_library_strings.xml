@@ -1,0 +1,5 @@
+<resources>
+    <string name="offline_installed_translation_languages">Installierte Übersetzungssprachen (%1$d)</string>
+    <string name="offline_installed_translation_help">Eine installierte Sprache als Ausgangssprache antippen. Weitere Sprachen stehen oben in der Auswahl für Ausgangs- und Zielsprache bereit.</string>
+    <string name="offline_builtin_english">In ML Kit enthalten</string>
+</resources>

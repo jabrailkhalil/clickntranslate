@@ -1,0 +1,3 @@
+<resources>
+    <string name="gallery_item_partial_error">Переведено блоков: %1$d из %2$d. Повторите непереведённые блоки.</string>
+</resources>

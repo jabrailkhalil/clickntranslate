@@ -1,0 +1,3 @@
+<resources>
+    <string name="gallery_item_partial_error">%1$d von %2$d Textblöcken übersetzt. Wiederhole die nicht übersetzten Blöcke.</string>
+</resources>

@@ -30,27 +30,13 @@ class SystemCapturePolicyTest {
         }
     }
 
-    @Test fun permissionPreparationPreservesSystemChoiceAndDoesNotRequestUnusedShizukuAuthorization() {
-        data class Case(val availability: ShizukuCapabilities.Availability, val systemNeedsGrant: Boolean)
-        val cases = listOf(
-            Case(ShizukuCapabilities.Availability.READY, true),
-            Case(ShizukuCapabilities.Availability.INSTALLED_NOT_GRANTED, false),
-            Case(ShizukuCapabilities.Availability.INSTALLED_NOT_PAIRED, false),
-            Case(ShizukuCapabilities.Availability.INSTALLED_COMPATIBILITY_REQUIRED, false),
-            Case(ShizukuCapabilities.Availability.NOT_INSTALLED, false),
-            Case(ShizukuCapabilities.Availability.NOT_RUNNING, false),
-        )
-        for (case in cases) for (granted in listOf(false, true))
-            for (accessibilityReady in listOf(false, true)) for (mode in CaptureStartMode.entries) {
-            val expected = if (granted && accessibilityReady) false else when (mode) {
-                CaptureStartMode.SHIZUKU -> true // ensureReady() is checked first by the coordinator.
-                CaptureStartMode.SYSTEM -> case.systemNeedsGrant
-            }
-            assertEquals("${case.availability} overlay=$granted accessibility=$accessibilityReady mode=$mode", expected,
-                shouldConfigureCapturePermissions(granted, accessibilityReady,
-                    mode == CaptureStartMode.SHIZUKU, case.availability))
-            assertEquals(mode, resolveCaptureStartMode(mode, case.availability))
-        }
+    @Test fun startingCaptureDoesNotSilentlyEnableAccessibilityOrConfigureOtherPermissions() {
+        val coordinator = File("src/main/java/dev/clickn/translate/capture/CaptureStartCoordinator.kt").readText()
+        assertFalse(coordinator.contains("permissions.configure("))
+        assertFalse(coordinator.contains("permissions.configureIfReady("))
+        assertFalse(coordinator.contains("grantOverlayPermission("))
+        assertTrue(coordinator.contains("CaptureStartPreference.initialize(context)"))
+        assertTrue(coordinator.contains("if (!Settings.canDrawOverlays(context)) return CaptureStartDecision.OpenOverlaySettings"))
     }
 
     @Test fun systemBackendTable() {
@@ -64,15 +50,12 @@ class SystemCapturePolicyTest {
         }
     }
 
-    @Test fun explicitChoiceWinsAndAutomaticChoiceUsesOnlyUsableShizukuStates() {
+    @Test fun explicitChoiceWinsAndANewInstallationNeverImplicitlySelectsShizuku() {
         for (state in ShizukuCapabilities.Availability.entries) {
             for (choice in CaptureStartMode.entries) {
                 assertEquals(choice, resolveCaptureStartMode(choice, state))
             }
-            val expected = if (state == ShizukuCapabilities.Availability.READY ||
-                state == ShizukuCapabilities.Availability.INSTALLED_NOT_GRANTED)
-                CaptureStartMode.SHIZUKU else CaptureStartMode.SYSTEM
-            assertEquals(expected, resolveCaptureStartMode(null, state))
+            assertEquals(CaptureStartMode.SYSTEM, resolveCaptureStartMode(null, state))
         }
     }
 
@@ -114,17 +97,8 @@ class SystemCapturePolicyTest {
         assertTrue(activity.contains("coordinator.start(CaptureBackend.MEDIA_PROJECTION"))
         assertTrue(coordinator.indexOf("verifyShellPrivilegeAsync()") < coordinator.indexOf("resolveCaptureStartMode("))
         assertTrue(coordinator.contains("CaptureServiceState.running.value"))
-        assertTrue(coordinator.contains("val permissionState = permissions.currentState()"))
-        assertTrue(coordinator.contains("overlayPermissionGranted = permissionState.overlayGranted"))
-        assertTrue(coordinator.contains("accessibilityReady = permissionState.accessibilityReady"))
-        assertFalse("overlay must not gate the shared permission check",
-            coordinator.contains("if (!Settings.canDrawOverlays(context)) {"))
-        assertTrue("system mode must not request Shizuku authorization if availability changes",
-            coordinator.contains("if (useShizuku) permissions.configure() else permissions.configureIfReady()"))
         assertTrue(coordinator.contains("if (!Settings.canDrawOverlays(context)) return CaptureStartDecision.OpenOverlaySettings"))
         assertTrue(coordinator.indexOf("if (useShizuku && !shizuku.ensureReady())") <
-            coordinator.indexOf("permissions.configure()"))
-        assertTrue(coordinator.indexOf("permissions.configure()") <
             coordinator.indexOf("return CaptureStartDecision.Ready(CaptureBackend.SHIZUKU)"))
         assertTrue(capture.contains("screenshotter = AccessibilityScreenshotter()"))
         for (marker in listOf("requestMutex.withLock", "withTimeoutOrNull", "buffer.close()",

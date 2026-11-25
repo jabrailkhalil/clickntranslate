@@ -1,33 +1,54 @@
-// Modified for Click'n'Translate on October 3, 2026.
 package dev.clickn.translate.overlay
 
+import java.text.Bidi
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class HorizontalRtlTextTest {
-    @Test
-    fun horizontalRtlDisplayText_keepsLogicalLineOrderForPerLineBidiLayout() {
-        data class Case(
-            val name: String,
-            val input: String,
-            val expected: String,
-        )
+    @Test fun russianTranslationOfAnRtlSourceRetainsLeftToRightLetterRuns() {
+        val text = horizontalRtlDisplayText("Спокойные реки текут между горами, они несут прохладу.")
+        val layout = Bidi(text, Bidi.DIRECTION_DEFAULT_RIGHT_TO_LEFT)
 
-        val rlo = "\u202E"
-        val pdf = "\u202C"
-        val cases = listOf(
-            Case("empty", "", ""),
-            Case("single character", "译", "${rlo}译$pdf"),
-            Case("CJK punctuation stays logical", "你好，世界。", "${rlo}你好，世界。$pdf"),
-            Case("paired punctuation stays logical", "(你好)", "${rlo}(你好)$pdf"),
-            Case("LF keeps first paragraph first", "第一行\n第二行", "${rlo}第一行$pdf\n${rlo}第二行$pdf"),
-            Case("CRLF keeps first paragraph first", "甲乙\r\n丙丁", "${rlo}甲乙$pdf\r\n${rlo}丙丁$pdf"),
-            Case("blank line remains blank", "甲\n\n乙", "${rlo}甲$pdf\n\n${rlo}乙$pdf"),
-            Case("surrogate and combining clusters stay logical", "A😀e\u0301中", "${rlo}A😀e\u0301中$pdf"),
-        )
+        assertTrue("The target paragraph is Russian, despite the RTL source", layout.baseIsLeftToRight())
+        assertRunDirection(text, layout, "Спокойные реки текут между горами", rightToLeft = false)
+    }
 
-        cases.forEach { case ->
-            assertEquals(case.name, case.expected, horizontalRtlDisplayText(case.input))
+    @Test fun arabicTargetRetainsArabicAndEmbeddedLatinRunDirections() {
+        val text = horizontalRtlDisplayText("نهر هادئ بين الجبال (ClicknTranslate 2026).")
+        val layout = Bidi(text, Bidi.DIRECTION_DEFAULT_LEFT_TO_RIGHT)
+
+        assertFalse("Arabic target must not inherit the source's LTR direction", layout.baseIsLeftToRight())
+        assertRunDirection(text, layout, "نهر هادئ بين الجبال", rightToLeft = true)
+        assertRunDirection(text, layout, "ClicknTranslate 2026", rightToLeft = false)
+    }
+
+    @Test fun mixedRussianTargetKeepsEachScriptAndNumericRunReadable() {
+        val text = horizontalRtlDisplayText("Перевод: العربية (QA 2026), готов.")
+        val layout = Bidi(text, Bidi.DIRECTION_DEFAULT_RIGHT_TO_LEFT)
+
+        assertRunDirection(text, layout, "Перевод", rightToLeft = false)
+        assertRunDirection(text, layout, "العربية", rightToLeft = true)
+        assertRunDirection(text, layout, "QA 2026", rightToLeft = false)
+        assertRunDirection(text, layout, "готов", rightToLeft = false)
+    }
+
+    @Test fun paragraphsAndGraphemesStayInTheOriginalLogicalText() {
+        val original = "Первый абзац 😀e\u0301\r\n\r\nنهر هادئ\nПоследний абзац."
+        assertEquals(original, horizontalRtlDisplayText(original))
+        assertEquals("", horizontalRtlDisplayText(""))
+    }
+
+    private fun assertRunDirection(text: String, layout: Bidi, run: String, rightToLeft: Boolean) {
+        val start = text.indexOf(run)
+        assertTrue("Missing test run: $run", start >= 0)
+        run.indices.filter { run[it].isLetterOrDigit() }.forEach { index ->
+            assertEquals(
+                "Wrong visual run direction for '${run[index]}' in '$run'",
+                if (rightToLeft) 1 else 0,
+                layout.getLevelAt(start + index) and 1,
+            )
         }
     }
 }

@@ -1,0 +1,202 @@
+{
+  "schema_version": 1,
+  "checkpoint": "production-update183-0abd1b9d",
+  "date": "2026-10-27",
+  "current_target_version": "1.8.3",
+  "status": "PRODUCTION_UPDATE_AND_COLD_LAUNCH_PASS_WITH_KNOWN_PRODUCT_LIMITS",
+  "all_features_complete": false,
+  "application": {
+    "application_id": "dev.clickn.translate",
+    "version_name": "1.8.3",
+    "version_code": 33,
+    "source_commit": "0abd1b9d920e24985acacbde8b02477f007a1e39",
+    "apk_path": "C:/Users/Home-PC/Desktop/ClicknTranslate-Android-1.8.3.apk",
+    "apk_bytes": 64376366,
+    "apk_sha256": "ebec8a26df443ab1418ff1eff130445cda5a788d5091bc6c414877da4c7777b5",
+    "apk_size_and_sha256_independently_checked": true,
+    "min_sdk": 26,
+    "target_sdk": 35
+  },
+  "signing": {
+    "existing_certificate_sha256": "1746bfc27cbbb823021ce32c1e7a2640584393d058b85e3d784711954bcafe85",
+    "expected_original_certificate_matches": true,
+    "signature_verifies": true,
+    "v2_verified": true,
+    "v3_verified": true,
+    "new_signing_key_created": false,
+    "private_key_material_in_report": false,
+    "evidence": [
+      "evidence/production-signature.txt",
+      "evidence/production-install-receipt.json"
+    ]
+  },
+  "production_update": {
+    "status": "SUCCESS",
+    "from": {
+      "version_name": "1.8.2",
+      "version_code": 7
+    },
+    "to": {
+      "version_name": "1.8.3",
+      "version_code": 33
+    },
+    "application_uninstalled": false,
+    "application_data_cleared": false,
+    "original_first_install_time_preserved": true,
+    "data_retention_scope": "Android in-place package update with no uninstall or clear; original installation identity retained",
+    "all_user_data_read_compared_or_hashed": false,
+    "private_production_history_read": false,
+    "other_packages_count": 3,
+    "other_package_versions_and_install_times_unchanged": true,
+    "started_utc": "2026-10-27T22:04:36.4276524+03:00",
+    "finished_utc": "2026-10-27T22:04:39.7755943+03:00",
+    "evidence": [
+      "evidence/production-install-receipt.json"
+    ]
+  },
+  "launch": {
+    "status": "PASS_COLD_ACTIVITY_LAUNCH",
+    "android_status": "ok",
+    "launch_state": "COLD",
+    "activity": "dev.clickn.translate/.ui.MainActivity",
+    "top_resumed": true,
+    "total_time_ms": 206,
+    "wait_time_ms": 213,
+    "translation_latency_benchmark": false,
+    "full_functionality_verified": false,
+    "evidence": [
+      "evidence/launch-production.txt",
+      "evidence/production-resumed.txt"
+    ]
+  },
+  "code_identity": {
+    "historical_source_commit": "2131073d4cc1d0f2911a2f85bf3daef322808a00",
+    "current_source_commit": "0abd1b9d920e24985acacbde8b02477f007a1e39",
+    "app_main_tree_equal": true,
+    "app_main_tree_sha1": "175332bd2fe4118db7cd526787e77f098eac2745",
+    "changed_app_paths": [
+      "app/build.gradle.kts"
+    ],
+    "change_scope": "Version metadata only",
+    "comparison_table": "../../../ANDROID_HANDOFF_194.ru.md"
+  },
+  "build": {
+    "status": "PASS",
+    "exit_code": 0,
+    "tasks": [
+      "assembleRelease unsigned local APK",
+      "assembleValidation"
+    ],
+    "started_at": "2026-10-27T21:52:18.1905552+03:00",
+    "finished_at": "2026-10-27T22:08:04.7584911+03:00",
+    "installation_status_at_install": "ASSEMBLE_RELEASE_COMPLETE_VALIDATION_ASSEMBLY_MAY_STILL_RUN",
+    "full_job_completed_after_install": true,
+    "signed_with_existing_key_after_release_assembly": true,
+    "unit_and_lint_rerun_for_version_only_change": false,
+    "metadata_source": ".tmp/version183/build-checks/build-receipt.json",
+    "metadata_scope": "Whitelisted public completion fields only; native/signing arguments not exported",
+    "release_published": false,
+    "new_key_created": false
+  },
+  "historical_verification": {
+    "source_commit": "2131073d4cc1d0f2911a2f85bf3daef322808a00",
+    "current_version_rerun": false,
+    "focused_unit_tests": {
+      "tests": 40,
+      "suites": 10,
+      "failures": 0,
+      "errors": 0,
+      "status": "HISTORICAL_PASS"
+    },
+    "lint": {
+      "errors": 0,
+      "warnings": 977,
+      "informational": 42,
+      "status": "HISTORICAL"
+    },
+    "native_android_reference": {
+      "tests": 1,
+      "failures": 1,
+      "status": "HISTORICAL_FAIL_STRICT_LATIN_WORD_REFERENCE",
+      "expected": "OCR",
+      "observed_emulator": "O",
+      "observed_phone": "OR",
+      "test_weakened": false
+    },
+    "report": "../phone194/report.json"
+  },
+  "known_product_limits": [
+    {
+      "layer": "OCR",
+      "expected": "OCR",
+      "observed_phone": "OR",
+      "observed_emulator": "O",
+      "status": "OPEN"
+    },
+    {
+      "layer": "Hy-MT2 translation",
+      "expected": "one book",
+      "observed": "две книги",
+      "status": "OPEN"
+    }
+  ],
+  "unverified_scope": [
+    "All production user data content/migration completeness",
+    "Capture/photo/model/ROI scenarios not rerun on production1.8.3 here",
+    "Physical Android8",
+    "16KB page runtime",
+    "Audible TTS",
+    "Paid APIs",
+    "Remaining OEM/language corpus coverage"
+  ],
+  "publication": {
+    "release_apk_assembled": true,
+    "github_release_created": false,
+    "pushed": false,
+    "published": false
+  },
+  "privacy": {
+    "public_evidence_files": 6,
+    "private_production_history_read": false,
+    "jks_exported": false,
+    "private_signing_json_exported": false,
+    "passwords_exported": false,
+    "key_access_copy_logs_exported": false,
+    "usb_serial_exported": false,
+    "private_prefixed_files_read_or_exported": false
+  },
+  "evidence_file_count": 6,
+  "evidence_total_bytes": 64350,
+  "evidence": [
+    {
+      "path": "evidence/launch-production.txt",
+      "bytes": 255,
+      "sha256": "1dbe701faf2f5d2f1d996c561c73151e5c38a5d96945872b5c3b7fd149a69447"
+    },
+    {
+      "path": "evidence/production-badging.txt",
+      "bytes": 5056,
+      "sha256": "35f0292eb4639fc8d26e184c67de1fff3457258fa0e6b4a5ef826a88c71271ff"
+    },
+    {
+      "path": "evidence/production-install-receipt.json",
+      "bytes": 1246,
+      "sha256": "e12835d975d2731808fc2435f2fb056994e07c1d22aa184bd1c9fd2186f60268"
+    },
+    {
+      "path": "evidence/production-resumed.txt",
+      "bytes": 102,
+      "sha256": "8f4448bc2573b4340fc504fb7a28f642761f76879ebf62ea85df3a7540e88758"
+    },
+    {
+      "path": "evidence/production-signature.txt",
+      "bytes": 987,
+      "sha256": "3766d5926714c725f5b2985653d718decf1f187ab1730290280ada7697dbf13e"
+    },
+    {
+      "path": "evidence/production-zipalign.txt",
+      "bytes": 56704,
+      "sha256": "8c1d9d65a556e52e590cca83c9479085eeabd7ce2d50bb7c1f883134c60363d3"
+    }
+  ]
+}

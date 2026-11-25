@@ -106,8 +106,8 @@ class GalleryTranslationConfirmStyleTest {
 
         listOf(
             PresetToggleCase(
-                "preset switcher starts expanded",
-                "var showPresetSwitcher by rememberSaveable { mutableStateOf(true) }",
+                "preset switcher starts collapsed for direct photo translation",
+                "var showPresetSwitcher by rememberSaveable { mutableStateOf(false) }",
             ),
             PresetToggleCase(
                 "task settings button toggles preset visibility",

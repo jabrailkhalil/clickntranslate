@@ -7,6 +7,8 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
 import dev.clickn.translate.data.Settings
+import dev.clickn.translate.data.AppLocalePrefs
+import dev.clickn.translate.R
 import dev.clickn.translate.data.SettingsRepository
 import dev.clickn.translate.data.TranslationPreset
 import dev.clickn.translate.data.TranslationPresetCatalog
@@ -16,8 +18,15 @@ import java.io.FileOutputStream
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
@@ -44,30 +53,83 @@ class GalleryTranslationRepository @Inject constructor(
     private val translatedPreviewStore: GalleryTranslatedPreviewStore,
     private val json: Json,
 ) {
-    fun observeTasks(): Flow<List<GalleryTranslationTaskEntity>> = dao.observeTasks()
+    private val legacyResultRepair = GalleryLegacyResultRepair(dao, json) { translated, total ->
+        AppLocalePrefs.live(context).getString(R.string.gallery_item_partial_error, translated, total)
+    }
 
-    fun observeLatestTask(): Flow<GalleryTranslationTaskEntity?> = dao.observeLatestTask()
+    private fun <T> afterInputCleanup(upstream: Flow<T>): Flow<T> = flow {
+        GalleryPrivateInputAccess.prepare(context.filesDir.toPath(), dao::privateInputReferences)
+        legacyResultRepair.run()
+        emitAll(upstream)
+    }.flowOn(Dispatchers.IO)
 
-    fun observeFeaturedTask(): Flow<GalleryTranslationTaskEntity?> = dao.observeFeaturedTask()
+    fun observeTasks(): Flow<List<GalleryTranslationTaskEntity>> = afterInputCleanup(dao.observeTasks())
 
-    fun observeTask(taskId: String): Flow<GalleryTranslationTaskEntity?> = dao.observeTask(taskId)
+    fun observeLatestTask(): Flow<GalleryTranslationTaskEntity?> = afterInputCleanup(dao.observeLatestTask())
+
+    fun observeFeaturedTask(): Flow<GalleryTranslationTaskEntity?> = afterInputCleanup(dao.observeFeaturedTask())
+
+    fun observeTask(taskId: String): Flow<GalleryTranslationTaskEntity?> = afterInputCleanup(dao.observeTask(taskId))
 
     fun observeItems(taskId: String): Flow<List<GalleryTranslationItemEntity>> =
-        dao.observeItems(taskId)
+        afterInputCleanup(dao.observeItems(taskId))
 
-    fun observeItem(itemId: String): Flow<GalleryTranslationItemEntity?> = dao.observeItem(itemId)
+    fun observeItem(itemId: String): Flow<GalleryTranslationItemEntity?> = afterInputCleanup(dao.observeItem(itemId))
 
-    suspend fun getTask(taskId: String): GalleryTranslationTaskEntity? = dao.getTask(taskId)
+    suspend fun getTask(taskId: String): GalleryTranslationTaskEntity? {
+        GalleryPrivateInputAccess.prepare(context.filesDir.toPath(), dao::privateInputReferences)
+        legacyResultRepair.run()
+        return dao.getTask(taskId)
+    }
 
-    suspend fun getItems(taskId: String): List<GalleryTranslationItemEntity> = dao.getItems(taskId)
+    suspend fun getItems(taskId: String): List<GalleryTranslationItemEntity> {
+        GalleryPrivateInputAccess.prepare(context.filesDir.toPath(), dao::privateInputReferences)
+        legacyResultRepair.run()
+        return dao.getItems(taskId)
+    }
 
-    suspend fun createTask(uriStrings: List<String>): GalleryPreparedTask = withContext(Dispatchers.IO) {
+    suspend fun createTask(
+        uriStrings: List<String>,
+        settingsSnapshot: Settings? = null,
+    ): GalleryPreparedTask {
+        val taskId = UUID.randomUUID().toString()
+        var enteredPublication = false
+        return try {
+            GalleryPrivateInputAccess.publication(context.filesDir.toPath(), dao::privateInputReferences) {
+                enteredPublication = true
+                createTask(taskId, uriStrings, settingsSnapshot)
+            }
+        } catch (error: Throwable) {
+            // Also covers cancellation on the IO -> caller handoff after Room commits.
+            // No worker is enqueued until this method has returned its prepared task.
+            if (enteredPublication) withContext(NonCancellable + Dispatchers.IO) {
+                GalleryPrivateInputAccess.rollback {
+                    val removed = runCatching { dao.deleteTask(taskId) }
+                        .onFailure { Timber.w(it, "Unable to roll back gallery task %s", taskId) }
+                        .isSuccess
+                    if (removed) {
+                        runCatching { settingsRepository.forgetSnapshotCredentials("gallery_$taskId") }
+                            .onFailure { Timber.w(it, "Unable to remove gallery snapshot %s", taskId) }
+                        runCatching {
+                            File(context.filesDir, "$TASK_FILES_DIR/$taskId").deleteRecursively()
+                        }.onFailure { Timber.w(it, "Unable to remove gallery import files %s", taskId) }
+                    }
+                }
+            }
+            throw error
+        }
+    }
+
+    private suspend fun createTask(
+        taskId: String,
+        uriStrings: List<String>,
+        settingsSnapshot: Settings?,
+    ): GalleryPreparedTask = withContext(Dispatchers.IO) {
         val selected = GalleryTranslationWorkPolicy.normalizeSelection(uriStrings)
         require(selected.isNotEmpty()) { "No images selected." }
 
-        val taskId = UUID.randomUUID().toString()
         val now = System.currentTimeMillis()
-        val settings = settingsRepository.get()
+        val settings = settingsSnapshot ?: settingsRepository.get()
         val activePreset = galleryTaskMatchingPreset(settings)
         val snapshot = TranslationPresetCatalog.fromSettings(
             id = "gallery_$taskId",
@@ -100,13 +162,9 @@ class GalleryTranslationRepository @Inject constructor(
                 ?.errorMessage
                 .orEmpty(),
         )
+        currentCoroutineContext().ensureActive()
         settingsRepository.rememberSnapshotCredentials(snapshot, settings)
-        try {
-            dao.insertTaskWithItems(task, items)
-        } catch (error: Throwable) {
-            settingsRepository.forgetSnapshotCredentials(snapshot.id)
-            throw error
-        }
+        dao.insertTaskWithItems(task, items)
         GalleryPreparedTask(
             id = taskId,
             sourceLang = settings.sourceLang,
@@ -118,16 +176,8 @@ class GalleryTranslationRepository @Inject constructor(
     }
 
     suspend fun settingsForTask(task: GalleryTranslationTaskEntity): Settings {
-        val current = settingsRepository.get()
-        val snapshot = runCatching {
-            json.decodeFromString<TranslationPreset>(task.settingsSnapshotJson)
-        }.getOrElse {
-            Timber.w(it, "Gallery task %s has an invalid settings snapshot", task.id)
-            return current.copy(
-                sourceLang = task.sourceLang,
-                targetLang = task.targetLang,
-            )
-        }
+        // Decode and validate the persisted route before resolving any credentials.
+        val snapshot = decodeGalleryTaskSnapshot(task, json)
         return settingsRepository.settingsForSnapshot(snapshot).copy(
             // Gallery work has no active foreground game. Global glossary entries remain
             // available, while app-specific memory must not attach to whichever app happens
@@ -151,9 +201,8 @@ class GalleryTranslationRepository @Inject constructor(
         dao.resetInterruptedItems(taskId, System.currentTimeMillis())
     }
 
-    suspend fun markTaskRunning(taskId: String) {
-        dao.markTaskRunning(taskId, GalleryTaskStatus.RUNNING, System.currentTimeMillis())
-    }
+    suspend fun markTaskRunning(taskId: String): Boolean =
+        dao.markTaskRunning(taskId, GalleryTaskStatus.RUNNING, System.currentTimeMillis()) == 1
 
     suspend fun markTaskWaitingRetry(taskId: String, lastError: String) {
         dao.markTaskWaitingRetry(taskId, lastError)
@@ -162,44 +211,76 @@ class GalleryTranslationRepository @Inject constructor(
     suspend fun nextPendingItem(taskId: String): GalleryTranslationItemEntity? =
         dao.nextPendingItem(taskId)
 
-    suspend fun markItemRunning(taskId: String, item: GalleryTranslationItemEntity) {
-        val now = System.currentTimeMillis()
-        dao.markItemRunning(item.id, now)
-        dao.updateCurrentItem(taskId, item.displayName)
+    suspend fun markItemRunning(
+        taskId: String,
+        item: GalleryTranslationItemEntity,
+    ): GalleryTranslationItemEntity? {
+        require(item.taskId == taskId)
+        return dao.claimItem(item, System.currentTimeMillis())
     }
 
     suspend fun completeItem(
         itemId: String,
+        expectedVersion: Long,
         decoded: GalleryDecodedImage,
         processedWidth: Int,
         processedHeight: Int,
         segments: List<GalleryTranslationSegment>,
-    ) {
-        dao.completeItem(
+    ): GalleryTranslationItemEntity? {
+        require(GallerySegmentRecovery.missingIndices(segments).isEmpty()) { "An incomplete image cannot be marked complete." }
+        return persistItemResult(itemId, expectedVersion, decoded, processedWidth, processedHeight, segments,
+            GalleryItemStatus.SUCCEEDED)
+    }
+
+    /** Remains RUNNING so interruption recovery can reclaim the saved recognition/results. */
+    internal suspend fun checkpointIncompleteItem(
+        itemId: String,
+        expectedVersion: Long,
+        decoded: GalleryDecodedImage,
+        processedWidth: Int,
+        processedHeight: Int,
+        segments: List<GalleryTranslationSegment>,
+    ): GalleryTranslationItemEntity? = persistItemResult(itemId, expectedVersion, decoded,
+        processedWidth, processedHeight, segments, GalleryItemStatus.RUNNING)
+
+    private suspend fun persistItemResult(
+        itemId: String,
+        expectedVersion: Long,
+        decoded: GalleryDecodedImage,
+        processedWidth: Int,
+        processedHeight: Int,
+        segments: List<GalleryTranslationSegment>,
+        status: GalleryItemStatus,
+    ): GalleryTranslationItemEntity? {
+        val changed = dao.completeItem(
             itemId = itemId,
+            expectedVersion = expectedVersion,
             originalWidth = decoded.originalWidth,
             originalHeight = decoded.originalHeight,
             processedWidth = processedWidth,
             processedHeight = processedHeight,
             sourceText = segments.joinToString("\n") { it.sourceText },
-            translatedText = segments.joinToString("\n") { it.translatedText },
+            translatedText = segments.filter { it.translatedText.isNotBlank() }.joinToString("\n") { it.translatedText },
             segmentsJson = json.encodeToString(segments),
             now = System.currentTimeMillis(),
+            status = status,
         )
+        return if (changed == 1) dao.getItem(itemId) else null
     }
 
     suspend fun markItemFailure(
         itemId: String,
+        expectedVersion: Long,
         retry: Boolean,
         message: String,
-    ) {
-        dao.markItemFailed(
+    ): Boolean = dao.markItemFailed(
             itemId = itemId,
+            expectedVersion = expectedVersion,
             status = if (retry) GalleryItemStatus.QUEUED else GalleryItemStatus.FAILED,
             message = message,
             now = System.currentTimeMillis(),
-        )
-    }
+        ) == 1
+
 
     suspend fun refreshProgress(taskId: String, lastError: String = ""): GalleryTaskProgress {
         val row = dao.progress(taskId)
@@ -207,6 +288,8 @@ class GalleryTranslationRepository @Inject constructor(
             total = row.total,
             succeeded = row.succeeded,
             failed = row.failed,
+            canceled = row.canceled,
+            partial = row.partial,
         )
         dao.updateProgress(
             taskId = taskId,
@@ -226,13 +309,19 @@ class GalleryTranslationRepository @Inject constructor(
             progress = progress,
             canceled = task?.status == GalleryTaskStatus.CANCELED,
         )
-        dao.finishTask(
+        val changed = dao.finishTask(
             taskId = taskId,
             status = status,
             finishedAtMs = System.currentTimeMillis(),
             lastError = lastError,
         )
-        return status
+        if (changed == 1) legacyResultRepair.repairTask(taskId)
+        return dao.getTask(taskId)?.status ?: GalleryTaskStatus.CANCELED
+    }
+
+    suspend fun failTaskConfiguration(taskId: String, message: String) {
+        dao.failPendingConfiguration(taskId, message, System.currentTimeMillis())
+        finishTask(taskId, message)
     }
 
     suspend fun cancelTask(taskId: String) {
@@ -240,89 +329,127 @@ class GalleryTranslationRepository @Inject constructor(
         refreshProgress(taskId)
     }
 
+    suspend fun failedRetrySelection(taskId: String): GalleryRetrySelection? = dao.failedRetrySelection(taskId)
+
+    suspend fun resetSelectedFailures(taskId: String, selection: GalleryRetrySelection): Int =
+        dao.resetSelectedFailures(taskId, selection, System.currentTimeMillis())
+
     suspend fun resetFailedTask(taskId: String): Int =
         dao.resetFailedTask(taskId, System.currentTimeMillis())
 
     suspend fun deleteTask(taskId: String) = withContext(Dispatchers.IO) {
         val items = dao.getItems(taskId)
         dao.deleteTask(taskId)
-        settingsRepository.forgetSnapshotCredentials("gallery_$taskId")
-        items.map(GalleryTranslationItemEntity::sourceUri)
-            .filter(String::isNotBlank)
-            .distinct()
-            .forEach { sourceUri ->
-                if (dao.countSourceUriReferences(sourceUri) == 0) {
-                    runCatching {
-                        context.contentResolver.releasePersistableUriPermission(
-                            Uri.parse(sourceUri),
-                            Intent.FLAG_GRANT_READ_URI_PERMISSION,
-                        )
+        // Once the durable task has gone, caller cancellation must not strand its private files.
+        withContext(NonCancellable) {
+            try {
+                settingsRepository.forgetSnapshotCredentials("gallery_$taskId")
+            } finally {
+                try {
+                    items.filter { it.localPath.isBlank() }.map(GalleryTranslationItemEntity::sourceUri)
+                        .filter(String::isNotBlank)
+                        .distinct()
+                        .forEach { sourceUri ->
+                            if (dao.countSourceUriReferences(sourceUri) == 0) {
+                                runCatching {
+                                    context.contentResolver.releasePersistableUriPermission(
+                                        Uri.parse(sourceUri), Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                                    )
+                                }
+                            }
+                        }
+                } finally {
+                    try {
+                        File(context.filesDir, "$TASK_FILES_DIR/$taskId").deleteRecursively()
+                    } finally {
+                        translatedPreviewStore.deleteTask(taskId)
                     }
                 }
+            }
         }
-        File(context.filesDir, "$TASK_FILES_DIR/$taskId").deleteRecursively()
-        translatedPreviewStore.deleteTask(taskId)
     }
 
-    private fun prepareItem(
+    private suspend fun prepareItem(
         taskId: String,
         position: Int,
         uriString: String,
         now: Long,
     ): GalleryTranslationItemEntity {
+        val importContext = currentCoroutineContext()
+        importContext.ensureActive()
         val uri = Uri.parse(uriString)
         val itemId = UUID.randomUUID().toString()
         val displayName = displayName(uri).ifBlank { "image_${position + 1}" }
-        val persisted = persistReadPermission(uri)
-        if (persisted) {
-            return GalleryTranslationItemEntity(
-                id = itemId,
-                taskId = taskId,
-                position = position,
-                sourceUri = uriString,
-                displayName = displayName,
-                updatedAtMs = now,
-            )
-        }
-
-        return runCatching {
-            val targetDir = File(context.filesDir, "$TASK_FILES_DIR/$taskId/source").apply {
-                check(mkdirs() || isDirectory)
-            }
-            val extension = displayName.substringAfterLast('.', "")
-                .takeIf { it.matches(Regex("[A-Za-z0-9]{1,8}")) }
-                ?.let { ".$it" }
-                .orEmpty()
-            val target = File(targetDir, "$itemId$extension")
-            try {
-                context.contentResolver.openInputStream(uri).use { input ->
-                    requireNotNull(input) { "Cannot open selected image." }
-                    FileOutputStream(target).use { output -> copyGalleryImage(input, output) }
+        val hadPersistedGrant = runCatching {
+            context.contentResolver.persistedUriPermissions.any { it.isReadPermission && it.uri == uri }
+        }.getOrDefault(false)
+        val persistable = hadPersistedGrant || persistReadPermission(uri)
+        // Only a grant acquired for this copy may be released. Existing/legacy grants are borrowed.
+        return try {
+            importContext.ensureActive()
+            var intendedLocalPath = ""
+            runCatching {
+                val targetDir = File(context.filesDir, "$TASK_FILES_DIR/$taskId/source").apply {
+                    check(mkdirs() || isDirectory)
                 }
-            } catch (error: Exception) {
-                target.delete()
-                throw error
+                val extension = displayName.substringAfterLast('.', "")
+                    .takeIf { it.matches(Regex("[A-Za-z0-9]{1,8}")) }
+                    ?.let { ".$it" }
+                    .orEmpty()
+                val target = File(targetDir, "$itemId$extension")
+                intendedLocalPath = target.absolutePath
+                val copyBudget = galleryImageCopyBudget(persistable, targetDir.usableSpace)
+                try {
+                    context.contentResolver.openInputStream(uri).use { input ->
+                        requireNotNull(input) { "Cannot open selected image." }
+                        FileOutputStream(target).use { output ->
+                            copyGalleryImage(input, output, maxBytes = copyBudget, checkpoint = {
+                                importContext.ensureActive()
+                                if (targetDir.usableSpace <= GALLERY_COPY_STORAGE_RESERVE) {
+                                    throw java.io.IOException("Not enough free space to copy the selected image.")
+                                }
+                            })
+                            output.fd.sync()
+                        }
+                    }
+                    importContext.ensureActive()
+                } catch (error: Exception) {
+                    target.delete()
+                    throw error
+                }
+                GalleryTranslationItemEntity(
+                    id = itemId,
+                    taskId = taskId,
+                    position = position,
+                    sourceUri = uriString,
+                    localPath = target.absolutePath,
+                    displayName = displayName,
+                    updatedAtMs = now,
+                )
+            }.getOrElse { error ->
+                if (error is CancellationException) throw error
+                GalleryTranslationItemEntity(
+                    id = itemId,
+                    taskId = taskId,
+                    position = position,
+                    sourceUri = uriString,
+                    localPath = intendedLocalPath.ifBlank {
+                        File(context.filesDir, "$TASK_FILES_DIR/$taskId/source/$itemId.missing").absolutePath
+                    },
+                    displayName = displayName,
+                    status = GalleryItemStatus.FAILED,
+                    errorMessage = error.message ?: error.javaClass.simpleName,
+                    updatedAtMs = now,
+                )
             }
-            GalleryTranslationItemEntity(
-                id = itemId,
-                taskId = taskId,
-                position = position,
-                sourceUri = uriString,
-                localPath = target.absolutePath,
-                displayName = displayName,
-                updatedAtMs = now,
-            )
-        }.getOrElse { error ->
-            GalleryTranslationItemEntity(
-                id = itemId,
-                taskId = taskId,
-                position = position,
-                sourceUri = uriString,
-                displayName = displayName,
-                status = GalleryItemStatus.FAILED,
-                errorMessage = error.message ?: error.javaClass.simpleName,
-                updatedAtMs = now,
-            )
+        } finally {
+            if (persistable && !hadPersistedGrant) {
+                withContext(NonCancellable + Dispatchers.IO) {
+                    runCatching {
+                        context.contentResolver.releasePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }.onFailure { Timber.w("Unable to release an owned temporary gallery read grant") }
+                }
+            }
         }
     }
 
@@ -333,13 +460,9 @@ class GalleryTranslationRepository @Inject constructor(
                 uri,
                 Intent.FLAG_GRANT_READ_URI_PERMISSION,
             )
-            context.contentResolver.openInputStream(uri).use { input ->
-                requireNotNull(input) { "Cannot open selected image." }
-                input.read()
-            }
             true
         }.getOrElse {
-            Timber.i(it, "URI permission could not be persisted; copying selected image")
+            Timber.i(it, "URI permission could not be persisted; applying the fallback copy budget")
             false
         }
     }

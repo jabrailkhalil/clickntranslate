@@ -3,9 +3,43 @@ package dev.clickn.translate.capture
 
 import dev.clickn.translate.data.LoopTriggerMode
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LoopRuntimePolicyTest {
+
+    @Test fun cleanCaptureCanReadAnOpenResultButDoesNotCancelAnUnchangedTranslation() {
+        for (blocking in listOf(false, true)) {
+            assertEquals(LoopActiveResultDecision.CAPTURE,
+                LoopRuntimePolicy.activeResultDecision(blocking, false, canCaptureCleanSource = true))
+            assertEquals(LoopActiveResultDecision.KEEP_TRANSLATING,
+                LoopRuntimePolicy.activeResultDecision(blocking, true, canCaptureCleanSource = true))
+        }
+    }
+
+    @Test fun textCompletionKeepsStableTextOnAnAnimatedBackgroundButRejectsWordEdits() {
+        for (mode in LoopTriggerMode.entries) {
+            assertFalse(LoopRuntimePolicy.sameSourceDuringTranslation(mode, true, false))
+            assertTrue(LoopRuntimePolicy.sameSourceDuringTranslation(mode, true, true))
+            assertFalse(LoopRuntimePolicy.sameSourceDuringTranslation(mode, false, null))
+        }
+        assertTrue(LoopRuntimePolicy.sameSourceDuringTranslation(
+            LoopTriggerMode.WAIT_FOR_TEXT_COMPLETE, false, true))
+        assertTrue(LoopRuntimePolicy.sameSourceDuringTranslation(
+            LoopTriggerMode.FIXED_INTERVAL, false, true))
+        assertFalse(LoopRuntimePolicy.sameSourceDuringTranslation(
+            LoopTriggerMode.SETTLED_PAGE, false, true))
+    }
+
+    @Test fun steadySmartResultUsesCalmSourceSamplingWhileFixedKeepsItsConfiguredPeriod() {
+        assertEquals(1_500L, LoopRuntimePolicy.pollingIntervalMs(
+            500, LoopTriggerMode.WAIT_FOR_TEXT_COMPLETE, 350, sourceResultPresent = true))
+        assertEquals(350L, LoopRuntimePolicy.pollingIntervalMs(
+            500, LoopTriggerMode.WAIT_FOR_TEXT_COMPLETE, 350, sourceResultPresent = false))
+        assertEquals(500L, LoopRuntimePolicy.pollingIntervalMs(
+            500, LoopTriggerMode.FIXED_INTERVAL, 350, sourceResultPresent = true))
+    }
 
     @Test
     fun activeResultDecision_coversLoopModesTranslationAndTimingBoundaries() {

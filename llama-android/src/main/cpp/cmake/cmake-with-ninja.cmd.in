@@ -1,7 +1,9 @@
 @echo off
 if /I "%~1"=="-E" goto run_cmake
+if "@CLICKTRANSLATE_VCVARS64@"=="" goto set_ninja
 call "@CLICKTRANSLATE_VCVARS64@" >nul 2>&1
 if errorlevel 1 exit /b %errorlevel%
+:set_ninja
 set "CMAKE_MAKE_PROGRAM=@CLICKTRANSLATE_HOST_NINJA@"
 
 :run_cmake

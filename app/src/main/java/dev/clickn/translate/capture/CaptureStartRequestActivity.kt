@@ -6,8 +6,11 @@ import android.content.Context
 import android.content.Intent
 import android.media.projection.MediaProjectionManager
 import android.media.projection.MediaProjectionConfig
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
@@ -17,11 +20,12 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewModelScope
 import dev.clickn.translate.ui.MainActivity
 import dev.clickn.translate.data.SettingsRepository
-import dev.clickn.translate.ui.openOverlayPermissionSettings
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -44,6 +48,7 @@ class CaptureStartRequestActivity : ComponentActivity() {
             viewModel.projectionGranted(result.resultCode, result.data!!)
         } else {
             Timber.w("MediaProjection denied")
+            viewModel.projectionDenied()
         }
         finishRequest()
     }
@@ -54,18 +59,27 @@ class CaptureStartRequestActivity : ComponentActivity() {
             viewModel.stage.collect { stage ->
                 when (stage) {
                     CaptureStartStage.WAITING -> Unit
-                    CaptureStartStage.PROJECTION -> if (viewModel.consumeProjectionRequest()) {
-                        val fullScreen = viewModel.shouldShareEntireScreen()
-                        val intent = if (Build.VERSION.SDK_INT >= 34 && fullScreen) {
-                            mpm.createScreenCaptureIntent(MediaProjectionConfig.createConfigForDefaultDisplay())
-                        } else {
-                            mpm.createScreenCaptureIntent()
+                    CaptureStartStage.PROJECTION -> if (viewModel.canPrepareProjection()) {
+                        try {
+                            // Nothing is marked externally launched during this cancellable await.
+                            val fullScreen = viewModel.shouldShareEntireScreen()
+                            currentCoroutineContext().ensureActive()
+                            val intent = if (Build.VERSION.SDK_INT >= 34 && fullScreen) {
+                                mpm.createScreenCaptureIntent(MediaProjectionConfig.createConfigForDefaultDisplay())
+                            } else {
+                                mpm.createScreenCaptureIntent()
+                            }
+                            if (viewModel.consumeProjectionRequest()) launcher.launch(intent)
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (error: Exception) {
+                            permissionLaunchFailed(error)
                         }
-                        launcher.launch(intent)
                     }
                     CaptureStartStage.OVERLAY_PERMISSION -> {
-                        openOverlayPermissionSettings(this@CaptureStartRequestActivity)
-                        finishRequest()
+                        if (viewModel.consumeOverlayRequest()) {
+                            openOverlayPermissionSettings(this@CaptureStartRequestActivity)
+                        }
                     }
                     CaptureStartStage.SETUP -> {
                         startActivity(Intent(this@CaptureStartRequestActivity, MainActivity::class.java)
@@ -73,10 +87,42 @@ class CaptureStartRequestActivity : ComponentActivity() {
                                 Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))
                         finishRequest()
                     }
-                    CaptureStartStage.FINISHED -> finishRequest()
+                    CaptureStartStage.FINISHED -> {
+                        if (viewModel.consumeOverlayDeniedNotice()) {
+                            Toast.makeText(dev.clickn.translate.data.AppLocalePrefs.live(this@CaptureStartRequestActivity),
+                                dev.clickn.translate.R.string.capture_start_overlay_denied, Toast.LENGTH_LONG).show()
+                        }
+                        finishRequest()
+                    }
                 }
             }
         }
+    }
+
+    // Register in stable constructor order: projection first, overlay second. Only primitive
+    // admission flags are saved here; ActivityResultRegistry owns pending platform results.
+    private val overlayPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        viewModel.overlayPermissionReturned(Settings.canDrawOverlays(this))
+    }
+
+    private fun openOverlayPermissionSettings(context: Context) {
+        try {
+            overlayPermissionLauncher.launch(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                Uri.parse("package:${context.packageName}")))
+        } catch (_: Exception) {
+            try {
+                overlayPermissionLauncher.launch(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION))
+            } catch (error: Exception) { permissionLaunchFailed(error) }
+        }
+    }
+
+    private fun permissionLaunchFailed(error: Exception) {
+        Timber.w(error, "[capture-start] permission UI unavailable")
+        Toast.makeText(dev.clickn.translate.data.AppLocalePrefs.live(this),
+            dev.clickn.translate.R.string.capture_start_permission_unavailable, Toast.LENGTH_LONG).show()
+        viewModel.permissionLaunchFailed()
     }
 
     private fun finishRequest() {
@@ -101,28 +147,54 @@ class CaptureStartViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
 ) : ViewModel() {
     private val ownsGate = coordinator.gate.acquire()
-    private val currentStage = MutableStateFlow(CaptureStartStage.WAITING)
+    private val admission = CapturePermissionAdmission(CapturePermissionSnapshot(
+        pending = savedState.get<String>("capturePendingPermission")?.let { name ->
+            CapturePendingPermission.entries.firstOrNull { it.name == name } ?: CapturePendingPermission.FINISHED
+        } ?: if (savedState.get<Boolean>("projectionRequested") == true) CapturePendingPermission.PROJECTION
+            else CapturePendingPermission.NONE,
+        overlayAttempted = savedState.get<Boolean>("captureOverlayAttempted") == true,
+        overlayDeniedNotice = savedState.get<Boolean>("captureOverlayDeniedNotice") == true,
+    ))
+    private val currentStage = MutableStateFlow(when (admission.snapshot.pending) {
+        CapturePendingPermission.NONE -> CaptureStartStage.WAITING
+        CapturePendingPermission.OVERLAY -> CaptureStartStage.OVERLAY_PERMISSION
+        CapturePendingPermission.PROJECTION -> CaptureStartStage.PROJECTION
+        CapturePendingPermission.FINISHED -> CaptureStartStage.FINISHED
+    })
     val stage = currentStage.asStateFlow()
-    private var projectionRequested = savedState.get<Boolean>("projectionRequested") == true
 
     init {
+        if (!ownsGate) finishAdmission()
+        else if (admission.snapshot.pending == CapturePendingPermission.NONE) prepare()
+    }
+
+    private fun prepare() {
         viewModelScope.launch {
-            if (!ownsGate) {
-                currentStage.value = CaptureStartStage.FINISHED
-            } else if (projectionRequested) {
-                // The ActivityResultRegistry restores the outstanding consent request after recreation.
-                currentStage.value = CaptureStartStage.PROJECTION
-            } else try {
-                when (val decision = coordinator.prepare()) {
-                    CaptureStartDecision.AlreadyRunning -> currentStage.value = CaptureStartStage.FINISHED
-                    CaptureStartDecision.OpenSetup -> currentStage.value = CaptureStartStage.SETUP
-                    CaptureStartDecision.OpenOverlaySettings -> currentStage.value = CaptureStartStage.OVERLAY_PERMISSION
+            if (!ownsGate || admission.snapshot.pending != CapturePendingPermission.NONE) return@launch
+            try {
+                val decision = coordinator.prepare()
+                currentCoroutineContext().ensureActive()
+                if (admission.snapshot.pending != CapturePendingPermission.NONE) return@launch
+                when (decision) {
+                    CaptureStartDecision.AlreadyRunning -> finishAdmission()
+                    CaptureStartDecision.OpenSetup -> {
+                        admission.finish()
+                        saveAdmission()
+                        currentStage.value = CaptureStartStage.SETUP
+                    }
+                    CaptureStartDecision.OpenOverlaySettings -> {
+                        if (admission.snapshot.overlayAttempted) {
+                            admission.finishOverlayDenied()
+                            saveAdmission()
+                            currentStage.value = CaptureStartStage.FINISHED
+                        } else currentStage.value = CaptureStartStage.OVERLAY_PERMISSION
+                    }
                     is CaptureStartDecision.Ready -> {
                         if (decision.backend == CaptureBackend.MEDIA_PROJECTION) {
                             currentStage.value = CaptureStartStage.PROJECTION
                         } else {
+                            finishAdmission()
                             coordinator.start(decision.backend)
-                            currentStage.value = CaptureStartStage.FINISHED
                         }
                     }
                 }
@@ -130,16 +202,46 @@ class CaptureStartViewModel @Inject constructor(
                 throw error
             } catch (error: Exception) {
                 Timber.w(error, "[capture-start] prepare failed")
+                admission.finish()
+                saveAdmission()
                 currentStage.value = CaptureStartStage.SETUP
             }
         }
     }
 
+    fun canPrepareProjection(): Boolean = ownsGate && currentStage.value == CaptureStartStage.PROJECTION &&
+        admission.snapshot.pending == CapturePendingPermission.NONE
+
     fun consumeProjectionRequest(): Boolean {
-        if (projectionRequested) return false
-        projectionRequested = true
+        if (!canPrepareProjection() || !admission.beginProjection()) return false
         savedState["projectionRequested"] = true
+        saveAdmission()
         return true
+    }
+
+    fun consumeOverlayRequest(): Boolean {
+        if (!ownsGate || currentStage.value != CaptureStartStage.OVERLAY_PERMISSION || !admission.beginOverlay()) return false
+        saveAdmission()
+        return true
+    }
+
+    fun overlayPermissionReturned(granted: Boolean) {
+        if (!ownsGate || !admission.consumeOverlayResult(granted)) return
+        saveAdmission()
+        if (granted) {
+            currentStage.value = CaptureStartStage.WAITING
+            prepare()
+        } else currentStage.value = CaptureStartStage.FINISHED
+    }
+
+    fun consumeOverlayDeniedNotice(): Boolean = admission.consumeDeniedNotice().also { saveAdmission() }
+
+    fun permissionLaunchFailed() = finishAdmission()
+
+    fun projectionDenied() {
+        if (!ownsGate || !admission.consumeProjectionResult()) return
+        saveAdmission()
+        currentStage.value = CaptureStartStage.FINISHED
     }
 
     suspend fun shouldShareEntireScreen(): Boolean {
@@ -150,6 +252,9 @@ class CaptureStartViewModel @Inject constructor(
     }
 
     fun projectionGranted(code: Int, data: Intent) {
+        if (!ownsGate || !admission.consumeProjectionResult()) return
+        saveAdmission()
+        currentStage.value = CaptureStartStage.FINISHED
         try {
             coordinator.start(CaptureBackend.MEDIA_PROJECTION, code, data)
         } catch (error: Exception) {
@@ -157,7 +262,70 @@ class CaptureStartViewModel @Inject constructor(
         }
     }
 
+    private fun saveAdmission() {
+        savedState["capturePendingPermission"] = admission.snapshot.pending.name
+        savedState["captureOverlayAttempted"] = admission.snapshot.overlayAttempted
+        savedState["captureOverlayDeniedNotice"] = admission.snapshot.overlayDeniedNotice
+        savedState["projectionRequested"] = admission.snapshot.pending == CapturePendingPermission.PROJECTION
+    }
+
+    private fun finishAdmission() {
+        admission.finish()
+        saveAdmission()
+        currentStage.value = CaptureStartStage.FINISHED
+    }
+
     override fun onCleared() {
+        admission.finish()
         if (ownsGate) coordinator.gate.release()
     }
+}
+
+internal enum class CapturePendingPermission { NONE, OVERLAY, PROJECTION, FINISHED }
+
+internal data class CapturePermissionSnapshot(
+    val pending: CapturePendingPermission = CapturePendingPermission.NONE,
+    val overlayAttempted: Boolean = false,
+    val overlayDeniedNotice: Boolean = false,
+)
+
+/** Single-use external admission; snapshot contains no Intent, projection token or settings. */
+internal class CapturePermissionAdmission(initial: CapturePermissionSnapshot = CapturePermissionSnapshot()) {
+    var snapshot = initial
+        private set
+
+    fun beginOverlay(): Boolean {
+        if (snapshot.pending != CapturePendingPermission.NONE || snapshot.overlayAttempted) return false
+        snapshot = snapshot.copy(pending = CapturePendingPermission.OVERLAY, overlayAttempted = true)
+        return true
+    }
+
+    fun consumeOverlayResult(granted: Boolean): Boolean {
+        if (snapshot.pending != CapturePendingPermission.OVERLAY) return false
+        snapshot = snapshot.copy(pending = if (granted) CapturePendingPermission.NONE else CapturePendingPermission.FINISHED,
+            overlayDeniedNotice = !granted)
+        return true
+    }
+
+    fun beginProjection(): Boolean {
+        if (snapshot.pending != CapturePendingPermission.NONE) return false
+        snapshot = snapshot.copy(pending = CapturePendingPermission.PROJECTION)
+        return true
+    }
+
+    fun consumeProjectionResult(): Boolean {
+        if (snapshot.pending != CapturePendingPermission.PROJECTION) return false
+        finish()
+        return true
+    }
+
+    fun finishOverlayDenied() {
+        snapshot = snapshot.copy(pending = CapturePendingPermission.FINISHED, overlayDeniedNotice = true)
+    }
+
+    fun consumeDeniedNotice(): Boolean = snapshot.overlayDeniedNotice.also {
+        snapshot = snapshot.copy(overlayDeniedNotice = false)
+    }
+
+    fun finish() { snapshot = snapshot.copy(pending = CapturePendingPermission.FINISHED) }
 }

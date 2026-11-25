@@ -15,7 +15,6 @@ import dev.clickn.translate.data.MangaOcrAdvancedSettingsPolicy
 import dev.clickn.translate.data.OcrEngineKind
 import dev.clickn.translate.data.OpenAiRequestOptions
 import dev.clickn.translate.data.OverlayFontEntry
-import dev.clickn.translate.data.OverlayFontCommit
 import dev.clickn.translate.data.OverlayTextStyle
 import dev.clickn.translate.data.OverlayFontImportResult
 import dev.clickn.translate.data.OverlayFontManager
@@ -24,13 +23,14 @@ import dev.clickn.translate.data.OverlayTheme
 import dev.clickn.translate.data.PreprocessOptions
 import dev.clickn.translate.data.RenderMode
 import dev.clickn.translate.data.Settings
+import dev.clickn.translate.data.saveEditorChanges
 import dev.clickn.translate.data.normalizedFloatingButtonAlpha
 import dev.clickn.translate.data.SettingsBundleExportResult
 import dev.clickn.translate.data.SettingsBundleImportResult
 import dev.clickn.translate.data.SettingsBundlePreview
 import dev.clickn.translate.data.SettingsBundleTransfer
 import dev.clickn.translate.data.SettingsRepository
-import dev.clickn.translate.data.StagedOverlayFont
+import dev.clickn.translate.data.SettingsImportRollback
 import dev.clickn.translate.data.TranslationPreset
 import dev.clickn.translate.data.TranslationContextMode
 import dev.clickn.translate.data.TranslationBlockInteractionMode
@@ -79,7 +79,10 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import java.io.File
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -107,15 +110,44 @@ class SettingsViewModel @Inject constructor(
     private val voiceDesignPromptGenerator: VoiceDesignPromptGenerator,
     private val miniMaxVoiceManager: MiniMaxVoiceManager,
     private val appPermissions: dev.clickn.translate.shizuku.AppPermissionCoordinator,
+    private val tesseractModels: dev.clickn.translate.ocr.TesseractModelStore,
+    private val settingsBundleImporter: dev.clickn.translate.data.SettingsBundleImporter,
 ) : ViewModel() {
 
     val modelDownloadWorkInfos: Flow<List<WorkInfo>> = modelDownloadManager.workInfos
+    val tesseractModelState = tesseractModels.state
+    private var tesseractModelJob: kotlinx.coroutines.Job? = null
+
+    suspend fun refreshTesseractModels() = tesseractModels.refresh()
+    fun downloadTesseractModels() {
+        if (tesseractModelJob?.isActive == true) return
+        tesseractModelJob = viewModelScope.launch {
+            try { modelDownloadManager.enqueueAndAwait(listOf(ModelDownloadSpec.tesseractArabic()), {}) }
+            catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch (_: Exception) { /* The shared queue and store publish terminal state. */ }
+        }
+    }
+    fun cancelTesseractModelDownload() {
+        modelDownloadManager.cancel(ModelDownloadSpec.tesseractArabic())
+        tesseractModelJob?.cancel()
+    }
+    fun deleteTesseractModels() {
+        if (tesseractModelJob?.isActive == true) return
+        tesseractModelJob = viewModelScope.launch {
+            try { tesseractModels.delete() }
+            catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch (_: dev.clickn.translate.ocr.TesseractModelException) { /* The store publishes a typed UI error. */ }
+        }
+    }
 
     suspend fun load(): Settings = repo.get()
+    internal val settingsUpdates: Flow<Settings> get() = repo.settings
 
-    private var localeChangeDraft: Settings? = null
-    internal fun retainLocaleChangeDraft(value: Settings?) { localeChangeDraft = value }
-    internal fun consumeLocaleChangeDraft(): Settings? = localeChangeDraft.also { localeChangeDraft = null }
+    private var localeChangeDraft: SettingsEditingSnapshot? = null
+    internal fun retainLocaleChangeDraft(persisted: Settings, draft: Settings?, formBaseline: Settings? = null) {
+        localeChangeDraft = draft?.let { SettingsEditingSnapshot(persisted, it, formBaseline) }
+    }
+    internal fun consumeLocaleChangeDraft(): SettingsEditingSnapshot? = localeChangeDraft.also { localeChangeDraft = null }
 
     private val recentLanguageMutex = Mutex()
 
@@ -142,10 +174,12 @@ class SettingsViewModel @Inject constructor(
 
     internal suspend fun availableAutoOcrRoutes(settings: Settings): Set<dev.clickn.translate.data.AutoOcrRoute> =
         withContext(Dispatchers.IO) {
+            tesseractModels.refresh()
             dev.clickn.translate.data.AutoOcrRoutingPolicy.candidates.filter { route ->
                 dev.clickn.translate.data.AutoOcrRoutingPolicy.configured(settings, route) && when (route.engine) {
                     OcrEngineKind.PADDLE_ONNX -> modelReadinessChecker.paddle(route.paddleVersion).ready
                     OcrEngineKind.MANGA_OCR_JA -> modelReadinessChecker.mangaOcr().ready
+                    OcrEngineKind.TESSERACT_ARABIC -> tesseractModels.state.value.ready
                     else -> true
                 }
             }.toSet()
@@ -202,8 +236,11 @@ class SettingsViewModel @Inject constructor(
     suspend fun getDownloadedMlKitLanguageModels(): Set<String> =
         routingTranslator.getDownloadedMlKitLanguageModels()
 
-    suspend fun deleteMlKitSourceLanguageModel(sourceLang: String, targetLang: String) =
-        routingTranslator.deleteMlKitSourceLanguageModel(sourceLang, targetLang)
+    suspend fun deleteMlKitSourceLanguageModel(sourceLang: String, targetLang: String) {
+        modelReadinessChecker.invalidateMlKitInventory()
+        try { routingTranslator.deleteMlKitSourceLanguageModel(sourceLang, targetLang) }
+        finally { modelReadinessChecker.invalidateMlKitInventory() }
+    }
 
     suspend fun loadSystemTtsVoices(preferredLanguageTag: String): List<SystemTtsVoiceOption> =
         systemTtsEngine.availableVoices(preferredLanguageTag)
@@ -275,15 +312,37 @@ class SettingsViewModel @Inject constructor(
         uri: Uri,
         settings: Settings,
     ): SettingsBundleExportResult = withContext(Dispatchers.IO) {
-        val output = appContext.contentResolver.openOutputStream(uri, "w")
-            ?: error("Could not open the selected export file.")
-        output.use {
-            SettingsBundleTransfer.write(
-                output = it,
-                settings = settings,
-                resolveFontFile = overlayFontManager::transferFileFor,
-                glossaryTerms = glossaryRepository.listAll(),
-            )
+        val exportContext = currentCoroutineContext()
+        val staged = File.createTempFile("settings-export-", ".zip", appContext.cacheDir)
+        try {
+            val result = staged.outputStream().use { output ->
+                SettingsBundleTransfer.write(
+                    output = output,
+                    settings = settings,
+                    resolveFontFile = overlayFontManager::transferFileFor,
+                    glossaryTerms = glossaryRepository.listAll(),
+                    uiPreferences = dev.clickn.translate.data.UiPreferenceTransfer.snapshot(appContext),
+                    checkpoint = { exportContext.ensureActive() },
+                )
+            }
+            // Validate and finish the package before touching the selected document.
+            exportContext.ensureActive()
+            val output = appContext.contentResolver.openOutputStream(uri, "w")
+                ?: error("Could not open the selected export file.")
+            // A document provider has no portable atomic-replace API. Once writing
+            // starts, finish this bounded, already validated ZIP on IO even if the
+            // screen closes, instead of leaving a ZIP truncated by cancellation.
+            withContext(NonCancellable) {
+                output.use { destination ->
+                    staged.inputStream().use { input ->
+                        input.copyTo(destination, bufferSize = 16 * 1024)
+                    }
+                }
+            }
+            exportContext.ensureActive()
+            result
+        } finally {
+            staged.delete()
         }
     }
 
@@ -293,82 +352,7 @@ class SettingsViewModel @Inject constructor(
         input.use(SettingsBundleTransfer::readPreview)
     }
 
-    suspend fun importSettingsBundle(uri: Uri): SettingsBundleImportResult = withContext(Dispatchers.IO) {
-        val stagingDir = File(appContext.cacheDir, "settings-import-${System.nanoTime()}")
-        require(stagingDir.mkdirs()) { "Could not create settings import staging storage." }
-        val stagedFonts = mutableListOf<StagedOverlayFont>()
-        val commits = mutableListOf<OverlayFontCommit>()
-        try {
-            val input = appContext.contentResolver.openInputStream(uri)
-                ?: error("Could not open the selected settings file.")
-            val preview = input.use { source ->
-                SettingsBundleTransfer.read(source) { font, fontInput ->
-                    stagedFonts += overlayFontManager.stageTransferredFont(font, fontInput, stagingDir)
-                }
-            }
-            if (preview.legacyPresetOnly) {
-                val imported = importTranslationPresets(preview.presets)
-                return@withContext SettingsBundleImportResult(
-                    settings = repo.get(),
-                    importedPresetCount = imported.importedCount,
-                    overwrittenPresetNames = imported.overwrittenNames,
-                    importedFontCount = 0,
-                    importedGlossaryTermCount = 0,
-                    legacyPresetOnly = true,
-                    skippedSettingFieldCount = 0,
-                )
-            }
-
-            val importedSettings = requireNotNull(preview.settings)
-            val beforeSettings = repo.get()
-            val beforeGlossary = glossaryRepository.listAll()
-            var glossaryCommitted = false
-            var settingsCommitted = false
-            try {
-                stagedFonts.forEach { commits += overlayFontManager.commitTransferredFont(it) }
-                val installedFonts = commits.map(OverlayFontCommit::entry)
-                val availableFonts = overlayFontManager.existingFontEntries(
-                    beforeSettings.overlayFonts + importedSettings.overlayFonts + installedFonts,
-                )
-                val merged = SettingsBundleTransfer.mergeImportedSettings(
-                    current = beforeSettings,
-                    imported = importedSettings,
-                    availableFonts = availableFonts,
-                )
-                val importedGlossaryCount = glossaryRepository.importTerms(preview.glossaryTerms)
-                glossaryCommitted = true
-                val importedState = repo.updateAfterPresetImport(
-                    (merged.presetResult.addedNames + merged.presetResult.overwrittenNames).toSet(),
-                ) { merged.settings }
-                settingsCommitted = true
-                commits.forEach(overlayFontManager::finishTransferredFont)
-                SettingsBundleImportResult(
-                    settings = importedState,
-                    importedPresetCount = merged.presetResult.importedCount,
-                    overwrittenPresetNames = merged.presetResult.overwrittenNames,
-                    importedFontCount = installedFonts.size,
-                    importedGlossaryTermCount = importedGlossaryCount,
-                    legacyPresetOnly = false,
-                    skippedSettingFieldCount = preview.skippedSettingFields.size,
-                )
-            } catch (error: Throwable) {
-                if (settingsCommitted) {
-                    runCatching { repo.update { beforeSettings } }.exceptionOrNull()?.let(error::addSuppressed)
-                }
-                if (glossaryCommitted) {
-                    runCatching { glossaryRepository.restoreTerms(beforeGlossary) }
-                        .exceptionOrNull()?.let(error::addSuppressed)
-                }
-                commits.asReversed().forEach { commit ->
-                    runCatching { overlayFontManager.rollbackTransferredFont(commit) }
-                        .exceptionOrNull()?.let(error::addSuppressed)
-                }
-                throw error
-            }
-        } finally {
-            stagingDir.deleteRecursively()
-        }
-    }
+    suspend fun importSettingsBundle(uri: Uri): SettingsBundleImportResult = settingsBundleImporter.import(uri)
 
     suspend fun importOverlayFont(uri: Uri): OverlayFontImportResult =
         overlayFontManager.importFont(uri)
@@ -388,6 +372,8 @@ class SettingsViewModel @Inject constructor(
 
     @Suppress("LongParameterList")
     suspend fun save(
+        baseline: Settings,
+        draft: Settings,
         baseUrl: String,
         apiKey: String,
         model: String,
@@ -512,148 +498,147 @@ class SettingsViewModel @Inject constructor(
         baiduFanyiSecretKey: String,
         overlayFonts: List<OverlayFontEntry>,
         activeTranslationPresetId: String,
-    ) {
-        repo.update {
-            it.copy(
-                baseUrl = baseUrl.trim(),
-                apiKey = apiKey.trim(),
-                model = model.trim(),
-                anthropicBaseUrl = anthropicBaseUrl.trim(),
-                anthropicApiKey = anthropicApiKey.trim(),
-                anthropicModel = anthropicModel.trim(),
-                targetLang = targetLang.trim(),
-                sourceLang = sourceLang.trim(),
-                promptTemplate = prompt,
-                openAiRequestOptions = openAiRequestOptions.normalized(),
-                overlayTextSizeSp = textSize.coerceIn(10, 28),
-                overlayTextStyle = overlayTextStyle.normalized(),
-                overlayAlpha = alpha.coerceIn(0.3f, 1f),
-                captureLoopIntervalMs = loopMs.coerceAtLeast(200),
-                loopTriggerMode = loopTriggerMode,
-                loopTextStableDurationMs = loopTextStableDurationMs.coerceIn(200L, 2000L),
-                loopSkipSimilarFrames = loopSkipSimilarFrames,
-                loopFrameSimilarityThreshold = loopFrameSimilarityThreshold.coerceIn(0.50f, 0.99f),
-                loopTextRegionMode = loopTextRegionMode,
-                loopTranslateRegionOnly = loopTranslateRegionOnly,
-                developerOptionsEnabled = developerOptionsEnabled,
-                performanceOverlayEnabled = performanceOverlayEnabled,
-                ocrScreenshotSavingEnabled = ocrScreenshotSavingEnabled,
-                disableTranslationCache = disableTranslationCache,
-                batchCumulativeCompletionTimeEnabled = batchCumulativeCompletionTimeEnabled,
-                shareEntireScreen = shareEntireScreen,
-                ocrRedBoxModeEnabled = ocrRedBoxModeEnabled,
-                ocrRedBoxShowSourceText = ocrRedBoxShowSourceText,
-                ocrRedBoxShowTranslation = ocrRedBoxShowTranslation,
-                streamingTranslate = streaming,
-                retryFailedTranslation = retryFailedTranslation,
-                ttsEnabled = ttsEnabled,
-                ttsProvider = ttsProvider,
-                ttsVoice = ttsVoice.trim(),
-                ttsEmotion = ttsEmotion.trim(),
-                ttsSpeed = ttsSpeed.coerceIn(0.25f, 4.0f),
-                ttsPitch = ttsPitch.coerceIn(0.25f, 4.0f),
-                ttsGainDb = ttsGainDb.coerceIn(
-                    MIN_TTS_PLAYBACK_GAIN_DB,
-                    MAX_TTS_PLAYBACK_GAIN_DB,
-                ),
-                ttsHttpBaseUrl = ttsHttpBaseUrl.trim(),
-                ttsHttpBearerToken = ttsHttpBearerToken.trim(),
-                ttsHttpResponseMode = ttsHttpResponseMode,
-                ttsVolcengineResource = ttsVolcengineResource,
-                ttsVolcengineBaseUrl = ttsVolcengineBaseUrl.trim(),
-                ttsVolcengineApiKey = ttsVolcengineApiKey.trim(),
-                ttsVolcengineSpeaker = ttsVolcengineSpeaker.trim()
-                    .ifBlank { "zh_female_vv_uranus_bigtts" },
-                ttsVolcengineModel = ttsVolcengineModel.trim()
-                    .ifBlank { "seed-tts-2.0-standard" },
-                ttsVolcengineContext = ttsVolcengineContext.trim(),
-                ttsVolcenginePitch = ttsVolcenginePitch.coerceIn(-12, 12),
-                ttsVolcengineToneFidelity = ttsVolcengineToneFidelity,
-                ttsMiniMaxModel = ttsMiniMaxModel,
-                ttsMiniMaxBaseUrl = ttsMiniMaxBaseUrl.trim(),
-                ttsMiniMaxApiKey = ttsMiniMaxApiKey.trim(),
-                ttsMiniMaxVoice = ttsMiniMaxVoice.trim().ifBlank { "male-qn-qingse" },
-                ttsMiniMaxEmotion = ttsMiniMaxEmotion.trim(),
-                ttsMiniMaxSpeed = ttsMiniMaxSpeed.coerceIn(0.5f, 2.0f),
-                ttsMiniMaxPitch = ttsMiniMaxPitch.coerceIn(-12, 12),
-                ttsMimoModel = ttsMimoModel,
-                ttsMimoBaseUrl = ttsMimoBaseUrl.trim(),
-                ttsMimoApiKey = ttsMimoApiKey.trim(),
-                ttsMimoVoice = ttsMimoVoice.trim().ifBlank { "mimo_default" },
-                ttsMimoInstruction = ttsMimoInstruction.trim(),
-                ttsMimoVoiceDesignPrompt = ttsMimoVoiceDesignPrompt.trim(),
-                ttsMimoVoiceCloneInstruction = ttsMimoVoiceCloneInstruction.trim(),
-                ttsMimoVoiceSampleUri = ttsMimoVoiceSampleUri.trim(),
-                renderMode = renderMode,
-                translationBlockInteractionMode = translationBlockInteractionMode,
-                overlayPlacement = placement,
-                overlayStyleMode = overlayStyleMode,
-                overlayTheme = overlayTheme,
-                customBgColor = customBg,
-                customFgColor = customFg,
-                customBorderColor = customBorder,
-                customBorderWidth = customBorderW,
-                overlayOffsetX = offsetX,
-                overlayOffsetY = offsetY,
-                ocrEngine = ocrEngine,
-                autoOcr = autoOcr.normalized(),
-                baiduOcrApiKey = baiduKey.trim(),
-                baiduOcrSecretKey = baiduSecret.trim(),
-                baiduOcrEndpoint = baiduEndpoint,
-                baiduOcrLanguage = baiduLanguage,
-                umiOcrBaseUrl = umiOcrBaseUrl.trim(),
-                lunaOcrBaseUrl = lunaOcrBaseUrl.trim(),
-                paddleAiStudioToken = paddleAiStudioToken.trim(),
-                tencentSecretId = tencentId.trim(),
-                tencentSecretKey = tencentKey.trim(),
-                tencentRegion = tencentRegion.trim().ifBlank { "ap-guangzhou" },
-                tencentOcrEndpoint = tencentEndpoint,
-                tencentOcrLanguage = tencentLanguage,
-                preprocess = preprocess,
-                a11yVolumeTrigger = a11yVolume,
-                floatingButtonSizeDp = floatingButtonSizeDp.coerceIn(32, 96),
-                floatingButtonAlpha = normalizedFloatingButtonAlpha(floatingButtonAlpha),
-                floatingButtonSnapToEdge = floatingButtonSnapToEdge,
-                floatingButtonAutoDock = floatingButtonAutoDock,
-                floatingButtonDockInsetDp = floatingButtonDockInsetDp.coerceIn(0, 40),
-                overlayAllowWrap = allowWrap,
-                overlayAvoidCollision = avoidCollision,
-                apiTimeoutSeconds = apiTimeoutSeconds.coerceIn(5, 300),
-                mergeAdjacentBlocks = mergeAdjacentBlocks,
-                mergeStrength = mergeStrength,
-                translationContextMode = translationContextMode,
-                cleartextAllowedHosts = cleartextHostsWithLocalOcrUrls(
-                    cleartextAllowedHosts,
-                    umiOcrBaseUrl,
-                    lunaOcrBaseUrl,
-                    ttsHttpBaseUrl,
-                    ttsMiniMaxBaseUrl,
-                    ttsMimoBaseUrl,
-                    ttsVolcengineBaseUrl,
-                ),
-                translatorEngine = translatorEngine,
-                deeplApiKey = deeplKey.trim(),
-                deeplPro = deeplPro,
-                deeplProtocol = deeplProtocol,
-                deeplBaseUrl = deeplBaseUrl.trim(),
-                deeplBearerAuth = deeplBearerAuth,
-                deeplCustomToken = deeplCustomToken.trim(),
-                niuTransMode = niuTransMode,
-                niuTransApiKey = niuTransApiKey.trim(),
-                niuTransAppId = niuTransAppId.trim(),
-                niuTransTermLibraryId = niuTransTermLibraryId.trim(),
-                niuTransMemoryLibraryId = niuTransMemoryLibraryId.trim(),
-                youdaoAppKey = youdaoAppKey.trim(),
-                youdaoAppSecret = youdaoAppSecret.trim(),
-                volcAccessKeyId = volcAccessKeyId.trim(),
-                volcSecretAccessKey = volcSecretAccessKey.trim(),
-                volcRegion = volcRegion.trim().ifBlank { "cn-north-1" },
-                baiduFanyiAppId = baiduFanyiAppId.trim(),
-                baiduFanyiSecretKey = baiduFanyiSecretKey.trim(),
-                overlayFonts = overlayFonts,
-                activeTranslationPresetId = activeTranslationPresetId,
-            )
-        }
+    ): Settings {
+        val normalizedDraft = draft.copy(
+            baseUrl = baseUrl.trim(),
+            apiKey = apiKey.trim(),
+            model = model.trim(),
+            anthropicBaseUrl = anthropicBaseUrl.trim(),
+            anthropicApiKey = anthropicApiKey.trim(),
+            anthropicModel = anthropicModel.trim(),
+            targetLang = targetLang.trim(),
+            sourceLang = sourceLang.trim(),
+            promptTemplate = prompt,
+            openAiRequestOptions = openAiRequestOptions.normalized(),
+            overlayTextSizeSp = textSize.coerceIn(10, 28),
+            overlayTextStyle = overlayTextStyle.normalized(),
+            overlayAlpha = alpha.coerceIn(0.3f, 1f),
+            captureLoopIntervalMs = loopMs.coerceAtLeast(200),
+            loopTriggerMode = loopTriggerMode,
+            loopTextStableDurationMs = loopTextStableDurationMs.coerceIn(200L, 2000L),
+            loopSkipSimilarFrames = loopSkipSimilarFrames,
+            loopFrameSimilarityThreshold = loopFrameSimilarityThreshold.coerceIn(0.50f, 0.99f),
+            loopTextRegionMode = loopTextRegionMode,
+            loopTranslateRegionOnly = loopTranslateRegionOnly,
+            developerOptionsEnabled = developerOptionsEnabled,
+            performanceOverlayEnabled = performanceOverlayEnabled,
+            ocrScreenshotSavingEnabled = ocrScreenshotSavingEnabled,
+            disableTranslationCache = disableTranslationCache,
+            batchCumulativeCompletionTimeEnabled = batchCumulativeCompletionTimeEnabled,
+            shareEntireScreen = shareEntireScreen,
+            ocrRedBoxModeEnabled = ocrRedBoxModeEnabled,
+            ocrRedBoxShowSourceText = ocrRedBoxShowSourceText,
+            ocrRedBoxShowTranslation = ocrRedBoxShowTranslation,
+            streamingTranslate = streaming,
+            retryFailedTranslation = retryFailedTranslation,
+            ttsEnabled = ttsEnabled,
+            ttsProvider = ttsProvider,
+            ttsVoice = ttsVoice.trim(),
+            ttsEmotion = ttsEmotion.trim(),
+            ttsSpeed = ttsSpeed.coerceIn(0.25f, 4.0f),
+            ttsPitch = ttsPitch.coerceIn(0.25f, 4.0f),
+            ttsGainDb = ttsGainDb.coerceIn(
+                MIN_TTS_PLAYBACK_GAIN_DB,
+                MAX_TTS_PLAYBACK_GAIN_DB,
+            ),
+            ttsHttpBaseUrl = ttsHttpBaseUrl.trim(),
+            ttsHttpBearerToken = ttsHttpBearerToken.trim(),
+            ttsHttpResponseMode = ttsHttpResponseMode,
+            ttsVolcengineResource = ttsVolcengineResource,
+            ttsVolcengineBaseUrl = ttsVolcengineBaseUrl.trim(),
+            ttsVolcengineApiKey = ttsVolcengineApiKey.trim(),
+            ttsVolcengineSpeaker = ttsVolcengineSpeaker.trim()
+                .ifBlank { "zh_female_vv_uranus_bigtts" },
+            ttsVolcengineModel = ttsVolcengineModel.trim()
+                .ifBlank { "seed-tts-2.0-standard" },
+            ttsVolcengineContext = ttsVolcengineContext.trim(),
+            ttsVolcenginePitch = ttsVolcenginePitch.coerceIn(-12, 12),
+            ttsVolcengineToneFidelity = ttsVolcengineToneFidelity,
+            ttsMiniMaxModel = ttsMiniMaxModel,
+            ttsMiniMaxBaseUrl = ttsMiniMaxBaseUrl.trim(),
+            ttsMiniMaxApiKey = ttsMiniMaxApiKey.trim(),
+            ttsMiniMaxVoice = ttsMiniMaxVoice.trim().ifBlank { "male-qn-qingse" },
+            ttsMiniMaxEmotion = ttsMiniMaxEmotion.trim(),
+            ttsMiniMaxSpeed = ttsMiniMaxSpeed.coerceIn(0.5f, 2.0f),
+            ttsMiniMaxPitch = ttsMiniMaxPitch.coerceIn(-12, 12),
+            ttsMimoModel = ttsMimoModel,
+            ttsMimoBaseUrl = ttsMimoBaseUrl.trim(),
+            ttsMimoApiKey = ttsMimoApiKey.trim(),
+            ttsMimoVoice = ttsMimoVoice.trim().ifBlank { "mimo_default" },
+            ttsMimoInstruction = ttsMimoInstruction.trim(),
+            ttsMimoVoiceDesignPrompt = ttsMimoVoiceDesignPrompt.trim(),
+            ttsMimoVoiceCloneInstruction = ttsMimoVoiceCloneInstruction.trim(),
+            ttsMimoVoiceSampleUri = ttsMimoVoiceSampleUri.trim(),
+            renderMode = renderMode,
+            translationBlockInteractionMode = translationBlockInteractionMode,
+            overlayPlacement = placement,
+            overlayStyleMode = overlayStyleMode,
+            overlayTheme = overlayTheme,
+            customBgColor = customBg,
+            customFgColor = customFg,
+            customBorderColor = customBorder,
+            customBorderWidth = customBorderW,
+            overlayOffsetX = offsetX,
+            overlayOffsetY = offsetY,
+            ocrEngine = ocrEngine,
+            autoOcr = autoOcr.normalized(),
+            baiduOcrApiKey = baiduKey.trim(),
+            baiduOcrSecretKey = baiduSecret.trim(),
+            baiduOcrEndpoint = baiduEndpoint,
+            baiduOcrLanguage = baiduLanguage,
+            umiOcrBaseUrl = umiOcrBaseUrl.trim(),
+            lunaOcrBaseUrl = lunaOcrBaseUrl.trim(),
+            paddleAiStudioToken = paddleAiStudioToken.trim(),
+            tencentSecretId = tencentId.trim(),
+            tencentSecretKey = tencentKey.trim(),
+            tencentRegion = tencentRegion.trim().ifBlank { "ap-guangzhou" },
+            tencentOcrEndpoint = tencentEndpoint,
+            tencentOcrLanguage = tencentLanguage,
+            preprocess = preprocess,
+            a11yVolumeTrigger = a11yVolume,
+            floatingButtonSizeDp = floatingButtonSizeDp.coerceIn(32, 96),
+            floatingButtonAlpha = normalizedFloatingButtonAlpha(floatingButtonAlpha),
+            floatingButtonSnapToEdge = floatingButtonSnapToEdge,
+            floatingButtonAutoDock = floatingButtonAutoDock,
+            floatingButtonDockInsetDp = floatingButtonDockInsetDp.coerceIn(0, 40),
+            overlayAllowWrap = allowWrap,
+            overlayAvoidCollision = avoidCollision,
+            apiTimeoutSeconds = apiTimeoutSeconds.coerceIn(5, 300),
+            mergeAdjacentBlocks = mergeAdjacentBlocks,
+            mergeStrength = mergeStrength,
+            translationContextMode = translationContextMode,
+            cleartextAllowedHosts = cleartextHostsWithLocalOcrUrls(
+                cleartextAllowedHosts,
+                umiOcrBaseUrl,
+                lunaOcrBaseUrl,
+                ttsHttpBaseUrl,
+                ttsMiniMaxBaseUrl,
+                ttsMimoBaseUrl,
+                ttsVolcengineBaseUrl,
+            ),
+            translatorEngine = translatorEngine,
+            deeplApiKey = deeplKey.trim(),
+            deeplPro = deeplPro,
+            deeplProtocol = deeplProtocol,
+            deeplBaseUrl = deeplBaseUrl.trim(),
+            deeplBearerAuth = deeplBearerAuth,
+            deeplCustomToken = deeplCustomToken.trim(),
+            niuTransMode = niuTransMode,
+            niuTransApiKey = niuTransApiKey.trim(),
+            niuTransAppId = niuTransAppId.trim(),
+            niuTransTermLibraryId = niuTransTermLibraryId.trim(),
+            niuTransMemoryLibraryId = niuTransMemoryLibraryId.trim(),
+            youdaoAppKey = youdaoAppKey.trim(),
+            youdaoAppSecret = youdaoAppSecret.trim(),
+            volcAccessKeyId = volcAccessKeyId.trim(),
+            volcSecretAccessKey = volcSecretAccessKey.trim(),
+            volcRegion = volcRegion.trim().ifBlank { "cn-north-1" },
+            baiduFanyiAppId = baiduFanyiAppId.trim(),
+            baiduFanyiSecretKey = baiduFanyiSecretKey.trim(),
+            overlayFonts = overlayFonts,
+            activeTranslationPresetId = activeTranslationPresetId,
+        )
+        return repo.saveEditorChanges(baseline, draft, normalizedDraft)
     }
 
     suspend fun setActiveTranslationPreset(id: String) {
@@ -779,24 +764,12 @@ class SettingsViewModel @Inject constructor(
 
     suspend fun importTranslationPresets(
         imported: List<TranslationPreset>
-    ): TranslationPresetImportResult {
-        var importResult: TranslationPresetImportResult? = null
-        repo.updateAfterPresetImport(imported.mapTo(mutableSetOf()) { it.name }) { current ->
-            val result = TranslationPresetTransfer.mergeImportedPresets(
-                existing = current.translationPresets,
-                imported = imported,
-            )
-            importResult = result
-            val activeId = current.activeTranslationPresetId.takeIf { id ->
-                id.isNotBlank() && TranslationPresetCatalog.find(result.presets, id) != null
-            }.orEmpty()
-            current.copy(
-                translationPresets = result.presets,
-                activeTranslationPresetId = activeId,
-            )
-        }
-        return requireNotNull(importResult)
-    }
+    ): TranslationPresetImportResult = importTranslationPresets(imported, rollback = null)
+
+    private suspend fun importTranslationPresets(
+        imported: List<TranslationPreset>,
+        rollback: SettingsImportRollback?,
+    ): TranslationPresetImportResult = repo.importPresetValues(imported, rollback)
 
     suspend fun applyTranslationPreset(id: String): Settings? = repo.applyTranslationPreset(id)
 

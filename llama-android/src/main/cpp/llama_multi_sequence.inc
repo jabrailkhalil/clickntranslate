@@ -83,7 +83,7 @@ static std::string clicktranslate_format_independent_user_prompt(const std::stri
             base_messages,
             user_message,
             true,
-            /* use_jinja */ false);
+            /* use_jinja */ true);
 }
 
 static jobjectArray clicktranslate_multi_fail(const char * reason, const int sequence_count) {

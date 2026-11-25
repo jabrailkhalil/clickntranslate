@@ -1,0 +1,21 @@
+{
+  "version": "1.21.1",
+  "repository": "https://github.com/microsoft/onnxruntime",
+  "commit": "8f7cce3a49fdbdac96e0868b75b7d0159db7ac7f",
+  "aarSha256": "30e594a4b9246fe3ca25768570e90f71e6d33ceb7b7dd72f92dcd7c267611d3f",
+  "mavenUrl": "https://repo.maven.apache.org/maven2/com/microsoft/onnxruntime/onnxruntime-android/1.21.1/onnxruntime-android-1.21.1.aar",
+  "files": [
+    {
+      "file": "LICENSE.txt",
+      "bytes": 1073,
+      "sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c",
+      "url": "https://raw.githubusercontent.com/microsoft/onnxruntime/8f7cce3a49fdbdac96e0868b75b7d0159db7ac7f/LICENSE"
+    },
+    {
+      "file": "ThirdPartyNotices.txt",
+      "bytes": 316114,
+      "sha256": "8c06e8cff286a4a117b3b246a4c7da68428a144af757823db50e3d6520941ec6",
+      "url": "https://raw.githubusercontent.com/microsoft/onnxruntime/8f7cce3a49fdbdac96e0868b75b7d0159db7ac7f/ThirdPartyNotices.txt"
+    }
+  ]
+}

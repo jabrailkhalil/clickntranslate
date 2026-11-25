@@ -1,0 +1,10 @@
+{
+  "debug_application_sha256_unchanged": true,
+  "task": ":app:assembleDebugAndroidTest",
+  "production_source_commit": "5a578d60e68518c8891345ad62376d7c1540ca49",
+  "source_commit": "dd2613d4d55ec6ceeb3e1b648a0a2bf082211719",
+  "exit_code": 0,
+  "finished_utc": "2026-11-24T20:30:16.0039063+00:00",
+  "started_utc": "2026-11-24T20:29:14.4770170+00:00",
+  "debug_application_sha256": "000f6a983d6d0afea8421b141e66ead252b9c2856808175c0a814068f437c9f4"
+}

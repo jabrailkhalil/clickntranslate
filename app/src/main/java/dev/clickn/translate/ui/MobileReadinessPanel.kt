@@ -1,70 +1,104 @@
 package dev.clickn.translate.ui
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.clickn.translate.R
-import dev.clickn.translate.data.Settings
+import dev.clickn.translate.capture.CaptureStartMode
 
 @Composable
-internal fun MobileReadinessPanel(settings: Settings, models: MobileModelState,
-    overlay: Boolean, accessibility: Boolean, notifications: Boolean, battery: Boolean,
-    onOverlay: () -> Unit, onService: () -> Unit, onOcr: () -> Unit, onModels: () -> Unit,
-    onAccessibility: () -> Unit, onNotifications: () -> Unit, onBattery: () -> Unit, onCapture: () -> Unit = onOverlay) {
-    var expanded by rememberSaveable { mutableStateOf(false) }
-    val serviceReady = !translationNeedsConfiguration(settings)
-    val needsModels = settings.translatorEngine in offlineTranslationEngines && models.translationReady != true
-    val ready = overlay && serviceReady && !models.checking && models.ocrReady == true && !needsModels
-    Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainerLow) {
-        Column(Modifier.fillMaxWidth().padding(20.dp)) {
-            Text(stringResource(if (ready) R.string.polish_ready else R.string.refine_readiness), style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(12.dp))
-            if (!overlay || expanded) ReadinessRow(R.string.setup_overlay, overlay, true, Icons.Outlined.Layers, onOverlay)
-            if (!serviceReady || expanded) ReadinessRow(R.string.mobile_services, serviceReady, true, Icons.Outlined.Translate, onService, providerName(settings.translatorEngine))
-            if (models.ocrReady != true || models.checking || expanded) {
-                ReadinessRow(R.string.setup_ocr, if (models.checking) null else models.ocrReady, true, Icons.Outlined.DocumentScanner, onOcr,
-                    if (models.checking) stringResource(R.string.refine_checking) else null)
+internal fun MobileReadinessPanel(entries: List<MobileReadinessItem>, onOpen: () -> Unit) {
+    val required = entries.filter { it.required }
+    val completed = required.count { it.ready == true }
+    val extra = entries.count { !it.required && it.ready != true }
+    Surface(onClick = onOpen, modifier = Modifier.testTag("readiness-open"),
+        shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainerLow) {
+        Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Outlined.Checklist, null, tint = MaterialTheme.colorScheme.primary)
+                Text(stringResource(R.string.readiness_title), Modifier.weight(1f).padding(horizontal = 12.dp),
+                    style = MaterialTheme.typography.titleMedium)
+                Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null)
             }
-            if (settings.translatorEngine in offlineTranslationEngines && (needsModels || expanded)) ReadinessRow(R.string.setup_models,
-                if (models.checking) null else models.translationReady, true, Icons.Outlined.Download, onModels,
-                if (models.checking) stringResource(R.string.refine_checking) else null)
-            TextButton(onClick = { expanded = !expanded }, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(if (expanded) R.string.polish_less else R.string.polish_readiness_details))
-                Icon(if (expanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore, null)
-            }
-            if (expanded) {
-                HorizontalDivider(Modifier.padding(vertical = 12.dp))
-                ReadinessRow(R.string.refine_capture_ready, null, false, Icons.Outlined.CropFree, onCapture, stringResource(R.string.refine_on_start))
-                ReadinessRow(R.string.setup_accessibility, accessibility, false, Icons.Outlined.Accessibility, onAccessibility)
-                ReadinessRow(R.string.setup_notifications, notifications, false, Icons.Outlined.Notifications, onNotifications)
-                ReadinessRow(R.string.setup_battery, battery, false, Icons.Outlined.BatterySaver, onBattery)
-            }
+            LinearProgressIndicator(progress = { if (required.isEmpty()) 0f else completed.toFloat() / required.size },
+                modifier = Modifier.fillMaxWidth().height(6.dp))
+            Text(stringResource(R.string.readiness_core_progress, completed, required.size),
+                style = MaterialTheme.typography.bodyMedium)
+            Text(stringResource(if (extra > 0) R.string.readiness_more_available else R.string.readiness_recommendations_done),
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
 
 @Composable
-private fun ReadinessRow(title: Int, ready: Boolean?, required: Boolean, icon: ImageVector, onClick: () -> Unit, summary: String? = null) {
-    Surface(onClick = onClick, color = androidx.compose.ui.graphics.Color.Transparent, shape = MaterialTheme.shapes.small) {
-        Row(Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically,
+internal fun MobileReadinessSheet(entries: List<MobileReadinessItem>, captureMode: CaptureStartMode?,
+    onItem: (MobileReadinessKey) -> Unit) {
+    LazyColumn(Modifier.fillMaxWidth().testTag("readiness-checklist"), contentPadding = PaddingValues(24.dp, 0.dp, 24.dp, 32.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        item {
+            Text(stringResource(R.string.readiness_title), style = MaterialTheme.typography.headlineSmall)
+            Text(stringResource(R.string.readiness_body), Modifier.padding(top = 8.dp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        item { Text(stringResource(R.string.readiness_core), style = MaterialTheme.typography.titleMedium) }
+        items(entries.filter { it.required }, key = { it.key }) { entry -> ReadinessSetting(entry, captureMode) { onItem(entry.key) } }
+        item {
+            HorizontalDivider(Modifier.padding(vertical = 4.dp))
+            Text(stringResource(R.string.readiness_recommended), style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.readiness_recommended_body), Modifier.padding(top = 8.dp),
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        items(entries.filterNot { it.required }, key = { it.key }) { entry -> ReadinessSetting(entry, captureMode) { onItem(entry.key) } }
+    }
+}
+
+@Composable
+private fun ReadinessSetting(entry: MobileReadinessItem, captureMode: CaptureStartMode?, onClick: () -> Unit) {
+    val title = when (entry.key) {
+        MobileReadinessKey.LANGUAGES -> R.string.setup_translation
+        MobileReadinessKey.SERVICE -> R.string.mobile_provider
+        MobileReadinessKey.OCR -> R.string.setup_ocr
+        MobileReadinessKey.TRANSLATION_MODELS -> R.string.setup_models
+        MobileReadinessKey.OVERLAY -> R.string.setup_overlay
+        MobileReadinessKey.CAPTURE -> R.string.setup_capture
+        MobileReadinessKey.HERO -> R.string.readiness_hero
+        MobileReadinessKey.NOTIFICATIONS -> R.string.setup_notifications
+        MobileReadinessKey.BATTERY -> R.string.setup_battery
+        MobileReadinessKey.ACCESSIBILITY -> R.string.setup_accessibility
+    }
+    val subtitle = when {
+        entry.ready == null -> stringResource(R.string.refine_checking)
+        entry.key == MobileReadinessKey.CAPTURE && captureMode != CaptureStartMode.SHIZUKU -> stringResource(R.string.readiness_system_capture)
+        entry.key == MobileReadinessKey.CAPTURE && entry.ready -> stringResource(R.string.readiness_shizuku_enabled)
+        entry.ready -> stringResource(R.string.refine_enabled)
+        entry.required -> stringResource(R.string.refine_required)
+        else -> stringResource(R.string.readiness_not_enabled)
+    }
+    Surface(onClick = onClick, modifier = Modifier.testTag("readiness-${entry.key.name.lowercase()}"),
+        shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainerLow) {
+        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Icon(if (ready == true) Icons.Outlined.CheckCircle else icon, null,
-                tint = if (ready == false && required) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(stringResource(title), style = MaterialTheme.typography.bodyMedium)
-                Text(summary ?: stringResource(if (ready == true) R.string.refine_enabled else if (required) R.string.refine_required else R.string.refine_optional),
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            when (entry.ready) {
+                null -> CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
+                true -> Icon(Icons.Outlined.CheckCircle, null, tint = MaterialTheme.colorScheme.primary)
+                false -> Icon(if (entry.required) Icons.Outlined.RadioButtonUnchecked else Icons.Outlined.AddCircleOutline, null,
+                    tint = if (entry.required) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, Modifier.size(18.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(stringResource(title), style = MaterialTheme.typography.bodyLarge)
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null)
         }
     }
 }

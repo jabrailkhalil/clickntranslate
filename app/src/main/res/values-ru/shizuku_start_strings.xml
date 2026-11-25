@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="shizuku_start_intro">Выберите способ захвата экрана. Его можно поменять в любой момент.</string>
+    <string name="shizuku_start_system_body">Использует системное разрешение Android. Подтверждение появляется при необходимости.</string>
+    <string name="shizuku_start_body">Захват без повторных запросов на показ экрана. Shizuku нужно установить и запустить отдельно.</string>
+    <string name="shizuku_start_checking">Проверяем Shizuku…</string>
+    <string name="shizuku_start_ready">Shizuku готов. Можно переводить экран.</string>
+    <string name="shizuku_start_permission">Shizuku работает. Разрешите доступ для Click’n’Translate.</string>
+    <string name="shizuku_start_no_privilege">Служба подключена, но права ADB или root не подтверждены. Перезапустите её в Shizuku.</string>
+    <string name="shizuku_start_compatibility">Служба совместимости не подключена. Откройте установленный менеджер Shizuku.</string>
+    <string name="shizuku_start_not_installed">Shizuku не установлен. Системный захват уже доступен.</string>
+    <string name="shizuku_start_not_running">Shizuku не запущен. Откройте его и запустите службу.</string>
+    <string name="shizuku_start_authorize">Использовать Shizuku</string>
+    <string name="shizuku_start_authorizing">Ожидаем разрешение Shizuku и проверяем доступ…</string>
+    <string name="shizuku_start_cancel">Отменить подключение</string>
+    <string name="shizuku_start_not_confirmed">Подключение не подтверждено. Разрешите доступ приложению в Shizuku и повторите попытку.</string>
+    <string name="shizuku_start_install">Установить Shizuku</string>
+    <string name="shizuku_start_open">Открыть Shizuku</string>
+    <string name="shizuku_start_guide">Инструкция</string>
+    <string name="shizuku_start_refresh">Проверить снова</string>
+</resources>

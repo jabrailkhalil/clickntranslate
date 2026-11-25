@@ -7,11 +7,16 @@ import androidx.work.Configuration
 import dev.clickn.translate.data.CrashRecorder
 import dev.clickn.translate.data.LogRepository
 import dev.clickn.translate.data.SettingsRepository
+import dev.clickn.translate.data.SettingsBundleImporter
+import dev.clickn.translate.data.SettingsImportRecoveryGate
+import dev.clickn.translate.data.SettingsStorage
+import dev.clickn.translate.gallery.GalleryExportReceipts
 import dev.clickn.translate.di.PrivateCleartextInterceptor
 import dev.clickn.translate.network.ScreenWakeNetworkRecovery
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -23,6 +28,10 @@ class ClickTranslateApp : Application(), Configuration.Provider {
 
     @Inject lateinit var logRepository: LogRepository
     @Inject lateinit var settingsRepository: SettingsRepository
+    @Inject lateinit var settingsStorage: SettingsStorage
+    @Inject lateinit var settingsBundleImporter: SettingsBundleImporter
+    @Inject lateinit var settingsImportRecoveryGate: SettingsImportRecoveryGate
+    @Inject lateinit var galleryExportReceipts: GalleryExportReceipts
     @Inject lateinit var cleartextInterceptor: PrivateCleartextInterceptor
     @Inject lateinit var screenWakeNetworkRecovery: ScreenWakeNetworkRecovery
     @Inject lateinit var workerFactory: HiltWorkerFactory
@@ -41,6 +50,8 @@ class ClickTranslateApp : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
+        // Start on IO; repository gates prevent first consumers from seeing a partial prior import.
+        settingsImportRecoveryGate.start(appScope, settingsBundleImporter::recoverPendingImport)
         // 仅 debug 包 plant DebugTree。release 包不打 logcat —— 避免线上日志泄漏；
         // 用户能在 app 内日志页（LogRepository）看到 OCR / 翻译关键信息已经够诊断。
         if (BuildConfig.DEBUG) {
@@ -54,6 +65,15 @@ class ClickTranslateApp : Application(), Configuration.Provider {
         CrashRecorder.loadPendingCrashes(this, logRepository)
         CrashRecorder.loadExitReasons(this, logRepository)
         screenWakeNetworkRecovery.start()
+        appScope.launch(Dispatchers.IO) {
+            try {
+                galleryExportReceipts.recoverPending()
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Exception) {
+                Timber.w("Gallery export recovery remains pending")
+            }
+        }
         // 持续把脱敏后的 settings 快照塞给 CrashRecorder，crash 时同步读这个内存值即可，
         // 避免 crash handler 走 DataStore IO 二次 crash。
         appScope.launch {
@@ -96,6 +116,7 @@ class ClickTranslateApp : Application(), Configuration.Provider {
     override fun onTerminate() {
         screenWakeNetworkRecovery.stop()
         appScope.cancel()
+        settingsStorage.close()
         super.onTerminate()
     }
 }

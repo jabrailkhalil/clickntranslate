@@ -59,7 +59,7 @@ class GalleryShareImportContractTest {
             Case(
                 "share request populates the create task selection",
                 activity,
-                "selectedGalleryUris = sharedUris",
+                "photoSelection = next",
             ),
         ).forEach { case ->
             assertTrue(case.name, case.source.contains(case.marker))

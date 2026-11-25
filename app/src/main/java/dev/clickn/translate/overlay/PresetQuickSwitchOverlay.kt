@@ -269,6 +269,7 @@ class PresetQuickSwitchOverlay(private val context: Context) {
         OcrEngineKind.UMI_OCR -> context.getString(R.string.settings_ocr_chip_umi)
         OcrEngineKind.LUNA_OCR -> context.getString(R.string.settings_ocr_chip_luna)
         OcrEngineKind.MANGA_OCR_JA -> context.getString(R.string.settings_ocr_chip_manga_ocr_ja)
+        OcrEngineKind.TESSERACT_ARABIC -> context.getString(R.string.settings_ocr_chip_tesseract_arabic)
     }
 
     private fun translatorName(engine: TranslatorEngine): String = when (engine) {

@@ -110,6 +110,9 @@ class DraggableOverlayWindow(
     }
 
     private val wm: WindowManager by lazy { createDisplayBoundWm() }
+    private val sourceVisibility = sourceCaptureViewVisibility()
+    private var hiddenForCapture = false
+    private var sourceTouchActive = false
 
     private var rootView: View? = null
     private var dialog: Dialog? = null
@@ -132,6 +135,11 @@ class DraggableOverlayWindow(
 
     fun isShown(): Boolean = rootView != null
 
+    fun canObserveSource(): Boolean = !sourceTouchActive && activeSelectionActionMode == null &&
+        wordPreviewView == null && selectableTextViews.keys.none { it.hasSelection() }
+
+    fun hideForSourceObservation(): SourceObservationLease = sourceVisibility.hideForSourceObservation()
+
     internal fun observationExclusionRects(): List<Rect> =
         listOfNotNull(rootView?.observationBounds(), wordPreviewView?.observationBounds())
 
@@ -140,8 +148,12 @@ class DraggableOverlayWindow(
      * 返回 false 表示窗口当前未显示，调用方无需安排恢复。
      */
     fun setHiddenForCapture(hidden: Boolean): Boolean {
+        hiddenForCapture = hidden
         val root = rootView ?: return false
-        root.visibility = if (hidden) View.INVISIBLE else View.VISIBLE
+        sourceVisibility.setDesired(root, if (hidden) View.INVISIBLE else View.VISIBLE)
+        dialog?.window?.decorView?.let {
+            sourceVisibility.setDesired(it, if (hidden) View.INVISIBLE else View.VISIBLE)
+        }
         return true
     }
 
@@ -450,10 +462,15 @@ class DraggableOverlayWindow(
             applyWindowLayoutParams(window, params)
             window.decorView.setBackgroundColor(Color.TRANSPARENT)
             WindowCompat.setDecorFitsSystemWindows(window, false)
+            sourceVisibility.track(root, if (hiddenForCapture) View.INVISIBLE else View.VISIBLE)
+            sourceVisibility.track(window.decorView, if (hiddenForCapture) View.INVISIBLE else View.VISIBLE)
             host.show()
+            sourceVisibility.setDesired(window.decorView, if (hiddenForCapture) View.INVISIBLE else View.VISIBLE)
             dialog = host
             updateWindowLayout(params)
         }.onFailure {
+            sourceVisibility.untrack(root)
+            pendingDialog?.window?.decorView?.let(sourceVisibility::untrack)
             runCatching { pendingDialog?.dismiss() }
         }
     }
@@ -513,6 +530,9 @@ class DraggableOverlayWindow(
 
     fun hide() {
         if (rootView == null && dialog == null) return
+        sourceTouchActive = false
+        rootView?.let(sourceVisibility::untrack)
+        dialog?.window?.decorView?.let(sourceVisibility::untrack)
         endActiveSelection()
         dismissWordPreview()
         val currentDialog = dialog
@@ -559,7 +579,7 @@ class DraggableOverlayWindow(
         // root = FrameLayout：里面叠两层 —— 内 wrap（VERTICAL 装 header/content/footer）+
         // 独立的锁按钮（右上角始终可见）。锁定时只隐藏内 wrap 的 header/footer，锁按钮一直在，
         // 让用户随时能解锁。
-        val root = FrameLayout(context).apply {
+        val root = SourceObservationRoot(context) { sourceTouchActive = it }.apply {
             background = shellBackground()
             this.alpha = this@DraggableOverlayWindow.alpha
             clipToOutline = true

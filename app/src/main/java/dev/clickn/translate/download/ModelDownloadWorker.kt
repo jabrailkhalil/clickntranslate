@@ -24,6 +24,14 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
+import dev.clickn.translate.ocr.TesseractModelStore
+import dev.clickn.translate.ocr.TesseractModelFiles
+import dev.clickn.translate.translate.MlKitOnDeviceTranslator
 import timber.log.Timber
 
 @HiltWorker
@@ -36,6 +44,8 @@ class ModelDownloadWorker @AssistedInject constructor(
     private val orientationModelInstaller: OrientationModelInstaller,
     private val modelReadinessChecker: ModelReadinessChecker,
     private val networkTester: ModelDownloadNetworkTester,
+    private val tesseractModels: TesseractModelStore,
+    private val mlKit: MlKitOnDeviceTranslator,
 ) : CoroutineWorker(appContext, workerParams) {
 
     private var lastProgressUpdateAt = 0L
@@ -71,6 +81,7 @@ class ModelDownloadWorker @AssistedInject constructor(
             specs.forEachIndexed { index, spec ->
                 download(spec, index, specs.size)
             }
+            modelReadinessChecker.refresh(specs)
             check(specs.all { modelReadinessChecker.check(it).ready }) {
                 "Required model components did not pass the shared installation check"
             }
@@ -120,6 +131,7 @@ class ModelDownloadWorker @AssistedInject constructor(
             batchIndex = index + 1,
             batchCount = count,
         )
+        modelReadinessChecker.refresh(listOf(spec))
         val initialReadiness = modelReadinessChecker.checkArtifact(spec)
         check(initialReadiness.supported) {
             applicationContext.getString(R.string.err_llm_device_unsupported)
@@ -139,9 +151,26 @@ class ModelDownloadWorker @AssistedInject constructor(
             batchIndex = index + 1,
             batchCount = count,
         )
-        networkTester.requireReachable(spec)
+        // The SDK owns its model URLs; never probe an invented Google endpoint.
+        if (spec.type != ModelDownloadType.ML_KIT_TRANSLATION) networkTester.requireReachable(spec)
 
         when (spec.type) {
+            ModelDownloadType.TESSERACT_ARABIC -> coroutineScope {
+                val total = TesseractModelFiles.models.sumOf { it.bytes }
+                val progress = launch {
+                    tesseractModels.state.collect { state ->
+                        if (state.busy) publishProgress(spec, label, index, count, "ara + eng",
+                            state.progress?.let { (it.coerceIn(0f, 1f) * total).toLong() } ?: 0L,
+                            total, false, null)
+                    }
+                }
+                try { tesseractModels.download() }
+                finally { withContext(NonCancellable) { progress.cancelAndJoin() } }
+            }
+            ModelDownloadType.ML_KIT_TRANSLATION -> {
+                val (source, target) = spec.mlKitLanguages()
+                mlKit.ensureLanguagePairModelsDownloaded(source, target, 120)
+            }
             ModelDownloadType.LLM -> {
                 val kind = LlmModelKind.valueOf(spec.variant)
                 llmInstaller.download(kind).collect { progress ->
@@ -165,6 +194,7 @@ class ModelDownloadWorker @AssistedInject constructor(
                 }
             }
         }
+        modelReadinessChecker.refresh(listOf(spec))
         check(modelReadinessChecker.checkArtifact(spec).installed) {
             "Downloaded model did not pass the shared installation check: ${spec.encode()}"
         }
@@ -315,6 +345,8 @@ class ModelDownloadWorker @AssistedInject constructor(
     }
 
     private fun displayName(spec: ModelDownloadSpec): String = when (spec.type) {
+        ModelDownloadType.TESSERACT_ARABIC -> applicationContext.getString(R.string.settings_ocr_chip_tesseract_arabic)
+        ModelDownloadType.ML_KIT_TRANSLATION -> "Google ML Kit: ${spec.variant.replace(':', '→')}"
         ModelDownloadType.LLM -> LlmModelKind.valueOf(spec.variant).displayName
         ModelDownloadType.PADDLE -> applicationContext.getString(PaddleModelVersion.valueOf(spec.variant).displayNameRes)
         ModelDownloadType.MANGA_OCR -> applicationContext.getString(R.string.settings_manga_ocr_model_name)

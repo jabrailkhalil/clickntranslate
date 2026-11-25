@@ -2,8 +2,47 @@ package dev.clickn.translate.ui
 
 import dev.clickn.translate.data.*
 import dev.clickn.translate.translate.MlKitLanguagePolicy
+import dev.clickn.translate.capture.CaptureStartMode
+
+internal enum class MobileReadinessKey {
+    LANGUAGES, SERVICE, OCR, TRANSLATION_MODELS, OVERLAY, CAPTURE, HERO, NOTIFICATIONS, BATTERY, ACCESSIBILITY,
+}
+
+internal data class MobileReadinessItem(val key: MobileReadinessKey, val ready: Boolean?, val required: Boolean)
+
+internal fun mobileReadinessItems(
+    settings: Settings, models: MobileModelState, overlay: Boolean,
+    captureMode: CaptureStartMode?, shizukuReady: Boolean?, heroSelected: Boolean,
+    notifications: Boolean, battery: Boolean, accessibility: Boolean,
+): List<MobileReadinessItem> = buildList {
+    add(MobileReadinessItem(MobileReadinessKey.LANGUAGES, setupLanguagePairReady(settings), true))
+    add(MobileReadinessItem(MobileReadinessKey.SERVICE, !translationNeedsConfiguration(settings), true))
+    add(MobileReadinessItem(MobileReadinessKey.OCR, if (models.checking) null else models.ocrReady, true))
+    if (settings.translatorEngine in offlineTranslationEngines) {
+        add(MobileReadinessItem(MobileReadinessKey.TRANSLATION_MODELS, if (models.checking) null else models.translationReady, true))
+    }
+    add(MobileReadinessItem(MobileReadinessKey.OVERLAY, overlay, true))
+    add(MobileReadinessItem(MobileReadinessKey.CAPTURE, when (captureMode) {
+        null -> null
+        CaptureStartMode.SYSTEM -> true
+        CaptureStartMode.SHIZUKU -> shizukuReady
+    }, true))
+    add(MobileReadinessItem(MobileReadinessKey.HERO, heroSelected, false))
+    add(MobileReadinessItem(MobileReadinessKey.NOTIFICATIONS, notifications, false))
+    add(MobileReadinessItem(MobileReadinessKey.BATTERY, battery, false))
+    add(MobileReadinessItem(MobileReadinessKey.ACCESSIBILITY, accessibility, false))
+}
 
 internal val offlineTranslationEngines = setOf(TranslatorEngine.GOOGLE_ML_KIT, TranslatorEngine.LOCAL_HY_MT2, TranslatorEngine.LOCAL_SAKURA)
+
+/** Screen readiness has the same prerequisites as the start action; optional grants do not block it. */
+internal fun mobileScreenReady(settings: Settings, models: MobileModelState, overlay: Boolean,
+    captureMode: CaptureStartMode? = CaptureStartMode.SYSTEM, shizukuReady: Boolean? = null): Boolean =
+    overlay && !models.checking && models.ocrReady == true && setupLanguagePairReady(settings) &&
+        !translationNeedsConfiguration(settings) &&
+        (settings.translatorEngine !in offlineTranslationEngines || models.translationReady == true) &&
+        captureMode != null && (captureMode != CaptureStartMode.SHIZUKU || shizukuReady == true)
+
 internal fun translationNeedsConfiguration(s: Settings): Boolean = when (s.translatorEngine) {
     TranslatorEngine.OPENAI -> s.apiKey.isBlank() || s.model.isBlank() || s.baseUrl.isBlank()
     TranslatorEngine.ANTHROPIC -> s.anthropicApiKey.isBlank() || s.anthropicModel.isBlank() || s.anthropicBaseUrl.isBlank()

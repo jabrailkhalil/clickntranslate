@@ -18,6 +18,11 @@ class GalleryTranslationExportContractTest {
         val renderer = sourceFile(
             "src/main/java/dev/clickn/translate/gallery/GalleryTranslatedImageRenderer.kt"
         ).readText()
+        val receipts = sourceFile("src/main/java/dev/clickn/translate/gallery/GalleryExportReceipts.kt").readText()
+        val keepStart = receipts.indexOf("suspend fun keepFiles(expectedReviewToken:")
+        val keepEnd = receipts.indexOf("suspend fun export(", keepStart.coerceAtLeast(0))
+        val keepFiles = if (keepStart >= 0 && keepEnd > keepStart) receipts.substring(keepStart, keepEnd) else ""
+        val documents = sourceFile("src/main/java/dev/clickn/translate/gallery/GalleryExportDocumentProof.kt").readText()
         val english = sourceFile("src/main/res/values/strings.xml").readText()
         val chinese = sourceFile("src/main/res/values-zh-rCN/strings.xml").readText()
 
@@ -38,9 +43,9 @@ class GalleryTranslationExportContractTest {
                 ),
             ),
             Case(
-                "floating window export is disabled with a localized reason",
+                "floating window export offers a localized text action",
                 screen.contains("GalleryExportRenderMode.UNSUPPORTED_FLOATING") &&
-                    screen.contains("R.string.gallery_export_floating_unavailable"),
+                    screen.contains("R.string.gallery_export_text_action"),
             ),
             Case(
                 "export action lives in the top app bar actions menu",
@@ -69,7 +74,8 @@ class GalleryTranslationExportContractTest {
             Case(
                 "exporter creates documents in the selected tree",
                 exporter.contains("DocumentsContract.buildDocumentUriUsingTree") &&
-                    exporter.contains("DocumentsContract.createDocument"),
+                    exporter.contains("exportReceipts.exportFile(") &&
+                    documents.contains("DocumentsContract.createDocument"),
             ),
             Case(
                 "outputs are encoded as png",
@@ -84,17 +90,40 @@ class GalleryTranslationExportContractTest {
             ),
             Case(
                 "metadata is written before copying through the system provider",
-                exporter.indexOf("encodedFile = encodeTranslatedPng(rendered)") <
-                    exporter.indexOf("DocumentsContract.createDocument") &&
-                    exporter.contains("encodedFile.inputStream().use"),
+                exporter.indexOf("encodedFile = encodeTranslatedPng(rendered, stagingDirectory)") <
+                    exporter.indexOf("exportReceipts.exportFile(") &&
+                    receipts.contains("store.payload(bound).inputStream().use") &&
+                    receipts.contains("exportContext.ensureActive()") &&
+                    receipts.contains("output.write(buffer, 0, read)"),
             ),
             Case(
                 "temporary encoded images are always cleaned up",
                 exporter.contains("file.exists() && !file.delete()"),
             ),
             Case(
-                "failed or canceled writes remove partial documents",
-                exporter.contains("DocumentsContract.deleteDocument"),
+                "failed or canceled writes preserve partial documents without a check-delete race",
+                receipts.contains("MAX_RECOVERY_DOCUMENTS = 8") &&
+                    receipts.contains("GalleryExportProofKind.PREFIX -> Unit") &&
+                    !Regex("""documents\s*\.\s*delete\s*\(""").containsMatchIn(receipts) &&
+                    receipts.contains("GalleryExportProofKind.UNCERTAIN -> Unit") &&
+                    receipts.contains("if (error is CancellationException) throw error") &&
+                    documents.contains("remoteLength > 0 -> GalleryExportProofKind.PREFIX"),
+            ),
+            Case(
+                "leaving files requires explicit confirmation of the displayed recovery snapshot",
+                screen.contains("R.string.gallery_export_recovery_keep_title") &&
+                    screen.contains("R.string.gallery_export_recovery_keep_message") &&
+                    screen.contains("R.string.gallery_export_recovery_keep_confirm") &&
+                    screen.contains("token == status.reviewToken") &&
+                    screen.contains("viewModel.keepExportFiles(token)") &&
+                    keepFiles.contains("check(expectedReviewToken == reviewToken(receipts))"),
+            ),
+            Case(
+                "explicit keep durably records retention before local recovery cleanup",
+                keepFiles.contains("withContext(NonCancellable)") &&
+                    keepFiles.indexOf("GalleryExportReceiptPhase.RETAINED") >= 0 &&
+                    keepFiles.indexOf("store.save(retained)") > keepFiles.indexOf("GalleryExportReceiptPhase.RETAINED") &&
+                    keepFiles.indexOf("forgetTerminal(receipt)") > keepFiles.indexOf("store.save(retained)"),
             ),
             Case(
                 "images are rendered sequentially and recycled",

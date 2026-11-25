@@ -24,6 +24,8 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -90,7 +92,7 @@ internal object PaddleRecognitionSizing {
     }
 
     /**
-     * The official Korean PP-OCRv5 recognizer keeps short lines at their natural width and
+     * The official Korean and Arabic PP-OCRv5 recognizers keep short lines at their natural width and
      * right-pads the input tensor to 3x48x320. Other already-deployed model paths retain their
      * existing dynamic-width behavior until they have separate device benchmarks.
      */
@@ -98,7 +100,7 @@ internal object PaddleRecognitionSizing {
         require(contentWidth in MIN_WIDTH..MAX_DYNAMIC_WIDTH) {
             "contentWidth must be within the supported recognition range"
         }
-        return if (modelVersion == PaddleModelVersion.V5_KOREAN) {
+        return if (modelVersion == PaddleModelVersion.V5_KOREAN || modelVersion == PaddleModelVersion.V5_ARABIC) {
             contentWidth.coerceAtLeast(OFFICIAL_BASE_WIDTH)
         } else {
             contentWidth
@@ -122,6 +124,8 @@ internal data class PaddleRecognitionCandidate(
     val outOfRangeIdx: Int = 0,
     val emittedChars: Int = text.count { !it.isWhitespace() },
     val elapsedMs: Long = 0L,
+    val tensorWidth: Int = targetWidth,
+    val ctcTokens: List<PaddleCtcToken> = emptyList(),
 )
 
 internal data class PaddleRecognizedText(
@@ -247,10 +251,13 @@ internal fun parsePaddleYamlCharacterDict(lines: List<String>): List<String> {
             val match = Regex("^\\s*-\\s+(.+)$").matchEntire(trimmed)
             if (match != null) {
                 var value = match.groupValues[1].trim(' ', '\t')
+                val singleQuoted = value.startsWith("'") && value.endsWith("'")
                 if ((value.startsWith("'") && value.endsWith("'")) ||
                     (value.startsWith("\"") && value.endsWith("\""))) {
                     value = value.substring(1, value.length - 1)
                 }
+                // YAML single-quoted scalars escape one apostrophe as two, e.g. '''' -> '.
+                if (singleQuoted) value = value.replace("''", "'")
                 value = value.replace("\\'", "'")
                     .replace("\\\"", "\"")
                     .replace("\\n", "\n")
@@ -622,10 +629,12 @@ class PaddleOcrEngine @Inject constructor(
             Timber.i("PaddleOCR run#%d quad[%d] %s", runId, i, quad.toPaddleLogString())
         }
         val tRecStart = System.currentTimeMillis()
+        val recognitionContext = currentCoroutineContext()
         val recognizedByIndex = recognizeQuads(
             src = bitmap,
             indexedQuads = sorted.mapIndexed { index, quad -> index to quad },
             runId = runId,
+            checkActive = { recognitionContext.ensureActive() },
         )
         val indexedResults = sorted.mapIndexedNotNull { i, quad ->
             val recognition = paddleRecognizedText(recognizedByIndex[i])
@@ -655,7 +664,15 @@ class PaddleOcrEngine @Inject constructor(
                     text = text,
                     boundingBox = rect,
                     confidence = recognition.confidence,
-                    recognizedLanguage = "auto",
+                    recognizedLanguage = if (loadedVersion == PaddleModelVersion.V5_ARABIC) {
+                        TesseractTextPolicy.language(text)
+                    } else "auto",
+                    layoutOrientation = if (loadedVersion == PaddleModelVersion.V5_ARABIC) {
+                        if (TesseractTextPolicy.rtl(text)) TextOrientation.HORIZONTAL_RTL else TextOrientation.HORIZONTAL_LTR
+                    } else null,
+                    regionGranularity = if (loadedVersion == PaddleModelVersion.V5_ARABIC) {
+                        TextRegionGranularity.LINE
+                    } else TextRegionGranularity.UNKNOWN,
                     sourceBoxes = listOf(Rect(rect)),
                 )
             }
@@ -683,6 +700,7 @@ class PaddleOcrEngine @Inject constructor(
         val memberDetectionIndices =
             shapeAwareReport?.detectorGuidedMasks?.memberDetectionIndices
         val results = if (
+            loadedVersion != PaddleModelVersion.V5_ARABIC &&
             regroupDetectedBubbles &&
             memberDetectionIndices != null &&
             memberDetectionIndices.size == sorted.size
@@ -738,7 +756,7 @@ class PaddleOcrEngine @Inject constructor(
                 ),
             )
         }
-        return results
+        return if (loadedVersion == PaddleModelVersion.V5_ARABIC) preparePaddleArabicParagraphs(results) else results
     }
 
     private fun detectQuadsForRecognition(
@@ -1140,6 +1158,7 @@ class PaddleOcrEngine @Inject constructor(
         src: Bitmap,
         indexedQuads: List<Pair<Int, DBPostprocessor.Quad>>,
         runId: Long,
+        checkActive: () -> Unit = {},
     ): Map<Int, PaddleRecognitionCandidate?> {
         val session = recSession ?: run {
             Timber.w("PaddleOCR run#%d recognition skipped: recSession=null", runId)
@@ -1195,6 +1214,15 @@ class PaddleOcrEngine @Inject constructor(
                 }
             }
             refineKoreanRecognitionCrops(prepared, indexedQuads.toMap(), results, session, e, runId)
+            if (loadedVersion == PaddleModelVersion.V5_ARABIC) {
+                val budget = ArabicLatinCropRefiner.Budget()
+                for (item in prepared) {
+                    val original = results[item.boxIndex] ?: continue
+                    results[item.boxIndex] = ArabicLatinCropRefiner.refine(item.crop, original, budget, checkActive) { word ->
+                        recognizeCrop(word, item.orientation, session, e, runId, item.boxIndex)
+                    }
+                }
+            }
             results
         } finally {
             prepared.forEach { item ->
@@ -1392,6 +1420,8 @@ class PaddleOcrEngine @Inject constructor(
                             outOfRangeIdx = decoded.outOfRangeIdx,
                             emittedChars = decoded.emittedChars,
                             elapsedMs = elapsedMs,
+                            tensorWidth = tensorWidth,
+                            ctcTokens = decoded.tokens,
                         ).also { candidate ->
                             Timber.i(
                                 "PaddleOCR run#%d rec[%d] batched=%s",
@@ -1455,6 +1485,8 @@ class PaddleOcrEngine @Inject constructor(
                         outOfRangeIdx = decoded.outOfRangeIdx,
                         emittedChars = decoded.emittedChars,
                         elapsedMs = elapsedMs,
+                        tensorWidth = tensorWidth,
+                        ctcTokens = decoded.tokens,
                     )
                     Timber.i(
                         "PaddleOCR run#%d rec[%d] candidate orientation=%s crop=%dx%d naturalW=%d input=%dx%d capped=%s elapsed=%dms score=%.3f quality=%.3f ctcSteps=%d classes=%d nonBlank=%d emitted=%d outOfRange=%d textStats=%s text='%s'",
@@ -1535,13 +1567,14 @@ class PaddleOcrEngine @Inject constructor(
     /** CTC greedy decode：每一步取最大概率，去重 + 去 blank（idx=0）。 */
     private fun ctcDecodeWithStats(logits: Array<FloatArray>): CtcDecodeResult {
         val sb = StringBuilder()
+        val tokens = mutableListOf<PaddleCtcToken>()
         var prev = -1
         var nonBlankSteps = 0
         var outOfRangeIdx = 0
         var emittedScoreTotal = 0f
         var emittedChars = 0
         val numClasses = logits.firstOrNull()?.size ?: 0
-        for (step in logits) {
+        for ((stepIndex, step) in logits.withIndex()) {
             var best = 0
             var bestVal = step[0]
             for (i in 1 until step.size) {
@@ -1553,11 +1586,13 @@ class PaddleOcrEngine @Inject constructor(
                 when {
                     keyIdx in keys.indices -> {
                         sb.append(keys[keyIdx])
+                        if (loadedVersion == PaddleModelVersion.V5_ARABIC) tokens += PaddleCtcToken(keys[keyIdx], stepIndex, bestVal)
                         emittedScoreTotal += bestVal
                         emittedChars++
                     }
                     keyIdx == keys.size -> {
                         sb.append(' ')
+                        if (loadedVersion == PaddleModelVersion.V5_ARABIC) tokens += PaddleCtcToken(" ", stepIndex, bestVal)
                         emittedScoreTotal += bestVal
                         emittedChars++
                     }
@@ -1571,13 +1606,14 @@ class PaddleOcrEngine @Inject constructor(
                 logits.size, numClasses, keys.size, nonBlankSteps, outOfRangeIdx)
         }
         return CtcDecodeResult(
-            text = sb.toString(),
+            text = if (loadedVersion == PaddleModelVersion.V5_ARABIC) arabicCtcLogicalText(sb.toString()) else sb.toString(),
             score = if (emittedChars == 0) 0f else emittedScoreTotal / emittedChars,
             steps = logits.size,
             numClasses = numClasses,
             nonBlankSteps = nonBlankSteps,
             outOfRangeIdx = outOfRangeIdx,
             emittedChars = emittedChars,
+            tokens = tokens,
         )
     }
 
@@ -1589,6 +1625,7 @@ class PaddleOcrEngine @Inject constructor(
         val nonBlankSteps: Int,
         val outOfRangeIdx: Int,
         val emittedChars: Int,
+        val tokens: List<PaddleCtcToken>,
     )
 
     /**

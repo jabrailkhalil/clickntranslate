@@ -18,6 +18,10 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        exclusiveContent {
+            forRepository { maven("https://jitpack.io") }
+            filter { includeGroup("cz.adaptech.tesseract4android") }
+        }
     }
 }
 

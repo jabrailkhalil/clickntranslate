@@ -134,9 +134,13 @@ class SettingsCoverageAuditTest {
             !settingsScreenSource.contains("fun buildSnapshot(): Settings = Settings().copy("),
         )
         assertTrue(
-            "initial snapshot must retain the complete repository Settings value",
+            "initial snapshot must keep the original baseline separate from drafts restored before IO",
             settingsScreenSource.contains("initialSettings = persisted") &&
-                settingsScreenSource.contains("val s = viewModel.consumeLocaleChangeDraft() ?: persisted"),
+                settingsScreenSource.contains("val persisted = editing.persisted") &&
+                settingsScreenSource.contains("val s = editing.draft") &&
+                settingsScreenSource.contains("val editing = loadSettingsEditingSnapshot(viewModel.consumeLocaleChangeDraft()) {") &&
+                settingsScreenSource.indexOf("loadSettingsEditingSnapshot(viewModel.consumeLocaleChangeDraft())") <
+                    settingsScreenSource.indexOf("viewModel.loadForScreen(context)"),
         )
         assertTrue(
             "Settings export must use buildSettingsTransferSnapshot",

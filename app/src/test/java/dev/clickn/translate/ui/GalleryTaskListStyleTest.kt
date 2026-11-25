@@ -185,6 +185,15 @@ class GalleryTaskListStyleTest {
             source.indexOf("private fun GalleryResultItem("),
             source.indexOf("private fun GalleryResultTextSection("),
         )
+        fun containerBefore(call: String): String {
+            val callIndex = detail.indexOf(call)
+            assertTrue("$call exists in task detail", callIndex >= 0)
+            val boxIndex = detail.lastIndexOf("Box(", callIndex)
+            assertTrue("$call has its own container", boxIndex >= 0)
+            return detail.substring(boxIndex, callIndex)
+        }
+        val summaryContainer = containerBefore("GalleryTaskSummary(")
+        val resultContainer = containerBefore("GalleryResultItem(")
 
         data class Case(
             val name: String,
@@ -201,8 +210,9 @@ class GalleryTaskListStyleTest {
             Case(
                 "summary and result cards own the horizontal inset",
                 Regex("""\.padding\(horizontal = 16\.dp\)""")
-                    .findAll(detail)
-                    .count() == 2,
+                    .containsMatchIn(summaryContainer) &&
+                    Regex("""\.padding\(horizontal = 16\.dp\)""")
+                        .containsMatchIn(resultContainer),
             ),
             Case(
                 "sticky tabs remain outside card insets",

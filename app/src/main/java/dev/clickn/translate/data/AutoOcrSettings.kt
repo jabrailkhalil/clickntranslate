@@ -29,8 +29,8 @@ data class AutoOcrSettings(
             .distinct().sorted(),
     )
 
-    fun routeFor(language: String): AutoOcrRoute? =
-        routes[languageKey(language)] ?: defaultRoute(language)
+    fun routeFor(language: String, arabicPaddleReady: Boolean = false): AutoOcrRoute? =
+        routes[languageKey(language)] ?: defaultRoute(language, arabicPaddleReady)
 
     companion object {
         fun languageKey(code: String): String = code.trim().replace('_', '-')
@@ -38,13 +38,18 @@ data class AutoOcrSettings(
                 when (it) { "iw" -> "he"; "in" -> "id"; "nb" -> "no"; else -> it }
             }
 
-        fun defaultRoute(language: String): AutoOcrRoute? {
+        /** Readiness is supplied by the caller; resolving a route never downloads a model. */
+        fun defaultRoute(language: String, arabicPaddleReady: Boolean = false): AutoOcrRoute? {
             val code = languageKey(language)
             if (code.isBlank() || code == "auto" || code == "und") return null
+            if (code == "ar" && arabicPaddleReady) {
+                return AutoOcrRoute(OcrEngineKind.PADDLE_ONNX, PaddleModelVersion.V5_ARABIC)
+            }
             val engine = when (code) {
                 "zh" -> OcrEngineKind.ML_KIT_CHINESE
                 "ja" -> OcrEngineKind.ML_KIT_JAPANESE
                 "ko" -> OcrEngineKind.ML_KIT_KOREAN
+                "ar" -> OcrEngineKind.TESSERACT_ARABIC
                 else -> OcrEngineKind.ML_KIT_LATIN.takeIf {
                     OcrLanguageCapability.supports(it, code)
                 }
@@ -100,9 +105,15 @@ object AutoOcrRoutingPolicy {
 
     /** Never invent a cloud fallback. An unavailable override falls back to a built-in local route. */
     fun resolve(settings: Settings, language: String, ready: (AutoOcrRoute) -> Boolean): AutoOcrRoute? {
-        val selected = settings.autoOcr.routeFor(language)
+        // Check the persisted override first: a previously selected Tesseract route
+        // must not be replaced merely because another local model was installed.
+        val selected = settings.autoOcr.routes[AutoOcrSettings.languageKey(language)]
         if (selected != null && supports(settings, language, selected) &&
             configured(settings, selected) && ready(selected)) return selected
+        if (AutoOcrSettings.languageKey(language) == "ar") {
+            val paddle = AutoOcrSettings.defaultRoute(language, arabicPaddleReady = true)!!
+            if (supports(settings, language, paddle) && ready(paddle)) return paddle
+        }
         return AutoOcrSettings.defaultRoute(language)?.takeIf { ready(it) }
     }
 }

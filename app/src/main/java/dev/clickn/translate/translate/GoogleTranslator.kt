@@ -8,11 +8,13 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import java.net.URLEncoder
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
@@ -44,7 +46,19 @@ class GoogleTranslator @Inject constructor(
         cache.get(cacheKey, settings)?.let { return it }
 
         val timedClient = client.withApiTimeout(settings.apiTimeoutSeconds)
-        val translated = callEndpoint(trimmed, from, to, timedClient)
+        val translated = buildString {
+            for (chunk in splitProviderText(trimmed, 1800)) {
+                currentCoroutineContext().ensureActive()
+                val content = chunk.trim()
+                if (content.isEmpty()) append(chunk)
+                else {
+                    append(chunk.takeWhile(Char::isWhitespace))
+                    append(callEndpoint(content, from, to, timedClient))
+                    append(chunk.takeLastWhile(Char::isWhitespace))
+                }
+            }
+        }
+        currentCoroutineContext().ensureActive()
         cache.put(cacheKey, translated, settings)
         return translated
     }
@@ -60,7 +74,10 @@ class GoogleTranslator @Inject constructor(
             val to = mapTargetLang(settings.targetLang)
             val result = callEndpoint("hello", "en", to, timedClient)
             TestResult(true, "OK hello→$result")
-        }.getOrElse { TestResult(false, it.message ?: it.javaClass.simpleName) }
+        }.getOrElse {
+            if (it is CancellationException) throw it
+            TestResult(false, it.message ?: it.javaClass.simpleName)
+        }
     }
 
     private suspend fun callEndpoint(
@@ -78,15 +95,7 @@ class GoogleTranslator @Inject constructor(
             .header("User-Agent", "Mozilla/5.0 (Android) ClickTranslate")
             .get()
             .build()
-        return withContext(Dispatchers.IO) {
-            httpClient.newCall(req).execute().use { r ->
-                val raw = r.body?.string().orEmpty()
-                if (!r.isSuccessful) {
-                    throw TranslationException("Google HTTP ${r.code}: ${raw.take(200)}")
-                }
-                parseResponse(raw)
-            }
-        }
+        return httpClient.newCall(req).awaitTranslationPayload(::parseResponse)
     }
 
     private fun parseResponse(raw: String): String {
@@ -103,8 +112,8 @@ class GoogleTranslator @Inject constructor(
             }
             sb.toString().ifEmpty { throw TranslationException("Google returned an empty translation") }
         }.getOrElse {
-            Timber.tag("GoogleTrans").w(it, "Response parsing failed: %s", raw.take(200))
-            throw TranslationException("Google response could not be parsed: ${raw.take(200)}", it)
+            Timber.tag("GoogleTrans").w("Response parsing failed (%d characters)", raw.length)
+            throw TranslationException("Google response could not be parsed", it)
         }
     }
 

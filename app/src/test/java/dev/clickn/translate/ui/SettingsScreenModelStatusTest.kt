@@ -982,6 +982,7 @@ class SettingsScreenModelStatusTest {
 
     @Test
     fun overlayFontDeleteUi_usesLongPressAndCenteredCountdownAcknowledgement() {
+        // Actual text geometry and exclusive tap/long press belong to SettingsOptionGroupRuntimeTest.
         data class Case(
             val name: String,
             val expectedPattern: Regex,
@@ -1004,22 +1005,12 @@ class SettingsScreenModelStatusTest {
                 expectedPattern = Regex("""Row\([\s\S]*?verticalAlignment = Alignment\.CenterVertically"""),
             ),
             Case(
-                name = "font chips use fixed height",
-                expectedPattern = Regex("""private fun OverlayFontChip\([\s\S]*?\.height\(36\.dp\)"""),
-            ),
-            Case(
                 name = "custom font chip routes long press to delete confirmation",
                 expectedPattern = Regex("""onLongClick = \{ pendingOverlayFontDelete = font \}"""),
             ),
             Case(
-                name = "custom font chip owns tap and long press in one recognizer",
-                expectedPattern = Regex(
-                    """detectTapGestures\([\s\S]*?onTap = \{ onClick\(\) \},[\s\S]*?onLongPress = \{ onLongClick\(\) \}"""
-                ),
-            ),
-            Case(
-                name = "two-line typography preview has fixed height to avoid scroll jumps",
-                expectedPattern = Regex("""AndroidView\([\s\S]*?\.height\(80\.dp\)"""),
+                name = "typography preview reserves space and grows for larger text",
+                expectedPattern = Regex("""AndroidView\([\s\S]*?\.heightIn\(min = 80\.dp\)"""),
             ),
             Case(
                 name = "font message keeps stable reserved height",

@@ -145,7 +145,7 @@ class SettingsBundleTransferTest {
     }
 
     @Test
-    fun v2Manifest_containsOnlyAllowlistedPortableValues() {
+    fun v3Manifest_containsOnlyAllowlistedPortableValues() {
         val settings = sampleSettings().copy(
             overlayFontFileName = "",
             overlayFontDisplayName = "",
@@ -163,7 +163,7 @@ class SettingsBundleTransferTest {
             zip.readBytes().toString(Charsets.UTF_8)
         }
 
-        assertTrue(manifest.contains("\"version\":2"))
+        assertTrue(manifest.contains("\"version\":3"))
         assertTrue(manifest.contains("\"values\""))
         listOf(
             "private.example",
@@ -321,6 +321,62 @@ class SettingsBundleTransferTest {
         assertEquals(0, preview.settings?.bubbleClusterGap)
         assertEquals(0, preview.settings?.mangaOcrCropPaddingPx)
         assertTrue(preview.skippedSettingFields.isEmpty())
+    }
+
+    @Test
+    fun partialAppearanceImport_keepsExistingBuiltInAndCustomActiveProfiles() {
+        val custom = TranslationPresetCatalog.fromSettings("custom_kept", "Kept profile", "K", Settings())
+        val manifest = """{"format":"clickntranslate.settings","version":2,"minimumReaderVersion":2,"settings":{"values":{"overlayTextSizeSp":27}},"fonts":[],"glossaryTerms":[]}"""
+        val bytes = ByteArrayOutputStream().also { output ->
+            ZipOutputStream(output).use { zip ->
+                zip.putNextEntry(ZipEntry("manifest.json"))
+                zip.write(manifest.toByteArray(Charsets.UTF_8))
+                zip.closeEntry()
+            }
+        }.toByteArray()
+        val preview = SettingsBundleTransfer.readPreview(ByteArrayInputStream(bytes))
+        assertEquals(setOf("overlayTextSizeSp"), preview.appliedSettingFields)
+        for (activeId in listOf(TranslationPresetCatalog.BUILTIN_MANGA_JA_ZH, custom.id)) {
+            val current = Settings(translationPresets = listOf(custom), activeTranslationPresetId = activeId)
+            val merged = SettingsBundleTransfer.mergeImportedSettings(current, requireNotNull(preview.settings),
+                emptyList(), preview.appliedSettingFields).settings
+            assertEquals("A size-only V2 import must preserve the valid current selection", activeId, merged.activeTranslationPresetId)
+            assertEquals(current.translationPresets, merged.translationPresets)
+            assertEquals(27, merged.overlayTextSizeSp)
+
+            val explicitEmpty = SettingsBundleTransfer.mergeImportedSettings(current, Settings(overlayTextSizeSp = 27),
+                emptyList(), setOf("overlayTextSizeSp", "activeTranslationPresetId")).settings
+            assertEquals("Empty imported selection must preserve the current valid profile", activeId, explicitEmpty.activeTranslationPresetId)
+        }
+    }
+
+    @Test
+    fun explicitlyImportedSelectionResolvesByNameAndRespectsAppliedFields() {
+        val kept = TranslationPresetCatalog.fromSettings("custom_kept", "Fixture profile", "F", Settings())
+        val remote = kept.copy(id = "custom_remote", name = "FIXTURE PROFILE")
+        val current = Settings(translationPresets = listOf(kept),
+            activeTranslationPresetId = TranslationPresetCatalog.BUILTIN_MANGA_JA_ZH)
+        val imported = Settings(overlayTextSizeSp = 27, translationPresets = listOf(remote),
+            activeTranslationPresetId = remote.id)
+        val selected = SettingsBundleTransfer.mergeImportedSettings(current, imported, emptyList(),
+            setOf("overlayTextSizeSp", "translationPresets", "activeTranslationPresetId"))
+        assertEquals("Imported ID must resolve to the existing same-name local ID", kept.id, selected.settings.activeTranslationPresetId)
+        assertEquals(1, selected.presetResult.importedCount)
+        assertEquals(listOf(kept.name), selected.presetResult.overwrittenNames)
+
+        val unselected = SettingsBundleTransfer.mergeImportedSettings(current, imported, emptyList(),
+            setOf("overlayTextSizeSp", "translationPresets"))
+        assertEquals("An unselected active-ID field cannot select the imported profile", current.activeTranslationPresetId,
+            unselected.settings.activeTranslationPresetId)
+    }
+
+    @Test
+    fun invalidExistingSelectionIsNotResurrectedByPartialImport() {
+        val current = Settings(activeTranslationPresetId = "custom_deleted_profile")
+        val merged = SettingsBundleTransfer.mergeImportedSettings(current, Settings(overlayTextSizeSp = 27),
+            emptyList(), setOf("overlayTextSizeSp")).settings
+        assertEquals("", merged.activeTranslationPresetId)
+        assertEquals(27, merged.overlayTextSizeSp)
     }
 
     private fun sampleSettings(): Settings {

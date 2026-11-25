@@ -10,6 +10,7 @@
     <string name="mobile_stop">Arrêter la traduction</string>
     <string name="mobile_ready">Prêt à traduire</string>
     <string name="mobile_running">Traduction de l’écran active</string>
+    <string name="mobile_running_next_step">Ouvrez l’application à traduire. Contrôlez la traduction avec le héros flottant ; maintenez-le appuyé pour ouvrir son menu.</string>
     <string name="mobile_pair">Langues</string>
     <string name="mobile_source">De</string>
     <string name="mobile_target">Vers</string>
@@ -24,7 +25,6 @@
     <string name="mobile_change">Modifier</string>
     <string name="mobile_permission_title">Autoriser le bouton flottant</string>
     <string name="mobile_permission_body">Une autorisation permet de traduire dans d’autres applis. La capture d’écran est demandée au démarrage.</string>
-    <string name="mobile_permission_enable">Autoriser la superposition</string>
     <string name="mobile_permission_done">Autorisation accordée</string>
     <string name="mobile_help">Comment ça marche</string>
     <string name="mobile_text_title">Vos mots, traduits.</string>
@@ -101,4 +101,23 @@
     <string name="settings_app_lang_de">Deutsch</string>
     <string name="settings_app_lang_fr">Français</string>
     <string name="settings_app_lang_es">Español</string>
-    </resources>
+    <string name="mobile_history_loading">Chargement de l’historique…</string>
+    <string name="mobile_history_import_error">L’ancien historique n’a pas pu être importé. Les données originales sont conservées ; les nouvelles traductions peuvent être enregistrées.</string>
+    <string name="mobile_history_erase_error">L’historique est effacé, mais son ancienne copie n’a pas pu être supprimée. Réessayez pour terminer la suppression.</string>
+    <string name="mobile_history_storage_error">L’historique est indisponible. La traduction reste dans l’onglet Texte. Réessayez de charger l’historique.</string>
+    <string name="mobile_history_retry">Réessayer</string>
+    <string name="mobile_history_entry_title">Traduction enregistrée</string>
+    <string name="mobile_history_original">Texte original</string>
+    <string name="mobile_history_close">Fermer</string>
+    <string name="mobile_history_use_source">Ouvrir le traducteur</string>
+    <string name="mobile_failure_connection">Connexion au service de traduction impossible. Vérifiez la connexion ou choisissez un autre service.</string>
+    <string name="mobile_failure_timeout">Le service n’a pas répondu à temps. Réessayez.</string>
+    <string name="mobile_failure_access">Le service a refusé l’accès. Vérifiez ses paramètres ou choisissez un autre service.</string>
+    <string name="mobile_failure_limit">Le service a limité les requêtes. Réessayez plus tard.</string>
+    <string name="mobile_failure_tls">Impossible d’établir une connexion sécurisée et de confiance avec le service.</string>
+    <string name="mobile_failure_service">Le service de traduction est indisponible. Réessayez plus tard.</string>
+    <string name="mobile_failure_response">Le service a renvoyé une réponse vide ou illisible. Réessayez ou choisissez un autre service.</string>
+    <string name="mobile_failure_details">Diagnostic</string>
+    <string name="mobile_failure_details_body">Ce code décrit l’erreur. Il ne contient ni texte de requête, ni contenu de réponse, ni clé API.</string>
+    <string name="mobile_checking_models">Vérification…</string>
+</resources>

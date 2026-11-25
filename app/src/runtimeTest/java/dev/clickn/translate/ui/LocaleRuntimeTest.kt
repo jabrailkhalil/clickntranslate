@@ -79,12 +79,55 @@ class LocaleRuntimeTest {
     }
 
     private fun finishIntro() {
-        repeat(2) {
+        repeat(MobileSetupSteps.COUNT - 1) {
             compose.onNodeWithText(resource(R.string.setup_next)).performClick()
             compose.waitForIdle()
         }
-        compose.onNodeWithText(resource(R.string.setup_finish)).assertIsDisplayed().performClick()
+        compose.waitUntil(10_000) {
+            compose.onAllNodes(hasTestTag("setup-next") and isEnabled()).fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText(resource(R.string.setup_finish)).assertIsDisplayed().assertIsEnabled().performClick()
+        // Finish awaits capture-mode initialization on IO; Compose idleness alone is not its completion receipt.
+        compose.waitUntil(10_000) {
+            compose.onAllNodes(hasText(resource(R.string.mobile_nav_settings)) and hasClickAction())
+                .fetchSemanticsNodes().size == 1
+        }
+        compose.onNodeWithText(resource(R.string.mobile_nav_settings)).assertIsDisplayed()
+    }
+
+    @Test fun heroDefaultIsExplicitlyConfirmedAndStepSurvivesRecreation() {
+        val prefs = dev.clickn.translate.data.CompanionPrefs
+        assertFalse(prefs.hasSelection(compose.activity))
+        repeat(2) { compose.onNodeWithTag("setup-next").performClick(); compose.waitForIdle() }
+        compose.onNodeWithText(resource(R.string.setup_hero_title)).assertIsDisplayed()
+        compose.onNodeWithTag("companion-chester").performScrollTo().assertIsSelected()
+        assertFalse(prefs.hasSelection(compose.activity))
+        compose.activityRule.scenario.recreate()
         compose.waitForIdle()
+        compose.onNodeWithTag("setup-options").performScrollToIndex(0)
+        compose.onNodeWithText(compose.activity.getString(R.string.setup_step, 3, 4)).assertIsDisplayed()
+        compose.onNodeWithTag("setup-next").performClick()
+        assertTrue(prefs.hasSelection(compose.activity))
+        assertEquals("chester", prefs.read(compose.activity))
+        compose.onNodeWithText(resource(R.string.setup_translation)).assertIsDisplayed()
+    }
+
+    @Test fun setupKeepsSavedCustomWithoutAPictureUntilAnotherCharacterIsExplicitlyChosen() {
+        val prefs = dev.clickn.translate.data.CompanionPrefs
+        compose.runOnIdle { prefs.write(compose.activity, prefs.CUSTOM) }
+        repeat(2) { compose.onNodeWithTag("setup-next").performClick(); compose.waitForIdle() }
+        compose.onNodeWithTag("setup-options").performScrollToNode(hasTestTag("companion-custom"))
+        compose.onNodeWithTag("companion-custom").assertIsSelected()
+        compose.activityRule.scenario.recreate()
+        compose.waitForIdle()
+        compose.onNodeWithTag("setup-options").performScrollToNode(hasTestTag("companion-custom"))
+        compose.onNodeWithTag("companion-custom").assertIsSelected()
+        compose.onNodeWithTag("setup-next").performClick()
+        assertEquals(prefs.CUSTOM, prefs.read(compose.activity))
+        compose.onNodeWithContentDescription(resource(R.string.setup_previous)).performClick()
+        compose.onNodeWithTag("setup-options").performScrollToNode(hasTestTag("companion-doc"))
+        compose.onNodeWithTag("companion-doc").performScrollTo().performClick()
+        assertEquals("doc", prefs.read(compose.activity))
     }
     private fun assertSetupShown(label: String) {
         compose.onNodeWithTag("setup-options").performScrollToIndex(0)
@@ -121,10 +164,16 @@ class LocaleRuntimeTest {
         openAdvanced()
         listClick(resource(R.string.refine_overlay))
         compose.onNodeWithText(resource(R.string.settings_render_floating_window_chip)).performScrollTo().performClick()
+        compose.onNodeWithText(resource(R.string.settings_render_floating_window_chip)).assertIsSelected()
+        assertEquals(dev.clickn.translate.data.RenderMode.BLOCKS, kotlinx.coroutines.runBlocking { repo.get().renderMode })
         compose.onNodeWithContentDescription(resource(R.string.common_back)).performClick()
         listClick(resource(R.string.refine_general))
         compose.onNodeWithText(resource(R.string.settings_app_lang_en)).performClick()
+        val previousActivity = compose.activity
         compose.onNodeWithText(resource(R.string.settings_app_lang_ru)).performClick()
+        compose.waitUntil(10_000) {
+            compose.activity !== previousActivity && compose.activity.resources.configuration.locales[0].language == "ru"
+        }
         compose.waitForIdle()
         compose.onNodeWithContentDescription(resource(R.string.common_back)).performClick()
         listClick(resource(R.string.refine_overlay))

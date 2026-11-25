@@ -1,0 +1,15 @@
+{
+  "zipalign_16k_static_verified": true,
+  "application_id": "dev.clickn.translate",
+  "physical_phone_install_performed": false,
+  "sha256": "a22c48e8b15c11a7f594fc46f2d47ab5d14e45195b70c4d69cd23fe45baac7cc",
+  "source_commit": "5a578d60e68518c8891345ad62376d7c1540ca49",
+  "signature_verified": true,
+  "certificate_sha256": "1746bfc27cbbb823021ce32c1e7a2640584393d058b85e3d784711954bcafe85",
+  "apk": "artifacts/android/1.8.3-code44/ClicknTranslate-Android-1.8.3-code44-candidate.apk",
+  "version_code": 44,
+  "version_name": "1.8.3",
+  "new_key_created": false,
+  "release_published": false,
+  "bytes": 64396846
+}

@@ -6,6 +6,22 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class MobileSetupAndLocalesTest {
+    @Test fun initialInterfaceLanguageSetsTargetWithoutReplacingAnEditedPair() {
+        val automatic = dev.clickn.translate.data.Settings(sourceLang = "auto", targetLang = "en")
+        for ((tag, target) in listOf("en" to "en", "ru" to "ru", "de" to "de", "fr" to "fr", "es" to "es", "zh-CN" to "zh-CN")) {
+            val locale = java.util.Locale.forLanguageTag(tag)
+            assertEquals(target, setupInterfaceLanguageSettings(automatic, locale, true, false, "en").targetLang)
+            assertEquals(automatic, setupInterfaceLanguageSettings(automatic, locale, false, false, "en"))
+            assertEquals(automatic, setupInterfaceLanguageSettings(automatic, locale, true, true, "en"))
+            val existing = automatic.copy(targetLang = "ja")
+            assertEquals(existing, setupInterfaceLanguageSettings(existing, locale, true, false, "en"))
+            val explicit = automatic.copy(sourceLang = "de")
+            assertEquals(explicit, setupInterfaceLanguageSettings(explicit, locale, true, false, "en"))
+        }
+        assertEquals("fr", setupInterfaceLanguageSettings(automatic.copy(targetLang = "ru"),
+            java.util.Locale.FRENCH, true, false, "ru").targetLang)
+    }
+
     @Test fun guidedLanguageSelectionRequiresASourceForServicesWithoutDetection() {
         for (engine in listOf(dev.clickn.translate.data.TranslatorEngine.MYMEMORY, dev.clickn.translate.data.TranslatorEngine.GOOGLE_ML_KIT)) {
             assertFalse(setupLanguagePairReady(dev.clickn.translate.data.Settings(translatorEngine = engine)))

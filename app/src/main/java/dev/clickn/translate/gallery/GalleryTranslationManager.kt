@@ -21,7 +21,13 @@ class GalleryTranslationManager @Inject constructor(
 ) {
     private val workManager = WorkManager.getInstance(context)
 
-    fun enqueue(task: GalleryPreparedTask) {
+    fun enqueue(task: GalleryPreparedTask) = enqueue(task, ExistingWorkPolicy.KEEP)
+
+    private fun enqueue(
+        task: GalleryPreparedTask,
+        policy: ExistingWorkPolicy,
+        retrySelection: GalleryRetrySelection? = null,
+    ) {
         val constraints = Constraints.Builder().apply {
             if (
                 GalleryTranslationWorkPolicy.requiresNetwork(
@@ -33,7 +39,13 @@ class GalleryTranslationManager @Inject constructor(
             }
         }.build()
         val request = OneTimeWorkRequestBuilder<GalleryTranslationWorker>()
-            .setInputData(workDataOf(GalleryTranslationWorker.KEY_TASK_ID to task.id))
+            .setInputData(workDataOf(
+                GalleryTranslationWorker.KEY_TASK_ID to task.id,
+                GalleryTranslationWorker.KEY_RETRY_ITEM_IDS to retrySelection?.items.orEmpty().map { it.id }.toTypedArray(),
+                GalleryTranslationWorker.KEY_RETRY_ITEM_VERSIONS to retrySelection?.items.orEmpty().map { it.version }.toLongArray(),
+                GalleryTranslationWorker.KEY_RETRY_TASK_STATUS to retrySelection?.taskStatus?.name.orEmpty(),
+                GalleryTranslationWorker.KEY_RETRY_TASK_FINISHED_AT to (retrySelection?.finishedAtMs ?: 0L),
+            ))
             .setConstraints(constraints)
             .setBackoffCriteria(
                 BackoffPolicy.EXPONENTIAL,
@@ -45,7 +57,7 @@ class GalleryTranslationManager @Inject constructor(
             .build()
         workManager.enqueueUniqueWork(
             GalleryTranslationWorkPolicy.uniqueWorkName(task.id),
-            ExistingWorkPolicy.KEEP,
+            policy,
             request,
         )
     }
@@ -56,8 +68,7 @@ class GalleryTranslationManager @Inject constructor(
     }
 
     suspend fun retryFailed(taskId: String): Boolean {
-        val reset = repository.resetFailedTask(taskId)
-        if (reset <= 0) return false
+        val retrySelection = repository.failedRetrySelection(taskId) ?: return false
         val task = repository.getTask(taskId) ?: return false
         enqueue(
             GalleryPreparedTask(
@@ -67,7 +78,11 @@ class GalleryTranslationManager @Inject constructor(
                 ocrEngine = enumValueOrDefault(task.ocrEngine),
                 translatorEngine = enumValueOrDefault(task.translatorEngine),
                 imageCount = task.totalCount,
-            )
+            ),
+            // The preceding worker can still be returning after its Room result is visible.
+            // KEEP would drop this explicit retry; append it without cancelling that owner.
+            policy = ExistingWorkPolicy.APPEND_OR_REPLACE,
+            retrySelection = retrySelection,
         )
         return true
     }

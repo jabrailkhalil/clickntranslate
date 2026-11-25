@@ -54,6 +54,11 @@ data class GalleryTranslationSegment(
     val confidence: Float,
     val recognizedLanguage: String? = null,
     val layoutOrientation: String? = null,
+    val bubbleGroupId: Int? = null,
+    val regionId: Int? = null,
+    val parentRegionId: Int? = null,
+    val regionGranularity: String? = null,
+    val presentationRotationDegrees: Int = 0,
 ) {
     companion object {
         fun from(block: TextBlock, translation: String?): GalleryTranslationSegment =
@@ -69,6 +74,11 @@ data class GalleryTranslationSegment(
                 layoutOrientation = block.layoutOrientation
                     ?.takeUnless { it == TextOrientation.UNKNOWN }
                     ?.name,
+                bubbleGroupId = block.bubbleGroupId,
+                regionId = block.regionId,
+                parentRegionId = block.parentRegionId,
+                regionGranularity = block.regionGranularity.name,
+                presentationRotationDegrees = block.presentationRotationDegrees,
             )
     }
 }
@@ -77,6 +87,9 @@ data class GalleryTaskProgress(
     val total: Int,
     val succeeded: Int,
     val failed: Int,
+    val canceled: Int = 0,
+    /** Subset of failed images with useful translated blocks; still eligible for retry. */
+    val partial: Int = 0,
 ) {
     val completed: Int get() = succeeded + failed
 }

@@ -158,11 +158,13 @@ class DictionaryLibraryWiringTest {
             "CardDefaults.cardElevation(defaultElevation = 0.dp)",
             "BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)",
             "status.installed -> stringResource(R.string.dictionary_pack_installed)",
-            "status.invalidReason != null -> status.invalidReason",
+            "dictionaryPackFailureMessageResource(status.invalidKind ?: DictionaryPackFailureKind.UNKNOWN)",
             "R.string.dictionary_pack_not_installed",
         ).forEach { marker ->
             assertTrue("compact dictionary layout missing $marker", marker in source)
         }
+        assertFalse("database/provider exception details must not be displayed",
+            source.contains("status.invalidReason != null -> status.invalidReason"))
         for ((directory, installed) in listOf("values" to "Installed", "values-zh-rCN" to "已安装")) {
             val strings = projectFile("app/src/main/res/$directory/strings.xml").readText()
             assertTrue(directory, strings.contains("<string name=\"dictionary_pack_installed\">$installed</string>"))

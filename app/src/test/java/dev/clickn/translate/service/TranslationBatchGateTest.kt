@@ -54,7 +54,9 @@ class TranslationBatchGateTest {
         val source = File("src/main/java/dev/clickn/translate/service/CaptureService.kt").readText()
         val cases = listOf(
             Case("clean frame invalidates old work", "cancelActiveTranslationBatch(\"prepareCleanCaptureFrame\")"),
-            Case("capture activates its id", "beginTranslationBatch(diagId)"),
+            Case("capture activates its id with its geometry generation", "beginTranslationBatch(diagId, geometryGeneration)"),
+            Case("prepared capture retains its original geometry generation", "val geometryGeneration = preparedGeometryGeneration ?: captureGeometry.snapshot()"),
+            Case("activation rejects a retired geometry generation", "if (!captureGeometry.bindBatch(batchId, geometryGeneration)) return"),
             Case("cleanup cancels translation job", "cancelActiveTranslationBatch(\"cleanupCapture\")"),
             Case("block jobs are tracked", "launchTranslationBatch(diagId)"),
             Case("block writes carry capture id", "translationBatchId = diagId"),
@@ -65,5 +67,10 @@ class TranslationBatchGateTest {
         cases.forEach { case ->
             assertTrue(case.name, source.contains(case.marker))
         }
+        assertEquals(
+            "both normal and selected-area capture bind their original geometry generation",
+            2,
+            Regex("beginTranslationBatch\\(diagId, geometryGeneration\\)").findAll(source).count(),
+        )
     }
 }

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="setup_hero_title">Elige a tu compañero</string>
+    <string name="setup_hero_body">Esta imagen aparece en el botón flotante sobre otras aplicaciones. Elige un compañero, el icono de acción o el logotipo. Puedes cambiarlo más adelante.</string>
+    <string name="setup_hero_custom_unavailable">Vista previa no disponible. Tu elección se conserva.</string>
+</resources>

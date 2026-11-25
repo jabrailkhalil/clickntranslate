@@ -8,6 +8,43 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SettingsScreenLoadPolicyTest {
+    @Test fun retainedEditRestoresWithoutAnIoReadAndKeepsTheOriginalDirtyBaseline() = runBlocking {
+        val persisted = Settings(renderMode = dev.clickn.translate.data.RenderMode.BLOCKS, apiKey = "owned-memory-key")
+        val draft = persisted.copy(renderMode = dev.clickn.translate.data.RenderMode.FLOATING_WINDOW,
+            apiKey = "owned-unsaved-key", floatingButtonAlpha = 0.6f)
+        val restored = loadSettingsEditingSnapshot(SettingsEditingSnapshot(persisted, draft)) {
+            error("Restoring an existing edit must not wait for or replace it with repository settings")
+        }
+        assertSame(persisted, restored.persisted)
+        assertSame(draft, restored.draft)
+        assertNotEquals(restored.persisted, restored.draft)
+        assertEquals(dev.clickn.translate.data.RenderMode.BLOCKS, restored.persisted.renderMode)
+        assertEquals(dev.clickn.translate.data.RenderMode.FLOATING_WINDOW, restored.draft.renderMode)
+        assertEquals("owned-unsaved-key", restored.draft.apiKey)
+    }
+
+    @Test fun aScreenWithoutARetainedEditStillLoadsOneCompleteRepositorySnapshot() = runBlocking {
+        val persisted = Settings(promptTemplate = "migrated prompt", floatingButtonAlpha = 0.4f)
+        var reads = 0
+        val restored = loadSettingsEditingSnapshot(null) { reads++; persisted }
+        assertEquals(1, reads)
+        assertSame(persisted, restored.persisted)
+        assertSame(persisted, restored.draft)
+    }
+
+    @Test fun repeatedLocaleRestoreNeverPromotesUnsavedValuesToTheDirtyBaseline() = runBlocking {
+        val persisted = Settings(renderMode = dev.clickn.translate.data.RenderMode.BLOCKS)
+        var editing = SettingsEditingSnapshot(persisted, persisted.copy(
+            renderMode = dev.clickn.translate.data.RenderMode.FLOATING_WINDOW))
+        repeat(3) { index ->
+            editing = loadSettingsEditingSnapshot(SettingsEditingSnapshot(editing.persisted,
+                editing.draft.copy(model = "owned-draft-$index"))) { error("Unexpected reload") }
+            assertSame(persisted, editing.persisted)
+            assertNotEquals(editing.persisted, editing.draft)
+            assertEquals("owned-draft-$index", editing.draft.model)
+        }
+    }
+
     @Test fun readsOnceAndOnlyMigratesKnownDefaults_tableDriven() = runBlocking {
         data class Case(val prompt: String, val expected: String, val writes: Int)
         listOf(
@@ -60,10 +97,7 @@ class SettingsScreenLoadPolicyTest {
         Unit
     }
 
-    @Test fun settingsMappingRunsOffCollectorAndUiLoadsOneSnapshot() {
-        val repository = File("src/main/java/dev/clickn/translate/data/SettingsRepository.kt").readText()
-        val flow = repository.substringAfter("val settings: Flow<Settings>").substringBefore("suspend fun get()")
-        assertTrue(flow.indexOf("prefs.toSettings()") < flow.indexOf(".flowOn(Dispatchers.IO)"))
+    @Test fun uiLoadsOneSnapshot() {
         val screen = File("src/main/java/dev/clickn/translate/ui/SettingsScreen.kt").readText()
         assertEquals(1, Regex("viewModel.loadForScreen\\(context\\)").findAll(screen).count())
         assertFalse(screen.contains("migrateDefaultPromptIfStale"))

@@ -54,7 +54,7 @@ class GalleryExportRenderPolicyTest {
     }
 
     @Test
-    fun `export availability rejects floating mode after normal task gating`() {
+    fun `terminal floating tasks can export text while active or empty tasks remain gated`() {
         data class Case(
             val name: String,
             val status: GalleryTaskStatus,
@@ -83,7 +83,7 @@ class GalleryExportRenderPolicyTest {
                 GalleryTaskStatus.SUCCEEDED,
                 1,
                 GalleryExportRenderMode.UNSUPPORTED_FLOATING,
-                false,
+                true,
             ),
             Case(
                 "active fixed task",
@@ -236,7 +236,7 @@ class GalleryExportRenderPolicyTest {
         listOf(
             Case(
                 OverlayTheme.CLASSIC_DARK,
-                0xE6000000.toInt(),
+                0xFF000000.toInt(),
                 0xFFFFFFFF.toInt(),
                 0x00000000,
                 0,
@@ -277,6 +277,16 @@ class GalleryExportRenderPolicyTest {
             assertEquals("${case.theme} width", case.expectedWidth, palette.borderWidthPx)
             assertEquals("${case.theme} style", BorderStyle.SOLID, palette.borderStyle)
         }
+    }
+
+    @Test
+    fun `classic dark honors a user selected translucent export`() {
+        val palette = galleryExportPalette(
+            settings = Settings(overlayTheme = OverlayTheme.CLASSIC_DARK, overlayAlpha = 0.5f),
+            density = 3f,
+            renderScale = 1f,
+        )
+        assertEquals(0x80000000.toInt(), palette.backgroundColor)
     }
 
     @Test

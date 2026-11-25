@@ -18,13 +18,11 @@ class SettledPageLoopWiringTest {
         val cases = listOf(
             Marker("persisted enum", source("data/Settings.kt"), "SETTLED_PAGE"),
             Marker("settings chip", source("ui/SettingsScreen.kt"), "LoopTriggerMode.SETTLED_PAGE"),
-            Marker("Chinese label", resource("values-zh-rCN/strings.xml"), ">停稳翻译</string>"),
-            Marker("English label", resource("values/strings.xml"), ">Translate when settled</string>"),
             Marker("independent observer", source("service/CaptureService.kt"), "observeSettledPage()"),
             Marker("latest page policy", source("service/CaptureService.kt"), "settledPagePolicy.observe("),
             Marker("old work invalidation", source("service/CaptureService.kt"), "invalidateSettledPageWork("),
             Marker("old translation cancellation", source("service/CaptureService.kt"), "cancelActiveTranslationBatch(\"settledPage:${'$'}reason\")"),
-            Marker("masked observation", source("service/CaptureService.kt"), "LoopFrameFingerprintFactory.createObservation("),
+            Marker("clean observation", source("service/CaptureService.kt"), "captureCleanSourceFrame("),
             Marker("late OCR rejection", source("service/CaptureService.kt"), "ensureCurrentSettledPage(settledPageRevision"),
             Marker("read-only overlay bounds", source("overlay/OverlayManager.kt"), "observationExclusionRects()"),
         )
@@ -34,9 +32,8 @@ class SettledPageLoopWiringTest {
         }
         val observer = source("service/CaptureService.kt").substringAfter("private suspend fun observeSettledPage()")
             .substringBefore("private fun selectLoopTextRoi(")
-        assertFalse("polling must not flash windows", observer.contains("setHiddenForCapture"))
-        assertFalse("polling must not flash translated text", observer.contains("setTranslationResultsHiddenForCapture"))
-        assertFalse("observation screenshot contains our UI, never hand it to OCR", observer.contains("preparedFullScreen ="))
+        assertTrue("observation uses reversible source capture", observer.contains("captureCleanSourceFrame("))
+        assertFalse("visual observations must not run OCR directly", observer.contains("ocrEngine.recognize("))
     }
 
     @Test
@@ -78,6 +75,4 @@ class SettledPageLoopWiringTest {
     private fun source(relative: String): String =
         File("src/main/java/dev/clickn/translate/$relative").readText()
 
-    private fun resource(relative: String): String =
-        File("src/main/res/$relative").readText()
 }

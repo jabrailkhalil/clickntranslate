@@ -1,0 +1,15 @@
+{
+  "elapsed_seconds": 15.63,
+  "accessibility_enabled": "0",
+  "media_projection": null,
+  "shizuku_server": "shell         5505 shizuku_server",
+  "sample": "c42-shizuku-result-1",
+  "version_code": 42,
+  "installed_sha256": "02274dc183f6c36d58599d3a71ef9bc85acad6ae53647e38d78b0556af130a80",
+  "manager_version": "13.6.0",
+  "manager_certificate_sha256": "268b5590e868fb08bae7e0ac413564cd1ff88f5ccff74af9dbd0dc918e30db30",
+  "provider": "Google EN→RU",
+  "translated_blocks": 2,
+  "capture_service_absent_after_stop": true,
+  "scope": "Android 36 x86_64 emulator, no root or Accessibility. Physical OEM behavior not exercised."
+}

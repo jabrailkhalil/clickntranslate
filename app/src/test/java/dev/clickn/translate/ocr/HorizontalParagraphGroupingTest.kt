@@ -89,4 +89,57 @@ class HorizontalParagraphGroupingTest {
             )
         }
     }
+
+    @Test
+    fun standard_groupsRecordedSourceDebugWrapsWithoutJoiningParagraphsOrFixtureChrome() {
+        // Actual restored-source API36 capture#1, 2026-10-25 18:53:15, ML_KIT_AUTO.
+        // .tmp/archive-restore/41-source-debug-capture-log.txt:55-61, raw-no-merge #1-7.
+        // The fixture's TextView contains two paragraphs separated by a real blank line.
+        val observed = listOf(
+            MergeDebugRect(200, 45, 338, 82),     // System sharing timer.
+            MergeDebugRect(48, 962, 320, 1006),   // Touch counter.
+            MergeDebugRect(50, 1037, 227, 1065),  // Fixture UID label.
+            MergeDebugRect(53, 1094, 880, 1155),  // Bright rivers run through quiet
+            MergeDebugRect(49, 1168, 249, 1228),  // valleys.
+            MergeDebugRect(64, 1312, 855, 1371),  // The small orange fox reads a
+            MergeDebugRect(51, 1382, 382, 1437),  // useful book.
+        )
+        assertEquals(
+            "The two sentence wraps must become two independent paragraph groups",
+            listOf(listOf(0), listOf(1), listOf(2), listOf(3, 4), listOf(5, 6)),
+            standard(observed),
+        )
+    }
+
+    @Test
+    fun standard_keepsTwoWrappedColumnsIndependentWithInterleavedDetectorOrder() {
+        // Constructed two-column layout, each column containing one two-line paragraph. Detector order
+        // is deliberately interleaved; equal-height rows in another column are not continuations.
+        val observed = listOf(
+            MergeDebugRect(355, 48, 490, 78),  // Right paragraph, second line.
+            MergeDebugRect(10, 10, 210, 40),   // Left paragraph, first line.
+            MergeDebugRect(350, 12, 610, 42),  // Right paragraph, first line.
+            MergeDebugRect(10, 46, 100, 76),   // Left paragraph, second line.
+        )
+        assertEquals(listOf(listOf(1, 3), listOf(2, 0)), standard(observed))
+    }
+
+    @Test
+    fun standard_groupsTwoRightAlignedRtlLinesInTopToBottomOrder() {
+        // Constructed geometry contract only: the second logical Arabic/Hebrew line is shorter and
+        // right-aligned. This grouper has no text/direction input and does not reorder glyphs
+        // or choose reading order between independent RTL columns.
+        val observed = listOf(
+            MergeDebugRect(420, 148, 600, 188), // Second logical line.
+            MergeDebugRect(240, 100, 600, 140), // First logical line.
+        )
+        assertEquals(listOf(listOf(1, 0)), standard(observed))
+    }
+
+    private fun standard(rects: List<MergeDebugRect>): List<List<Int>> = groupHorizontalParagraphRects(
+        rects = rects,
+        bubbleGroupIds = List(rects.size) { null },
+        verticalGapRatio = 0.8f,
+        horizontalOverlapRatio = 0.3f,
+    )
 }

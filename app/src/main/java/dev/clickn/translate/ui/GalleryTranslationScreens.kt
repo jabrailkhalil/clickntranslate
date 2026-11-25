@@ -112,6 +112,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -134,6 +135,8 @@ import dev.clickn.translate.data.TranslatorEngine
 import dev.clickn.translate.gallery.GalleryImageDecoder
 import dev.clickn.translate.gallery.GalleryExportProgress
 import dev.clickn.translate.gallery.GalleryExportRenderMode
+import dev.clickn.translate.gallery.GalleryExportReceipts
+import dev.clickn.translate.gallery.GalleryExportRecoveryStatus
 import dev.clickn.translate.gallery.GalleryItemStatus
 import dev.clickn.translate.gallery.GalleryTaskStatus
 import dev.clickn.translate.gallery.GalleryTranslationExporter
@@ -142,19 +145,21 @@ import dev.clickn.translate.gallery.GalleryTranslationManager
 import dev.clickn.translate.gallery.GalleryTranslationRepository
 import dev.clickn.translate.gallery.GalleryTranslationTaskEntity
 import dev.clickn.translate.gallery.GalleryTranslationWorkPolicy
+import dev.clickn.translate.gallery.GalleryTaskSnapshotException
 import dev.clickn.translate.gallery.GalleryTranslatedPreviewStore
 import dev.clickn.translate.gallery.galleryCanExport
+import dev.clickn.translate.gallery.loadGalleryBitmap
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.text.DateFormat
 import java.util.Date
 import javax.inject.Inject
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlin.math.floor
+
+private data class GallerySubmission(val uris: List<String>, val settings: Settings)
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -172,8 +177,8 @@ fun GalleryTranslationConfirmScreen(
     var creating by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf("") }
     var previewIndex by remember { mutableStateOf<Int?>(null) }
-    var showCreateDialog by remember { mutableStateOf(false) }
-    var showPresetSwitcher by rememberSaveable { mutableStateOf(true) }
+    var pendingSubmission by remember { mutableStateOf<GallerySubmission?>(null) }
+    var showPresetSwitcher by rememberSaveable { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val picker = rememberLauncherForActivityResult(
         ActivityResultContracts.PickMultipleVisualMedia(
@@ -189,7 +194,24 @@ fun GalleryTranslationConfirmScreen(
             )
         }
     }
-    BackHandler(enabled = !creating, onBack = onBack)
+    // Leaving the screen cancels the composition-owned import and its repository cleanup.
+    BackHandler(onBack = onBack)
+    fun startSubmission(submission: GallerySubmission) {
+        if (creating) return
+        creating = true
+        errorMessage = ""
+        scope.launch {
+            try {
+                onCreated(viewModel.createAndEnqueue(submission.uris, submission.settings))
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                errorMessage = error.message ?: error.javaClass.simpleName
+            } finally {
+                creating = false
+            }
+        }
+    }
     previewIndex?.let { initialPage ->
         GalleryImagePreviewDialog(
             sources = selectedUris.mapIndexed { index, uri ->
@@ -207,41 +229,37 @@ fun GalleryTranslationConfirmScreen(
             onDismiss = { previewIndex = null },
         )
     }
-    if (showCreateDialog) {
+    pendingSubmission?.let { submission ->
         CatalystAlertDialog(
-            onDismissRequest = { showCreateDialog = false },
+            onDismissRequest = { pendingSubmission = null },
             title = {
                 Text(stringResource(R.string.gallery_confirm_create_dialog_title))
             },
             text = {
-                Text(
-                    stringResource(
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(
                         R.string.gallery_confirm_create_dialog_message,
-                        selectedUris.size,
-                    )
-                )
+                        submission.uris.size,
+                    ))
+                    Text(stringResource(R.string.gallery_confirm_language,
+                        Languages.nameOf(context, submission.settings.sourceLang),
+                        Languages.nameOf(context, submission.settings.targetLang)))
+                    Text(stringResource(R.string.gallery_confirm_translator,
+                        stringResource(translatorEngineLabelRes(submission.settings.translatorEngine))))
+                }
             },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        showCreateDialog = false
-                        creating = true
-                        errorMessage = ""
-                        scope.launch {
-                            runCatching { viewModel.createAndEnqueue(selectedUris) }
-                                .onSuccess(onCreated)
-                                .onFailure {
-                                    errorMessage = it.message ?: it.javaClass.simpleName
-                                    creating = false
-                                }
-                        }
+                        pendingSubmission = null
+                        startSubmission(submission)
                     }
                 ) {
                     Text(stringResource(R.string.gallery_confirm_create_dialog_confirm))
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showCreateDialog = false }) {
+                TextButton(onClick = { pendingSubmission = null }) {
                     Text(stringResource(android.R.string.cancel))
                 }
             },
@@ -254,7 +272,7 @@ fun GalleryTranslationConfirmScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.gallery_confirm_title)) },
                 navigationIcon = {
-                    IconButton(onClick = onBack, enabled = !creating) {
+                    IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
                     }
                 },
@@ -341,6 +359,7 @@ fun GalleryTranslationConfirmScreen(
                                             settings = settings,
                                             viewModel = presetViewModel,
                                             snackbarHostState = snackbarHostState,
+                                            enabled = !creating,
                                         )
                                     }
                                 }
@@ -474,7 +493,15 @@ fun GalleryTranslationConfirmScreen(
                     .fillMaxWidth()
                     .height(56.dp),
                 enabled = selectedUris.isNotEmpty() && settings != null && !creating,
-                onClick = { showCreateDialog = true },
+                onClick = {
+                    val current = settings ?: return@Button
+                    val submission = GallerySubmission(selectedUris.toList(), current)
+                    if (submission.uris.size >= GalleryTranslationWorkPolicy.FOREGROUND_IMAGE_THRESHOLD) {
+                        pendingSubmission = submission
+                    } else {
+                        startSubmission(submission)
+                    }
+                },
             ) {
                 if (creating) {
                     CircularProgressIndicator(
@@ -498,6 +525,7 @@ private fun GalleryPresetSwitcher(
     settings: Settings?,
     viewModel: MainViewModel,
     snackbarHostState: SnackbarHostState,
+    enabled: Boolean = true,
 ) {
     val scope = rememberCoroutineScope()
     val unsavedPresetName = stringResource(R.string.settings_translation_preset_unsaved_name)
@@ -659,18 +687,18 @@ private fun GalleryPresetSwitcher(
         activePresetId = plans?.currentPresetId.orEmpty(),
         modelIssuesByPreset = modelIssues,
         onPresetSelected = { preset ->
-            if (shouldConfirmUnsavedPresetSwitch(
+            if (enabled && shouldConfirmUnsavedPresetSwitch(
                     currentPresetId = plans?.currentPresetId.orEmpty(),
                     targetPresetId = preset.id,
                 )
             ) {
                 pendingPresetSwitch = preset
-            } else {
+            } else if (enabled) {
                 applyPresetNow(preset)
             }
         },
         onPresetBlocked = {
-            scope.launch { snackbarHostState.showSnackbar(presetNotReadyMessage) }
+            if (enabled) scope.launch { snackbarHostState.showSnackbar(presetNotReadyMessage) }
         },
     )
 }
@@ -714,7 +742,7 @@ private fun GallerySelectedThumbnail(
         initialValue = null,
         key1 = uriString,
     ) {
-        value = withContext(Dispatchers.IO) {
+        value = loadGalleryBitmap {
             imageDecoder.decodeThumbnail(uriString, localPath = "")
         }
     }
@@ -849,29 +877,24 @@ fun GalleryTranslationTasksScreen(
             )
         },
     ) { innerPadding ->
-        if (tasks.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-                    .padding(24.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    stringResource(R.string.gallery_tasks_empty),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                items(tasks, key = GalleryTranslationTaskEntity::id) { task ->
-                    GalleryTaskCard(task = task, onOpen = { onOpenTask(task.id) })
+        Column(Modifier.fillMaxSize().padding(innerPadding)) {
+            GalleryExportRecoverySection(viewModel, modifier = Modifier.padding(horizontal = 16.dp))
+            if (tasks.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize().weight(1f).padding(24.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(stringResource(R.string.gallery_tasks_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize().weight(1f),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    items(tasks, key = GalleryTranslationTaskEntity::id) { task ->
+                        GalleryTaskCard(task = task, onOpen = { onOpenTask(task.id) })
+                    }
                 }
             }
         }
@@ -1064,7 +1087,7 @@ fun GalleryTranslationTaskDetailScreen(
                                             GalleryExportRenderMode.UNSUPPORTED_FLOATING -> {
                                             Text(
                                                 stringResource(
-                                                    R.string.gallery_export_floating_unavailable
+                                                    R.string.gallery_export_text_action
                                                 )
                                             )
                                         }
@@ -1134,6 +1157,10 @@ fun GalleryTranslationTaskDetailScreen(
             contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            item(key = "export-recovery") {
+                GalleryExportRecoverySection(viewModel, enabled = currentExportProgress == null,
+                    modifier = Modifier.padding(horizontal = 16.dp))
+            }
             item {
                 Box(
                     modifier = Modifier
@@ -1172,6 +1199,89 @@ fun GalleryTranslationTaskDetailScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun GalleryExportRecoverySection(
+    viewModel: GalleryTranslationViewModel,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    val status by viewModel.exportRecovery.collectAsState()
+    val scope = rememberCoroutineScope()
+    var busy by remember { mutableStateOf(false) }
+    var failed by remember { mutableStateOf(false) }
+    fun runAction(action: suspend () -> GalleryExportRecoveryStatus) {
+        scope.launch {
+            busy = true
+            failed = false
+            try {
+                failed = !action().journalAvailable
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Exception) {
+                failed = true // Never show provider exception messages/URIs.
+            } finally {
+                busy = false
+            }
+        }
+    }
+    GalleryExportRecoveryNotice(status, busy || !enabled, failed,
+        onRecheck = { runAction(viewModel::checkExportRecovery) },
+        onKeep = { token -> runAction { viewModel.keepExportFiles(token) } }, modifier = modifier)
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun GalleryExportRecoveryNotice(
+    status: GalleryExportRecoveryStatus,
+    busy: Boolean,
+    failed: Boolean,
+    onRecheck: () -> Unit,
+    onKeep: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var confirmingToken by remember { mutableStateOf<String?>(null) }
+    if (status.allClean) return
+    Card(modifier.fillMaxWidth(), colors = CardDefaults.cardColors(
+        containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(R.string.gallery_export_recovery_title), style = MaterialTheme.typography.titleSmall)
+            Text(when {
+                failed -> stringResource(R.string.gallery_export_recovery_error)
+                !status.journalAvailable -> stringResource(R.string.gallery_export_recovery_unavailable)
+                status.reviewCount > 0 -> stringResource(R.string.gallery_export_recovery_pending, status.reviewCount)
+                else -> stringResource(R.string.gallery_export_recovery_cleanup)
+            }, style = MaterialTheme.typography.bodyMedium)
+            if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = onRecheck, enabled = !busy) {
+                    Text(stringResource(R.string.gallery_export_recovery_check))
+                }
+                if (status.reviewToken != null && status.reviewCount > 0) {
+                    TextButton(onClick = { confirmingToken = status.reviewToken }, enabled = !busy) {
+                        Text(stringResource(R.string.gallery_export_recovery_keep))
+                    }
+                }
+            }
+        }
+    }
+    val token = confirmingToken
+    if (token != null && token == status.reviewToken) {
+        CatalystAlertDialog(
+            onDismissRequest = { confirmingToken = null },
+            title = { Text(stringResource(R.string.gallery_export_recovery_keep_title)) },
+            text = { Text(stringResource(R.string.gallery_export_recovery_keep_message)) },
+            confirmButton = {
+                TextButton(enabled = !busy, onClick = { confirmingToken = null; onKeep(token) }) {
+                    Text(stringResource(R.string.gallery_export_recovery_keep_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmingToken = null }) { Text(stringResource(android.R.string.cancel)) }
+            },
+        )
     }
 }
 
@@ -1477,7 +1587,9 @@ private fun GalleryResultItem(
         processedWidth = item.processedWidth,
         processedHeight = item.processedHeight,
     )
-    val textPaneHeight = galleryResultTextPaneHeightDp(thumbnailRatio).dp
+    val textPaneHeight = galleryResultTextPaneHeightDp(thumbnailRatio, LocalDensity.current.fontScale).dp
+    val hasResult = item.status == GalleryItemStatus.SUCCEEDED ||
+        (item.status == GalleryItemStatus.FAILED && item.translatedText.isNotBlank())
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
@@ -1507,8 +1619,8 @@ private fun GalleryResultItem(
                     modifier = Modifier
                         .weight(1f)
                         .then(
-                            if (item.status == GalleryItemStatus.SUCCEEDED) {
-                                Modifier.height(textPaneHeight)
+                            if (hasResult) {
+                                Modifier.height(textPaneHeight + if (item.status == GalleryItemStatus.FAILED) 80.dp else 0.dp)
                             } else {
                                 Modifier
                             }
@@ -1530,7 +1642,7 @@ private fun GalleryResultItem(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
-                        GalleryItemStatusText(item.status)
+                        GalleryItemStatusText(item.status, hasResult)
                     }
                     if (item.status == GalleryItemStatus.FAILED) {
                         Text(
@@ -1539,7 +1651,7 @@ private fun GalleryResultItem(
                             color = MaterialTheme.colorScheme.error,
                         )
                     }
-                    if (item.status == GalleryItemStatus.SUCCEEDED) {
+                    if (hasResult) {
                         Column(
                             modifier = Modifier.weight(1f),
                         ) {
@@ -1573,17 +1685,38 @@ private fun GalleryResultTextSection(
     text: String,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
+    var textActions by remember(text) { mutableStateOf(false) }
     val scrollState = rememberScrollState()
     Column(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 8.dp, vertical = 4.dp),
     ) {
-        Text(
-            title,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(title, Modifier.weight(1f), style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Box {
+                IconButton(onClick = { textActions = true }, enabled = text.isNotBlank()) {
+                    Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.gallery_text_actions))
+                }
+                DropdownMenu(expanded = textActions, onDismissRequest = { textActions = false }) {
+                    DropdownMenuItem(text = { Text(stringResource(R.string.gallery_text_copy)) }, onClick = {
+                        textActions = false
+                        context.getSystemService(android.content.ClipboardManager::class.java)
+                            .setPrimaryClip(android.content.ClipData.newPlainText(title, text))
+                    })
+                    DropdownMenuItem(text = { Text(stringResource(R.string.gallery_text_share)) }, onClick = {
+                        textActions = false
+                        context.startActivity(android.content.Intent.createChooser(android.content.Intent(
+                            android.content.Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(android.content.Intent.EXTRA_TEXT, text)
+                        }, null))
+                    })
+                }
+            }
+        }
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -1625,7 +1758,7 @@ private fun GalleryResultThumbnail(
         key2 = item.updatedAtMs,
     ) {
         if (!showProcessingPlaceholder) {
-            value = withContext(Dispatchers.IO) {
+            value = loadGalleryBitmap {
                 thumbnailLoader(item)
             }
         }
@@ -1769,21 +1902,19 @@ private fun GalleryImagePreviewPage(
         initialValue = GalleryPreviewLoadState(),
         key1 = source,
     ) {
-        value = withContext(Dispatchers.IO) {
+        val loaded = loadGalleryBitmap {
             val resultItem = source.resultItem
             val resultLoader = resultPreviewLoader
-            GalleryPreviewLoadState(
-                loading = false,
-                bitmap = if (resultItem != null && resultLoader != null) {
-                    resultLoader(resultItem)
-                } else {
-                    imageDecoder.decodePreview(
-                        sourceUri = source.sourceUri,
-                        localPath = source.localPath,
-                    )
-                },
-            )
+            if (resultItem != null && resultLoader != null) {
+                resultLoader(resultItem)
+            } else {
+                imageDecoder.decodePreview(
+                    sourceUri = source.sourceUri,
+                    localPath = source.localPath,
+                )
+            }
         }
+        value = GalleryPreviewLoadState(loading = false, bitmap = loaded)
     }
     val previewBitmap = previewState.bitmap
     DisposableEffect(previewBitmap) {
@@ -1920,12 +2051,12 @@ private fun GalleryStatusText(status: GalleryTaskStatus) {
 }
 
 @Composable
-private fun GalleryItemStatusText(status: GalleryItemStatus) {
+private fun GalleryItemStatusText(status: GalleryItemStatus, hasResult: Boolean = false) {
     val taskStatus = when (status) {
         GalleryItemStatus.QUEUED -> GalleryTaskStatus.QUEUED
         GalleryItemStatus.RUNNING -> GalleryTaskStatus.RUNNING
         GalleryItemStatus.SUCCEEDED -> GalleryTaskStatus.SUCCEEDED
-        GalleryItemStatus.FAILED -> GalleryTaskStatus.FAILED
+        GalleryItemStatus.FAILED -> if (hasResult) GalleryTaskStatus.PARTIAL else GalleryTaskStatus.FAILED
         GalleryItemStatus.CANCELED -> GalleryTaskStatus.CANCELED
     }
     GalleryStatusText(taskStatus)
@@ -1953,11 +2084,17 @@ class GalleryTranslationViewModel @Inject constructor(
     private val manager: GalleryTranslationManager,
     private val exporter: GalleryTranslationExporter,
     private val translatedPreviewStore: GalleryTranslatedPreviewStore,
+    private val exportReceipts: GalleryExportReceipts,
     settingsRepository: SettingsRepository,
     val imageDecoder: GalleryImageDecoder,
 ) : ViewModel() {
     val settings = settingsRepository.settings
     val tasks = repository.observeTasks()
+    val exportRecovery = exportReceipts.status
+
+    suspend fun checkExportRecovery() = exportReceipts.recoverPending()
+
+    suspend fun keepExportFiles(reviewToken: String) = exportReceipts.keepFiles(reviewToken)
 
     fun observeTask(taskId: String): Flow<GalleryTranslationTaskEntity?> =
         repository.observeTask(taskId)
@@ -1965,8 +2102,8 @@ class GalleryTranslationViewModel @Inject constructor(
     fun observeItems(taskId: String): Flow<List<GalleryTranslationItemEntity>> =
         repository.observeItems(taskId)
 
-    suspend fun createAndEnqueue(uriStrings: List<String>): String {
-        val task = repository.createTask(uriStrings)
+    suspend fun createAndEnqueue(uriStrings: List<String>, settingsSnapshot: Settings? = null): String {
+        val task = repository.createTask(uriStrings, settingsSnapshot = settingsSnapshot)
         manager.enqueue(task)
         return task.id
     }
@@ -1988,23 +2125,23 @@ class GalleryTranslationViewModel @Inject constructor(
 
     suspend fun loadResultThumbnail(item: GalleryTranslationItemEntity): android.graphics.Bitmap? {
         val task = repository.getTask(item.taskId)
-        val translated = task?.let {
+        val translated = try { task?.let {
             translatedPreviewStore.loadTranslatedThumbnail(
                 item = item,
                 settings = repository.settingsForTask(it),
             )
-        }
+        } } catch (_: GalleryTaskSnapshotException) { null }
         return translated ?: imageDecoder.decodeThumbnail(item.sourceUri, item.localPath)
     }
 
     suspend fun loadResultPreview(item: GalleryTranslationItemEntity): android.graphics.Bitmap? {
         val task = repository.getTask(item.taskId)
-        val translated = task?.let {
+        val translated = try { task?.let {
             translatedPreviewStore.loadTranslatedPreview(
                 item = item,
                 settings = repository.settingsForTask(it),
             )
-        }
+        } } catch (_: GalleryTaskSnapshotException) { null }
         return translated ?: imageDecoder.decodePreview(item.sourceUri, item.localPath)
     }
 
@@ -2019,5 +2156,6 @@ internal fun galleryResultThumbnailRatio(
     1f
 }
 
-internal fun galleryResultTextPaneHeightDp(thumbnailRatio: Float): Float =
-    (112f / thumbnailRatio).coerceAtLeast(112f)
+internal fun galleryResultTextPaneHeightDp(thumbnailRatio: Float, fontScale: Float = 1f): Float =
+    // Two 48dp action rows and the filename must leave readable space for both text bodies.
+    (112f / thumbnailRatio).coerceAtLeast(240f * fontScale.coerceAtLeast(1f))

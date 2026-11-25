@@ -3,15 +3,19 @@ package dev.clickn.translate.gallery
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.system.Os
 import dev.clickn.translate.data.Settings
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.io.FileOutputStream
+import java.nio.file.Files
+import java.nio.file.LinkOption.NOFOLLOW_LINKS
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.decodeFromString
@@ -24,9 +28,11 @@ class GalleryTranslatedPreviewStore @Inject constructor(
     private val imageDecoder: GalleryImageDecoder,
     private val renderer: GalleryTranslatedImageRenderer,
     private val json: Json,
+    private val dao: GalleryTranslationDao,
 ) {
     private val root = File(context.cacheDir, CACHE_ROOT)
-    private val generationMutex = Mutex()
+    private val cacheDirectory = context.cacheDir
+    private val generationMutex = GalleryTransientFiles.previewGenerationMutex
 
     suspend fun storeTranslatedPreview(
         item: GalleryTranslationItemEntity,
@@ -41,6 +47,7 @@ class GalleryTranslatedPreviewStore @Inject constructor(
         }
         withContext(Dispatchers.IO) {
             generationMutex.withLock {
+                GalleryTransientFiles.preparePreviews(cacheDirectory)
                 writePreview(
                     item = item,
                     source = source,
@@ -48,10 +55,9 @@ class GalleryTranslatedPreviewStore @Inject constructor(
                     processedHeight = processedHeight,
                     segments = segments,
                     settings = settings,
-                )
+                ) != null
             }
         }
-        true
     } ?: false
 
     suspend fun loadTranslatedThumbnail(
@@ -64,8 +70,9 @@ class GalleryTranslatedPreviewStore @Inject constructor(
         settings: Settings,
     ): Bitmap? = loadTranslated(item, settings, thumbnail = false)
 
-    fun deleteTask(taskId: String) {
-        File(root, taskId).deleteRecursively()
+    suspend fun deleteTask(taskId: String) = withContext(Dispatchers.IO) {
+        generationMutex.withLock { File(root, taskId).deleteRecursively() }
+        Unit
     }
 
     private suspend fun loadTranslated(
@@ -77,6 +84,7 @@ class GalleryTranslatedPreviewStore @Inject constructor(
             !galleryResultUsesTranslatedPreview(
                 status = item.status,
                 renderMode = galleryExportRenderMode(settings),
+                hasTranslatedText = item.translatedText.isNotBlank(),
             )
         ) {
             return@safely null
@@ -84,7 +92,7 @@ class GalleryTranslatedPreviewStore @Inject constructor(
         val previewFile = withContext(Dispatchers.IO) {
             ensurePreview(item, settings)
         } ?: return@safely null
-        withContext(Dispatchers.IO) {
+        loadGalleryBitmap {
             if (thumbnail) {
                 imageDecoder.decodeThumbnail(
                     sourceUri = "",
@@ -103,8 +111,11 @@ class GalleryTranslatedPreviewStore @Inject constructor(
         item: GalleryTranslationItemEntity,
         settings: Settings,
     ): File? = generationMutex.withLock {
+        GalleryTransientFiles.preparePreviews(cacheDirectory)
+        if (!isCommitted(item)) return@withLock null
+        GalleryTransientFiles.previewTaskDirectory(cacheDirectory, item.taskId)
         val target = previewFile(item)
-        if (target.isFile && target.length() > 0L) return@withLock target
+        if (Files.isRegularFile(target.toPath(), NOFOLLOW_LINKS) && target.length() > 0L) return@withLock target
 
         val segments = json.decodeFromString<List<GalleryTranslationSegment>>(item.segmentsJson)
             .filter { it.translatedText.isNotBlank() }
@@ -112,7 +123,8 @@ class GalleryTranslatedPreviewStore @Inject constructor(
 
         var decoded: GalleryDecodedImage? = null
         try {
-            decoded = imageDecoder.decode(item)
+            val decodeContext = currentCoroutineContext()
+            decoded = imageDecoder.decode(item, checkpoint = { decodeContext.ensureActive() })
             writePreview(
                 item = item,
                 source = decoded.bitmap,
@@ -126,18 +138,20 @@ class GalleryTranslatedPreviewStore @Inject constructor(
         }
     }
 
-    private fun writePreview(
+    private suspend fun writePreview(
         item: GalleryTranslationItemEntity,
         source: Bitmap,
         processedWidth: Int,
         processedHeight: Int,
         segments: List<GalleryTranslationSegment>,
         settings: Settings,
-    ): File {
+    ): File? {
+        val generationContext = currentCoroutineContext()
+        generationContext.ensureActive()
+        if (!isCommitted(item)) return null
         val target = previewFile(item)
-        val directory = requireNotNull(target.parentFile)
-        check(directory.mkdirs() || directory.isDirectory)
-        val temporary = File(directory, "${item.id}.tmp")
+        val directory = GalleryTransientFiles.previewTaskDirectory(cacheDirectory, item.taskId)
+        val temporary = File.createTempFile("${item.id}-", ".tmp", directory)
         var rendered: Bitmap? = null
         try {
             val outputBitmap = renderer.render(
@@ -148,15 +162,15 @@ class GalleryTranslatedPreviewStore @Inject constructor(
                 settings = settings,
             )
             rendered = outputBitmap
+            generationContext.ensureActive()
             FileOutputStream(temporary).use { output ->
                 check(outputBitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, output)) {
                     "Unable to encode translated preview."
                 }
             }
-            if (target.exists()) check(target.delete())
-            check(temporary.renameTo(target)) {
-                "Unable to publish translated preview."
-            }
+            generationContext.ensureActive()
+            if (!isCommitted(item)) return null
+            Os.rename(temporary.absolutePath, target.absolutePath)
             return target
         } finally {
             temporary.delete()
@@ -167,7 +181,15 @@ class GalleryTranslatedPreviewStore @Inject constructor(
     }
 
     private fun previewFile(item: GalleryTranslationItemEntity): File =
-        File(File(root, item.taskId), "${item.id}.jpg")
+        File(File(root, item.taskId), "${item.id}-${item.updatedAtMs}-v2.jpg")
+
+    private suspend fun isCommitted(item: GalleryTranslationItemEntity): Boolean {
+        val stored = dao.getItem(item.id) ?: return false
+        return stored.taskId == item.taskId && stored.status == item.status &&
+            (stored.status == GalleryItemStatus.SUCCEEDED ||
+                (stored.status == GalleryItemStatus.FAILED && stored.translatedText.isNotBlank())) &&
+            stored.updatedAtMs == item.updatedAtMs
+    }
 
     private suspend fun <T> safely(
         item: GalleryTranslationItemEntity,
@@ -189,7 +211,7 @@ class GalleryTranslatedPreviewStore @Inject constructor(
     }
 
     private companion object {
-        const val CACHE_ROOT = "gallery-translated-previews-v1"
+        const val CACHE_ROOT = GalleryTransientFiles.PREVIEW_ROOT
         const val JPEG_QUALITY = 90
     }
 }
@@ -197,5 +219,6 @@ class GalleryTranslatedPreviewStore @Inject constructor(
 internal fun galleryResultUsesTranslatedPreview(
     status: GalleryItemStatus,
     renderMode: GalleryExportRenderMode,
-): Boolean = status == GalleryItemStatus.SUCCEEDED &&
+    hasTranslatedText: Boolean = false,
+): Boolean = (status == GalleryItemStatus.SUCCEEDED || (status == GalleryItemStatus.FAILED && hasTranslatedText)) &&
     renderMode != GalleryExportRenderMode.UNSUPPORTED_FLOATING

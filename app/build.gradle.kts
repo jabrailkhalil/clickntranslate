@@ -12,6 +12,9 @@ hilt {
     enableAggregatingTask = true
 }
 
+// Explicit host-build override; the archived toolchain remains the default.
+val archiveNdkVersion = providers.gradleProperty("archiveNdkVersion").orElse("26.1.10909125")
+
 val localLlmGenerationThreads = providers
     .gradleProperty("localLlmGenerationThreads")
     .orElse("6")
@@ -46,15 +49,15 @@ android {
     namespace = "dev.clickn.translate"
     compileSdk = 35
     buildToolsVersion = "35.0.0"
-    ndkVersion = "26.1.10909125"
+    ndkVersion = archiveNdkVersion.get()
 
     defaultConfig {
         applicationId = "dev.clickn.translate"
         manifestPlaceholders["launcherLabel"] = "Clickn"
         minSdk = 26
         targetSdk = 35
-        versionCode = 7
-        versionName = "1.8.2"
+        versionCode = 45
+        versionName = "1.8.3"
         buildConfigField("String", "MOBILE_RELEASE_API_URL", "\"$mobileReleaseApiUrl\"")
 
         // Controlled local-LLM A/B switch. PP remains device-policy selected (6 on the
@@ -91,6 +94,10 @@ android {
         }
     }
 
+    testBuildType = providers.gradleProperty("androidTestBuildType").orElse("debug").get().also {
+        require(it in setOf("debug", "validation")) { "androidTestBuildType must be debug or validation" }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -107,6 +114,15 @@ android {
             applicationIdSuffix = if (providers.gradleProperty("previewBuild").isPresent) ".preview" else ".debug"
             manifestPlaceholders["launcherLabel"] = "Clickn"
             isDebuggable = true
+        }
+        // Exercise the minified release code on-device without using a production key.
+        create("validation") {
+            initWith(getByName("release"))
+            applicationIdSuffix = ".validation"
+            versionNameSuffix = "-validation"
+            manifestPlaceholders["launcherLabel"] = "Clickn QA"
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += listOf("release")
         }
     }
 
@@ -186,6 +202,8 @@ dependencies {
     implementation(libs.mlkit.text.recognition.chinese)
     implementation(libs.mlkit.text.recognition.korean)
     implementation(libs.mlkit.translate)
+    // Explicit Arabic + English on-device OCR; models are downloaded separately by the user.
+    implementation("cz.adaptech.tesseract4android:tesseract4android:4.9.0")
     implementation("com.google.mlkit:language-id:17.0.6")
 
     // DataStore / Room
@@ -218,6 +236,7 @@ dependencies {
 
     // Test
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 }

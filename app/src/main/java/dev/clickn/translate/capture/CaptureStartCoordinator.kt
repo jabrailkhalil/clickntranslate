@@ -11,7 +11,6 @@ import dev.clickn.translate.service.CaptureService
 import dev.clickn.translate.service.CaptureServiceState
 import dev.clickn.translate.R
 import dev.clickn.translate.data.LogRepository
-import dev.clickn.translate.shizuku.AppPermissionCoordinator
 import dev.clickn.translate.shizuku.ShizukuManager
 import dev.clickn.translate.shizuku.ShizukuCapabilities
 import dev.clickn.translate.trigger.AccessibilityServiceStatus
@@ -34,7 +33,6 @@ internal sealed interface CaptureStartDecision {
 class CaptureStartCoordinator @Inject constructor(
     @ApplicationContext private val context: Context,
     private val shizuku: ShizukuManager,
-    private val permissions: AppPermissionCoordinator,
     private val capabilities: ShizukuCapabilities,
     private val logs: LogRepository,
 ) {
@@ -44,20 +42,14 @@ class CaptureStartCoordinator @Inject constructor(
         if (CaptureServiceState.running.value) {
             return CaptureStartDecision.AlreadyRunning
         }
+        CaptureStartPreference.initialize(context)
         val preference = CaptureStartPreference.mode.value
         // Resolve initial asynchronous readiness before choosing a backend, not from a stale UI snapshot.
         if (preference != CaptureStartMode.SYSTEM) shizuku.verifyShellPrivilegeAsync()
         val useShizuku = resolveCaptureStartMode(preference, capabilities.availability(context)) == CaptureStartMode.SHIZUKU
         if (useShizuku && !shizuku.ensureReady()) return CaptureStartDecision.OpenSetup
-        val permissionState = permissions.currentState()
-        if (shouldConfigureCapturePermissions(
-                overlayPermissionGranted = permissionState.overlayGranted,
-                accessibilityReady = permissionState.accessibilityReady,
-                useShizuku = useShizuku,
-                availability = capabilities.availability(context),
-            )) {
-            if (useShizuku) permissions.configure() else permissions.configureIfReady()
-        }
+        // Starting capture is not consent to enable Accessibility or modify unrelated app grants.
+        // Explicit permission setup remains available through AppPermissionCoordinator.
         if (!Settings.canDrawOverlays(context)) return CaptureStartDecision.OpenOverlaySettings
         if (CaptureServiceState.running.value) return CaptureStartDecision.AlreadyRunning
         if (useShizuku) return CaptureStartDecision.Ready(CaptureBackend.SHIZUKU)

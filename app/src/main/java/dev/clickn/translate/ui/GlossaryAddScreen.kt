@@ -47,6 +47,7 @@ import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -61,6 +62,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import dev.clickn.translate.R
 import dev.clickn.translate.appcontext.ForegroundApp
@@ -71,6 +73,7 @@ import dev.clickn.translate.glossary.GlossaryImportConflictPolicy
 import dev.clickn.translate.glossary.GlossaryImportDocument
 import dev.clickn.translate.glossary.GlossaryImportFormatException
 import dev.clickn.translate.glossary.GlossaryImportJson
+import dev.clickn.translate.glossary.decodeGlossaryImportUtf8
 import dev.clickn.translate.glossary.GlossaryImportOptions
 import dev.clickn.translate.glossary.GlossaryImportPreview
 import dev.clickn.translate.glossary.GlossaryImportPreviewPolicy
@@ -80,6 +83,10 @@ import dev.clickn.translate.glossary.GlossaryTermCategory
 import dev.clickn.translate.glossary.GlossaryTermEntity
 import java.io.ByteArrayOutputStream
 import java.io.IOException
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -273,6 +280,7 @@ private fun GlossarySingleAddPane(
                 ) {
                     OutlinedTextField(
                         value = sourceTerm,
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(textDirection = TextDirection.Content),
                         onValueChange = { sourceTerm = it },
                         label = { Text(stringResource(R.string.glossary_source_term)) },
                         modifier = Modifier.fillMaxWidth(),
@@ -280,6 +288,7 @@ private fun GlossarySingleAddPane(
                     )
                     OutlinedTextField(
                         value = targetTerm,
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(textDirection = TextDirection.Content),
                         onValueChange = { targetTerm = it },
                         label = { Text(stringResource(R.string.glossary_target_term)) },
                         modifier = Modifier.fillMaxWidth(),
@@ -420,53 +429,62 @@ private fun GlossaryBatchImportPane(
             )
         }
     }
+    var reading by remember { mutableStateOf(false) }
+    var operation by remember { mutableStateOf<Job?>(null) }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        uri ?: return@rememberLauncherForActivityResult
-        scope.launch {
-            runCatching { readGlossaryImportFile(context, uri) }
-                .onSuccess { loaded ->
+        if (uri != null && !reading && !importing) {
+            reading = true
+            operation = scope.launch {
+                var failureMessage: String? = null
+                try {
+                    val loaded = readGlossaryImportFile(context, uri)
                     fileName = loaded.first
                     document = loaded.second
                     selectedIndices = GlossaryImportPreviewPolicy.defaultSelection(loaded.second)
                     selectedPreviewFilter = GlossaryImportPreviewFilter.ALL
-                }
-                .onFailure { error ->
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
                     document = null
                     fileName = null
                     selectedIndices = emptySet()
                     selectedPreviewFilter = GlossaryImportPreviewFilter.ALL
-                    snackbarHostState.showSnackbar(
-                        if (error is GlossaryImportFormatException) {
-                            context.getString(R.string.glossary_import_invalid_file)
-                        } else {
-                            error.message ?: context.getString(R.string.glossary_import_invalid_file)
-                        }
-                    )
+                    failureMessage = if (error is GlossaryImportFormatException) {
+                        context.getString(R.string.glossary_import_invalid_file)
+                    } else {
+                        error.message ?: context.getString(R.string.glossary_import_invalid_file)
+                    }
+                } finally {
+                    reading = false
+                    operation = null
                 }
+                failureMessage?.let { snackbarHostState.showSnackbar(it) }
+            }
         }
     }
 
     val importPreview: (GlossaryImportPreview) -> Unit = { currentPreview ->
-        val terms = GlossaryImportPreviewPolicy.buildTerms(
-            preview = currentPreview,
-            options = effectiveOptions,
-        )
+        val requestedOptions = effectiveOptions
+        val terms = GlossaryImportPreviewPolicy.buildTerms(currentPreview, requestedOptions)
         importing = true
-        scope.launch {
-            runCatching {
-                viewModel.importTerms(terms, effectiveOptions.conflictPolicy)
-            }.onSuccess { result ->
-                snackbarHostState.showSnackbar(context.importResultMessage(result))
+        operation = scope.launch {
+            var resultMessage: String? = null
+            try {
+                val result = viewModel.importTerms(terms, requestedOptions.conflictPolicy)
                 document = null
                 fileName = null
                 selectedIndices = emptySet()
                 selectedPreviewFilter = GlossaryImportPreviewFilter.ALL
-            }.onFailure { error ->
-                snackbarHostState.showSnackbar(
-                    error.message ?: context.getString(R.string.glossary_import_failed)
-                )
+                resultMessage = context.importResultMessage(result)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                resultMessage = error.message ?: context.getString(R.string.glossary_import_failed)
+            } finally {
+                importing = false
+                operation = null
             }
-            importing = false
+            resultMessage?.let { snackbarHostState.showSnackbar(it) }
         }
     }
 
@@ -501,6 +519,7 @@ private fun GlossaryBatchImportPane(
                     OutlinedButton(
                         modifier = Modifier.fillMaxWidth(),
                         onClick = { picker.launch(arrayOf("application/json", "text/json", "text/plain")) },
+                        enabled = !reading && !importing,
                     ) {
                         Icon(Icons.Default.Description, contentDescription = null)
                         Text(
@@ -579,10 +598,18 @@ private fun GlossaryBatchImportPane(
             }
         }
         }
+        if (reading || importing) {
+            TextButton(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = { operation?.cancel() },
+            ) {
+                Text(stringResource(android.R.string.cancel))
+            }
+        }
         preview?.let { currentPreview ->
             GlossaryImportBottomAction(
                 preview = currentPreview,
-                enabled = currentPreview.canImport && !importing &&
+                enabled = currentPreview.canImport && !importing && !reading &&
                     GlossaryScopePolicy.isValid(scopeMode, currentScopeApp, selectedApp),
                 onImport = { importPreview(currentPreview) },
             )
@@ -838,7 +865,7 @@ private fun GlossaryImportPreviewCard(
             ) {
                 Text(
                     text = row.entry.source.ifBlank { stringResource(R.string.glossary_import_empty_value) },
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Content),
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -846,7 +873,7 @@ private fun GlossaryImportPreviewCard(
                     text = "→ " + row.entry.target.ifBlank {
                         stringResource(R.string.glossary_import_empty_value)
                     },
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Content),
                     color = MaterialTheme.colorScheme.primary,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
@@ -970,17 +997,12 @@ private suspend fun readGlossaryImportFile(
     uri: Uri,
 ): Pair<String, GlossaryImportDocument> = withContext(Dispatchers.IO) {
     val resolver = context.contentResolver
-    val declaredLength = runCatching {
-        resolver.openAssetFileDescriptor(uri, "r")?.use { it.length }
-    }.getOrNull() ?: -1L
-    if (declaredLength > GLOSSARY_IMPORT_MAX_FILE_BYTES) {
-        throw IOException(context.getString(R.string.glossary_import_file_too_large))
-    }
     val bytes = resolver.openInputStream(uri)?.use { input ->
         val output = ByteArrayOutputStream()
         val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
         var total = 0
         while (true) {
+            currentCoroutineContext().ensureActive()
             val read = input.read(buffer)
             if (read < 0) break
             total += read
@@ -994,7 +1016,8 @@ private suspend fun readGlossaryImportFile(
     val name = resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
         if (it.moveToFirst()) it.getString(0) else null
     }.orEmpty().ifBlank { "glossary.json" }
-    name to GlossaryImportJson.parse(bytes.toString(Charsets.UTF_8))
+    currentCoroutineContext().ensureActive()
+    name to GlossaryImportJson.parse(decodeGlossaryImportUtf8(bytes))
 }
 
 private fun Context.importResultMessage(result: GlossaryImportCommitResult): String = getString(

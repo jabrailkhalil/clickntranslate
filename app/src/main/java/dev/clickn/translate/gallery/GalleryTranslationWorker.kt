@@ -16,11 +16,14 @@ import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
 import dev.clickn.translate.R
 import dev.clickn.translate.data.RenderMode
+import dev.clickn.translate.data.AppLocalePrefs
 import dev.clickn.translate.data.Settings
 import dev.clickn.translate.data.needsRawBitmap
 import dev.clickn.translate.ocr.BitmapPreprocessor
 import dev.clickn.translate.ocr.RoutingOcrEngine
 import dev.clickn.translate.ocr.TextBlock
+import dev.clickn.translate.ocr.TextOrientation
+import dev.clickn.translate.ocr.TextRegionGranularity
 import dev.clickn.translate.translate.RoutingTranslator
 import dev.clickn.translate.translate.TranslationVisualContextPreparer
 import dev.clickn.translate.translate.TranslationVisualDebugStore
@@ -29,8 +32,13 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import timber.log.Timber
+import kotlinx.serialization.json.Json
+import kotlin.math.ceil
+import kotlin.math.floor
 
 @HiltWorker
 class GalleryTranslationWorker @AssistedInject constructor(
@@ -41,6 +49,7 @@ class GalleryTranslationWorker @AssistedInject constructor(
     private val ocrEngine: RoutingOcrEngine,
     private val translator: RoutingTranslator,
     private val translatedPreviewStore: GalleryTranslatedPreviewStore,
+    private val json: Json,
 ) : CoroutineWorker(appContext, workerParams) {
 
     private val translationVisualDebugStore by lazy {
@@ -50,10 +59,33 @@ class GalleryTranslationWorker @AssistedInject constructor(
     override suspend fun doWork(): Result {
         val taskId = inputData.getString(KEY_TASK_ID).orEmpty()
         if (taskId.isBlank()) return Result.failure()
+        val retryIds = inputData.getStringArray(KEY_RETRY_ITEM_IDS).orEmpty()
+        val retryVersions = inputData.getLongArray(KEY_RETRY_ITEM_VERSIONS) ?: LongArray(0)
+        if (retryIds.size != retryVersions.size || retryIds.size > GalleryTranslationWorkPolicy.MAX_IMAGES_PER_TASK ||
+            retryIds.toSet().size != retryIds.size
+        ) return Result.failure()
+        if (retryIds.isNotEmpty()) {
+            val expectedStatus = GalleryTaskStatus.entries.firstOrNull {
+                it.name == inputData.getString(KEY_RETRY_TASK_STATUS)
+            } ?: return Result.failure()
+            if (expectedStatus !in setOf(GalleryTaskStatus.FAILED, GalleryTaskStatus.PARTIAL, GalleryTaskStatus.CANCELED)) {
+                return Result.failure()
+            }
+            repository.resetSelectedFailures(taskId, GalleryRetrySelection(
+                taskStatus = expectedStatus,
+                finishedAtMs = inputData.getLong(KEY_RETRY_TASK_FINISHED_AT, 0L),
+                items = retryIds.indices.map { GalleryRetryItem(retryIds[it], retryVersions[it]) },
+            ))
+        }
         val task = repository.getTask(taskId) ?: return Result.failure()
         if (task.status == GalleryTaskStatus.CANCELED) return Result.success()
 
-        val settings = repository.settingsForTask(task)
+        val settings = try {
+            repository.settingsForTask(task)
+        } catch (invalid: GalleryTaskSnapshotException) {
+            repository.failTaskConfiguration(taskId, requireNotNull(invalid.message))
+            return Result.failure()
+        }
         val useForeground = GalleryTranslationWorkPolicy.shouldUseForeground(
             imageCount = task.totalCount,
             translatorEngine = settings.translatorEngine,
@@ -63,14 +95,15 @@ class GalleryTranslationWorker @AssistedInject constructor(
         }
 
         repository.resetInterruptedItems(taskId)
-        repository.markTaskRunning(taskId)
+        if (!repository.markTaskRunning(taskId)) return Result.success()
         Timber.i("Gallery translation started task=%s images=%d", taskId, task.totalCount)
 
         while (true) {
+            currentCoroutineContext().ensureActive()
             val latestTask = repository.getTask(taskId) ?: return Result.failure()
             if (latestTask.status == GalleryTaskStatus.CANCELED) return Result.success()
-            val item = repository.nextPendingItem(taskId) ?: break
-            repository.markItemRunning(taskId, item)
+            val pending = repository.nextPendingItem(taskId) ?: break
+            val item = repository.markItemRunning(taskId, pending) ?: continue
 
             try {
                 processItem(item, settings)
@@ -82,9 +115,9 @@ class GalleryTranslationWorker @AssistedInject constructor(
                 throw cancellation
             } catch (error: Throwable) {
                 val message = error.message?.take(500) ?: error.javaClass.simpleName
-                val nextAttemptCount = item.attemptCount + 1
+                val nextAttemptCount = item.attemptCount
                 val retry = if (
-                    error is EmptyTranslationException ||
+                    error is IncompleteTranslationException ||
                     error is TranslationRequestException
                 ) {
                     GalleryTranslationWorkPolicy.shouldRetryFailedTranslation(
@@ -103,7 +136,8 @@ class GalleryTranslationWorker @AssistedInject constructor(
                     retry,
                     nextAttemptCount,
                 )
-                repository.markItemFailure(item.id, retry, message)
+                val failedVersion = (error as? IncompleteTranslationException)?.resultVersion ?: item.updatedAtMs
+                if (!repository.markItemFailure(item.id, failedVersion, retry, message)) continue
                 repository.refreshProgress(taskId, message)
                 if (retry) {
                     repository.markTaskWaitingRetry(taskId, message)
@@ -112,6 +146,7 @@ class GalleryTranslationWorker @AssistedInject constructor(
             }
         }
 
+        currentCoroutineContext().ensureActive()
         val status = repository.finishTask(taskId)
         Timber.i("Gallery translation finished task=%s status=%s", taskId, status)
         return Result.success()
@@ -121,15 +156,19 @@ class GalleryTranslationWorker @AssistedInject constructor(
         item: GalleryTranslationItemEntity,
         settings: Settings,
     ) {
+        val workContext = currentCoroutineContext()
         var decoded: GalleryDecodedImage? = null
         var preprocessed: Bitmap? = null
         try {
-            decoded = imageDecoder.decode(item)
+            decoded = imageDecoder.decode(item, checkpoint = { workContext.ensureActive() })
+            workContext.ensureActive()
+            val saved = GallerySegmentRecovery.resume(item, decoded.bitmap.width, decoded.bitmap.height, json)
             val segments = if (translator.isEndToEndFor(settings)) {
-                translateOrThrow {
-                    translator.ocrAndTranslate(decoded.bitmap, settings)
-                }.map { (block, text) ->
-                    GalleryTranslationSegment.from(block, text)
+                if (saved != null && GallerySegmentRecovery.missingIndices(saved).isEmpty()) saved else {
+                    val fresh = translateOrThrow {
+                        translator.ocrAndTranslate(decoded.bitmap, settings)
+                    }.map { (block, text) -> GalleryTranslationSegment.from(block, text) }
+                    GallerySegmentRecovery.mergeImageOnlyResult(saved, fresh)
                 }
             } else {
                 val preprocessOptions = if (settings.ocrEngine.needsRawBitmap) {
@@ -137,16 +176,17 @@ class GalleryTranslationWorker @AssistedInject constructor(
                 } else {
                     settings.preprocess
                 }
-                preprocessed = BitmapPreprocessor.apply(decoded.bitmap, preprocessOptions)
-                val rawBlocks = ocrEngine.recognizeWithSettings(
-                    bitmap = preprocessed,
-                    kind = settings.ocrEngine,
-                    settings = settings,
-                )
-                val blocks = if (preprocessOptions.upscale2x) {
-                    rawBlocks.map(::downscaleTwo)
-                } else {
-                    rawBlocks
+                val blocks = saved?.map(::restoreGalleryTextBlock) ?: run {
+                    val ocrInput = BitmapPreprocessor.apply(decoded.bitmap, preprocessOptions)
+                    preprocessed = ocrInput
+                    val rawBlocks = try {
+                        ocrEngine.recognizeWithSettings(bitmap = ocrInput, kind = settings.ocrEngine, settings = settings)
+                    } finally {
+                        if (ocrInput !== decoded.bitmap && !ocrInput.isRecycled) ocrInput.recycle()
+                        preprocessed = null
+                    }
+                    workContext.ensureActive()
+                    if (preprocessOptions.upscale2x) rawBlocks.map(::downscaleGalleryOcrBlock) else rawBlocks
                 }
                 if (blocks.isEmpty()) throw NoTextDetectedException()
                 val visualPreparation = withContext(Dispatchers.Default) {
@@ -171,34 +211,39 @@ class GalleryTranslationWorker @AssistedInject constructor(
                         visualPreparation.debugArtifact?.absolutePath ?: "none",
                     )
                 }
-                val translated = translateOrThrow {
-                    translator.translateBatch(
-                        blocks.map(TextBlock::text),
-                        visualPreparation.settings,
-                    )
-                }
-                blocks.mapIndexed { index, block ->
-                    GalleryTranslationSegment.from(block, translated.getOrNull(index))
+                GallerySegmentRecovery.translateMissing(saved ?: blocks.map { GalleryTranslationSegment.from(it, null) }) { pending ->
+                    translateOrThrow { translator.translateBatch(pending, visualPreparation.settings) }
                 }
             }
-            if (segments.isEmpty()) throw NoTextDetectedException()
-            if (segments.all { it.translatedText.isBlank() }) {
-                throw EmptyTranslationException()
+            if (segments.isEmpty() || segments.all { it.sourceText.isBlank() && it.translatedText.isBlank() }) throw NoTextDetectedException()
+            val missing = GallerySegmentRecovery.missingIndices(segments)
+            if (missing.isNotEmpty()) {
+                workContext.ensureActive()
+                val progress = repository.checkpointIncompleteItem(item.id, item.updatedAtMs, decoded,
+                    decoded.bitmap.width, decoded.bitmap.height, segments) ?: return
+                val total = segments.count { it.sourceText.isNotBlank() }
+                throw IncompleteTranslationException(progress.updatedAtMs,
+                    AppLocalePrefs.live(applicationContext).getString(R.string.gallery_item_partial_error,
+                        total - missing.size, total))
             }
+            workContext.ensureActive()
+            val completed = repository.completeItem(
+                itemId = item.id,
+                expectedVersion = item.updatedAtMs,
+                decoded = decoded,
+                processedWidth = decoded.bitmap.width,
+                processedHeight = decoded.bitmap.height,
+                segments = segments,
+            ) ?: return
+            // A cancelled/replaced claim cannot warm a cache for a result it did not commit.
+            workContext.ensureActive()
             translatedPreviewStore.storeTranslatedPreview(
-                item = item,
+                item = completed,
                 source = decoded.bitmap,
                 processedWidth = decoded.bitmap.width,
                 processedHeight = decoded.bitmap.height,
                 segments = segments,
                 settings = settings,
-            )
-            repository.completeItem(
-                itemId = item.id,
-                decoded = decoded,
-                processedWidth = decoded.bitmap.width,
-                processedHeight = decoded.bitmap.height,
-                segments = segments,
             )
         } finally {
             preprocessed?.takeIf { it !== decoded?.bitmap && !it.isRecycled }?.recycle()
@@ -264,20 +309,42 @@ class GalleryTranslationWorker @AssistedInject constructor(
     }
 
     private class NoTextDetectedException : IllegalStateException("No text detected.")
-    private class EmptyTranslationException : IllegalStateException("No translation returned.")
+    private class IncompleteTranslationException(val resultVersion: Long, message: String) : IllegalStateException(message)
     private class TranslationRequestException(cause: Throwable) :
         IllegalStateException(cause.message ?: cause.javaClass.simpleName, cause)
 
     companion object {
         const val KEY_TASK_ID = "task_id"
+        const val KEY_RETRY_ITEM_IDS = "retry_item_ids"
+        const val KEY_RETRY_ITEM_VERSIONS = "retry_item_versions"
+        const val KEY_RETRY_TASK_STATUS = "retry_task_status"
+        const val KEY_RETRY_TASK_FINISHED_AT = "retry_task_finished_at"
         const val ROUTE_GALLERY_TASKS = "GalleryTasks"
         private const val NOTIFICATION_CHANNEL_ID = "gallery_translation"
         private const val NOTIFICATION_ID_BASE = 6100
     }
 }
 
-private fun downscaleTwo(block: TextBlock): TextBlock {
-    fun Rect.half(): Rect = Rect(left / 2, top / 2, right / 2, bottom / 2)
+internal fun restoreGalleryTextBlock(segment: GalleryTranslationSegment): TextBlock = TextBlock(
+    text = segment.sourceText,
+    boundingBox = segment.boundingBox.toAndroidRect(),
+    sourceBoxes = segment.sourceBoxes.map(GalleryRect::toAndroidRect),
+    confidence = segment.confidence,
+    recognizedLanguage = segment.recognizedLanguage,
+    layoutOrientation = segment.layoutOrientation?.let { value -> TextOrientation.entries.firstOrNull { it.name == value } },
+    bubbleGroupId = segment.bubbleGroupId,
+    regionId = segment.regionId,
+    parentRegionId = segment.parentRegionId,
+    regionGranularity = TextRegionGranularity.entries.firstOrNull { it.name == segment.regionGranularity }
+        ?: TextRegionGranularity.UNKNOWN,
+    presentationRotationDegrees = segment.presentationRotationDegrees,
+)
+
+internal fun downscaleGalleryOcrBlock(block: TextBlock): TextBlock {
+    fun Rect.half(): Rect = Rect(
+        floor(left / 2.0).toInt(), floor(top / 2.0).toInt(),
+        ceil(right / 2.0).toInt(), ceil(bottom / 2.0).toInt(),
+    )
     return block.copy(
         boundingBox = block.boundingBox.half(),
         sourceBoxes = block.sourceBoxes.map { it.half() },

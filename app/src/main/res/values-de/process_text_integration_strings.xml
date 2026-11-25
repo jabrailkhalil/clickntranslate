@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="process_text_replace">Auswahl ersetzen</string>
+    <string name="process_text_retry">Erneut versuchen</string>
+    <string name="process_text_too_long">Wähle höchstens %1$d Zeichen aus. Dein Text wurde nicht geändert.</string>
+    <string name="process_text_copy_failed">Kopieren fehlgeschlagen. Die Übersetzung bleibt verfügbar.</string>
+    <string name="process_text_interrupted">Übersetzung unterbrochen. Tippe zum Fortsetzen auf „Erneut versuchen“.</string>
+    <string name="integration_tile_start">Bildschirmübersetzung starten</string>
+    <string name="integration_tile_stop">Bildschirmübersetzung stoppen</string>
+    <string name="integration_tile_launch_failed">Bildschirmübersetzung konnte nicht geöffnet werden. Öffne die App und versuche es erneut.</string>
+</resources>

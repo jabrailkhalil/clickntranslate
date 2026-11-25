@@ -1,0 +1,114 @@
+{
+  "page_checks": [
+    {
+      "page": 0,
+      "start": "hero tap",
+      "samples": [
+        {
+          "elapsed_seconds": 4.16,
+          "label": "c43-first-page-00",
+          "result": false,
+          "hierarchy_available": true,
+          "progress_window": null
+        },
+        {
+          "elapsed_seconds": 10.14,
+          "label": "c43-first-page-01",
+          "result": false,
+          "hierarchy_available": true,
+          "progress_window": "mAttrs={(0,63)(wrapxwrap) gr=TOP CENTER sim={adjust=pan} layoutInDisplayCutoutMode=always ty=APPLICATION_OVERLAY fmt=TRANSLUCENT alpha=0.8"
+        },
+        {
+          "elapsed_seconds": 16.8,
+          "label": "c43-first-page-02",
+          "result": false,
+          "hierarchy_available": true,
+          "progress_window": "mAttrs={(0,63)(wrapxwrap) gr=TOP CENTER sim={adjust=pan} layoutInDisplayCutoutMode=always ty=APPLICATION_OVERLAY fmt=TRANSLUCENT alpha=0.8"
+        },
+        {
+          "elapsed_seconds": 22.56,
+          "label": "c43-first-page-03",
+          "result": false,
+          "hierarchy_available": true,
+          "progress_window": "mAttrs={(0,63)(wrapxwrap) gr=TOP CENTER sim={adjust=pan} layoutInDisplayCutoutMode=always ty=APPLICATION_OVERLAY fmt=TRANSLUCENT alpha=0.8"
+        },
+        {
+          "elapsed_seconds": 29.06,
+          "label": "c43-first-page-04",
+          "result": false,
+          "hierarchy_available": true,
+          "progress_window": "mAttrs={(0,63)(wrapxwrap) gr=TOP CENTER sim={adjust=pan} layoutInDisplayCutoutMode=always ty=APPLICATION_OVERLAY fmt=TRANSLUCENT alpha=0.8"
+        },
+        {
+          "elapsed_seconds": 35.64,
+          "label": "c43-first-page-05",
+          "result": false,
+          "hierarchy_available": true,
+          "progress_window": null
+        },
+        {
+          "elapsed_seconds": 42.58,
+          "label": "c43-first-page-06",
+          "result": true,
+          "hierarchy_available": true,
+          "progress_window": null
+        }
+      ]
+    },
+    {
+      "page": 1,
+      "start": "activity intent",
+      "samples": [
+        {
+          "elapsed_seconds": 4.03,
+          "label": "c43-switch-1-00",
+          "result": false,
+          "hierarchy_available": true
+        },
+        {
+          "elapsed_seconds": 9.45,
+          "label": "c43-switch-1-01",
+          "result": false,
+          "hierarchy_available": true
+        },
+        {
+          "elapsed_seconds": 15.94,
+          "label": "c43-switch-1-02",
+          "result": true,
+          "hierarchy_available": true
+        }
+      ]
+    },
+    {
+      "page": 0,
+      "start": "activity intent",
+      "samples": [
+        {
+          "elapsed_seconds": 4.03,
+          "label": "c43-switch-0-00",
+          "result": false,
+          "hierarchy_available": true
+        },
+        {
+          "elapsed_seconds": 10.22,
+          "label": "c43-switch-0-01",
+          "result": false,
+          "hierarchy_available": true
+        },
+        {
+          "elapsed_seconds": 15.84,
+          "label": "c43-switch-0-02",
+          "result": true,
+          "hierarchy_available": true
+        }
+      ]
+    }
+  ],
+  "installed_sha256": "fe3087c1132e367490be24117688d279addf085c377f9da5f83117f95a4d4efe",
+  "indicator_cleared_after_result": true,
+  "indicator_before_cancel": "mAttrs={(0,63)(wrapxwrap) gr=TOP CENTER sim={adjust=pan} layoutInDisplayCutoutMode=always ty=APPLICATION_OVERLAY fmt=TRANSLUCENT alpha=0.8",
+  "indicator_cleared_after_cancel": true,
+  "projection_active_after_loop_cancel": true,
+  "cancelled_page_kept_source": true,
+  "projection_released": true
+}

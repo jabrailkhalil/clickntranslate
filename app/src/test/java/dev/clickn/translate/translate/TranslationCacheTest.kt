@@ -3,9 +3,25 @@ package dev.clickn.translate.translate
 
 import dev.clickn.translate.data.Settings
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Test
 
 class TranslationCacheTest {
+    @Test
+    fun hashCollisionsCannotReturnAnotherSourceOrPromptTranslation() {
+        assertEquals("Aa".hashCode(), "BB".hashCode())
+        val cache = TranslationCache()
+        val settings = Settings()
+        val first = cache.key("Aa", "google", "ru", "Aa")
+        val otherSource = cache.key("BB", "google", "ru", "Aa")
+        val otherPrompt = cache.key("Aa", "google", "ru", "BB")
+        cache.put(first, "only the first text", settings)
+        assertNotEquals(first, otherSource)
+        assertNotEquals(first, otherPrompt)
+        assertEquals(null, cache.get(otherSource, settings))
+        assertEquals(null, cache.get(otherPrompt, settings))
+    }
+
     @Test
     fun cachePolicy_tableDriven() {
         data class Case(

@@ -26,6 +26,8 @@ tools/local_ocr_debug/models/
 
 # 临时截图 / 调试产物
 /tmp/
+/.tmp/
+*.log
 
 # Python tooling cache
 __pycache__/

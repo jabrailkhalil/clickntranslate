@@ -15,6 +15,9 @@ internal class SettledPagePolicy {
         val ready: Boolean,
     )
 
+    /** Identifies one execution, including retries of the same page revision. */
+    data class AttemptTicket(val revision: Long, val attemptId: Long)
+
     private var revision = 0L
     private var hasAnchor = false
     private var stableSinceMs = 0L
@@ -22,6 +25,10 @@ internal class SettledPagePolicy {
     private var submittedRevision: Long? = null
     private var readyRevision: Long? = null
     private var observationPaused = false
+    private var attemptSequence = 0L
+    private var activeAttempt: AttemptTicket? = null
+    private var retryNotBeforeMs: Long? = null
+    private var consecutiveFailures = 0
 
     @Synchronized
     fun observe(
@@ -42,10 +49,12 @@ internal class SettledPagePolicy {
             stableSinceMs = nowMs
             submittedRevision = null
             readyRevision = null
+            clearRetryState()
             return Decision(revision, invalidate, replaceAnchor = true, ready = false)
         }
         val ready = submittedRevision != revision &&
-            nowMs - stableSinceMs >= stableDurationMs.coerceAtLeast(1L)
+            nowMs - stableSinceMs >= stableDurationMs.coerceAtLeast(1L) &&
+            (retryNotBeforeMs?.let { nowMs >= it } != false)
         readyRevision = revision.takeIf { ready }
         return Decision(
             revision,
@@ -57,9 +66,43 @@ internal class SettledPagePolicy {
 
     /** Claim only after an execution slot is available; never queue intermediate pages. */
     @Synchronized
-    fun claim(expectedRevision: Long): Boolean {
-        if (!hasAnchor || expectedRevision != revision || readyRevision != revision || submittedRevision == revision) return false
+    fun claim(expectedRevision: Long): Boolean = claimAttempt(expectedRevision) != null
+
+    @Synchronized
+    fun claimAttempt(expectedRevision: Long): AttemptTicket? {
+        if (!hasAnchor || expectedRevision != revision || readyRevision != revision || submittedRevision == revision) return null
         submittedRevision = revision
+        retryNotBeforeMs = null
+        return AttemptTicket(revision, ++attemptSequence).also { activeAttempt = it }
+    }
+
+    /**
+     * Only a caller-classified transient failure permits another execution of this page.
+     * Empty/successful pages remain submitted. A late callback from an earlier attempt cannot
+     * reopen a revision currently being processed by its retry.
+     */
+    @Synchronized
+    fun retryAfterFailure(ticket: AttemptTicket, nowMs: Long): Boolean {
+        if (!hasAnchor || ticket != activeAttempt || ticket.revision != revision || submittedRevision != revision) return false
+        // Leave a backwards timestamp for observe() to handle as a page discontinuity.
+        if (lastObservationMs?.let { nowMs < it } == true) return false
+        val failures = (consecutiveFailures + 1).coerceAtMost(6)
+        val delayMs = when (failures) {
+            1 -> 1_000L
+            2 -> 2_000L
+            3 -> 4_000L
+            4 -> 8_000L
+            5 -> 16_000L
+            else -> 30_000L
+        }
+        // An unrepresentable future deadline must not become an immediate retry loop.
+        if (nowMs > Long.MAX_VALUE - delayMs) return false
+        consecutiveFailures = failures
+        lastObservationMs = nowMs
+        retryNotBeforeMs = nowMs + delayMs
+        activeAttempt = null
+        submittedRevision = null
+        readyRevision = null
         return true
     }
 
@@ -85,5 +128,12 @@ internal class SettledPagePolicy {
         submittedRevision = null
         readyRevision = null
         observationPaused = false
+        clearRetryState()
+    }
+
+    private fun clearRetryState() {
+        activeAttempt = null
+        retryNotBeforeMs = null
+        consecutiveFailures = 0
     }
 }

@@ -4,12 +4,11 @@ import android.graphics.Bitmap
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.TouchApp
+import androidx.compose.material.icons.outlined.Photo
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -21,7 +20,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import dev.clickn.translate.R
@@ -36,7 +34,7 @@ internal fun FloatingAppearanceSheet(settings: Settings, onUpdate: ((Settings) -
     onAdvanced: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var choice by remember { mutableStateOf(CompanionPrefs.read(context)) }
+    val choice by rememberCompanionChoice(context)
     var picture by remember { mutableStateOf<Bitmap?>(null) }
     var size by remember(settings.floatingButtonSizeDp) { mutableFloatStateOf(settings.floatingButtonSizeDp.toFloat().coerceIn(32f, 96f)) }
     var opacity by remember(settings.floatingButtonAlpha) { mutableFloatStateOf(normalizedFloatingButtonAlpha(settings.floatingButtonAlpha)) }
@@ -49,14 +47,13 @@ internal fun FloatingAppearanceSheet(settings: Settings, onUpdate: ((Settings) -
             try {
                 picture = withContext(Dispatchers.IO) { BrandIconPrefs.importPicture(context, uri, floating = true) }
                 CompanionPrefs.write(context, CompanionPrefs.CUSTOM)
-                choice = CompanionPrefs.CUSTOM
             } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
             catch (_: Exception) { error = true }
             finally { busy = false }
         }
     }
     androidx.compose.foundation.lazy.LazyColumn(
-        Modifier.fillMaxWidth().testTag("floating-appearance"),
+        Modifier.fillMaxWidth().testTag("floating-appearance").selectableGroup(),
         contentPadding = PaddingValues(24.dp, 0.dp, 24.dp, 32.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
@@ -72,32 +69,7 @@ internal fun FloatingAppearanceSheet(settings: Settings, onUpdate: ((Settings) -
                 }
             }
         }
-        val options = listOf(CompanionPrefs.ACTION to R.string.polish_action_icon, CompanionPrefs.LOGO to R.string.refine_brand_logo) +
-            AppCompanion.entries.map { it.id to it.label } +
-            if (picture != null) listOf(CompanionPrefs.CUSTOM to R.string.polish_custom_picture) else emptyList()
-        options.chunked(3).forEach { row ->
-            item {
-                Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).selectableGroup(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    row.forEach { (id, label) ->
-                        Surface(
-                            modifier = Modifier.weight(1f).fillMaxHeight().testTag("companion-$id")
-                                .selectable(choice == id, role = Role.RadioButton, onClick = {
-                                    CompanionPrefs.write(context, id); choice = id
-                                }),
-                            shape = MaterialTheme.shapes.medium,
-                            border = BorderStroke(if (choice == id) 2.dp else 1.dp,
-                                if (choice == id) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
-                        ) {
-                            Column(Modifier.padding(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                FloatingPicture(id, picture, Modifier.size(56.dp))
-                                Text(stringResource(label), Modifier.padding(top = 8.dp), style = MaterialTheme.typography.labelLarge)
-                            }
-                        }
-                    }
-                    repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
-                }
-            }
-        }
+        companionChoices(choice, picture) { CompanionPrefs.write(context, it) }
         item {
             OutlinedButton(onClick = { picker.launch("image/*") }, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.refine_choose_image))
@@ -133,6 +105,7 @@ internal fun FloatingPicture(choice: String, bitmap: Bitmap?, modifier: Modifier
     val companion = AppCompanion.entries.firstOrNull { it.id == choice }
     when {
         choice == CompanionPrefs.CUSTOM && bitmap != null -> Image(bitmap.asImageBitmap(), null, modifier, contentScale = ContentScale.Fit)
+        choice == CompanionPrefs.CUSTOM -> Icon(Icons.Outlined.Photo, null, modifier.padding(actionPadding), tint = MaterialTheme.colorScheme.primary)
         choice == CompanionPrefs.LOGO -> BrandLogo(modifier)
         companion != null -> Image(painterResource(companion.image), null, modifier, contentScale = ContentScale.Fit)
         else -> Icon(Icons.Outlined.TouchApp, null, modifier.padding(actionPadding), tint = MaterialTheme.colorScheme.primary)

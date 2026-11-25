@@ -80,7 +80,7 @@ class PaddleRecognitionSizingTest {
     }
 
     @Test
-    fun tensorWidth_tableDriven_onlyPadsKoreanV5ShortLines() {
+    fun tensorWidth_tableDriven_padsOfficialKoreanAndArabicV5ShortLines() {
         data class Case(
             val name: String,
             val modelVersion: PaddleModelVersion?,
@@ -92,6 +92,9 @@ class PaddleRecognitionSizingTest {
             Case("Korean short crop", PaddleModelVersion.V5_KOREAN, 76, 320),
             Case("Korean boundary", PaddleModelVersion.V5_KOREAN, 320, 320),
             Case("Korean long crop", PaddleModelVersion.V5_KOREAN, 476, 476),
+            Case("Arabic short crop", PaddleModelVersion.V5_ARABIC, 76, 320),
+            Case("Arabic boundary", PaddleModelVersion.V5_ARABIC, 320, 320),
+            Case("Arabic long crop", PaddleModelVersion.V5_ARABIC, 476, 476),
             Case("v5 mobile unchanged", PaddleModelVersion.V5_MOBILE, 76, 76),
             Case("v6 small unchanged", PaddleModelVersion.V6_SMALL, 153, 153),
             Case("unknown model unchanged", null, 120, 120),

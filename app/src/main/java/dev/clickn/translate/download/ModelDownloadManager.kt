@@ -100,6 +100,7 @@ class ModelDownloadManager @Inject constructor(
     fun cancel(workId: UUID) {
         workManager.cancelWorkById(workId)
     }
+    fun cancel(spec: ModelDownloadSpec) { workManager.cancelAllWorkByTag(ModelDownloadWorkPolicy.specTag(spec)) }
 
     private suspend fun enqueue(specs: List<ModelDownloadSpec>, ownerPresetId: String?): UUID {
         require(specs.isNotEmpty()) { "At least one model download is required" }
@@ -126,6 +127,7 @@ class ModelDownloadManager @Inject constructor(
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
                 .addTag(ModelDownloadWorkPolicy.WORK_TAG)
                 .apply {
+                    requiredSpecs.forEach { addTag(ModelDownloadWorkPolicy.specTag(it)) }
                     ownerPresetId?.takeIf { it.isNotBlank() }?.let {
                         addTag(ModelDownloadWorkPolicy.ownerTag(it))
                     }

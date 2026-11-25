@@ -1,0 +1,5 @@
+<resources>
+    <string name="offline_installed_translation_languages">Langues de traduction installées (%1$d)</string>
+    <string name="offline_installed_translation_help">Touchez une langue installée pour la choisir comme source. Les autres langues restent disponibles dans les sélecteurs source et cible ci-dessus.</string>
+    <string name="offline_builtin_english">Inclus dans ML Kit</string>
+</resources>

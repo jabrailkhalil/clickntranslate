@@ -24,6 +24,7 @@ class LoopTextStabilityProbePolicyTest {
             OcrEngineKind.ML_KIT_KOREAN,
             OcrEngineKind.PADDLE_ONNX,
             OcrEngineKind.MANGA_OCR_JA,
+            OcrEngineKind.TESSERACT_ARABIC,
         )
         val cases = OcrEngineKind.entries.map { engine ->
             Case(engine, engine in localOrLan)

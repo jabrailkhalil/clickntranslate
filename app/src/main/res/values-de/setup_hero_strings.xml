@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="setup_hero_title">Wähle deinen Begleiter</string>
+    <string name="setup_hero_body">Dieses Bild erscheint auf der schwebenden Schaltfläche über anderen Apps. Wähle einen Begleiter, das Aktionssymbol oder das Logo. Du kannst die Auswahl später ändern.</string>
+    <string name="setup_hero_custom_unavailable">Vorschau nicht verfügbar. Deine Auswahl bleibt gespeichert.</string>
+</resources>

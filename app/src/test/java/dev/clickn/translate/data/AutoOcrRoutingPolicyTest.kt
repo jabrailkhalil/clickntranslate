@@ -23,7 +23,7 @@ class AutoOcrRoutingPolicyTest {
         val expected = listOf(
             OcrEngineKind.ML_KIT_JAPANESE, OcrEngineKind.ML_KIT_KOREAN,
             OcrEngineKind.ML_KIT_CHINESE, OcrEngineKind.ML_KIT_LATIN,
-            OcrEngineKind.PADDLE_ONNX, OcrEngineKind.MANGA_OCR_JA,
+            OcrEngineKind.PADDLE_ONNX, OcrEngineKind.MANGA_OCR_JA, OcrEngineKind.TESSERACT_ARABIC,
             OcrEngineKind.UMI_OCR, OcrEngineKind.LUNA_OCR,
             OcrEngineKind.BAIDU, OcrEngineKind.TENCENT, OcrEngineKind.YOUDAO,
             OcrEngineKind.PADDLE_AI_STUDIO,
@@ -49,7 +49,7 @@ class AutoOcrRoutingPolicyTest {
             "fr" to OcrEngineKind.ML_KIT_LATIN,
             "sq" to OcrEngineKind.PADDLE_ONNX,
             "auto" to null,
-            "ar" to null,
+            "ar" to OcrEngineKind.TESSERACT_ARABIC,
         ).forEach { (code, expected) -> assertEquals(code, expected, AutoOcrSettings().routeFor(code)?.engine) }
     }
 
@@ -85,7 +85,60 @@ class AutoOcrRoutingPolicyTest {
                 it.engine != OcrEngineKind.MANGA_OCR_JA || case.installed
             }?.engine)
         }
-        assertNull(AutoOcrRoutingPolicy.resolve(Settings(), "ar") { true })
+        assertEquals(AutoOcrRoute(OcrEngineKind.PADDLE_ONNX, PaddleModelVersion.V5_ARABIC),
+            AutoOcrRoutingPolicy.resolve(Settings(), "ar") { true })
+        assertNull(AutoOcrRoutingPolicy.resolve(Settings(), "ar") { false })
+    }
+
+    @Test fun arabicDefaultUsesOnlyActuallyReadyLocalPacks() {
+        val paddle = AutoOcrRoute(OcrEngineKind.PADDLE_ONNX, PaddleModelVersion.V5_ARABIC)
+        val tess = AutoOcrRoute(OcrEngineKind.TESSERACT_ARABIC)
+        for ((installed, expected) in listOf(
+            emptySet<AutoOcrRoute>() to null,
+            setOf(tess) to tess,
+            setOf(paddle) to paddle,
+            setOf(tess, paddle) to paddle,
+        )) {
+            val checked = mutableListOf<AutoOcrRoute>()
+            val settings = Settings(baiduOcrApiKey = "unused", baiduOcrSecretKey = "unused")
+            val actual = AutoOcrRoutingPolicy.resolve(settings, "ar-EG") {
+                checked += it
+                it in installed
+            }
+            assertEquals(installed.toString(), expected, actual)
+            assertTrue("Automatic fallback must not consider cloud or another Paddle pack",
+                checked.all { it == paddle || it == tess })
+        }
+        assertEquals(tess, AutoOcrSettings.defaultRoute("ar"))
+        assertEquals(paddle, AutoOcrSettings.defaultRoute("ar", arabicPaddleReady = true))
+        assertEquals(AutoOcrRoute(OcrEngineKind.ML_KIT_LATIN),
+            AutoOcrSettings.defaultRoute("en", arabicPaddleReady = true))
+    }
+
+    @Test fun persistedExplicitTesseractSurvivesInstallingPreferredArabicPaddle() {
+        val restored = Json.decodeFromString<Settings>(
+            """{"autoOcr":{"routes":{"ar":{"engine":"TESSERACT_ARABIC"}}}}""")
+        val explicit = AutoOcrRoute(OcrEngineKind.TESSERACT_ARABIC)
+        assertEquals(explicit, restored.autoOcr.routeFor("ar-SA", arabicPaddleReady = true))
+        val checked = mutableListOf<AutoOcrRoute>()
+        assertEquals(explicit, AutoOcrRoutingPolicy.resolve(restored, "ar-SA") {
+            checked += it
+            true // Both local engines are installed; the persisted override still wins.
+        })
+        assertEquals(listOf(explicit), checked)
+        assertEquals(explicit, restored.autoOcr.routes["ar"])
+        assertEquals("ar", AutoOcrRoutingPolicy.settingsFor(restored, "ar-SA", explicit).sourceLang)
+    }
+
+    @Test fun unavailableArabicOverrideFallsBackLocallyWithoutSelectingUnconfiguredCloud() {
+        val paddle = AutoOcrRoute(OcrEngineKind.PADDLE_ONNX, PaddleModelVersion.V5_ARABIC)
+        val tess = AutoOcrRoute(OcrEngineKind.TESSERACT_ARABIC)
+        for (selectedRoute in listOf(paddle, AutoOcrRoute(OcrEngineKind.BAIDU))) {
+            val settings = Settings(autoOcr = AutoOcrSettings(mapOf("ar" to selectedRoute)))
+            assertEquals(tess, AutoOcrRoutingPolicy.resolve(settings, "ar") { it == tess })
+            assertNull(AutoOcrRoutingPolicy.resolve(settings, "ar") { false })
+            assertEquals(selectedRoute, settings.autoOcr.routes["ar"])
+        }
     }
 
     @Test fun mappingRoundTripPresetAndCredentialBoundary() {

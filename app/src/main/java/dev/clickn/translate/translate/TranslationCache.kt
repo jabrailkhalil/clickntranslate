@@ -3,6 +3,7 @@ package dev.clickn.translate.translate
 
 import dev.clickn.translate.data.Settings
 import java.util.LinkedHashMap
+import java.security.MessageDigest
 
 /**
  * 译文缓存：key = 原文 + 模型 + 目标语 + prompt 哈希。
@@ -18,8 +19,17 @@ class TranslationCache(capacity: Int = 256) {
             size > capacity
     }
 
-    fun key(source: String, model: String, targetLang: String, prompt: String): String =
-        "$model|$targetLang|${prompt.hashCode()}|${source.hashCode()}|${source.length}"
+    fun key(source: String, model: String, targetLang: String, prompt: String): String {
+        // String.hashCode collides for ordinary texts such as "Aa" and "BB".
+        // Length-prefix each field so separators inside custom prompts remain unambiguous.
+        val digest = MessageDigest.getInstance("SHA-256")
+        for (field in arrayOf(model, targetLang, prompt, source)) {
+            val bytes = field.toByteArray(Charsets.UTF_8)
+            for (shift in 24 downTo 0 step 8) digest.update((bytes.size ushr shift).toByte())
+            digest.update(bytes)
+        }
+        return digest.digest().joinToString("") { (it.toInt() and 255).toString(16).padStart(2, '0') }
+    }
 
     fun get(key: String, settings: Settings): String? {
         if (!TranslationCachePolicy.isEnabled(settings)) return null

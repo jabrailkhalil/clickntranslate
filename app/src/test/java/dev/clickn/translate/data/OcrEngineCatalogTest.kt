@@ -16,7 +16,7 @@ class OcrEngineCatalogTest {
         val groups = mapOf(
             OcrEngineGroup.ON_DEVICE to listOf(OcrEngineKind.ML_KIT_AUTO, OcrEngineKind.ML_KIT_JAPANESE,
                 OcrEngineKind.ML_KIT_KOREAN, OcrEngineKind.ML_KIT_CHINESE, OcrEngineKind.ML_KIT_LATIN,
-                OcrEngineKind.PADDLE_ONNX, OcrEngineKind.MANGA_OCR_JA),
+                OcrEngineKind.PADDLE_ONNX, OcrEngineKind.MANGA_OCR_JA, OcrEngineKind.TESSERACT_ARABIC),
             OcrEngineGroup.LOCAL to listOf(OcrEngineKind.UMI_OCR, OcrEngineKind.LUNA_OCR),
             OcrEngineGroup.CLOUD to listOf(OcrEngineKind.BAIDU, OcrEngineKind.TENCENT,
                 OcrEngineKind.YOUDAO, OcrEngineKind.PADDLE_AI_STUDIO),

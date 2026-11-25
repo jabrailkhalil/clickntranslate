@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="setup_hero_title">Выбери героя</string>
+    <string name="setup_hero_body">Эта картинка появится на плавающей кнопке поверх других приложений. Выбери героя, значок действия или логотип. Выбор можно изменить позже.</string>
+    <string name="setup_hero_custom_unavailable">Предпросмотр недоступен. Выбор сохранён.</string>
+</resources>

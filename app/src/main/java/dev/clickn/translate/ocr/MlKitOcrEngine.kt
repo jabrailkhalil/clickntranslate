@@ -51,15 +51,20 @@ class MlKitOcrEngine @Inject constructor(
         bitmap: Bitmap,
         kind: OcrEngineKind,
         settings: Settings,
-    ): List<TextBlock> = recognizeInternal(bitmap, kind)
+    ): List<TextBlock> = recognizeInternal(bitmap, kind, prepareParagraphs = !settings.mergeAdjacentBlocks)
 
-    private suspend fun recognizeInternal(bitmap: Bitmap, kind: OcrEngineKind): List<TextBlock> {
-        return when (kind) {
+    private suspend fun recognizeInternal(
+        bitmap: Bitmap,
+        kind: OcrEngineKind,
+        prepareParagraphs: Boolean = true,
+    ): List<TextBlock> {
+        val raw = when (kind) {
             OcrEngineKind.ML_KIT_LATIN -> runRecognizer(latin, bitmap, "latin", "full")
             OcrEngineKind.ML_KIT_JAPANESE -> recognizeJapanese(bitmap)
             OcrEngineKind.ML_KIT_CHINESE -> runRecognizer(chinese, bitmap, "zh", "full")
             OcrEngineKind.ML_KIT_KOREAN -> runRecognizer(korean, bitmap, "ko", "full")
             OcrEngineKind.ML_KIT_AUTO -> autoRecognize(bitmap)
+            OcrEngineKind.TESSERACT_ARABIC -> error("Tesseract must be dispatched through RoutingOcrEngine")
             OcrEngineKind.BAIDU,
             OcrEngineKind.TENCENT,
             OcrEngineKind.YOUDAO,
@@ -69,6 +74,12 @@ class MlKitOcrEngine @Inject constructor(
             OcrEngineKind.PADDLE_ONNX,
             OcrEngineKind.MANGA_OCR_JA -> autoRecognize(bitmap)
         }
+        // Explicit geometric merge (including Floating ALL) keeps its original
+        // atomic input. Japanese glyph/column recognition remains unchanged.
+        return if (prepareParagraphs && kind in setOf(OcrEngineKind.ML_KIT_LATIN,
+                OcrEngineKind.ML_KIT_CHINESE, OcrEngineKind.ML_KIT_KOREAN)) {
+            prepareMlKitParagraphBlocks(raw)
+        } else raw
     }
 
     private suspend fun recognizeJapanese(bitmap: Bitmap): List<TextBlock> {
@@ -127,7 +138,7 @@ class MlKitOcrEngine @Inject constructor(
         lang: String,
         origin: String,
         japaneseGlyphCollector: MutableList<MlKitJapaneseGlyph>? = null,
-    ): List<TextBlock> = suspendCancellableCoroutine { cont ->
+    ): List<TextBlock> = finishBorrowedOcrWork { suspendCancellableCoroutine { cont ->
         val input = InputImage.fromBitmap(bitmap, 0)
         val startedAt = SystemClock.elapsedRealtime()
         recognizer.process(input)
@@ -252,7 +263,7 @@ class MlKitOcrEngine @Inject constructor(
                 )
                 if (cont.isActive) cont.resumeWithException(error)
             }
-    }
+    } }
 
     /**
      * Debug-only repair path for pages whose symbol geometry strongly disagrees with the

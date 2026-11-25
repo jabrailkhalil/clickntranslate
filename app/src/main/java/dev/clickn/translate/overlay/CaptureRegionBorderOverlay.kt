@@ -66,6 +66,22 @@ internal class CaptureRegionBorderOverlay(
     }
 
     private var borderView: CaptureRegionBorderView? = null
+    private val sourceVisibility = sourceCaptureViewVisibility()
+
+    fun canObserveSource(): Boolean = dragAnchor == null
+
+    fun hideForSourceObservation(): SourceObservationLease = sourceVisibility.hideForSourceObservation()
+
+    private fun addSourceView(view: View, params: WindowManager.LayoutParams) {
+        sourceVisibility.track(view, desiredSourceVisibility())
+        try { wm.addView(view, params) }
+        catch (failure: Throwable) { sourceVisibility.untrack(view); throw failure }
+    }
+
+    private fun removeSourceView(view: View) {
+        sourceVisibility.untrack(view)
+        wm.removeView(view)
+    }
     private val adjustmentViews = mutableMapOf<CaptureRegionDragKind, CaptureRegionHandleView>()
     private var hiddenForCapture: Boolean = false
     private var autoHideOnCapture: Boolean = true
@@ -98,7 +114,7 @@ internal class CaptureRegionBorderOverlay(
         )
         val params = borderLayoutParams(screenWidth, screenHeight)
         if (borderView == null) {
-            if (runCatching { wm.addView(view, params) }.isSuccess) {
+            if (runCatching { addSourceView(view, params) }.isSuccess) {
                 borderView = view
             }
         } else {
@@ -145,7 +161,7 @@ internal class CaptureRegionBorderOverlay(
     }
 
     fun hide() {
-        borderView?.let { runCatching { wm.removeView(it) } }
+        borderView?.let { runCatching { removeSourceView(it) } }
         borderView = null
         removeAdjustmentHandles()
         adjustmentRegion = null
@@ -153,7 +169,12 @@ internal class CaptureRegionBorderOverlay(
     }
 
     private fun syncVisibility() {
-        val visibility = if (
+        val visibility = desiredSourceVisibility()
+        borderView?.let { sourceVisibility.setDesired(it, visibility) }
+        adjustmentViews.values.forEach { sourceVisibility.setDesired(it, visibility) }
+    }
+
+    private fun desiredSourceVisibility(): Int = if (
             shouldHideCaptureRegionBorder(
                 hiddenForCapture = hiddenForCapture,
                 hiddenForEditor = hiddenForEditor,
@@ -161,9 +182,6 @@ internal class CaptureRegionBorderOverlay(
                 autoHideOnCapture = autoHideOnCapture,
             )
         ) View.INVISIBLE else View.VISIBLE
-        borderView?.visibility = visibility
-        adjustmentViews.values.forEach { it.visibility = visibility }
-    }
 
     private fun syncAdjustmentHandles(
         enabled: Boolean,
@@ -186,7 +204,7 @@ internal class CaptureRegionBorderOverlay(
                     setOnTouchListener { _, event -> onHandleTouch(kind, event) }
                 }
                 val added = runCatching {
-                    wm.addView(
+                    addSourceView(
                         handle,
                         handleLayoutParams(kind, region, screenWidth, screenHeight),
                     )
@@ -290,7 +308,7 @@ internal class CaptureRegionBorderOverlay(
     }
 
     private fun removeAdjustmentHandles() {
-        adjustmentViews.values.forEach { runCatching { wm.removeView(it) } }
+        adjustmentViews.values.forEach { runCatching { removeSourceView(it) } }
         adjustmentViews.clear()
     }
 

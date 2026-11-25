@@ -1,0 +1,2 @@
+zipalign -c -v -P 16 4 ClicknTranslate-Android-1.8.3-code44-candidate.apk
+Verification succesful

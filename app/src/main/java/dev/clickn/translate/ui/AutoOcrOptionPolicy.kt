@@ -23,6 +23,7 @@ internal fun autoOcrCanSelect(settings: Settings, language: String, route: AutoO
 internal fun autoOcrModelSpec(route: AutoOcrRoute?): ModelDownloadSpec? = when (route?.engine) {
     OcrEngineKind.PADDLE_ONNX -> ModelDownloadSpec.paddle(route.paddleVersion)
     OcrEngineKind.MANGA_OCR_JA -> ModelDownloadSpec.mangaOcr()
+    OcrEngineKind.TESSERACT_ARABIC -> ModelDownloadSpec.tesseractArabic()
     else -> null
 }
 

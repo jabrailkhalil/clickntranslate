@@ -10,7 +10,6 @@ import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.datastore.preferences.preferencesDataStore
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import dev.clickn.translate.R
 import dev.clickn.translate.capture.CaptureRegion
@@ -29,8 +28,6 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
-private val Context.dataStore by preferencesDataStore("clickntranslate_settings")
-
 private fun normalizeLoopFrameSimilarity(value: Float): Float =
     if (value.isFinite()) value.coerceIn(0.50f, 0.99f) else 0.95f
 
@@ -40,11 +37,19 @@ private fun normalizeLoopTextStableDuration(value: Long): Long = value.coerceIn(
 class SettingsRepository internal constructor(
     private val context: Context,
     secretCipher: SettingsSecretCipher,
-    private val settingsStore: DataStore<Preferences>,
+    incomingSettingsStore: DataStore<Preferences>,
+    private val recoveryGate: SettingsImportRecoveryGate = SettingsImportRecoveryGate.readyForIsolatedStore(),
 ) {
     @Inject
-    constructor(@ApplicationContext context: Context, secretCipher: SettingsSecretCipher) :
-        this(context, secretCipher, context.dataStore)
+    constructor(@ApplicationContext context: Context, secretCipher: SettingsSecretCipher,
+        storage: SettingsStorage, recoveryGate: SettingsImportRecoveryGate) :
+        this(context, secretCipher, storage.dataStore, recoveryGate)
+
+    private val rawSettingsStore = incomingSettingsStore
+    private val settingsStore = recoveryGate.wrap(incomingSettingsStore)
+
+    internal suspend fun awaitImportRecovery() = recoveryGate.awaitReady()
+    internal fun isImportRecoveryReady(): Boolean = recoveryGate.isReady()
 
     private object Keys {
         val BaseUrl = stringPreferencesKey("base_url")
@@ -328,9 +333,11 @@ class SettingsRepository internal constructor(
         Keys.TranslationPresets
     )
 
-    val settings: Flow<Settings> = settingsStore.data
-        .map { prefs -> prefs.toSettings() }
+    internal val selectionSnapshots: Flow<TranslationSelectionSnapshot> = settingsStore.data
+        .map { prefs -> TranslationSelectionSnapshot(prefs.toSettings(), TranslationSelectionRevision.read(prefs)) }
         .flowOn(Dispatchers.IO)
+
+    val settings: Flow<Settings> = selectionSnapshots.map { it.settings }
 
     suspend fun get(): Settings = settings.first()
 
@@ -639,16 +646,68 @@ class SettingsRepository internal constructor(
     }
 
     suspend fun updateAfterPresetImport(importedNames: Set<String>, transform: (Settings) -> Settings): Settings =
-        updateWithPreferences(readBack = true) { current, prefs ->
-            val next = transform(current)
-            val normalizedNames = importedNames.mapTo(mutableSetOf()) { it.trim().lowercase(java.util.Locale.ROOT) }
-            val importedIds = next.translationPresets.filter {
-                it.name.trim().lowercase(java.util.Locale.ROOT) in normalizedNames
-            }.mapTo(mutableSetOf()) { it.id }
-            importedIds.forEach { prefs.remove(presetCredentialKey(it)) }
-            if (next.activeTranslationPresetId in importedIds) {
-                PresetCredentialPolicy.apply(next.activeTranslationPresetId, next, null)
-            } else next
+        updateImportedSettings(importedNames, rollback = null, transform = transform)
+
+    internal suspend fun importPresetValues(
+        imported: List<TranslationPreset>,
+        rollback: SettingsImportRollback? = null,
+    ): TranslationPresetImportResult {
+        var result: TranslationPresetImportResult? = null
+        updateImportedSettings(imported.mapTo(mutableSetOf()) { it.name }, rollback) { current ->
+            val merged = TranslationPresetTransfer.mergeImportedPresets(current.translationPresets, imported)
+            result = merged
+            current.copy(translationPresets = merged.presets,
+                activeTranslationPresetId = current.activeTranslationPresetId.takeIf { id ->
+                    id.isNotBlank() && TranslationPresetCatalog.find(merged.presets, id) != null
+                }.orEmpty())
+        }
+        return requireNotNull(result)
+    }
+
+    internal suspend fun updateImportedSettings(
+        importedNames: Set<String>,
+        rollback: SettingsImportRollback?,
+        transform: (Settings) -> Settings,
+    ): Settings = updateWithPreferences(readBack = true, rollback = rollback) { current, prefs ->
+        val next = transform(current)
+        val normalizedNames = importedNames.mapTo(mutableSetOf()) { it.trim().lowercase(java.util.Locale.ROOT) }
+        val importedIds = next.translationPresets.filter {
+            it.name.trim().lowercase(java.util.Locale.ROOT) in normalizedNames
+        }.mapTo(mutableSetOf()) { it.id }
+        importedIds.forEach { prefs.remove(presetCredentialKey(it)) }
+        if (next.activeTranslationPresetId in importedIds) {
+            PresetCredentialPolicy.apply(next.activeTranslationPresetId, next, null)
+        } else next
+    }
+
+    internal suspend fun rollbackImportedSettings(rollback: SettingsImportRollback) =
+        rollbackImportedSettingsInStore(rollback, settingsStore)
+
+    /** The sole gate bypass: only the startup journal coordinator may restore these local values. */
+    internal suspend fun recoverImportedSettings(changes: List<ImportPreferenceChange>) =
+        rollbackImportedSettingsInStore(SettingsImportRollback.restoreToken(changes), rawSettingsStore)
+
+    internal suspend fun importedFontReferencesForRecovery(): Set<String> = rawSettingsStore.data.first().toSettings().let {
+        it.overlayFonts.mapTo(mutableSetOf()) { font -> font.fileName }.apply { add(it.overlayFontFileName) }
+    }
+
+    private suspend fun rollbackImportedSettingsInStore(rollback: SettingsImportRollback, store: DataStore<Preferences>) =
+        withContext(Dispatchers.IO) {
+            store.edit { prefs ->
+                val before = prefs.toSettings()
+                rollback.restore(prefs) { key, actual, expected ->
+                    if (key == TranslationSelectionRevision.key) false
+                    else if (actual == expected) true
+                    else if (key in secureStringKeys && actual is String && expected is String) {
+                        // An unrelated settings edit re-encrypts these values with a new
+                        // nonce. Compare their content, without exporting either value.
+                        val decoded = secretCodec.decodeStored(actual)
+                        decoded != null && decoded == secretCodec.decodeStored(expected)
+                    } else false
+                }
+                TranslationSelectionRevision.advanceIfChanged(prefs, before, prefs.toSettings())
+            }
+            Unit
         }
 
     suspend fun rememberSnapshotCredentials(snapshot: TranslationPreset, source: Settings) = withContext(Dispatchers.IO) {
@@ -682,12 +741,29 @@ class SettingsRepository internal constructor(
         updateWithPreferences { current, _ -> transform(current) }
     }
 
+    internal suspend fun updateTranslationSelectionIfUnchanged(
+        expected: TranslationSelectionSnapshot,
+        requested: Settings,
+    ) {
+        updateWithPreferences { current, prefs ->
+            if (expected.matches(current, TranslationSelectionRevision.read(prefs))) {
+                current.copy(
+                    translatorEngine = requested.translatorEngine,
+                    sourceLang = requested.sourceLang,
+                    targetLang = requested.targetLang,
+                )
+            } else current
+        }
+    }
+
     private suspend fun updateWithPreferences(
         readBack: Boolean = false,
+        rollback: SettingsImportRollback? = null,
         transform: (Settings, MutablePreferences) -> Settings,
     ): Settings = withContext(Dispatchers.IO) {
         var committed: Settings? = null
         settingsStore.edit { prefs ->
+            val beforeImport = if (rollback != null) prefs.asMap().toMap() else null
             val current = prefs.toSettings()
             val requested = transform(current, prefs)
             val languageSafe = if (
@@ -933,6 +1009,9 @@ class SettingsRepository internal constructor(
             prefs[Keys.BubbleClusterGap] = MangaOcrAdvancedSettingsPolicy.BUBBLE_CLUSTER_GAP
             prefs[Keys.MangaOcrCropPaddingPx] = MangaOcrAdvancedSettingsPolicy.CROP_PADDING_PX
             committed = if (readBack) prefs.toSettings() else next
+            if (beforeImport != null) rollback?.record(beforeImport, prefs.asMap().toMap())
+            // Checkpoints compensate setting values; they must never rewind selection ownership.
+            TranslationSelectionRevision.advanceIfChanged(prefs, current, next)
         }
         requireNotNull(committed)
     }

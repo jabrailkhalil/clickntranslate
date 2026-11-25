@@ -8,11 +8,18 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class OverlayThemeContrastTest {
+    @Test fun defaultBackdropCompletelyCoversUnderlyingText() {
+        val settings = Settings()
+        val color = Color(requireNotNull(builtInOverlayPalette(settings.overlayTheme)).background)
+        val backdrop = color.copy(alpha = color.alpha * settings.overlayAlpha)
+        assertEquals(backdrop.compositeOver(Color.White), backdrop.compositeOver(Color.Black))
+    }
+
     @Test fun builtInTextAndActionsStayReadableOverLightAndDarkApplications() {
         OverlayTheme.entries.filter { it != OverlayTheme.CUSTOM }.forEach { theme ->
             val palette = builtInOverlayPalette(theme)!!
             assertEquals(palette.accent, translationActionAccentColor(theme, 0, 0))
-            listOf(1f, Settings().overlayAlpha).forEach { windowAlpha ->
+            listOf(1f, 0.85f).forEach { windowAlpha ->
                 listOf(Color.White, Color.Black).forEach { underneath ->
                     val background = Color(palette.background)
                     val bg = background.copy(alpha = background.alpha * windowAlpha).compositeOver(underneath)

@@ -10,6 +10,7 @@
     <string name="mobile_stop">Übersetzung beenden</string>
     <string name="mobile_ready">Bereit zum Übersetzen</string>
     <string name="mobile_running">Bildschirmübersetzung aktiv</string>
+    <string name="mobile_running_next_step">Öffne die App, die du übersetzen möchtest. Steuere die Übersetzung über die schwebende Figur; halte sie gedrückt, um ihr Menü zu öffnen.</string>
     <string name="mobile_pair">Sprachen</string>
     <string name="mobile_source">Von</string>
     <string name="mobile_target">Nach</string>
@@ -24,7 +25,6 @@
     <string name="mobile_change">Ändern</string>
     <string name="mobile_permission_title">Schwebende Schaltfläche erlauben</string>
     <string name="mobile_permission_body">Eine Berechtigung ermöglicht Übersetzungen in anderen Apps. Die Bildschirmaufnahme wird beim Start angefragt.</string>
-    <string name="mobile_permission_enable">Über anderen Apps anzeigen</string>
     <string name="mobile_permission_done">Berechtigung erteilt</string>
     <string name="mobile_help">So funktioniert es</string>
     <string name="mobile_text_title">Deine Worte, übersetzt.</string>
@@ -101,4 +101,23 @@
     <string name="settings_app_lang_de">Deutsch</string>
     <string name="settings_app_lang_fr">Français</string>
     <string name="settings_app_lang_es">Español</string>
-    </resources>
+    <string name="mobile_history_loading">Verlauf wird geladen…</string>
+    <string name="mobile_history_import_error">Der bisherige Verlauf konnte nicht importiert werden. Die Originaldaten bleiben erhalten; neue Übersetzungen können gespeichert werden.</string>
+    <string name="mobile_history_erase_error">Der Verlauf wurde geleert, aber seine alte Sicherung konnte nicht entfernt werden. Bitte erneut versuchen.</string>
+    <string name="mobile_history_storage_error">Der Verlauf ist nicht verfügbar. Die Übersetzung bleibt im Bereich „Text“. Bitte erneut laden.</string>
+    <string name="mobile_history_retry">Erneut versuchen</string>
+    <string name="mobile_history_entry_title">Gespeicherte Übersetzung</string>
+    <string name="mobile_history_original">Originaltext</string>
+    <string name="mobile_history_close">Schließen</string>
+    <string name="mobile_history_use_source">Im Übersetzer öffnen</string>
+    <string name="mobile_failure_connection">Keine Verbindung zum Übersetzungsdienst. Verbindung prüfen oder einen anderen Dienst wählen.</string>
+    <string name="mobile_failure_timeout">Der Dienst hat nicht rechtzeitig geantwortet. Bitte erneut versuchen.</string>
+    <string name="mobile_failure_access">Der Dienst hat den Zugriff verweigert. Einstellungen prüfen oder einen anderen Dienst wählen.</string>
+    <string name="mobile_failure_limit">Der Dienst hat Anfragen begrenzt. Bitte später erneut versuchen.</string>
+    <string name="mobile_failure_tls">Es konnte keine vertrauenswürdige sichere Verbindung zum Dienst hergestellt werden.</string>
+    <string name="mobile_failure_service">Der Übersetzungsdienst ist nicht verfügbar. Bitte später erneut versuchen.</string>
+    <string name="mobile_failure_response">Der Dienst hat eine leere oder unlesbare Antwort gesendet. Erneut versuchen oder einen anderen Dienst wählen.</string>
+    <string name="mobile_failure_details">Diagnose</string>
+    <string name="mobile_failure_details_body">Dieser Code beschreibt den Fehler. Er enthält keinen Anfragetext, keinen Antwortinhalt und keinen API-Schlüssel.</string>
+    <string name="mobile_checking_models">Bereitschaft wird geprüft…</string>
+</resources>

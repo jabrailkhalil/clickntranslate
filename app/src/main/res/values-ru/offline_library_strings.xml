@@ -1,0 +1,5 @@
+<resources>
+    <string name="offline_installed_translation_languages">Установленные языки перевода (%1$d)</string>
+    <string name="offline_installed_translation_help">Нажмите установленный язык, чтобы выбрать его исходным. Другие языки доступны в выборе исходного языка и перевода выше.</string>
+    <string name="offline_builtin_english">Входит в ML Kit</string>
+</resources>

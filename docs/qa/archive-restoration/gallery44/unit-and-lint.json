@@ -1,0 +1,16 @@
+{
+  "source_commit": "5a578d60e68518c8891345ad62376d7c1540ca49",
+  "suite_count": 492,
+  "totals": {
+    "tests": 1895,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "lint_severities": {
+    "Warning": 975,
+    "Information": 42
+  },
+  "lint_sha256": "4a43c30567228f34cbadc9d757fee4296b91c3dfc68fc2749cba32c73670c473",
+  "scope": "JVM_AND_LINT_FOR_CODE44"
+}

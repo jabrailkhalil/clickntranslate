@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="process_text_replace">Remplacer la sélection</string>
+    <string name="process_text_retry">Réessayer</string>
+    <string name="process_text_too_long">Sélectionnez au maximum %1$d caractères. Votre texte n’a pas été modifié.</string>
+    <string name="process_text_copy_failed">Copie impossible. La traduction reste disponible.</string>
+    <string name="process_text_interrupted">Traduction interrompue. Appuyez sur Réessayer pour continuer.</string>
+    <string name="integration_tile_start">Démarrer la traduction d’écran</string>
+    <string name="integration_tile_stop">Arrêter la traduction d’écran</string>
+    <string name="integration_tile_launch_failed">Impossible d’ouvrir la traduction d’écran. Ouvrez l’application et réessayez.</string>
+</resources>

@@ -24,6 +24,8 @@ import android.widget.Toast
 import androidx.core.app.ServiceCompat
 import dev.clickn.translate.R
 import dev.clickn.translate.capture.CaptureCoordinateRelation
+import dev.clickn.translate.capture.CaptureGeometryBarrier
+import dev.clickn.translate.capture.MainCaptureUiVisibility
 import dev.clickn.translate.capture.CaptureContentOrientationPolicy
 import dev.clickn.translate.capture.CaptureRegion
 import dev.clickn.translate.capture.captureRegionOrigin
@@ -59,6 +61,7 @@ import dev.clickn.translate.capture.Screenshotter
 import dev.clickn.translate.capture.SettledPagePolicy
 import dev.clickn.translate.capture.SettledPageFrame
 import dev.clickn.translate.capture.SettledPageVisualPolicy
+import dev.clickn.translate.capture.SettledTextWatch
 import dev.clickn.translate.capture.ShizukuScreenshotter
 import dev.clickn.translate.capture.diagnoseCaptureGeometry
 import dev.clickn.translate.capture.floatingWindowCaptureAction
@@ -201,6 +204,7 @@ import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 
 internal fun allowsFrequentTextStabilityProbe(
     ocrEngine: OcrEngineKind,
@@ -216,7 +220,8 @@ internal fun allowsFrequentTextStabilityProbe(
         OcrEngineKind.ML_KIT_CHINESE,
         OcrEngineKind.ML_KIT_KOREAN,
         OcrEngineKind.PADDLE_ONNX,
-        OcrEngineKind.MANGA_OCR_JA -> true
+        OcrEngineKind.MANGA_OCR_JA,
+        OcrEngineKind.TESSERACT_ARABIC -> true
         OcrEngineKind.BAIDU,
         OcrEngineKind.TENCENT,
         OcrEngineKind.YOUDAO,
@@ -300,10 +305,11 @@ class CaptureService : Service() {
     private val mainScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val captureLock = Mutex()
     private val screenshotLock = Mutex()
+    private val sourceObservationCapture = SourceObservationCapture()
     private val translationVisualDebugStore by lazy {
         TranslationVisualDebugStore.forContext(this)
     }
-    private val translationBatchGate = TranslationBatchGate()
+    private val translationBatchGate = TranslationBatchGate(MainCaptureUiVisibility)
     private val floatingWordLookupCoordinator by lazy {
         FloatingWordLookupCoordinator(translator, scope, offlineDictionaryRepository)
     }
@@ -311,10 +317,22 @@ class CaptureService : Service() {
     private var screenshotter: Screenshotter? = null
     private var captureStopRequested = false
     private var captureUiStartupJob: Job? = null
+    // Main-thread state. The startup coroutine can still be active after it finishes applying settings.
+    private var floatingButtonReady = false
     private var captureProbeJob: Job? = null
     private var projection: MediaProjection? = null
     private var floatingButton: FloatingButtonManager? = null
-    private var overlay: OverlayManager? = null
+    private var overlayManager: OverlayManager? = null
+    // All presentation paths, including delayed loading/error hints, share this live gate.
+    // Configuration and teardown use overlayManager directly and remain effective while hidden.
+    private var overlay: OverlayManager?
+        get() = overlayManager.takeUnless { MainCaptureUiVisibility.snapshot().visible }
+        set(value) {
+            overlayManager = value
+            value?.setPerformanceOverlayHiddenForCapture(MainCaptureUiVisibility.snapshot().visible)
+        }
+    private var stopOwnUiObservation: (() -> Unit)? = null
+    private var resumeLoopAfterOwnUi = false
     private var captureRegionBorder: CaptureRegionBorderOverlay? = null
     private var regionPicker: RegionPickerOverlay? = null
     private var regionPickerJob: Job? = null
@@ -342,7 +360,9 @@ class CaptureService : Service() {
     private val floatingDialogueHistorySession = DialogueHistorySession()
     private var loopFrameStabilityState = LoopFrameStabilityState()
     private val settledPagePolicy = SettledPagePolicy()
-    private var settledPageAnchor: SettledPageFrame? = null
+    @Volatile private var settledPageAnchor: SettledPageFrame? = null
+    @Volatile private var settledTextWatch: SettledTextWatch? = null
+    private var lastSettledSourceObservationMs: Long? = null
     private var pendingLoopRoiResult: PendingLoopRoiResult? = null
     private var loopRoiTextFallbackActive: Boolean = false
     @Volatile private var loopTranslationInFlight = false
@@ -354,11 +374,53 @@ class CaptureService : Service() {
     // （悬浮按钮大小、配色主题、字号、透明度、紧贴文位置 …）。原先只在 captureOnce
     // 时读 settings，导致用户必须停止/重启服务或触发一次截屏才能看到改动。
     private var settingsCollectJob: Job? = null
+    @Volatile private var observedSettings: Settings? = null
     private var performanceOverlayCollectJob: Job? = null
     @Volatile private var loopMode: Boolean = false
     private val captureSequence = AtomicLong(0L)
+    private val captureGeometry = CaptureGeometryBarrier()
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    override fun onCreate() {
+        super.onCreate()
+        stopOwnUiObservation = MainCaptureUiVisibility.observe(::onOwnUiVisibilityChanged)
+    }
+
+    /** Main lifecycle notification: remove old windows before our Activity can draw its first frame. */
+    private fun onOwnUiVisibilityChanged() {
+        if (captureStopRequested) return
+        if (!MainCaptureUiVisibility.snapshot().visible) {
+            overlayManager?.setPerformanceOverlayHiddenForCapture(hidden = false)
+            captureRegionBorder?.setHiddenForCapture(hidden = false)
+            if (CaptureServiceState.running.value && floatingButtonReady) floatingButton?.show()
+            if (resumeLoopAfterOwnUi) {
+                resumeLoopAfterOwnUi = false
+                if (!loopMode && CaptureServiceState.running.value) toggleLoopMode()
+            }
+            return
+        }
+        resumeLoopAfterOwnUi = loopMode
+        if (loopMode) toggleLoopMode()
+        // Also rejects pre-OCR work that has not yet bound its translation batch.
+        captureGeometry.retire { retireCaptureGeometry("ownUiVisible") }
+        cancelInputTranslation(silent = true)
+        floatingWordDetailsRequestId++
+        floatingWordDetailsJob?.cancel()
+        translationCardWordLookupId++
+        translationCardWordLookupJob?.cancel()
+        regionPickerJob?.cancel()
+        regionPicker?.dismiss()
+        wordSelect?.dismiss()
+        languageQuickSwitch?.dismiss()
+        presetQuickSwitch?.dismiss()
+        translationCorrectionOverlay?.dismiss()
+        overlayManager?.cancelStartCountdown()
+        overlayManager?.clear()
+        overlayManager?.setPerformanceOverlayHiddenForCapture(hidden = true)
+        captureRegionBorder?.setHiddenForCapture(hidden = true)
+        floatingButton?.hide()
+    }
 
     override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
         super.onConfigurationChanged(newConfig)
@@ -366,12 +428,16 @@ class CaptureService : Service() {
             "service configurationChanged orientation=${newConfig.orientation.toDiagOrientation()} " +
                 "display=${currentDisplayGeometry().toDiagString()} projection=${projectionDiagnosticSummary()}"
         )
+        val screen = physicalDisplaySize(this)
+        captureGeometry.observeDisplay(screen.width, screen.height) {
+            retireCaptureGeometry("displaySizeChanged")
+        }
         resizeProjectionForCurrentDisplay("serviceConfigurationChanged")
         // 屏幕方向变了把圆球 + 悬浮窗口 + 截屏区域都按比例重算位置。
         // captureRegion 走 SettingsRepository.rescaleCaptureRegionIfNeeded——
         // 它用 saved 元数据按当前屏幕尺寸自动算比例，比"上次 onConfigurationChanged 拿到的尺寸"更稳。
         floatingButton?.onConfigurationChanged()
-        mainScope.launch { overlay?.onConfigurationChanged() }
+        mainScope.launch { overlayManager?.onConfigurationChanged() }
         scope.launch {
             val screen = physicalDisplaySize(this@CaptureService)
             settingsRepository.rescaleCaptureRegionIfNeeded(screen.width, screen.height)
@@ -381,10 +447,7 @@ class CaptureService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_START -> handleStart(intent)
-            ACTION_STOP -> {
-                captureStopRequested = true
-                stopSelf()
-            }
+            ACTION_STOP -> requestCaptureStop()
             ACTION_TRIGGER_ONCE -> triggerOnce()
             ACTION_SHOW_BUTTON -> floatingButton?.show()
             ACTION_PICK_REGION -> showRegionPickerOverlay()
@@ -394,6 +457,27 @@ class CaptureService : Service() {
             }
         }
         return START_NOT_STICKY
+    }
+
+    /** Runs on Main. The automatic polling coroutine remains alive after a geometry change. */
+    private fun retireCaptureGeometry(reason: String, clearFloatingResult: Boolean = false) {
+        cancelActiveTranslationBatch(reason)
+        settledPageExecutionJob?.cancel(CancellationException(reason))
+        settledPageExecutionJob = null
+        resetLoopCaptureState()
+        resetLoopRuntimeState()
+        activeCaptureDisplayRegion = null
+        if (clearFloatingResult) overlayManager?.clear()
+        else overlayManager?.clearForCaptureGeometryChange()
+        translationCard?.dismiss()
+        translationBlockCopyOverlay?.dismiss()
+        ttsEngine.stop()
+        VerticalDiagnosticLog.i("capture geometry retired reason=$reason generation=${captureGeometry.snapshot()}")
+    }
+
+    private fun requestCaptureStop() {
+        captureStopRequested = true
+        stopSelf()
     }
 
     private fun handleStart(intent: Intent) {
@@ -417,6 +501,8 @@ class CaptureService : Service() {
     }
 
     private fun initializeCapture(intent: Intent) {
+        val initialScreen = physicalDisplaySize(this)
+        captureGeometry.observeDisplay(initialScreen.width, initialScreen.height)
         // Service 启动时主动 rescale 一次 captureRegion——如果用户在 service 没跑时旋转了屏幕，
         // 这里把 region 校正到当前屏幕方向。
         scope.launch {
@@ -474,15 +560,38 @@ class CaptureService : Service() {
                 failCaptureStart()
                 return
             }
-            val mpm = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-            projection = mpm.getMediaProjection(resultCode, data)
-            val mp = projection
-            if (mp == null) {
-                Timber.w("getMediaProjection returned null")
-                failCaptureStart()
+            try {
+                val manager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+                val mp = checkNotNull(manager.getMediaProjection(resultCode, data)) {
+                    "MediaProjection consent is unavailable"
+                }
+                projection = mp
+                val capture = MediaProjectionScreenshotter(
+                    this,
+                    mp,
+                    onCaptureSizeChanged = { width, height ->
+                        mainScope.launch {
+                            if (projection === mp && !captureStopRequested) {
+                                captureGeometry.observeCapture(width, height) {
+                                    retireCaptureGeometry("capturedContentSizeChanged")
+                                }
+                            }
+                        }
+                    },
+                    onProjectionStopped = {
+                        mainScope.launch {
+                            // A queued terminal callback from an old owner cannot stop a later session.
+                            if (projection === mp && !captureStopRequested) requestCaptureStop()
+                        }
+                    },
+                )
+                screenshotter = capture
+                capture.start()
+                check(capture.isReady) { "MediaProjection ended during startup" }
+            } catch (error: RuntimeException) {
+                failCaptureStart(error)
                 return
             }
-            screenshotter = MediaProjectionScreenshotter(this, mp)
             Timber.i("CaptureService started with MediaProjection path")
         }
 
@@ -509,6 +618,7 @@ class CaptureService : Service() {
                 settingsRepository.setCaptureRegion(region, screenWidth, screenHeight)
             }
         }
+        captureRegionBorder?.setHiddenForCapture(MainCaptureUiVisibility.snapshot().visible)
         floatingButton = FloatingButtonManager(
             this,
             // 主球单击：按当前 skill 路由。FloatingButtonManager.skill 由 settings collect 同步保持最新；
@@ -580,7 +690,8 @@ class CaptureService : Service() {
                     floatingButton?.skill = s.floatingButtonSkill
                     floatingButton?.inputTranslationDoubleAction = s.inputTranslationDoubleAction
                     floatingButton?.applyOpacity(s.floatingButtonAlpha)
-                    floatingButton?.show()
+                    floatingButtonReady = true
+                    if (!MainCaptureUiVisibility.snapshot().visible) floatingButton?.show()
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -594,7 +705,16 @@ class CaptureService : Service() {
         settingsCollectJob?.cancel()
         settingsCollectJob = scope.launch {
             var lastEngine: dev.clickn.translate.data.TranslatorEngine? = null
+            var previousSettings: Settings? = null
             settingsRepository.settings.collect { s ->
+                val processingSettings = s.sourceObservationSettings()
+                observedSettings = processingSettings
+                if (previousSettings != null && previousSettings != processingSettings) {
+                    withContext(Dispatchers.Main.immediate) {
+                        captureGeometry.retire { retireCaptureGeometry("settings_changed", clearFloatingResult = true) }
+                    }
+                }
+                previousSettings = processingSettings
                 applyOverlayConfig(s, syncFloatingWindowLock = true)
                 // 端侧 LLM 引擎切走时主动释放权重：避免 500MB+ 模型常驻内存抢 Bitmap / OCR 模型空间。
                 val wasLocal = lastEngine?.name?.startsWith("LOCAL_") == true
@@ -718,12 +838,21 @@ class CaptureService : Service() {
         delay(CAPTURE_CHROME_SETTLE_MS)
     }
 
-    private fun restoreCaptureChrome(showLoading: Boolean, restoreFloatingButton: Boolean) {
+    private fun restoreCaptureChrome(
+        showLoading: Boolean,
+        restoreFloatingButton: Boolean,
+        loadingBatchId: Long? = null,
+    ) {
         mainScope.launch {
+            if (MainCaptureUiVisibility.snapshot().visible) return@launch
             overlay?.setPerformanceOverlayHiddenForCapture(hidden = false)
             captureRegionBorder?.setHiddenForCapture(hidden = false)
             if (restoreFloatingButton) floatingButton?.show()
-            if (showLoading) overlay?.showLoadingHint()
+            if (showLoading && !captureStopRequested &&
+                translationBatchGate.accepts(loadingBatchId) && captureGeometry.acceptsBatch(loadingBatchId)
+            ) {
+                overlay?.showLoadingHint()
+            }
             Timber.d(
                 "Capture chrome restored after screenshot loading=%s floatingButton=%s",
                 showLoading,
@@ -782,6 +911,7 @@ class CaptureService : Service() {
     }
 
     private fun triggerOnce() {
+        if (MainCaptureUiVisibility.snapshot().visible) return
         if (captureLock.isLocked) {
             Timber.i("Skip manual trigger because capture is already running")
             return
@@ -804,6 +934,7 @@ class CaptureService : Service() {
      * 翻译期间如果输入框、窗口或原文发生变化，就拒绝覆盖，避免把结果写进错误位置。
      */
     private fun triggerInputTranslation() {
+        if (MainCaptureUiVisibility.snapshot().visible) return
         if (inputTranslationJob?.isActive == true) {
             cancelInputTranslation(silent = false)
             return
@@ -992,6 +1123,8 @@ class CaptureService : Service() {
      * 全程错误用 [OverlayManager.showErrorHint] 红条提示（跟主链路同链路），不弹 Toast。
      */
     private fun triggerWordSelect() {
+        if (MainCaptureUiVisibility.snapshot().visible) return
+        val uiRevision = MainCaptureUiVisibility.snapshot().revision
         val ws = wordSelect ?: WordSelectOverlay(this).also { wordSelect = it }
         if (ws.isShown()) return
         mainScope.launch {
@@ -1004,6 +1137,7 @@ class CaptureService : Service() {
                 }
             } else null
 
+            if (!MainCaptureUiVisibility.allowsPresentation(uiRevision)) return@launch
             captureRegionBorder?.setHiddenForWordSelect(hidden = true)
             floatingButton?.hide()
             ws.show(
@@ -1059,7 +1193,7 @@ class CaptureService : Service() {
                 onCancel = {
                     mainScope.launch {
                         captureRegionBorder?.setHiddenForWordSelect(hidden = false)
-                        floatingButton?.show()
+                        if (!MainCaptureUiVisibility.snapshot().visible) floatingButton?.show()
                     }
                 }
             )
@@ -1072,6 +1206,7 @@ class CaptureService : Service() {
         restoreFloatingButtonAfterScreenshot: Boolean = false,
         extractTextOnly: Boolean = false,
     ) {
+        if (MainCaptureUiVisibility.snapshot().visible) return
         if (!captureLock.tryLock()) {
             restoreCaptureChrome(
                 showLoading = false,
@@ -1081,7 +1216,8 @@ class CaptureService : Service() {
             return
         }
         val diagId = captureSequence.incrementAndGet()
-        beginTranslationBatch(diagId)
+        val geometryGeneration = captureGeometry.snapshot()
+        beginTranslationBatch(diagId, geometryGeneration)
         val perfStartedAt = SystemClock.elapsedRealtime()
         fun logWordSelectPerf(stage: String, details: String = "") {
             Timber.tag("WordSelectPerf").i(
@@ -1095,13 +1231,15 @@ class CaptureService : Service() {
         logWordSelectPerf("started", "rect=${rect.width()}x${rect.height()}")
         var captureChromeRestored = false
         var activeCard: TranslationCardOverlay? = null
+        var geometryOwnedFull: Bitmap? = null
         var floatingWindowPreparation = PreparedFloatingWindowCapture()
         fun restoreCaptureChromeOnce(showLoading: Boolean) {
             if (captureChromeRestored) return
             captureChromeRestored = true
             restoreCaptureChrome(
                 showLoading = showLoading,
-                restoreFloatingButton = restoreFloatingButtonAfterScreenshot
+                restoreFloatingButton = restoreFloatingButtonAfterScreenshot,
+                loadingBatchId = diagId,
             )
         }
         suspend fun dismissActiveCard() {
@@ -1128,12 +1266,13 @@ class CaptureService : Service() {
             )
             if (floatingWindowPreparation.hidden) delay(CAPTURE_CHROME_SETTLE_MS)
             var full = captureScreenshotWithTiming(shotter, diagId)
+            geometryOwnedFull = full
             restoreFloatingWindowAfterCapture(floatingWindowPreparation)
             floatingWindowPreparation = floatingWindowPreparation.copy(hidden = false)
             if (full == null) {
                 restoreCaptureChromeOnce(showLoading = false)
                 val msg = getString(R.string.toast_capture_failed)
-                mainScope.launch { overlay?.showErrorHint(msg) }
+                mainScope.launch { if (captureGeometry.acceptsBatch(diagId)) overlay?.showErrorHint(msg) }
                 return
             }
             val captureMask = mapOverlayBoundsToCapture(
@@ -1150,6 +1289,8 @@ class CaptureService : Service() {
                     "wordSelect floating window preserved and masked bounds=$captureMask"
                 )
             }
+            geometryOwnedFull = full
+            ensureCurrentTranslationBatch(diagId)
             logWordSelectPerf("screenshot_ready", "frame=${full.width}x${full.height}")
             restoreCaptureChromeOnce(showLoading = false)
             var sourceLanguageEvidence = emptyList<dev.clickn.translate.tts.TtsLanguageEvidence>()
@@ -1173,6 +1314,7 @@ class CaptureService : Service() {
                 playbackId = "word-select:$diagId:dictionary",
             )
             val card = withContext(Dispatchers.Main) {
+                ensureCurrentTranslationBatch(diagId)
                 (translationCard ?: TranslationCardOverlay(
                     context = this@CaptureService,
                     onDismissed = {
@@ -1225,7 +1367,7 @@ class CaptureService : Service() {
             if (cropped == null) {
                 dismissActiveCard()
                 val msg = getString(R.string.word_card_no_text)
-                mainScope.launch { overlay?.showErrorHint(msg) }
+                mainScope.launch { if (captureGeometry.acceptsBatch(diagId)) overlay?.showErrorHint(msg) }
                 return
             }
             logWordSelectPerf("crop_ready", "crop=${cropped.width}x${cropped.height}")
@@ -1258,7 +1400,7 @@ class CaptureService : Service() {
                     shortError(t)
                 )
                 dismissActiveCard()
-                mainScope.launch { overlay?.showErrorHint(msg) }
+                mainScope.launch { if (captureGeometry.acceptsBatch(diagId)) overlay?.showErrorHint(msg) }
                 cropped.recycle()
                 return
             }
@@ -1283,6 +1425,7 @@ class CaptureService : Service() {
             } finally {
                 cropped.recycle()
             }
+            ensureCurrentTranslationBatch(diagId)
             val text = if (extractTextOnly) {
                 dev.clickn.translate.capture.extractedCardText(ocrBlocks, settings)
             } else dev.clickn.translate.capture.wordSelectRecognizedText(
@@ -1292,12 +1435,13 @@ class CaptureService : Service() {
             if (text.isEmpty()) {
                 dismissActiveCard()
                 val msg = getString(if (croppedStats.blankLike) R.string.ocr_empty_capture_help else R.string.ocr_no_text_help)
-                mainScope.launch { overlay?.showErrorHint(msg, durationMs = 12_000L) }
+                mainScope.launch { if (captureGeometry.acceptsBatch(diagId)) overlay?.showErrorHint(msg, durationMs = 12_000L) }
                 return
             }
             withContext(Dispatchers.Main) {
                 // Only Auto+automatic source has independently identified tags. Other engines can return
                 // configured-language placeholders; let the shared identifier inspect those texts on demand.
+                ensureCurrentTranslationBatch(diagId)
                 sourceLanguageEvidence = if (settings.ocrEngine == OcrEngineKind.ML_KIT_AUTO &&
                     settings.sourceLang == "auto") orderedOcrBlocks.map {
                     dev.clickn.translate.tts.TtsLanguageEvidence(it.text, it.recognizedLanguage)
@@ -1334,7 +1478,10 @@ class CaptureService : Service() {
                 settings = translationRequestSettings,
                 dictionaryTerm = dictionaryTerm,
                 onPartialTranslation = { partial ->
-                    withContext(Dispatchers.Main) { card.updateTranslation(partial) }
+                    withContext(Dispatchers.Main) {
+                        ensureCurrentTranslationBatch(diagId)
+                        card.updateTranslation(partial)
+                    }
                 },
                 onWordResult = { result ->
                     logVerticalDiag(
@@ -1345,7 +1492,10 @@ class CaptureService : Service() {
                             "definitions=${result.effectiveDefinitions().size} notes=${result.difficultyNotes.size} " +
                             "examples=${result.examples.size}"
                     )
-                    withContext(Dispatchers.Main) { card.updateWordResult(result) }
+                    withContext(Dispatchers.Main) {
+                        ensureCurrentTranslationBatch(diagId)
+                        card.updateWordResult(result)
+                    }
                 },
                 onStage = { stage ->
                     logWordSelectPerf(
@@ -1391,6 +1541,7 @@ class CaptureService : Service() {
                     label = "wordSelect",
                 ).text
             withContext(Dispatchers.Main) {
+                ensureCurrentTranslationBatch(diagId)
                 card.updateWordResult(outcome.wordResult)
                 card.updateTranslation(displayedTranslation, final = true)
             }
@@ -1400,7 +1551,7 @@ class CaptureService : Service() {
                     settings.translatorEngine.name,
                     shortError(outcome.translationError)
                 )
-                mainScope.launch { overlay?.showErrorHint(msg) }
+                mainScope.launch { if (captureGeometry.acceptsBatch(diagId)) overlay?.showErrorHint(msg) }
             }
             if (outcome.translation?.isNotBlank() == true) {
                 logRepository.pair(
@@ -1416,11 +1567,12 @@ class CaptureService : Service() {
             )
         } catch (ce: kotlinx.coroutines.CancellationException) {
             dismissActiveCard()
-            throw ce
+            if (captureGeometry.isCurrent(geometryGeneration)) throw ce
         } catch (t: Throwable) {
             dismissActiveCard()
             throw t
         } finally {
+            geometryOwnedFull?.let { if (!it.isRecycled) it.recycle() }
             restoreFloatingWindowAfterCapture(floatingWindowPreparation)
             restoreCaptureChromeOnce(showLoading = false)
             logWordSelectPerf("pipeline_finished")
@@ -1567,6 +1719,10 @@ class CaptureService : Service() {
     }
 
     private fun toggleLoopMode() {
+        if (!loopMode && MainCaptureUiVisibility.snapshot().visible) {
+            resumeLoopAfterOwnUi = true
+            return
+        }
         if (loopMode) {
             loopMode = false
             loopJob?.cancel()
@@ -1579,6 +1735,7 @@ class CaptureService : Service() {
             mainScope.launch {
                 // 中途切回 OFF：若倒计时圆圈还没消失，立刻撤掉
                 overlay?.cancelStartCountdown()
+                overlay?.dismissLoading()
                 floatingButton?.setLoopActive(false, 0L)
             }
             Timber.i("Loop mode OFF")
@@ -1586,6 +1743,7 @@ class CaptureService : Service() {
             val msg = getString(R.string.toast_loop_off)
             mainScope.launch { overlay?.showInfoHint(msg) }
         } else {
+            val uiRevision = MainCaptureUiVisibility.snapshot().revision
             resetLoopCaptureState()
             resetLoopRuntimeState()
             loopMode = true
@@ -1601,7 +1759,9 @@ class CaptureService : Service() {
                     String.format(java.util.Locale.US, "%.1f", interval / 1000.0)
                 }
                 val stabilityTrigger = LoopRuntimePolicy.usesStabilityPolling(s.loopTriggerMode)
-                val msg = if (stabilityTrigger) {
+                val msg = if (s.loopTriggerMode == LoopTriggerMode.SETTLED_PAGE) {
+                    getString(R.string.toast_loop_on_settled, s.loopTextStableDurationMs)
+                } else if (stabilityTrigger) {
                     getString(R.string.toast_loop_on_smart, s.loopTextStableDurationMs)
                 } else {
                     getString(R.string.toast_loop_on, secsStr)
@@ -1620,6 +1780,14 @@ class CaptureService : Service() {
                         "indicator=${indicator.mode.name}/${indicator.periodMs}ms"
                 )
                 mainScope.launch {
+                    if (!loopMode || !MainCaptureUiVisibility.allowsPresentation(uiRevision)) return@launch
+                    // The next tap already cancels the loop during countdown. Keep the
+                    // hero's visual and accessibility state in sync with that action.
+                    floatingButton?.setLoopActive(
+                        active = true,
+                        intervalMs = 3000L,
+                        indeterminate = true,
+                    )
                     // 悬浮提示放在倒计时之前：先让用户看到「自动翻译已开启（每 xx 秒一次）」的参数确认，
                     // 再看 3-2-1 圆圈。showInfoHint 默认 1800ms 自动消失，倒计时还在进行时就已经淡出，
                     // 不会跟圆圈视觉打架；且 OCR 在倒计时结束 +80ms 才开始，不会截到提示条。
@@ -1629,7 +1797,7 @@ class CaptureService : Service() {
                         hintText = getString(R.string.loop_countdown_hint)
                     ) {
                         // onFinish 时圆圈已经 removeView 且 ~80ms VSYNC 缓冲过
-                        if (!loopMode) return@showStartCountdown // 倒计时途中被关掉
+                        if (!loopMode || !MainCaptureUiVisibility.allowsPresentation(uiRevision)) return@showStartCountdown
                         floatingButton?.setLoopActive(
                             active = true,
                             intervalMs = indicator.periodMs,
@@ -1638,15 +1806,19 @@ class CaptureService : Service() {
                         loopJob = scope.launch {
                             while (isActive && loopMode) {
                                 val s2 = settingsRepository.get()
-                                if (s2.loopTriggerMode == LoopTriggerMode.SETTLED_PAGE) {
+                                if (s2.loopTriggerMode == LoopTriggerMode.SETTLED_PAGE ||
+                                    loopTranslationInFlight || settledPageExecutionJob?.isCompleted == false
+                                ) {
+                                    // Source changes cancel an in-flight translation in every automatic
+                                    // mode; text-completion still uses its own ROI/OCR settling below.
                                     observeSettledPage()
-                                } else {
-                                    captureOnce()
                                 }
+                                if (s2.loopTriggerMode != LoopTriggerMode.SETTLED_PAGE) launchLegacyLoopCapture()
                                 val ivl = LoopRuntimePolicy.pollingIntervalMs(
                                     configuredLoopIntervalMs = s2.captureLoopIntervalMs,
                                     mode = s2.loopTriggerMode,
                                     backendMinimumMs = screenshotter?.minimumLoopObservationIntervalMs ?: 0L,
+                                    sourceResultPresent = previousLoopOcrText != null || loopTranslationInFlight,
                                 )
                                 delay(ivl)
                             }
@@ -1659,11 +1831,23 @@ class CaptureService : Service() {
         }
     }
 
+    private fun launchLegacyLoopCapture() {
+        if (settledPageExecutionJob?.isCompleted == false || captureLock.isLocked || loopTranslationInFlight) return
+        val job = scope.launch(start = CoroutineStart.LAZY) { captureOnce() }
+        settledPageExecutionJob = job
+        job.invokeOnCompletion {
+            if (settledPageExecutionJob === job) settledPageExecutionJob = null
+        }
+        job.start()
+    }
+
     private fun showTranslationBlockCopyPanel(source: String, translation: String) {
+        val uiRevision = MainCaptureUiVisibility.snapshot().revision
         scope.launch {
             val settings = settingsRepository.get()
             val diagId = captureSequence.incrementAndGet()
             mainScope.launch {
+                if (!MainCaptureUiVisibility.allowsPresentation(uiRevision)) return@launch
                 translationCard?.dismiss()
                 val copyOverlay = translationBlockCopyOverlay
                     ?: TranslationBlockCopyOverlay(
@@ -1703,10 +1887,12 @@ class CaptureService : Service() {
     }
 
     private fun showTranslationCorrection(request: TranslationCorrectionRequest) {
+        val uiRevision = MainCaptureUiVisibility.snapshot().revision
         scope.launch {
             val settings = settingsRepository.get()
             val memoryScope = translationMemoryService.currentScope(settings)
             withContext(Dispatchers.Main) {
+                if (!MainCaptureUiVisibility.allowsPresentation(uiRevision)) return@withContext
                 translationBlockCopyOverlay?.dismiss()
                 val editor = translationCorrectionOverlay
                     ?: TranslationCorrectionOverlay(this@CaptureService).also {
@@ -1796,6 +1982,8 @@ class CaptureService : Service() {
     private fun resetLoopCaptureState() {
         resetLegacyLoopCaptureState()
         settledPageAnchor = null
+        settledTextWatch = null
+        lastSettledSourceObservationMs = null
         settledPagePolicy.reset()
     }
 
@@ -1816,7 +2004,8 @@ class CaptureService : Service() {
         lastLoopRuntimeLogState = null
     }
 
-    private fun beginTranslationBatch(batchId: Long) {
+    private fun beginTranslationBatch(batchId: Long, geometryGeneration: Long = captureGeometry.snapshot()) {
+        if (!captureGeometry.bindBatch(batchId, geometryGeneration)) return
         val previousBatchId = translationBatchGate.activate(batchId)
         translationRenderJob?.cancel()
         translationRenderJob = null
@@ -1836,7 +2025,7 @@ class CaptureService : Service() {
     }
 
     private fun ensureCurrentTranslationBatch(batchId: Long?) {
-        if (!translationBatchGate.accepts(batchId)) {
+        if (!(translationBatchGate.accepts(batchId) && captureGeometry.acceptsBatch(batchId))) {
             throw CancellationException("Stale translation batch")
         }
     }
@@ -1852,14 +2041,14 @@ class CaptureService : Service() {
         batchId: Long?,
         block: suspend CoroutineScope.() -> Unit,
     ) {
-        if (!translationBatchGate.accepts(batchId)) return
+        if (!(translationBatchGate.accepts(batchId) && captureGeometry.acceptsBatch(batchId))) return
         translationRenderJob?.cancel()
         val job = scope.launch(start = CoroutineStart.LAZY) {
             try {
                 block()
             } finally {
                 withContext(NonCancellable + Dispatchers.Main.immediate) {
-                    if (translationBatchGate.accepts(batchId)) {
+                    if ((translationBatchGate.accepts(batchId) && captureGeometry.acceptsBatch(batchId))) {
                         overlay?.dismissLoading()
                     }
                 }
@@ -1875,7 +2064,7 @@ class CaptureService : Service() {
     }
 
     private fun translationJobOwnsLoading(batchId: Long): Boolean =
-        translationBatchGate.accepts(batchId) && translationRenderJob?.isActive == true
+        (translationBatchGate.accepts(batchId) && captureGeometry.acceptsBatch(batchId)) && translationRenderJob?.isActive == true
 
     private fun beginLoopTranslation(diagId: Long?): Long? {
         if (!loopMode) return null
@@ -1894,7 +2083,7 @@ class CaptureService : Service() {
         loopTranslationInFlight = false
         lastLoopRuntimeLogState = "translation_finished"
         diagId?.let {
-            logVerticalDiag(it, "loop runtime translation finished manualDismissRequired=true")
+            logVerticalDiag(it, "loop runtime translation finished")
         }
     }
 
@@ -1902,7 +2091,7 @@ class CaptureService : Service() {
         if (!loopMode) return
         loopTranslationInFlight = false
         lastLoopRuntimeLogState = "result_displayed"
-        diagId?.let { logVerticalDiag(it, "loop runtime result visible manualDismissRequired=true") }
+        diagId?.let { logVerticalDiag(it, "loop runtime result visible") }
     }
 
     private fun logLoopRuntimeTransition(diagId: Long, state: String, message: String) {
@@ -1936,7 +2125,7 @@ class CaptureService : Service() {
 
     private suspend fun invalidateSettledPageWork(diagId: Long, reason: String) {
         settledPageExecutionJob?.cancel(CancellationException("Settled page changed: $reason"))
-        settledPageExecutionJob = null
+        // Completion releases this slot after capture cleanup, including visibility leases.
         cancelActiveTranslationBatch("settledPage:$reason")
         loopSessionId += 1L
         loopTranslationInFlight = false
@@ -1950,53 +2139,58 @@ class CaptureService : Service() {
     }
 
     /**
-     * Read-only observation continues during OCR/translation, without hiding the displayed result.
-     * Only common, unobscured source pixels are compared. The worker takes a clean OCR screenshot
-     * once a new page is stable; observation frames can contain our own UI and must not reach OCR.
+     * Observe source pixels even under the displayed translation. A short reversible visibility
+     * lease includes roots created during streaming; the screenshot mutex covers the whole lease.
+     * Observations compare visual anchors. When a page settles, OCR uses the accepted
+     * observation instead of waiting for another clean capture.
      */
     private suspend fun observeSettledPage() {
+        if (MainCaptureUiVisibility.snapshot().visible) return
+        val nowMs = SystemClock.elapsedRealtime()
+        val lastObservation = lastSettledSourceObservationMs
+        if (lastObservation != null && nowMs >= lastObservation &&
+            nowMs - lastObservation < SETTLED_SOURCE_OBSERVATION_INTERVAL_MS
+        ) return
+        val geometryGeneration = captureGeometry.snapshot()
         val diagId = captureSequence.incrementAndGet()
         var full: Bitmap? = null
         try {
             val screenNow = physicalDisplaySize(this@CaptureService)
             settingsRepository.rescaleCaptureRegionIfNeeded(screenNow.width, screenNow.height)
             val settings = settingsRepository.get()
-            if (settings.loopTriggerMode != LoopTriggerMode.SETTLED_PAGE) return
+            val settledMode = settings.loopTriggerMode == LoopTriggerMode.SETTLED_PAGE
+            if (!settledMode && !loopTranslationInFlight && settledPageExecutionJob?.isCompleted != false) return
             val shotter = screenshotter ?: return
-            suspend fun readExclusions(): List<Rect> = withContext(Dispatchers.Main.immediate) {
-                overlay?.observationExclusionRects().orEmpty() +
-                    floatingButton?.observationExclusionRects().orEmpty()
-            }
-            val beforeExclusions = readExclusions()
-            full = captureScreenshotWithTiming(shotter, diagId)
+            lastSettledSourceObservationMs = nowMs
+            full = captureCleanSourceFrame(shotter, diagId, geometryGeneration, settings)
             val captured = full ?: run {
                 // A failed sample proves neither a page turn nor stability.
                 settledPagePolicy.pauseObservation(SystemClock.elapsedRealtime())
                 return
             }
-            val exclusions = beforeExclusions + readExclusions()
+            if (!captureGeometry.isCurrent(geometryGeneration)) return
             val workBitmap = cropIfNeeded(captured, settings.captureRegion) ?: run {
                 invalidateSettledPageWork(diagId, "invalid_region")
                 settledPageAnchor = null
                 settledPagePolicy.reset()
                 return
             }
+            val previousWatch = settledTextWatch
+            var textObservation: SettledTextWatch.Observation? = null
             val fingerprint = try {
-                val offsetX = if (workBitmap !== captured) settings.captureRegion?.left?.coerceAtLeast(0) ?: 0 else 0
-                val offsetY = if (workBitmap !== captured) settings.captureRegion?.top?.coerceAtLeast(0) ?: 0 else 0
-                val masks = exclusions.mapNotNull { rect ->
-                    mapOverlayBoundsToCapture(
-                        OverlayCaptureRect(rect.left, rect.top, rect.right, rect.bottom),
-                        screenNow.width, screenNow.height, captured.width, captured.height,
-                    )?.let { mapped ->
-                        Rect(mapped.left, mapped.top, mapped.right, mapped.bottom).apply {
-                            offset(-offsetX, -offsetY)
-                        }
-                    }
-                }
-                LoopFrameFingerprintFactory.createObservation(workBitmap, settings.hashCode(), masks)
+                val contextId = settings.sourceObservationSettings().hashCode()
+                textObservation = previousWatch?.observe(workBitmap, contextId)
+                LoopFrameFingerprintFactory.createObservation(workBitmap, contextId, emptyList())
             } finally {
                 if (workBitmap !== captured) workBitmap.recycle()
+            }
+            if (!captureGeometry.isCurrent(geometryGeneration)) return
+            if (!settledMode && previousWatch == null) {
+                // Bootstrap OCR may take seconds. An animated background must not repeatedly
+                // cancel it before any text regions exist. Its result is checked against a
+                // fresh source crop before translation/presentation.
+                settledPagePolicy.pauseObservation(SystemClock.elapsedRealtime())
+                return
             }
             val previousAnchor = settledPageAnchor
             val comparable = previousAnchor?.let { SettledPageVisualPolicy.comparable(it, fingerprint) } ?: true
@@ -2008,51 +2202,135 @@ class CaptureService : Service() {
                 (previousAnchor != null && comparable && similarity == null)
             ) {
                 settledPagePolicy.pauseObservation(SystemClock.elapsedRealtime())
-                logVerticalDiag(diagId, "settled page observe paused reason=source_occluded masks=${exclusions.size}")
+                logVerticalDiag(diagId, "settled page observe paused reason=source_unavailable")
                 return
             }
-            val sameAsAnchor = similarity?.let {
-                it >= LoopFrameChangePolicy.normalizeThreshold(settings.loopFrameSimilarityThreshold)
-            } ?: false
+            val threshold = LoopFrameChangePolicy.normalizeThreshold(settings.loopFrameSimilarityThreshold)
+            val sameAsAnchor = LoopRuntimePolicy.sameSourceDuringTranslation(
+                mode = settings.loopTriggerMode,
+                sameFrame = similarity?.let { it >= threshold } == true,
+                sameText = textObservation?.let { it.similarity >= threshold },
+            )
             val decision = settledPagePolicy.observe(
                 sameAsAnchor = sameAsAnchor,
                 contextUnchanged = comparable,
                 nowMs = SystemClock.elapsedRealtime(),
                 stableDurationMs = settings.loopTextStableDurationMs,
             )
-            if (decision.replaceAnchor) settledPageAnchor = fingerprint
+            if (decision.replaceAnchor) {
+                settledPageAnchor = fingerprint
+                // The local watch must advance with the candidate, otherwise a real edit would
+                // forever compare against the previous OCR text and never become stable.
+                if (settledTextWatch === previousWatch) settledTextWatch = textObservation?.current
+            }
             val firstAnchor = previousAnchor == null
             logVerticalDiag(
                 diagId,
                 "settled page observe revision=${decision.revision} same=$sameAsAnchor " +
-                    "similarity=${similarity?.toDiagFloat() ?: "n/a"} masks=${exclusions.size} " +
+                    "similarity=${similarity?.toDiagFloat() ?: "n/a"} clean=true " +
+                    "textSimilarity=${textObservation?.similarity?.toDiagFloat() ?: "n/a"} " +
                     "replace=${decision.replaceAnchor} invalidate=${decision.invalidatePrevious} " +
                     "ready=${decision.ready} busy=${settledPageExecutionJob?.isActive == true || captureLock.isLocked}",
             )
-            if (firstAnchor || decision.invalidatePrevious) {
+            if ((firstAnchor && settledMode) || decision.invalidatePrevious) {
                 invalidateSettledPageWork(
                     diagId,
                     if (firstAnchor) "initial_anchor" else "page_changed",
                 )
             }
-            if (!decision.ready) return
+            if (!settledMode || !decision.ready) return
             if (settledPageExecutionJob?.isActive == true || captureLock.isLocked) return
-            if (!settledPagePolicy.claim(decision.revision)) return
+            val attempt = settledPagePolicy.claimAttempt(decision.revision) ?: return
 
+            // The lazy job may be cancelled before entering captureOnce. Its completion
+            // callback owns any frame that the body did not take.
+            val pendingFrame = AtomicReference<Bitmap?>(captured)
             val job = scope.launch(start = CoroutineStart.LAZY) {
+                val frame = pendingFrame.getAndSet(null) ?: return@launch
                 captureOnce(
+                    showLoadingAfterScreenshot = true,
+                    preparedFullScreen = frame,
                     preparedSettings = settings,
                     settledPageRevision = decision.revision,
+                    settledPageAttempt = attempt,
+                    preparedGeometryGeneration = geometryGeneration,
                 )
             }
+            full = null
             settledPageExecutionJob = job
             job.invokeOnCompletion {
+                pendingFrame.getAndSet(null)?.recycle()
                 if (settledPageExecutionJob === job) settledPageExecutionJob = null
             }
             job.start()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            settledPagePolicy.pauseObservation(SystemClock.elapsedRealtime())
+            logVerticalDiag(error, diagId, "settled page observation failed; next bounded sample will retry")
         } finally {
             full?.let { if (!it.isRecycled) it.recycle() }
         }
+    }
+
+    private fun rememberLoopTextSource(bitmap: Bitmap, blocks: List<TextBlock>, settings: Settings) {
+        if (!loopMode) return
+        // Ignore numeric clocks/counters and retain samples only, never the source image.
+        settledTextWatch = SettledTextWatch.create(
+            bitmap,
+            settings.sourceObservationSettings().hashCode(),
+            blocks.filter { it.text.any(Char::isLetter) }.map {
+                val box = it.boundingBox
+                LoopTextRect(box.left, box.top, box.right, box.bottom)
+            },
+        )
+    }
+
+    /** Validate slow interval/text bootstraps against their OCR regions, not animated backgrounds. */
+    private suspend fun validateLoopTextSource(
+        original: Bitmap,
+        blocks: List<TextBlock>,
+        settings: Settings,
+        diagId: Long,
+        geometryGeneration: Long,
+    ): Boolean {
+        if (!loopMode || settings.loopTriggerMode == LoopTriggerMode.SETTLED_PAGE) return true
+        ensureCurrentTranslationBatch(diagId)
+        val contextId = settings.sourceObservationSettings().hashCode()
+        val witness = SettledTextWatch.create(original, contextId, blocks.map {
+            val box = it.boundingBox
+            LoopTextRect(box.left, box.top, box.right, box.bottom)
+        })
+        val shotter = screenshotter
+        var fresh: Bitmap? = null
+        val valid = try {
+            fresh = shotter?.let { captureCleanSourceFrame(it, diagId, geometryGeneration, settings) }
+            val full = fresh
+            if (full == null) false else {
+                val crop = cropIfNeeded(full, settings.captureRegion)
+                if (crop == null) false else try {
+                    val observation = witness?.observe(crop, contextId)
+                    val threshold = LoopFrameChangePolicy.normalizeThreshold(settings.loopFrameSimilarityThreshold)
+                    observation != null && observation.similarity >= threshold
+                } finally {
+                    if (crop !== full) crop.recycle()
+                }
+            }
+        } finally {
+            fresh?.let { if (!it.isRecycled) it.recycle() }
+        }
+        ensureCurrentTranslationBatch(diagId)
+        if (valid) {
+            rememberLoopTextSource(original, blocks, settings)
+            return true
+        }
+        // The source changed while OCR was running, or validation was intentionally unavailable.
+        // Do not commit this captured page or leave its processed hash suppressing the next try.
+        resetLegacyLoopCaptureState()
+        cancelActiveTranslationBatch("source_changed_after_ocr")
+        withContext(Dispatchers.Main.immediate) { overlay?.clear() }
+        logVerticalDiag(diagId, "text result discarded: fresh source validation unavailable or changed")
+        return false
     }
 
     private fun selectLoopTextRoi(
@@ -2119,6 +2397,7 @@ class CaptureService : Service() {
         source: String,
         adaptiveStyles: List<AdaptiveOverlayStyle> = emptyList(),
     ) {
+        ensureCurrentTranslationBatch(diagId)
         val normalizedText = LoopFrameChangePolicy.normalizeOcrText(blocks.map { it.text })
         if (blocks.isEmpty() || normalizedText.isEmpty()) {
             logVerticalDiag(diagId, "stop: no OCR blocks source=$source")
@@ -2186,6 +2465,7 @@ class CaptureService : Service() {
         )
         if (redBoxActive && !debugShouldTranslate) {
             withContext(Dispatchers.Main) {
+                ensureCurrentTranslationBatch(diagId)
                 overlay?.showBlocks(blocks.map { it to "" }, renderOrientation, diagnosticId = diagId)
             }
             markLoopResultVisible(diagId)
@@ -2371,9 +2651,16 @@ class CaptureService : Service() {
     private suspend fun captureScreenshotWithTiming(
         screenshotter: Screenshotter,
         diagId: Long,
-    ): Bitmap? = screenshotLock.withLock {
+    ): Bitmap? = screenshotLock.withLock { captureScreenshotUnlocked(screenshotter, diagId) }
+
+    /** Caller holds screenshotLock, including any visibility lease around the capture. */
+    private suspend fun captureScreenshotUnlocked(
+        screenshotter: Screenshotter,
+        diagId: Long,
+        freshAfterNanos: Long? = null,
+    ): Bitmap? {
         val startedAt = SystemClock.elapsedRealtime()
-        val bitmap = screenshotter.capture()
+        val bitmap = if (freshAfterNanos == null) screenshotter.capture() else screenshotter.captureAfter(freshAfterNanos)
         val elapsedMs = (SystemClock.elapsedRealtime() - startedAt).coerceAtLeast(0L)
         val wakeContext = performanceDiagnostics.currentWakeContext()
         val wakeSuffix = wakeContext?.let {
@@ -2396,7 +2683,47 @@ class CaptureService : Service() {
                 elapsedMs = elapsedMs,
             )
         }
-        bitmap
+        return bitmap
+    }
+
+    private suspend fun captureCleanSourceFrame(
+        shotter: Screenshotter,
+        diagId: Long,
+        geometryGeneration: Long,
+        settings: Settings,
+    ): Bitmap? = screenshotLock.withLock {
+        val uiRevision = MainCaptureUiVisibility.snapshot().revision
+        sourceObservationCapture.capture(
+            isValid = {
+                !captureStopRequested && captureGeometry.isCurrent(geometryGeneration) &&
+                    screenshotter === shotter && MainCaptureUiVisibility.allowsPresentation(uiRevision) &&
+                    (observedSettings == null || observedSettings == settings.sourceObservationSettings()) &&
+                    overlayManager?.canObserveSource() != false &&
+                    floatingButton?.canObserveSource() != false &&
+                    captureRegionBorder?.canObserveSource() != false &&
+                    regionPicker?.isShown() != true && wordSelect?.isShown() != true &&
+                    languageQuickSwitch?.isShown() != true && presetQuickSwitch?.isShown() != true &&
+                    translationCard?.isShown() != true && translationBlockCopyOverlay?.isShown() != true &&
+                    translationCorrectionOverlay?.isShown() != true && inputTranslationJob?.isActive != true
+            },
+            acquire = {
+                overlayManager?.let { add(it.hideForSourceObservation()) }
+                floatingButton?.let { add(it.hideForSourceObservation()) }
+                captureRegionBorder?.let { add(it.hideForSourceObservation()) }
+            },
+            capture = { fence -> captureScreenshotUnlocked(shotter, diagId, fence) },
+        )
+    }
+
+    // Moving the control does not change capture coordinates, OCR or translation. Its screen
+    // pixels are hidden by the lease; a position save must not discard a user's displayed result.
+    private fun Settings.sourceObservationSettings(): Settings = copy(floatingButtonX = -1, floatingButtonY = -1)
+
+    private fun retrySettledPageAttempt(attempt: SettledPagePolicy.AttemptTicket?, diagId: Long, reason: String) {
+        if (attempt == null || !loopMode || captureStopRequested || MainCaptureUiVisibility.snapshot().visible) return
+        if (settledPagePolicy.retryAfterFailure(attempt, SystemClock.elapsedRealtime())) {
+            logVerticalDiag(diagId, "settled page retry scheduled revision=${attempt.revision} reason=$reason")
+        }
     }
 
     private suspend fun captureOnce(
@@ -2406,8 +2733,15 @@ class CaptureService : Service() {
         preparedFullScreen: Bitmap? = null,
         preparedSettings: Settings? = null,
         settledPageRevision: Long? = null,
+        settledPageAttempt: SettledPagePolicy.AttemptTicket? = null,
+        preparedGeometryGeneration: Long? = null,
     ) {
+        if (MainCaptureUiVisibility.snapshot().visible) {
+            preparedFullScreen?.let { if (!it.isRecycled) it.recycle() }
+            return
+        }
         if (!captureLock.tryLock()) {
+            retrySettledPageAttempt(settledPageAttempt, captureSequence.get(), "capture_busy")
             preparedFullScreen?.let { if (!it.isRecycled) it.recycle() }
             restoreCaptureChrome(
                 showLoading = false,
@@ -2417,6 +2751,8 @@ class CaptureService : Service() {
             return
         }
         val diagId = captureSequence.incrementAndGet()
+        val geometryGeneration = preparedGeometryGeneration ?: captureGeometry.snapshot()
+        var geometryOwnedBitmap: Bitmap? = null
         var captureAttemptStarted = false
         var captureChromeRestored = false
         var floatingButtonHiddenForCapture = false
@@ -2428,7 +2764,8 @@ class CaptureService : Service() {
             captureChromeRestored = true
             restoreCaptureChrome(
                 showLoading = showLoading,
-                restoreFloatingButton = restoreFloatingButtonAfterScreenshot
+                restoreFloatingButton = restoreFloatingButtonAfterScreenshot,
+                loadingBatchId = diagId,
             )
         }
         suspend fun restoreFloatingButtonAfterCapture() {
@@ -2442,7 +2779,7 @@ class CaptureService : Service() {
             if (!captureRegionBorderHiddenForCapture) return
             captureRegionBorderHiddenForCapture = false
             withContext(Dispatchers.Main) {
-                captureRegionBorder?.setHiddenForCapture(hidden = false)
+                captureRegionBorder?.setHiddenForCapture(MainCaptureUiVisibility.snapshot().visible)
             }
         }
         try {
@@ -2454,6 +2791,9 @@ class CaptureService : Service() {
             val settings = transientCaptureRegion?.let { region ->
                 persistedSettings.copy(captureRegion = region)
             } ?: persistedSettings
+            if (!captureGeometry.isCurrent(geometryGeneration)) {
+                throw CancellationException("Capture geometry changed before OCR")
+            }
             ensureCurrentSettledPage(settledPageRevision)
             // The settings flow remains live while a capture is running. Keep this capture's
             // coordinate space independent so an unrelated settings emission cannot reset a
@@ -2464,6 +2804,7 @@ class CaptureService : Service() {
                 val activeResultDecision = LoopRuntimePolicy.activeResultDecision(
                     hasBlockingResult = hasBlockingResult,
                     translationInFlight = loopTranslationInFlight,
+                    canCaptureCleanSource = true,
                 )
                 when (activeResultDecision) {
                     LoopActiveResultDecision.CAPTURE -> lastLoopRuntimeLogState = null
@@ -2487,7 +2828,8 @@ class CaptureService : Service() {
                 }
             }
             captureAttemptStarted = true
-            beginTranslationBatch(diagId)
+            beginTranslationBatch(diagId, geometryGeneration)
+            ensureCurrentTranslationBatch(diagId)
             logVerticalDiag(diagId, "start loopMode=$loopMode")
             var full = preparedFullScreen
             if (full != null) {
@@ -2497,6 +2839,10 @@ class CaptureService : Service() {
                     restoreCaptureChromeOnce(showLoading = false)
                     return
                 }
+                if (loopMode || settledPageRevision != null) {
+                    lastSettledSourceObservationMs = SystemClock.elapsedRealtime()
+                    full = captureCleanSourceFrame(shotter, diagId, geometryGeneration, settings)
+                } else {
                 var captureChromeChanged = false
                 captureRegionBorderHiddenForCapture = withContext(Dispatchers.Main) {
                     captureRegionBorder?.setHiddenForCapture(hidden = true) == true
@@ -2530,17 +2876,28 @@ class CaptureService : Service() {
                 restoreFloatingButtonAfterCapture()
                 restoreFloatingWindowAfterCapture(floatingWindowPreparation)
                 floatingWindowPreparation = floatingWindowPreparation.copy(hidden = false)
+                }
             }
             if (full == null) {
+                retrySettledPageAttempt(settledPageAttempt, diagId, "capture_unavailable")
+                if (loopMode) {
+                    // A visibility lease may be intentionally unavailable during dragging,
+                    // selection or an open panel. Pause quietly instead of reporting a false
+                    // permission/capture failure on every automatic poll.
+                    logVerticalDiag(diagId, "automatic source unavailable; retry on next observation")
+                    return
+                }
                 // 截屏链路返回 null（MediaProjection token 失效 / Shizuku 调用失败等），
                 // 之前直接 return，用户只看到圈转一下；现在显式提示。
                 Timber.w("Screenshot capture returned null")
                 restoreCaptureChromeOnce(showLoading = false)
                 logRepository.error(LogRepository.Category.CAPTURE, getString(R.string.log_msg_capture_failed))
                 val msg = getString(R.string.toast_capture_failed)
-                mainScope.launch { overlay?.showErrorHint(msg) }
+                mainScope.launch { if (captureGeometry.acceptsBatch(diagId)) overlay?.showErrorHint(msg) }
                 return
             }
+            geometryOwnedBitmap = full
+            ensureCurrentTranslationBatch(diagId)
             ensureCurrentSettledPage(settledPageRevision, recycleOnReject = full)
             // 在拿 settings 之前先 rescale region，免得拿到的是旧屏幕方向的坐标。
             restoreCaptureChromeOnce(showLoading = showLoadingAfterScreenshot)
@@ -2558,6 +2915,7 @@ class CaptureService : Service() {
                     "floating window preserved during capture and masked bounds=$captureMask"
                 )
             }
+            geometryOwnedBitmap = full
             val fullStats = sampleBitmapFrameStats(full)
             logVerticalDiag(
                 diagId,
@@ -2574,6 +2932,7 @@ class CaptureService : Service() {
                 full.recycle()
                 return
             }
+            geometryOwnedBitmap = workBitmap
             logVerticalDiag(
                 diagId,
                 "workBitmap=${workBitmap.width}x${workBitmap.height} region=${region.toDiagString()}"
@@ -2604,6 +2963,26 @@ class CaptureService : Service() {
             // Source-only red-box mode needs the regular OCR pipeline so no translator/API is called.
             val isEndToEnd = configuredEndToEnd && debugShouldTranslate
 
+            if (loopMode && settledPageRevision == null) {
+                val contextId = settings.sourceObservationSettings().hashCode()
+                val textObservation = settledTextWatch?.observe(workBitmap, contextId)
+                val threshold = LoopFrameChangePolicy.normalizeThreshold(settings.loopFrameSimilarityThreshold)
+                if (textObservation != null && textObservation.similarity < threshold) {
+                    // A proven source-pixel edit is not OCR spelling jitter. Forget the old
+                    // processed-text anchor so a short edit of a long paragraph can translate.
+                    resetLegacyLoopCaptureState()
+                    settledTextWatch = textObservation.current
+                    logVerticalDiag(diagId, "automatic source text changed; processed anchors reset")
+                }
+                settledPageAnchor = LoopFrameFingerprintFactory.createObservation(workBitmap, contextId, emptyList())
+                settledPagePolicy.observe(
+                    sameAsAnchor = false,
+                    contextUnchanged = false,
+                    nowMs = SystemClock.elapsedRealtime(),
+                    stableDurationMs = settings.loopTextStableDurationMs,
+                )
+                if (textObservation != null) settledTextWatch = textObservation.current
+            }
             val smartLoopEnabled = loopMode &&
                 settings.loopTriggerMode == LoopTriggerMode.WAIT_FOR_TEXT_COMPLETE
             val roiOptimizationEnabled = smartLoopEnabled &&
@@ -2651,6 +3030,7 @@ class CaptureService : Service() {
                             }
                             LoopRoiStabilityDecision.TRANSLATE_CACHED -> {
                                 pendingLoopRoiResult = null
+                                rememberLoopTextSource(workBitmap, pending.blocks, settings)
                                 val fingerprint = createLoopFrameFingerprint(workBitmap, settings)
                                 val adaptiveStyles = analyzeAdaptiveOverlayStyles(
                                     workBitmap,
@@ -2688,6 +3068,8 @@ class CaptureService : Service() {
                                     .takeIf { it.isNotEmpty() }
                                     ?.let(::findOcrResultQualityIssue)
                                 if (finalBlocks.isNotEmpty() && finalQualityIssue == null) {
+                                    if (!validateLoopTextSource(workBitmap, finalBlocks, settings, diagId, geometryGeneration)) return
+                                    rememberLoopTextSource(workBitmap, finalBlocks, settings)
                                     val fingerprint = createLoopFrameFingerprint(workBitmap, settings)
                                     val adaptiveStyles = analyzeAdaptiveOverlayStyles(
                                         workBitmap,
@@ -2813,7 +3195,23 @@ class CaptureService : Service() {
             val ocrStartedAt = System.currentTimeMillis()
             if (isEndToEnd) {
                 val translatedBlocks = try {
-                    translator.ocrAndTranslate(workBitmap, settings)
+                    retryCurrentPageRequest(
+                        retryEnabled = loopMode && settings.retryFailedTranslation,
+                        ensureCurrent = {
+                            ensureCurrentTranslationBatch(diagId)
+                            ensureCurrentSettledPage(settledPageRevision)
+                        },
+                        onRetry = { error, delayMs ->
+                            logVerticalDiag(error, diagId, "imageTranslation recovery delayMs=$delayMs")
+                            val message = getString(R.string.toast_ocr_failed_format,
+                                settings.translatorEngine.name, shortError(error))
+                            mainScope.launch {
+                                if (translationBatchGate.accepts(diagId) && captureGeometry.acceptsBatch(diagId)) {
+                                    overlay?.showErrorHint(message)
+                                }
+                            }
+                        },
+                    ) { translator.ocrAndTranslate(workBitmap, settings) }
                 } catch (ce: kotlinx.coroutines.CancellationException) {
                     workBitmap.recycle()
                     throw ce
@@ -2826,10 +3224,15 @@ class CaptureService : Service() {
                         elapsedMs = elapsedSince(ocrStartedAt)
                     )
                     val msg = getString(R.string.toast_ocr_failed_format, settings.translatorEngine.name, shortError(t))
-                    mainScope.launch { overlay?.showErrorHint(msg) }
+                    mainScope.launch { if (captureGeometry.acceptsBatch(diagId)) overlay?.showErrorHint(msg) }
                     workBitmap.recycle()
                     return
                 }
+                ensureCurrentTranslationBatch(diagId)
+                if (!validateLoopTextSource(workBitmap, translatedBlocks.map { it.first }, settings, diagId, geometryGeneration)) {
+                    return
+                }
+                rememberLoopTextSource(workBitmap, translatedBlocks.map { it.first }, settings)
                 val adaptiveStyles = analyzeAdaptiveOverlayStyles(
                     workBitmap,
                     translatedBlocks.map { it.first },
@@ -2837,6 +3240,7 @@ class CaptureService : Service() {
                     diagId,
                 )
                 workBitmap.recycle()
+                ensureCurrentTranslationBatch(diagId)
                 ensureCurrentSettledPage(settledPageRevision)
                 val normalizedEndToEndText = LoopFrameChangePolicy.normalizeOcrText(
                     translatedBlocks.map { (block, _) -> block.text }
@@ -2996,6 +3400,7 @@ class CaptureService : Service() {
                 workBitmap.recycle()
                 throw ce
             } catch (t: Throwable) {
+                if (t is Exception) retrySettledPageAttempt(settledPageAttempt, diagId, "ocr_failure")
                 Timber.w(t, "OCR failed")
                 logVerticalDiag(t, diagId, "first OCR failed engine=${effectiveEngine.name}")
                 logRepository.error(
@@ -3008,7 +3413,7 @@ class CaptureService : Service() {
                 // 用悬浮错误条显示（走 loading 圈同链路），跨 ROM 一致——不走 Toast，因为后台
                 // Service Toast 在 HyperOS / MIUI 等国产 ROM 上会被静默丢弃。
                 val msg = getString(R.string.toast_ocr_failed_format, effectiveEngine.name, shortError(t))
-                mainScope.launch { overlay?.showErrorHint(msg) }
+                mainScope.launch { if (captureGeometry.acceptsBatch(diagId)) overlay?.showErrorHint(msg) }
                 if (preprocessed !== ocrBitmap) preprocessed.recycle()
                 if (ocrBitmap !== workBitmap) ocrBitmap.recycle()
                 workBitmap.recycle()
@@ -3224,6 +3629,7 @@ class CaptureService : Service() {
 
             if (preprocessed !== ocrBitmap) preprocessed.recycle()
             if (ocrBitmap !== workBitmap) ocrBitmap.recycle()
+            ensureCurrentTranslationBatch(diagId)
             logVerticalDiag(
                 diagId,
                 "ocr final engine=${effectiveEngine.name} paddleVersion=${settings.paddleModelVersion.name} " +
@@ -3298,7 +3704,7 @@ class CaptureService : Service() {
                     elapsedMs = ocrElapsedMs
                 )
                 val message = getString(R.string.ocr_no_text_help)
-                mainScope.launch { overlay?.showErrorHint(message, durationMs = 12_000L) }
+                mainScope.launch { if (captureGeometry.acceptsBatch(diagId)) overlay?.showErrorHint(message, durationMs = 12_000L) }
                 return
             }
             val qualityIssue = findOcrResultQualityIssue(blocks)
@@ -3315,8 +3721,13 @@ class CaptureService : Service() {
                     qualityIssue.toLogString()
                 )
                 logRepository.warn(LogRepository.Category.OCR, message, elapsedMs = ocrElapsedMs)
-                mainScope.launch { overlay?.showErrorHint(message) }
+                mainScope.launch { if (captureGeometry.acceptsBatch(diagId)) overlay?.showErrorHint(message) }
                 return
+            }
+            if (loopMode) {
+                ensureCurrentSettledPage(settledPageRevision)
+                rememberLoopTextSource(workBitmap, blocks, settings)
+                logVerticalDiag(diagId, "settled text watch regions=${settledTextWatch?.regionCount ?: 0}")
             }
             val shouldSeedLoopRoi = roiOptimizationEnabled &&
                 !forceTextStabilityFallback &&
@@ -3466,6 +3877,7 @@ class CaptureService : Service() {
                 return
             }
             ensureCurrentSettledPage(settledPageRevision, recycleOnReject = workBitmap)
+            if (!validateLoopTextSource(workBitmap, blocks, settings, diagId, geometryGeneration)) return
             if (logRepository.verboseEnabled) {
                 val joined = orderedRawBlocks.mapIndexed { i, b ->
                     "#${i + 1} ${b.text}"
@@ -3486,6 +3898,7 @@ class CaptureService : Service() {
                 logVerticalDiag(diagId, "render OCR debug boxes without translation")
                 workBitmap.recycle()
                 withContext(Dispatchers.Main) {
+                    ensureCurrentTranslationBatch(diagId)
                     overlay?.showBlocks(
                         blocks.map { it to "" },
                         renderOrientation,
@@ -3526,6 +3939,7 @@ class CaptureService : Service() {
                 diagId,
             )
             workBitmap.recycle()
+            ensureCurrentTranslationBatch(diagId)
             ensureCurrentSettledPage(settledPageRevision)
             if (translationBlocks.isEmpty()) {
                 logVerticalDiag(
@@ -3608,25 +4022,39 @@ class CaptureService : Service() {
                     )
                 else -> renderFloatingWindow(translationBlocks, translationRequestSettings, diagId)
             }
+        } catch (cancelled: CancellationException) {
+            if (captureGeometry.isCurrent(geometryGeneration)) throw cancelled
+            // Retire this attempt without cancelling its caller's automatic polling loop.
+            logVerticalDiag(diagId, "capture discarded after geometry change")
+        } catch (error: Exception) {
+            retrySettledPageAttempt(settledPageAttempt, diagId, "execution_failure")
+            logVerticalDiag(error, diagId, "capture execution failed")
+            Timber.w(error, "Capture execution failed")
         } finally {
-            unclaimedPreparedFull?.let { if (!it.isRecycled) it.recycle() }
-            restoreCaptureRegionBorderAfterCapture()
-            restoreFloatingButtonAfterCapture()
-            restoreFloatingWindowAfterCapture(floatingWindowPreparation)
-            if (captureAttemptStarted) {
-                restoreCaptureChromeOnce(showLoading = false)
-                logVerticalDiag(diagId, "finish")
-                // Async block/stream rendering owns loading until every translation (and any
-                // delayed text repair) reaches its terminal path. Capture cleanup only handles
-                // failures and synchronous rendering paths that did not transfer that ownership.
-                if (!translationJobOwnsLoading(diagId)) {
-                    mainScope.launch { overlay?.dismissLoading() }
-                } else {
-                    logVerticalDiag(diagId, "loading retained until translation batch finishes")
+            try {
+                withContext(NonCancellable) {
+                    geometryOwnedBitmap?.let { if (!it.isRecycled) it.recycle() }
+                    unclaimedPreparedFull?.let { if (!it.isRecycled) it.recycle() }
+                    restoreCaptureRegionBorderAfterCapture()
+                    restoreFloatingButtonAfterCapture()
+                    restoreFloatingWindowAfterCapture(floatingWindowPreparation)
+                    if (captureAttemptStarted) {
+                        restoreCaptureChromeOnce(showLoading = false)
+                        logVerticalDiag(diagId, "finish")
+                        // Async block/stream rendering owns loading until every translation (and any
+                        // delayed text repair) reaches its terminal path. Capture cleanup only handles
+                        // failures and synchronous rendering paths that did not transfer that ownership.
+                        if (!translationJobOwnsLoading(diagId)) {
+                            withContext(Dispatchers.Main.immediate) { overlay?.dismissLoading() }
+                        } else {
+                            logVerticalDiag(diagId, "loading retained until translation batch finishes")
+                        }
+                    }
                 }
+            } finally {
+                activeCaptureDisplayRegion = null
+                captureLock.unlock()
             }
-            activeCaptureDisplayRegion = null
-            captureLock.unlock()
         }
     }
 
@@ -3735,6 +4163,7 @@ class CaptureService : Service() {
                 settings.developerOptionsEnabled,
                 settings.ocrRedBoxModeEnabled,
             ) -> withContext(Dispatchers.Main) {
+                ensureCurrentTranslationBatch(diagId)
                 overlay?.showBlocks(
                     items,
                     outputOrientation,
@@ -3743,6 +4172,7 @@ class CaptureService : Service() {
                 )
             }
             settings.renderMode == RenderMode.BLOCKS -> withContext(Dispatchers.Main) {
+                ensureCurrentTranslationBatch(diagId)
                 overlay?.showBlocks(
                     items,
                     outputOrientation,
@@ -3752,6 +4182,7 @@ class CaptureService : Service() {
                 )
             }
             else -> withContext(Dispatchers.Main) {
+                ensureCurrentTranslationBatch(diagId)
                 overlay?.showFullScreen(items.map { (b, dst) -> b.text to dst })
             }
         }
@@ -3867,6 +4298,8 @@ class CaptureService : Service() {
     }
 
     private fun showFloatingEnglishWordDetails(outcome: FloatingWordLookupOutcome) {
+        val uiRevision = MainCaptureUiVisibility.snapshot().revision
+        if (!MainCaptureUiVisibility.allowsPresentation(uiRevision)) return
         floatingWordDetailsJob?.cancel()
         val requestId = ++floatingWordDetailsRequestId
         floatingWordDetailsJob = scope.launch {
@@ -3900,7 +4333,7 @@ class CaptureService : Service() {
                 notFoundLabel = getString(R.string.floating_word_lookup_not_found),
             )
             withContext(Dispatchers.Main) {
-                if (requestId != floatingWordDetailsRequestId) return@withContext
+                if (requestId != floatingWordDetailsRequestId || !MainCaptureUiVisibility.allowsPresentation(uiRevision)) return@withContext
                 translationBlockCopyOverlay?.dismiss()
                 val card = translationCard ?: TranslationCardOverlay(
                     context = this@CaptureService,
@@ -3960,7 +4393,7 @@ class CaptureService : Service() {
                 notFoundLabel = getString(R.string.floating_word_lookup_not_found),
             )
             withContext(Dispatchers.Main) {
-                if (requestId != floatingWordDetailsRequestId) return@withContext
+                if (requestId != floatingWordDetailsRequestId || !MainCaptureUiVisibility.allowsPresentation(uiRevision)) return@withContext
                 translationCard?.updateWordDetailsForSource(outcome.word, finalContent)
             }
         }
@@ -4108,6 +4541,7 @@ class CaptureService : Service() {
         // useful pending state. Without a prepared patch, retain the ellipsis to avoid drawing the
         // OCR source on top of the still-visible captured source.
         withContext(Dispatchers.Main) {
+            ensureCurrentTranslationBatch(diagId)
             overlay?.showBlocks(
                 blocks.map { block -> block to if (showRecognizedSource) block.text else "…" },
                 orientation,
@@ -4219,62 +4653,67 @@ class CaptureService : Service() {
                     successfulUnitTranslations[index] = normalizedText
                     onAccepted(index, unit, normalizedText)
                 }
-                val pendingIndexes = translationUnits.indices
-                    .filterNot(pagePlan.reusedTranslationsByIndex::containsKey)
-                val pendingUnits = pendingIndexes.map(translationUnits::get)
-                diagId?.let {
-                    logVerticalDiag(
-                        it,
-                        "pageTranslation reuse accepted=${pagePlan.reusedTranslationsByIndex.size} " +
-                            "pending=${pendingUnits.size}"
-                    )
-                }
-                if (pendingUnits.isNotEmpty() && pagePlan.useBatch) {
-                    batchTranslatePage(
-                        translationUnits = pendingUnits,
-                        settings = contextualSettings,
-                        diagId = diagId,
-                        render = { pendingIndex, unit, translatedText, failed, _, _ ->
-                            val index = pendingIndexes[pendingIndex]
-                            val normalizedText = normalizeOutput(translatedText)
-                            render(
-                                index,
-                                unit,
-                                normalizedText,
-                                failed,
-                                AdaptiveTextLayoutPhase.FINAL,
-                            )
-                            if (!failed) {
-                                successfulUnitTranslations[index] = normalizedText
-                                onAccepted(index, unit, normalizedText)
-                            }
-                        },
-                        publishFailure = { failedPendingIndexes, error ->
-                            publishFailure(failedPendingIndexes.mapNotNull(pendingIndexes::getOrNull), error)
-                        },
-                    )
-                } else if (pendingUnits.isNotEmpty()) {
-                    val translated = translatePageIndividually(
-                        translationUnits = pendingUnits,
-                        settings = contextualSettings,
-                        diagId = diagId,
-                    ) { pendingIndex, unit, partial, phase ->
-                        val index = pendingIndexes[pendingIndex]
-                        render(index, unit, normalizeOutput(partial), false, phase)
+                val completedTranslations = recoverPageTranslations(
+                    unitCount = translationUnits.size,
+                    initialTranslations = successfulUnitTranslations,
+                    retryEnabled = loopMode && contextualSettings.retryFailedTranslation,
+                    ensureCurrent = { ensureCurrentTranslationBatch(diagId) },
+                    onRetry = { pending, delayMs ->
+                        diagId?.let {
+                            logVerticalDiag(it, "pageTranslation recovery pending=$pending delayMs=$delayMs")
+                        }
+                    },
+                ) { pendingIndexes, accept ->
+                    val pendingUnits = pendingIndexes.map(translationUnits::get)
+                    val requestSettings = settingsForPendingPageUnits(contextualSettings, pendingUnits)
+                    diagId?.let {
+                        logVerticalDiag(
+                            it,
+                            "pageTranslation attempt pending=${pendingUnits.size} " +
+                                "accepted=${translationUnits.size - pendingUnits.size}",
+                        )
                     }
-                    translated.forEach { (pendingIndex, text) ->
-                        val index = pendingIndexes[pendingIndex]
-                        val unit = translationUnits[index]
-                        val normalizedText = normalizeOutput(text)
-                        successfulUnitTranslations[index] = normalizedText
-                        onAccepted(index, unit, normalizedText)
+                    if (pagePlan.useBatch) {
+                        batchTranslatePage(
+                            translationUnits = pendingUnits,
+                            settings = requestSettings,
+                            diagId = diagId,
+                            render = { pendingIndex, unit, translatedText, failed, _, _ ->
+                                val index = pendingIndexes[pendingIndex]
+                                val normalizedText = normalizeOutput(translatedText)
+                                render(index, unit, normalizedText, failed, AdaptiveTextLayoutPhase.FINAL)
+                                if (!failed) {
+                                    accept(index, normalizedText)
+                                    onAccepted(index, unit, normalizedText)
+                                }
+                            },
+                            publishFailure = { failedPendingIndexes, error ->
+                                publishFailure(failedPendingIndexes.mapNotNull(pendingIndexes::getOrNull), error)
+                            },
+                        )
+                    } else {
+                        val translated = translatePageIndividually(
+                            translationUnits = pendingUnits,
+                            settings = requestSettings,
+                            diagId = diagId,
+                        ) { pendingIndex, unit, partial, phase ->
+                            val index = pendingIndexes[pendingIndex]
+                            render(index, unit, normalizeOutput(partial), false, phase)
+                        }
+                        translated.forEach { (pendingIndex, text) ->
+                            val index = pendingIndexes[pendingIndex]
+                            val unit = translationUnits[index]
+                            val normalizedText = normalizeOutput(text)
+                            accept(index, normalizedText)
+                            onAccepted(index, unit, normalizedText)
+                        }
                     }
                 }
                 ensureCurrentTranslationBatch(diagId)
                 commitDialogueHistoryIfComplete(
                     settings = contextualSettings,
                     units = translationUnits,
-                    translationsByIndex = successfulUnitTranslations,
+                    translationsByIndex = completedTranslations,
                     historySession = pagePlan.historySession,
                     diagId = diagId,
                 )
@@ -4410,7 +4849,7 @@ class CaptureService : Service() {
                 return
             }
             withContext(Dispatchers.Main) {
-                if (translationBatchGate.accepts(diagId)) {
+                if ((translationBatchGate.accepts(diagId) && captureGeometry.acceptsBatch(diagId))) {
                     overlay?.showShapeAwareBubblePatches(
                         patches = emptyList(),
                         fallbackBlockIndices = successfulBlockIndices,
@@ -4426,7 +4865,7 @@ class CaptureService : Service() {
                 { patches ->
                     val mappedPatches = session.mapPatchesToDisplay(patches)
                     withContext(Dispatchers.Main) {
-                        if (translationBatchGate.accepts(diagId)) {
+                        if ((translationBatchGate.accepts(diagId) && captureGeometry.acceptsBatch(diagId))) {
                             overlay?.showShapeAwareBubblePatches(
                                 patches = mappedPatches,
                                 fallbackBlockIndices = fallbackBlockIndices,
@@ -4600,7 +5039,7 @@ class CaptureService : Service() {
         }
         if (finishResult.isFailure) {
             withContext(Dispatchers.Main) {
-                if (translationBatchGate.accepts(diagId)) {
+                if ((translationBatchGate.accepts(diagId) && captureGeometry.acceptsBatch(diagId))) {
                     overlay?.showShapeAwareBubblePatches(
                         patches = emptyList(),
                         fallbackBlockIndices = fallbackBlockIndices,
@@ -4782,7 +5221,7 @@ class CaptureService : Service() {
         phase: AdaptiveTextLayoutPhase,
         translationBatchId: Long?,
     ) {
-        if (!translationBatchGate.accepts(translationBatchId)) return
+        if (!(translationBatchGate.accepts(translationBatchId) && captureGeometry.acceptsBatch(translationBatchId))) return
         pageTranslationRowUpdates(
             translatedText = translatedText,
             unit = unit,
@@ -4814,7 +5253,7 @@ class CaptureService : Service() {
             diagId = diagId,
             prepare = { sourceTexts ->
                 withContext(Dispatchers.Main) {
-                    if (translationBatchGate.accepts(diagId)) {
+                    if ((translationBatchGate.accepts(diagId) && captureGeometry.acceptsBatch(diagId))) {
                         overlay?.prepareFloatingWindow(sourceTexts)
                     }
                 }
@@ -4825,7 +5264,7 @@ class CaptureService : Service() {
                     unit = unit,
                 )
                 withContext(Dispatchers.Main) {
-                    if (translationBatchGate.accepts(diagId)) {
+                    if ((translationBatchGate.accepts(diagId) && captureGeometry.acceptsBatch(diagId))) {
                         updates.forEach { update ->
                             overlay?.updateFloatingWindowText(update.blockIndex, update.text, phase)
                         }
@@ -4834,7 +5273,7 @@ class CaptureService : Service() {
             },
             publishFailure = { pendingIndexes, error ->
                 withContext(Dispatchers.Main) {
-                    if (translationBatchGate.accepts(diagId)) {
+                    if ((translationBatchGate.accepts(diagId) && captureGeometry.acceptsBatch(diagId))) {
                         pendingIndexes.forEach { index ->
                             pageTranslationRowUpdates(
                                 translatedText = PageTranslationPresentationTextPolicy.normalize(
@@ -5383,7 +5822,7 @@ class CaptureService : Service() {
         withContext(Dispatchers.Main) {
             captureRegionBorder?.applySettings(settings)
             translationCard?.setSourceWordLookupEnabled(settings.dictionaryTapLookupEnabled)
-            overlay?.apply {
+            overlayManager?.apply {
                 overlayStyleMode = if (adaptiveBlocksEnabled) {
                     OverlayStyleMode.ADAPTIVE
                 } else {
@@ -5458,6 +5897,8 @@ class CaptureService : Service() {
 
     /** 释放截屏相关资源（不停 Service），用于 handleStart 重入时去重 + onDestroy 兜底。 */
     private fun cleanupCapture() {
+        resumeLoopAfterOwnUi = false
+        floatingButtonReady = false
         captureUiStartupJob?.cancel()
         captureUiStartupJob = null
         captureProbeJob?.cancel()
@@ -5482,8 +5923,8 @@ class CaptureService : Service() {
         performanceOverlayCollectJob?.cancel()
         performanceOverlayCollectJob = null
         performanceDiagnostics.setPerformanceOverlayEnabled(false)
-        overlay?.setPerformanceOverlayEnabled(false)
-        overlay?.clear()
+        overlayManager?.setPerformanceOverlayEnabled(false)
+        overlayManager?.clear()
         overlay = null
         captureRegionBorder?.hide()
         captureRegionBorder = null
@@ -5504,14 +5945,22 @@ class CaptureService : Service() {
         translationCorrectionOverlay?.dismiss()
         translationCorrectionOverlay = null
         ttsEngine.stop()
-        screenshotter?.release()
+        val activeScreenshotter = screenshotter
+        val activeProjection = projection
         screenshotter = null
-        projection?.stop()
         projection = null
+        if (activeScreenshotter != null) {
+            activeScreenshotter.release()
+        } else if (activeProjection != null) {
+            runCatching { activeProjection.stop() }
+                .onFailure { Timber.w(it, "Failed to stop projection after startup failure") }
+        }
     }
 
     override fun onDestroy() {
         captureStopRequested = true
+        stopOwnUiObservation?.invoke()
+        stopOwnUiObservation = null
         cleanupCapture()
         // 释放端侧 LLM 权重。runBlocking 在 onDestroy 是可接受的——cleanUp 内部是同步 JNI 调用，
         // 几十毫秒级；不阻塞主线程没意义，等 Mutex 拿到锁就立刻返回。
@@ -5539,6 +5988,7 @@ class CaptureService : Service() {
         const val EXTRA_USE_SHIZUKU = "extra_use_shizuku"
         const val EXTRA_CAPTURE_BACKEND = "extra_capture_backend"
         private const val CAPTURE_CHROME_SETTLE_MS = 80L
+        private const val SETTLED_SOURCE_OBSERVATION_INTERVAL_MS = 1_500L
         private const val INPUT_TRANSLATION_GUIDE_DELAY_MS = 250L
 
         fun stopIntent(context: Context): Intent =

@@ -10,6 +10,7 @@
     <string name="mobile_stop">Остановить перевод</string>
     <string name="mobile_ready">Готов к переводу</string>
     <string name="mobile_running">Перевод экрана включён</string>
+    <string name="mobile_running_next_step">Откройте приложение, которое хотите перевести. Управляйте переводом через плавающего героя; удержание открывает его меню.</string>
     <string name="mobile_pair">Языки перевода</string>
     <string name="mobile_source">С какого</string>
     <string name="mobile_target">На какой</string>
@@ -24,7 +25,6 @@
     <string name="mobile_change">Изменить</string>
     <string name="mobile_permission_title">Разреши плавающую кнопку</string>
     <string name="mobile_permission_body">Одно разрешение позволит переводить в других приложениях. Захват экрана запросим при запуске.</string>
-    <string name="mobile_permission_enable">Разрешить отображение поверх приложений</string>
     <string name="mobile_permission_done">Разрешение выдано</string>
     <string name="mobile_help">Как пользоваться</string>
     <string name="mobile_text_title">Твои слова на любом языке.</string>
@@ -101,4 +101,23 @@
     <string name="settings_app_lang_de">Deutsch</string>
     <string name="settings_app_lang_fr">Français</string>
     <string name="settings_app_lang_es">Español</string>
-    </resources>
+    <string name="mobile_history_loading">Загружаем историю…</string>
+    <string name="mobile_history_import_error">Не удалось перенести прежнюю историю. Исходные данные сохранены; новые переводы можно сохранять.</string>
+    <string name="mobile_history_erase_error">История очищена, но удалить её старую копию пока не удалось. Повторите попытку, чтобы завершить удаление.</string>
+    <string name="mobile_history_storage_error">История недоступна. Перевод остаётся на экране «Текст». Попробуйте загрузить историю снова.</string>
+    <string name="mobile_history_retry">Повторить</string>
+    <string name="mobile_history_entry_title">Сохранённый перевод</string>
+    <string name="mobile_history_original">Исходный текст</string>
+    <string name="mobile_history_close">Закрыть</string>
+    <string name="mobile_history_use_source">В переводчик</string>
+    <string name="mobile_failure_connection">Не удалось подключиться к сервису перевода. Проверьте соединение или выберите другой сервис.</string>
+    <string name="mobile_failure_timeout">Сервис не ответил вовремя. Повторите попытку.</string>
+    <string name="mobile_failure_access">Сервис отклонил доступ. Проверьте его настройки или выберите другой сервис.</string>
+    <string name="mobile_failure_limit">Сервис ограничил число запросов. Повторите попытку позже.</string>
+    <string name="mobile_failure_tls">Не удалось установить доверенное защищённое соединение с сервисом.</string>
+    <string name="mobile_failure_service">Сервис перевода недоступен. Повторите попытку позже.</string>
+    <string name="mobile_failure_response">Сервис вернул пустой или непонятный ответ. Повторите запрос или выберите другой сервис.</string>
+    <string name="mobile_failure_details">Диагностика</string>
+    <string name="mobile_failure_details_body">Этот код описывает ошибку. В нём нет исходного текста, содержимого ответа или API-ключа.</string>
+    <string name="mobile_checking_models">Проверяем готовность…</string>
+</resources>

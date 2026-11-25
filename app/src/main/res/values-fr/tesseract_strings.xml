@@ -1,0 +1,12 @@
+<resources>
+    <string name="settings_ocr_chip_tesseract_arabic">Tesseract: arabe + anglais</string>
+    <string name="settings_tesseract_language_scope">OCR local pour l’arabe et l’anglais. Auto reconnaît les deux écritures. Téléchargez les modèles une fois ; la reconnaissance reste sur cet appareil.</string>
+    <string name="settings_tesseract_models_missing">Les modèles OCR arabe et anglais sont absents. Téléchargez-les ici avant de reconnaître l’arabe.</string>
+    <string name="settings_tesseract_models_ready">Les modèles OCR arabe et anglais sont vérifiés et prêts.</string>
+    <string name="settings_tesseract_download">Télécharger les modèles</string>
+    <string name="settings_tesseract_retry">Réessayer le téléchargement</string>
+    <string name="settings_tesseract_cancel">Annuler le téléchargement</string>
+    <string name="settings_tesseract_delete">Supprimer les modèles</string>
+    <string name="settings_tesseract_download_failed">Échec du téléchargement OCR. Vérifiez la connexion et réessayez.</string>
+    <string name="settings_tesseract_models_invalid">Les modèles OCR sont endommagés. Téléchargez-les à nouveau.</string>
+</resources>

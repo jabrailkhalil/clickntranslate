@@ -5,53 +5,64 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.clickn.translate.capture.CaptureStartMode
+import dev.clickn.translate.capture.CaptureStartPreference
 import dev.clickn.translate.data.Settings
 import dev.clickn.translate.data.SettingsRepository
+import dev.clickn.translate.history.TextHistoryEntry
+import dev.clickn.translate.history.TextHistoryIssue
+import dev.clickn.translate.history.TextHistoryRepository
+import dev.clickn.translate.history.TextHistoryState
 import dev.clickn.translate.translate.RoutingTranslator
 import dev.clickn.translate.translate.TranslatorConnectionTester
 import dev.clickn.translate.translate.TestResult
+import dev.clickn.translate.translate.TranslationFailureDescriptor
+import dev.clickn.translate.translate.describeTranslationFailure
+import dev.clickn.translate.shizuku.ShizukuCapabilities
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.json.Json
-
-@Serializable
-data class MobileHistoryEntry(
-    val id: Long,
-    val source: String,
-    val translated: String,
-    val from: String,
-    val to: String,
-    val provider: String,
-)
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 data class MobileModelState(val checking: Boolean = true, val translationReady: Boolean? = null,
     val ocrReady: Boolean? = null, val downloadedLanguages: Set<String> = emptySet(),
-    val llmReady: Set<dev.clickn.translate.llm.LlmModelKind> = emptySet())
+    val llmReady: Set<dev.clickn.translate.llm.LlmModelKind> = emptySet(), val arabicOcrReady: Boolean = false)
 
-data class MobileTranslationState(val busy: Boolean = false, val result: String = "", val error: String? = null)
+data class MobileTranslationState(val busy: Boolean = false, val result: String = "", val error: TranslationFailureDescriptor? = null)
+
+data class MobileShizukuState(
+    val availability: ShizukuCapabilities.Availability = ShizukuCapabilities.Availability.NOT_INSTALLED,
+    val checking: Boolean = true,
+    val authorizing: Boolean = false,
+    val authorizationDenied: Boolean = false,
+)
 
 @HiltViewModel
 class MobileViewModel @Inject constructor(
-    @ApplicationContext context: Context,
     private val repo: SettingsRepository,
+    private val historyRepository: TextHistoryRepository,
     private val translator: RoutingTranslator,
     private val tester: TranslatorConnectionTester,
     private val models: dev.clickn.translate.download.ModelReadinessChecker,
     private val shizuku: dev.clickn.translate.shizuku.ShizukuManager,
+    private val tesseractModels: dev.clickn.translate.ocr.TesseractModelStore,
+    private val modelDownloads: dev.clickn.translate.download.ModelDownloadManager,
+    private val shizukuCapabilities: ShizukuCapabilities,
+    @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
-    val settings = repo.settings.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
-    private val historyPrefs = context.getSharedPreferences("clickn_text_history", Context.MODE_PRIVATE)
-    private val json = Json { ignoreUnknownKeys = true }
-    private val serializer = ListSerializer(MobileHistoryEntry.serializer())
-    private val _history = MutableStateFlow(runCatching {
-        json.decodeFromString(serializer, historyPrefs.getString("entries", "[]")!!)
-    }.getOrDefault(emptyList()))
+    private val selectionSnapshots = repo.selectionSnapshots
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    val settings = selectionSnapshots.map { it?.settings }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    private val _history = MutableStateFlow(TextHistoryState())
     val history = _history.asStateFlow()
+    private var historyJob: Job? = null
     private val _translation = MutableStateFlow(MobileTranslationState())
     val translation = _translation.asStateFlow()
     private var translationJob: Job? = null
@@ -62,16 +73,75 @@ class MobileViewModel @Inject constructor(
     val testing = _testing.asStateFlow()
     private var testJob: Job? = null
     private var testRequest = 0L
-    private val _captureReady = MutableStateFlow<Boolean?>(null)
-    val captureReady = _captureReady.asStateFlow()
-    fun prepareShizuku() = viewModelScope.launch {
-        _captureReady.value = null
-        try {
-            val ready = shizuku.ensureReady()
-            if (ready) dev.clickn.translate.capture.CaptureStartPreference.select(dev.clickn.translate.capture.CaptureStartMode.SHIZUKU)
-            _captureReady.value = ready
-        } catch (cancelled: CancellationException) { throw cancelled }
-        catch (_: Exception) { _captureReady.value = false }
+    private val _shizukuState = MutableStateFlow(MobileShizukuState())
+    val shizukuState = _shizukuState.asStateFlow()
+    val captureModeInitialized = CaptureStartPreference.initialized
+    private var shizukuRefreshJob: Job? = null
+    private var shizukuRefreshRequest = 0L
+    private var shizukuAuthorizationJob: Job? = null
+    private var shizukuAuthorizationRequest = 0L
+
+    suspend fun ensureCaptureModeInitialized() { CaptureStartPreference.initialize(appContext) }
+
+    fun refreshShizuku() {
+        val request = ++shizukuRefreshRequest
+        shizukuRefreshJob?.cancel()
+        _shizukuState.update { it.copy(checking = true) }
+        shizukuRefreshJob = viewModelScope.launch {
+            try {
+                shizuku.verifyShellPrivilegeAsync()
+                val availability = withContext(Dispatchers.IO) { shizukuCapabilities.availability(appContext) }
+                if (request == shizukuRefreshRequest) _shizukuState.update {
+                    it.copy(availability = availability, checking = false)
+                }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) {
+                if (request == shizukuRefreshRequest) _shizukuState.update {
+                    it.copy(availability = ShizukuCapabilities.Availability.NOT_RUNNING, checking = false)
+                }
+            }
+        }
+    }
+
+    fun prepareShizuku() {
+        if (shizukuAuthorizationJob?.isActive == true) return
+        val request = ++shizukuAuthorizationRequest
+        val selectionRevision = CaptureStartPreference.revision()
+        _shizukuState.update { it.copy(authorizing = true, authorizationDenied = false) }
+        shizukuAuthorizationJob = viewModelScope.launch {
+            try {
+                ensureCaptureModeInitialized()
+                val ready = withTimeoutOrNull(30_000) { shizuku.ensureReady() } == true
+                currentCoroutineContext().ensureActive()
+                if (request == shizukuAuthorizationRequest) {
+                    val verified = ready && shizuku.isServiceRunning() && shizuku.hasPermission() && shizuku.shellPrivilegeOk.value
+                    if (verified && CaptureStartPreference.selectIfUnchanged(CaptureStartMode.SHIZUKU, selectionRevision)) {
+                        CaptureStartPreference.awaitPersistence()
+                    }
+                    if (request == shizukuAuthorizationRequest) _shizukuState.update { it.copy(authorizationDenied = !verified) }
+                }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) {
+                if (request == shizukuAuthorizationRequest) _shizukuState.update { it.copy(authorizationDenied = true) }
+            } finally {
+                if (request == shizukuAuthorizationRequest) {
+                    _shizukuState.update { it.copy(authorizing = false) }
+                    refreshShizuku()
+                }
+            }
+        }
+    }
+
+    fun cancelShizukuPreparation() {
+        ++shizukuAuthorizationRequest
+        shizukuAuthorizationJob?.cancel()
+        shizukuAuthorizationJob = null
+        _shizukuState.update { it.copy(authorizing = false, authorizationDenied = false) }
+    }
+
+    fun selectSystemCapture() {
+        cancelShizukuPreparation()
+        CaptureStartPreference.select(CaptureStartMode.SYSTEM)
     }
 
     private val _models = MutableStateFlow(MobileModelState())
@@ -83,6 +153,69 @@ class MobileViewModel @Inject constructor(
     private val _offlineError = MutableStateFlow(false)
     val offlineError = _offlineError.asStateFlow()
     private var offlineJob: Job? = null
+    private var offlineSpec: dev.clickn.translate.download.ModelDownloadSpec? = null
+    val tesseractModelState = tesseractModels.state
+    val modelDownloadWorkInfos = modelDownloads.workInfos
+    private var arabicOcrJob: Job? = null
+
+    fun enableArabicOcr() {
+        if (arabicOcrJob?.isActive == true) return
+        arabicOcrJob = viewModelScope.launch {
+            val version = dev.clickn.translate.data.PaddleModelVersion.V5_ARABIC
+            try {
+                val baseline = repo.get()
+                if (!withContext(Dispatchers.IO) { models.paddle(version).ready }) {
+                    modelDownloads.enqueueAndAwait(listOf(dev.clickn.translate.download.ModelDownloadSpec.paddle(version)), {})
+                }
+                if (!withContext(Dispatchers.IO) { models.paddle(version).ready }) return@launch
+                repo.update { current ->
+                    // A later explicit OCR choice must survive this background download.
+                    if (current.ocrEngine == baseline.ocrEngine && current.paddleModelVersion == baseline.paddleModelVersion) {
+                        current.copy(ocrEngine = dev.clickn.translate.data.OcrEngineKind.PADDLE_ONNX, paddleModelVersion = version)
+                    } else current
+                }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { /* The shared download queue displays failures and retry. */ }
+            finally { settings.value?.let(::refreshModels) }
+        }
+    }
+
+    fun cancelArabicOcrDownload() {
+        arabicOcrJob?.cancel()
+        modelDownloads.cancel(dev.clickn.translate.download.ModelDownloadSpec.paddle(dev.clickn.translate.data.PaddleModelVersion.V5_ARABIC))
+    }
+
+    fun downloadTesseractModels() = viewModelScope.launch {
+        try { modelDownloads.enqueueAndAwait(listOf(dev.clickn.translate.download.ModelDownloadSpec.tesseractArabic()), {}) }
+        catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: Exception) { /* Queue/store state is displayed by the package hub. */ }
+        finally { settings.value?.let(::refreshModels) }
+    }
+    fun cancelTesseractModels() = modelDownloads.cancel(dev.clickn.translate.download.ModelDownloadSpec.tesseractArabic())
+    fun deleteTesseractModels() = viewModelScope.launch {
+        tesseractModels.delete()
+        settings.value?.let(::refreshModels)
+    }
+
+    init {
+        reloadHistory()
+        viewModelScope.launch { ensureCaptureModeInitialized() }
+        viewModelScope.launch {
+            combine(shizuku.binderAlive, shizuku.shellPrivilegeOk) { alive, privileged -> alive to privileged }
+                .distinctUntilChanged().collect { (alive, privileged) ->
+                    if (!alive || !privileged) _shizukuState.update {
+                        it.copy(availability = if (alive) ShizukuCapabilities.Availability.INSTALLED_NOT_PAIRED
+                            else ShizukuCapabilities.Availability.NOT_RUNNING, checking = true)
+                    }
+                    refreshShizuku()
+                }
+        }
+        viewModelScope.launch {
+            tesseractModels.state.map { it.ready }.distinctUntilChanged().drop(1).collect {
+                settings.value?.let(::refreshModels)
+            }
+        }
+    }
 
     fun refreshModels(s: Settings) {
         val request = ++readinessRequest
@@ -92,14 +225,18 @@ class MobileViewModel @Inject constructor(
             try {
                 val installed = runCatching { translator.getDownloadedMlKitLanguageModels() }.getOrDefault(emptySet())
                 val state = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    tesseractModels.refresh()
+                    val arabicPaddleReady = models.paddle(dev.clickn.translate.data.PaddleModelVersion.V5_ARABIC).ready
                     val llm = dev.clickn.translate.llm.LlmModelKind.entries.filter { models.llm(it).ready }.toSet()
                     fun routeReady(route: dev.clickn.translate.data.AutoOcrRoute): Boolean = when (route.engine) {
                         dev.clickn.translate.data.OcrEngineKind.PADDLE_ONNX -> models.paddle(route.paddleVersion).ready
                         dev.clickn.translate.data.OcrEngineKind.MANGA_OCR_JA -> models.mangaOcr().ready
+                        dev.clickn.translate.data.OcrEngineKind.TESSERACT_ARABIC -> tesseractModels.state.value.ready
                         else -> dev.clickn.translate.data.AutoOcrRoutingPolicy.configured(s, route)
                     }
                     val ocrReady = if (s.ocrEngine == dev.clickn.translate.data.OcrEngineKind.ML_KIT_AUTO) {
-                        s.sourceLang == "auto" || dev.clickn.translate.data.AutoOcrRoutingPolicy.resolve(s, s.sourceLang, ::routeReady) != null
+                        if (dev.clickn.translate.ocr.requiresArabicOcrBootstrap(s) && !tesseractModels.state.value.ready && !arabicPaddleReady) false
+                        else s.sourceLang == "auto" || dev.clickn.translate.data.AutoOcrRoutingPolicy.resolve(s, s.sourceLang, ::routeReady) != null
                     } else routeReady(dev.clickn.translate.data.AutoOcrRoute(s.ocrEngine, s.paddleModelVersion)) &&
                         (s.sourceLang == "auto" || dev.clickn.translate.ocr.OcrLanguageCapability.supports(s, s.sourceLang))
                     val translated = when (s.translatorEngine) {
@@ -108,7 +245,7 @@ class MobileViewModel @Inject constructor(
                         dev.clickn.translate.data.TranslatorEngine.LOCAL_SAKURA -> dev.clickn.translate.llm.LlmModelKind.SAKURA_1_5B_Q4 in llm
                         else -> null
                     }
-                    MobileModelState(false, translated, ocrReady, installed, llm)
+                    MobileModelState(false, translated, ocrReady, installed, llm, arabicPaddleReady)
                 }
                 if (request == readinessRequest) _models.value = state
             } catch (cancelled: CancellationException) { throw cancelled }
@@ -117,20 +254,35 @@ class MobileViewModel @Inject constructor(
     }
     fun downloadOfflinePair(s: Settings) {
         if (_offlineBusy.value) return
+        val baseline = selectionSnapshots.value ?: return
         offlineJob = viewModelScope.launch {
             _offlineBusy.value = true; _offlineError.value = false
             try {
                 val pair = mobileMlKitPair(s)
-                translator.downloadMlKitLanguagePair(pair.sourceLang, pair.targetLang, maxOf(120, s.apiTimeoutSeconds))
-                repo.update { it.copy(translatorEngine = pair.translatorEngine, sourceLang = pair.sourceLang, targetLang = pair.targetLang) }
+                val spec = dev.clickn.translate.download.ModelDownloadSpec.mlKitTranslation(pair.sourceLang, pair.targetLang)
+                offlineSpec = spec
+                OfflineTranslationActivationPolicy.downloadAndActivate(
+                    baseline = baseline,
+                    requestedPair = pair,
+                    download = { modelDownloads.enqueueAndAwait(listOf(spec), {}) },
+                    activate = repo::updateTranslationSelectionIfUnchanged,
+                )
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { _offlineError.value = true }
-            finally { _offlineBusy.value = false; refreshModels(repo.get()) }
+            finally { offlineSpec = null; _offlineBusy.value = false; refreshModels(repo.get()) }
         }
     }
-    fun cancelOfflineDownload() { offlineJob?.cancel() }
+    fun cancelOfflineDownload() { offlineSpec?.let(modelDownloads::cancel); offlineJob?.cancel() }
 
     fun update(transform: (Settings) -> Settings) = viewModelScope.launch { repo.update(transform) }
+
+    private val providerSaves = ProviderSaveCoordinator(viewModelScope)
+    internal val providerSaveState = providerSaves.status
+
+    internal fun saveProvider(transform: (Settings) -> Settings) = providerSaves.save {
+        repo.update(transform)
+        resetTranslation()
+    }
 
     fun translate(source: String) {
         if (source.isBlank()) return
@@ -140,26 +292,49 @@ class MobileViewModel @Inject constructor(
             _translation.value = MobileTranslationState(busy = true)
             try {
                 val snapshot = repo.get()
+                val historyGeneration = try {
+                    historyRepository.writeGeneration()
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Exception) { historyUnavailable(); null }
                 val result = translator.translate(source, snapshot).orEmpty()
                 if (request != translationRequest) return@launch
                 check(result.isNotBlank()) { "Empty translation" }
-                _translation.value = MobileTranslationState(result = result)
-                val entry = MobileHistoryEntry(maxOf(System.currentTimeMillis(), (_history.value.firstOrNull()?.id ?: 0L) + 1L), source, result,
-                    snapshot.sourceLang, snapshot.targetLang, snapshot.translatorEngine.name)
-                _history.value = (listOf(entry) + _history.value.filterNot {
-                    it.source == source && it.from == entry.from && it.to == entry.to && it.provider == entry.provider
-                }).take(50)
-                persistHistory()
+                if (historyGeneration != null) {
+                    try {
+                        historyRepository.save(TextHistoryEntry(createdAtMs = System.currentTimeMillis(),
+                            source = source, translated = result, from = snapshot.sourceLang,
+                            to = snapshot.targetLang, provider = snapshot.translatorEngine.name), historyGeneration)
+                    } catch (cancelled: CancellationException) { throw cancelled }
+                    catch (_: Exception) { historyUnavailable() }
+                }
+                if (request == translationRequest) _translation.value = MobileTranslationState(result = result)
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (error: Exception) {
-                if (request == translationRequest) _translation.value = MobileTranslationState(error = error.javaClass.simpleName)
+                if (request == translationRequest) _translation.value = MobileTranslationState(error = describeTranslationFailure(error))
             } finally { if (request == translationRequest) _translation.value = _translation.value.copy(busy = false) }
         }
     }
 
     fun resetTranslation() { ++translationRequest; translationJob?.cancel(); _translation.value = MobileTranslationState() }
-    fun clearHistory() { _history.value = emptyList(); persistHistory() }
-    private fun persistHistory() { historyPrefs.edit().putString("entries", json.encodeToString(serializer, _history.value)).apply() }
+    fun clearHistory() = viewModelScope.launch {
+        try { historyRepository.clear() }
+        catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: Exception) { historyUnavailable() }
+    }
+
+    fun reloadHistory() {
+        historyJob?.cancel()
+        _history.update { it.copy(loading = true, issue = null) }
+        historyJob = viewModelScope.launch {
+            try { historyRepository.observe().collect { _history.value = it } }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { historyUnavailable() }
+        }
+    }
+
+    private fun historyUnavailable() {
+        _history.update { it.copy(loading = false, issue = TextHistoryIssue.STORAGE) }
+    }
 
     fun test(settings: Settings) {
         val request = ++testRequest

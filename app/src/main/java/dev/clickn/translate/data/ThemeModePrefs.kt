@@ -26,9 +26,9 @@ object ThemeModePrefs {
     }
 
     fun write(context: Context, mode: Int) {
-        context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
-            .edit()
-            .putInt(KEY_MODE, mode)
-            .apply()
+        UiPreferenceTransfer.write(context, UiPreferenceField.THEME, mode)
     }
+
+    fun observe(context: Context, onChange: () -> Unit): () -> Unit =
+        UiPreferenceTransfer.observe(context, UiPreferenceField.THEME, onChange)
 }

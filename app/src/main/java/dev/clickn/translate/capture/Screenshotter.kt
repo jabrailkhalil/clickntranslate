@@ -19,6 +19,13 @@ interface Screenshotter {
     /** 抓一帧。返回 null 表示这一帧没有就绪 / 上一帧没变化，调用方应跳过。 */
     suspend fun capture(): Bitmap?
 
+    /**
+     * Capture after a UI change, rejecting buffered frames older than [minTimestampNanos].
+     * The fence uses [System.nanoTime]. On-demand backends already capture when called;
+     * buffered backends must enforce freshness in their own producer's timebase.
+     */
+    suspend fun captureAfter(minTimestampNanos: Long): Bitmap? = capture()
+
     /** 释放资源（VirtualDisplay、ImageReader、MediaProjection token）。 */
     fun release()
 }

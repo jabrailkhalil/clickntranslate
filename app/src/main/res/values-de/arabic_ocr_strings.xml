@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="paddle_version_v5_arabic">PP-OCRv5 Arabisch</string>
+    <string name="paddle_version_v5_arabic_desc">~13 MB. Arabische und englische Texterkennung auf dem Gerät.</string>
+    <string name="paddle_version_v5_arabic_languages">Arabisch, Englisch</string>
+    <string name="mobile_arabic_ocr">Arabischen Text erkennen</string>
+    <string name="mobile_arabic_ocr_body">Einmal herunterladen, um arabischen und englischen Text auf dem Telefon zu erkennen. Bilder bleiben auf dem Gerät.</string>
+    <string name="mobile_arabic_ocr_download">Laden und verwenden</string>
+    <string name="mobile_arabic_ocr_use">Arabische OCR verwenden</string>
+</resources>

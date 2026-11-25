@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="gallery_export_text_action">Экспортировать перевод (.txt)</string>
+    <string name="gallery_text_actions">Действия с текстом</string>
+    <string name="gallery_text_copy">Копировать</string>
+    <string name="gallery_text_share">Отправить</string>
+</resources>

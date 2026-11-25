@@ -3,12 +3,15 @@ package dev.clickn.translate.download
 
 import dev.clickn.translate.data.PaddleModelVersion
 import dev.clickn.translate.llm.LlmModelKind
+import dev.clickn.translate.translate.MlKitLanguagePolicy
 
 enum class ModelDownloadType {
     LLM,
     PADDLE,
     MANGA_OCR,
     ORIENTATION,
+    TESSERACT_ARABIC,
+    ML_KIT_TRANSLATION,
 }
 
 data class ModelDownloadSpec(
@@ -17,11 +20,25 @@ data class ModelDownloadSpec(
 ) {
     fun encode(): String = "${type.name}|$variant"
 
+    fun mlKitLanguages(): Pair<String, String> {
+        require(type == ModelDownloadType.ML_KIT_TRANSLATION)
+        require(Regex("[a-z]{2}:[a-z]{2}").matches(variant)) { "Invalid canonical ML Kit model pair" }
+        val pair = variant.split(':', limit = 2)
+        require(pair.size == 2)
+        val resolved = MlKitLanguagePolicy.resolveConfiguredSource(pair[0]) to MlKitLanguagePolicy.resolveTarget(pair[1])
+        require(variant == "${resolved.first}:${resolved.second}") { "Invalid canonical ML Kit model pair" }
+        return resolved
+    }
+
     companion object {
         fun llm(kind: LlmModelKind) = ModelDownloadSpec(ModelDownloadType.LLM, kind.name)
         fun paddle(version: PaddleModelVersion) = ModelDownloadSpec(ModelDownloadType.PADDLE, version.name)
         fun mangaOcr() = ModelDownloadSpec(ModelDownloadType.MANGA_OCR)
         fun orientation() = ModelDownloadSpec(ModelDownloadType.ORIENTATION)
+        fun tesseractArabic() = ModelDownloadSpec(ModelDownloadType.TESSERACT_ARABIC)
+        fun mlKitTranslation(source: String, target: String): ModelDownloadSpec = ModelDownloadSpec(
+            ModelDownloadType.ML_KIT_TRANSLATION,
+            "${MlKitLanguagePolicy.resolveConfiguredSource(source)}:${MlKitLanguagePolicy.resolveTarget(target)}")
 
         fun decode(value: String): ModelDownloadSpec? {
             val parts = value.split('|', limit = 2)
@@ -32,7 +49,10 @@ data class ModelDownloadSpec(
             if ((type == ModelDownloadType.LLM || type == ModelDownloadType.PADDLE) && variant.isBlank()) {
                 return null
             }
-            return ModelDownloadSpec(type, variant)
+            val spec = ModelDownloadSpec(type, variant)
+            if (type == ModelDownloadType.ML_KIT_TRANSLATION && runCatching { spec.mlKitLanguages() }.isFailure) return null
+            if (type == ModelDownloadType.TESSERACT_ARABIC && variant.isNotEmpty()) return null
+            return spec
         }
 
         fun decodeAll(values: Array<out String>): List<ModelDownloadSpec>? =
@@ -98,6 +118,7 @@ object ModelDownloadWorkPolicy {
         specs.joinToString(",") { it.encode() }
 
     fun ownerTag(presetId: String): String = "$OWNER_TAG_PREFIX$presetId"
+    fun specTag(spec: ModelDownloadSpec): String = "$WORK_TAG-spec:${spec.encode()}"
 
     fun ownerPresetId(tags: Set<String>): String? = tags.asSequence()
         .filter { it.startsWith(OWNER_TAG_PREFIX) }

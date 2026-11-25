@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="gallery_export_text_action">导出译文 (.txt)</string>
+    <string name="gallery_text_actions">文本操作</string>
+    <string name="gallery_text_copy">复制</string>
+    <string name="gallery_text_share">分享</string>
+</resources>

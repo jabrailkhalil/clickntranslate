@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="readiness_title">应用准备情况</string>
+    <string name="readiness_core_progress">必要设置：%1$d / %2$d</string>
+    <string name="readiness_more_available">打开清单，检查有助于日常使用的设置。</string>
+    <string name="readiness_recommendations_done">附加设置已完成。</string>
+    <string name="readiness_body">查看已经启用的功能，点按任意项目即可设置。</string>
+    <string name="readiness_core">屏幕翻译所需设置</string>
+    <string name="readiness_recommended">使用更方便</string>
+    <string name="readiness_recommended_body">这些设置不是必需的，请按需选择。</string>
+    <string name="readiness_hero">悬浮伙伴</string>
+    <string name="readiness_system_capture">系统截图。启动时 Android 会请求授权。</string>
+    <string name="readiness_shizuku_enabled">Shizuku 已连接</string>
+    <string name="readiness_not_enabled">尚未启用</string>
+</resources>

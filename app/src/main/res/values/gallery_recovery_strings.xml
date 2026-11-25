@@ -1,0 +1,3 @@
+<resources>
+    <string name="gallery_item_partial_error">Translated %1$d of %2$d blocks. Retry the untranslated blocks.</string>
+</resources>

@@ -29,16 +29,23 @@ internal object CompanionPrefs {
     }
 
     fun keepVisible(context: Context): Boolean = prefs(context).getBoolean("keep_visible", false)
-    fun setKeepVisible(context: Context, enabled: Boolean) {
+    fun setKeepVisible(context: Context, enabled: Boolean) = synchronized(UiPreferenceTransfer.mutationLock) {
         prefs(context).edit().putBoolean("keep_visible", enabled)
             .putLong("revision", prefs(context).getLong("revision", 0) + 1).apply()
     }
 
     fun read(context: Context): String = normalized(prefs(context).getString("choice", AppCompanion.CHESTER.id))
+    fun hasSelection(context: Context): Boolean = prefs(context).contains("choice")
+
+    /** Continuing setup confirms the default, but never replaces an existing/custom selection. */
+    fun confirmSelection(context: Context): String = synchronized(UiPreferenceTransfer.mutationLock) {
+        if (!hasSelection(context)) write(context, AppCompanion.CHESTER.id)
+        read(context)
+    }
+
     fun write(context: Context, choice: String) {
         require(normalized(choice) == choice)
-        prefs(context).edit().putString("choice", choice)
-            .putLong("revision", prefs(context).getLong("revision", 0) + 1).apply()
+        UiPreferenceTransfer.write(context, UiPreferenceField.COMPANION, choice)
     }
     fun observe(context: Context, onChanged: () -> Unit): () -> Unit {
         val preferences = prefs(context)

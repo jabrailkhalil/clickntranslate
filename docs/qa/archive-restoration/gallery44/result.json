@@ -1,0 +1,48 @@
+{
+  "version_code": 44,
+  "apk_sha256": "a22c48e8b15c11a7f594fc46f2d47ab5d14e45195b70c4d69cd23fe45baac7cc",
+  "source_sha256": "b8af7ceb62191bbcad1a6f1f11f5be5f366d9af2b551da354aa1c09fa73fafba",
+  "previous_export_sha256": "093cbb7d1b73549bfcb60f2d9b1eb3de269905b858cea91552fc62327603bc75",
+  "export_sha256": "5f8aa6cae8e7221caaa840ede3b6344dd1ca9be3384c5b21546e499dab5b19bd",
+  "used_existing_gallery_task": true,
+  "source_and_previous_export_remained_available": true,
+  "translated_blocks": [
+    "Серебряные поезда едут за гору.",
+    "Легкий ветерок несет осенние листья."
+  ],
+  "detail_capture": "c44-gallery-kept-task-00",
+  "preview_capture": "c44-gallery-preview-rendered",
+  "export_capture": "c44-gallery-exported-00",
+  "samples": [
+    {
+      "bounds": [
+        175,
+        895,
+        350,
+        925
+      ],
+      "source_white_pixels": 3067,
+      "source_black_pixels": 1546,
+      "background_rgb": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "bounds": [
+        175,
+        1398,
+        470,
+        1426
+      ],
+      "source_white_pixels": 4944,
+      "source_black_pixels": 2260,
+      "background_rgb": [
+        0,
+        0,
+        0
+      ]
+    }
+  ]
+}

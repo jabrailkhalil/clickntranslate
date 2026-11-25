@@ -1,1 +1,16 @@
-app/src/main/assets/onnxruntime_third_party_notices_1_20_0.txt text eol=lf
+* text=auto
+gradlew text eol=lf
+*.sh text eol=lf
+*.bat text eol=crlf
+*.png binary
+*.jar binary
+*.apk binary
+*.onnx binary
+*.bin binary
+*.db binary
+# QA digests identify exact captured bytes, including Windows line endings
+# and whitespace emitted by device/Gradle logs. Preserve those bytes verbatim.
+docs/qa/** -text -whitespace
+app/src/main/assets/ocr_notices/** -text -whitespace
+app/src/main/assets/onnx_notices/** -text -whitespace
+app/src/androidTest/assets/onnx-identity/** -text -whitespace

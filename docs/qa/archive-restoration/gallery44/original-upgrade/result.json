@@ -1,0 +1,30 @@
+{
+  "certificate_sha256": "1746bfc27cbbb823021ce32c1e7a2640584393d058b85e3d784711954bcafe85",
+  "after": {
+    "first_install_time": "2026-11-24 20:35:25",
+    "sha256": "a22c48e8b15c11a7f594fc46f2d47ab5d14e45195b70c4d69cd23fe45baac7cc",
+    "version_code": 44
+  },
+  "emulator_native_bridge": "libndk_translation.so",
+  "android_api": 35,
+  "before": {
+    "first_install_time": "2026-11-24 20:35:25",
+    "sha256": "3a8d5d6ce41b368642f0b03bd1745e9764908aa9a1229660bd67b1557b114d63",
+    "version_code": 7
+  },
+  "before_version_name": "1.8.2",
+  "after_version_name": "1.8.3",
+  "apk_package": "dev.clickn.translate",
+  "data_cleared": false,
+  "uninstalled": false,
+  "existing_setup_skipped": true,
+  "dark_theme_selected_before_and_after": true,
+  "selected_translation_service_after": "Google Translate",
+  "target_language_after": "ru",
+  "test_history_entry": {
+    "language_pair": "Detect language → Russian",
+    "translated": "Зеленый велосипед ждет на станции.",
+    "source": "The green bicycle waits by the station.",
+    "displayed_time": "11/24/26 8:37 PM"
+  }
+}

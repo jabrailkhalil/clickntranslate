@@ -14,6 +14,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
@@ -39,6 +41,7 @@ class GalleryTranslationExporter @Inject constructor(
     private val imageDecoder: GalleryImageDecoder,
     private val renderer: GalleryTranslatedImageRenderer,
     private val json: Json,
+    private val exportReceipts: GalleryExportReceipts,
 ) {
     suspend fun exportTask(
         taskId: String,
@@ -49,12 +52,11 @@ class GalleryTranslationExporter @Inject constructor(
             "The gallery translation task no longer exists."
         }
         val settings = repository.settingsForTask(task)
-        require(galleryExportRenderMode(settings) != GalleryExportRenderMode.UNSUPPORTED_FLOATING) {
-            "Floating-window tasks do not support translated-image export."
-        }
+        val textExport = galleryExportRenderMode(settings) == GalleryExportRenderMode.UNSUPPORTED_FLOATING
         val items = repository.getItems(taskId)
             .filter { it.status == GalleryItemStatus.SUCCEEDED }
         if (items.isEmpty()) return GalleryExportResult(total = 0, exported = 0, failed = 0)
+        exportReceipts.recoverPending()
 
         val parentDocumentUri = withContext(Dispatchers.IO) {
             require(DocumentsContract.isTreeUri(treeUri)) {
@@ -67,7 +69,7 @@ class GalleryTranslationExporter @Inject constructor(
                         Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
                 )
             }.onFailure {
-                Timber.i(it, "Gallery export destination permission is session-only")
+                Timber.i("Gallery export destination permission is session-only")
             }
             DocumentsContract.buildDocumentUriUsingTree(
                 treeUri,
@@ -78,6 +80,7 @@ class GalleryTranslationExporter @Inject constructor(
         var exported = 0
         var failed = 0
         items.forEachIndexed { index, item ->
+            currentCoroutineContext().ensureActive()
             onProgress(
                 GalleryExportProgress(
                     completed = index,
@@ -87,11 +90,12 @@ class GalleryTranslationExporter @Inject constructor(
             )
             try {
                 withContext(Dispatchers.IO) {
-                    exportItem(
-                        item = item,
-                        parentDocumentUri = parentDocumentUri,
-                        settings = settings,
-                    )
+                    if (textExport) {
+                        exportGalleryTextDocument(exportReceipts, parentDocumentUri, item.position, item.displayName,
+                            json.decodeFromString<List<GalleryTranslationSegment>>(item.segmentsJson))
+                    } else {
+                        exportItem(item, parentDocumentUri, settings)
+                    }
                 }
                 exported++
             } catch (cancellation: CancellationException) {
@@ -120,11 +124,11 @@ class GalleryTranslationExporter @Inject constructor(
         )
     }
 
-    private fun exportItem(
+    private suspend fun exportItem(
         item: GalleryTranslationItemEntity,
         parentDocumentUri: Uri,
         settings: Settings,
-    ) {
+    ) = GalleryTransientFiles.withExportStaging(context.cacheDir) { stagingDirectory ->
         val segments = json.decodeFromString<List<GalleryTranslationSegment>>(item.segmentsJson)
             .filter { it.translatedText.isNotBlank() }
         require(segments.isNotEmpty()) { "No translated regions to export." }
@@ -132,9 +136,11 @@ class GalleryTranslationExporter @Inject constructor(
         var decoded: GalleryDecodedImage? = null
         var rendered: Bitmap? = null
         var encodedFile: File? = null
-        var outputUri: Uri? = null
+        val exportContext = currentCoroutineContext()
         try {
-            decoded = imageDecoder.decode(item)
+            exportContext.ensureActive()
+            decoded = imageDecoder.decode(item, checkpoint = { exportContext.ensureActive() })
+            exportContext.ensureActive()
             rendered = renderer.render(
                 source = decoded.bitmap,
                 processedWidth = item.processedWidth,
@@ -142,30 +148,15 @@ class GalleryTranslationExporter @Inject constructor(
                 segments = segments,
                 settings = settings,
             )
-            encodedFile = encodeTranslatedPng(rendered)
-            outputUri = requireNotNull(
-                DocumentsContract.createDocument(
-                    context.contentResolver,
-                    parentDocumentUri,
-                    PNG_MIME_TYPE,
-                    galleryTranslatedFileName(item.position, item.displayName),
-                )
-            ) {
-                "The selected folder could not create an output image."
-            }
-            encodedFile.inputStream().use { input ->
-                context.contentResolver.openOutputStream(outputUri, "w").use { output ->
-                    requireNotNull(output) { "The output image could not be opened." }
-                    input.copyTo(output)
-                }
-            }
-        } catch (error: Throwable) {
-            outputUri?.let { uri ->
-                runCatching {
-                    DocumentsContract.deleteDocument(context.contentResolver, uri)
-                }
-            }
-            throw error
+            exportContext.ensureActive()
+            encodedFile = encodeTranslatedPng(rendered, stagingDirectory)
+            exportContext.ensureActive()
+            exportReceipts.exportFile(
+                parentDocumentUri,
+                PNG_MIME_TYPE,
+                galleryTranslatedFileName(item.position, item.displayName),
+                encodedFile,
+            )
         } finally {
             encodedFile?.let { file ->
                 if (file.exists() && !file.delete()) {
@@ -179,11 +170,11 @@ class GalleryTranslationExporter @Inject constructor(
         }
     }
 
-    private fun encodeTranslatedPng(rendered: Bitmap): File {
+    private fun encodeTranslatedPng(rendered: Bitmap, stagingDirectory: File): File {
         val outputFile = File.createTempFile(
             TEMP_FILE_PREFIX,
             ".png",
-            context.cacheDir,
+            stagingDirectory,
         )
         try {
             outputFile.outputStream().buffered().use { output ->
@@ -206,7 +197,7 @@ class GalleryTranslationExporter @Inject constructor(
 
     private companion object {
         const val PNG_MIME_TYPE = "image/png"
-        const val TEMP_FILE_PREFIX = "gallery_translated_"
+        const val TEMP_FILE_PREFIX = GalleryTransientFiles.EXPORT_PREFIX
     }
 }
 

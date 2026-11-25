@@ -17,12 +17,17 @@ plugins {
     alias(libs.plugins.kotlin.android)
 }
 
+// Only the explicitly requested Debug preview may omit Vulkan host shader generation.
+// Default Debug and every Release retain Vulkan; this is not a product feature reduction.
+val archiveCpuDebug = providers.gradleProperty("archiveCpuDebug").map { it.toBooleanStrict() }.orElse(false)
+val archiveNdkVersion = providers.gradleProperty("archiveNdkVersion").orElse("26.1.10909125")
+
 android {
     namespace = "com.arm.aichat"
     // Click'n'Translate :app 用 35，AGP 8.7.3 不支持 36；compileSdk 跟随主工程。
     compileSdk = 35
     buildToolsVersion = "35.0.0"
-    ndkVersion = "26.1.10909125"
+    ndkVersion = archiveNdkVersion.get()
 
     // Pin the NDK in both modules so local and CI native builds use the same toolchain.
 
@@ -47,7 +52,6 @@ android {
 
                 arguments += "-DGGML_NATIVE=OFF"
                 arguments += "-DGGML_BACKEND_DL=ON"
-                arguments += "-DGGML_VULKAN=ON"
                 // **必须 ON**：BACKEND_DL=ON 模式下 ggml 启动时扫 native lib dir 找
                 // `libggml-cpu-android_*.so` 多变体文件做 dlopen。关了 ALL_VARIANTS 只产
                 // libggml-cpu.so（无后缀），扫不到 → "no backends are loaded" → loadModel 必败。
@@ -56,6 +60,9 @@ android {
                 // 那时再单独排除该变体。
                 arguments += "-DGGML_CPU_ALL_VARIANTS=ON"
                 arguments += "-DGGML_LLAMAFILE=OFF"
+                providers.gradleProperty("vulkanHostToolchain").orNull?.let {
+                    arguments += "-DGGML_VULKAN_SHADERS_GEN_TOOLCHAIN=${file(it).absolutePath.replace('\\', '/')}"
+                }
             }
         }
         aarMetadata {
@@ -75,6 +82,10 @@ android {
     externalNativeBuild {
         cmake {
             path("src/main/cpp/CMakeLists.txt")
+            // Keep Windows Ninja paths short without moving or deleting any source/output.
+            providers.gradleProperty("nativeBuildStagingDir").orNull?.let {
+                buildStagingDirectory = file(it)
+            }
             // CMake 3.22.1 是 Android SDK 自带版本；上游主仓 cmake_minimum_required = 3.14..3.28 足够覆盖。
             version = "3.22.1"
         }
@@ -84,6 +95,7 @@ android {
         getByName("debug") {
             externalNativeBuild {
                 cmake {
+                    arguments += "-DGGML_VULKAN=${if (archiveCpuDebug.get()) "OFF" else "ON"}"
                     arguments += "-DCLICKTRANSLATE_NATIVE_LOGCAT=ON"
                 }
             }
@@ -91,6 +103,7 @@ android {
         getByName("release") {
             externalNativeBuild {
                 cmake {
+                    arguments += "-DGGML_VULKAN=ON"
                     arguments += "-DCLICKTRANSLATE_NATIVE_LOGCAT=OFF"
                 }
             }
@@ -108,10 +121,10 @@ android {
     packaging {
         jniLibs {
             // Snapdragon 8 Gen 3 selected android_armv8.6_1, whose i8mm path produced
-            // incoherent Qwen2 output. Keep DOTPROD + FP16 but exclude every competing
-            // CPU variant so ggml's runtime scorer deterministically loads armv8.2_2.
+            // incoherent Qwen2 output. Prefer DOTPROD + FP16 without that i8mm path.
+            // Keep the ARMv8 baseline as a capability fallback: the official runtime scorer
+            // still prefers armv8.2_2 when supported, and older ARM64 CPUs retain a backend.
             excludes += setOf(
-                "**/libggml-cpu-android_armv8.0_1.so",
                 "**/libggml-cpu-android_armv8.2_1.so",
                 "**/libggml-cpu-android_armv8.6_1.so",
                 "**/libggml-cpu-android_armv9.0_1.so",

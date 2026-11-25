@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="process_text_replace">Replace selection</string>
+    <string name="process_text_retry">Retry</string>
+    <string name="process_text_too_long">Select no more than %1$d characters. Your text has not been changed.</string>
+    <string name="process_text_copy_failed">Could not copy. The translation is still available.</string>
+    <string name="process_text_interrupted">Translation was interrupted. Tap Retry to continue.</string>
+    <string name="integration_tile_start">Start screen translation</string>
+    <string name="integration_tile_stop">Stop screen translation</string>
+    <string name="integration_tile_launch_failed">Could not open screen translation. Open the app and try again.</string>
+</resources>

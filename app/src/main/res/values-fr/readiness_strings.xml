@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="readiness_title">État de préparation</string>
+    <string name="readiness_core_progress">Réglages essentiels : %1$d sur %2$d</string>
+    <string name="readiness_more_available">Ouvrez la liste pour vérifier les réglages utiles au quotidien.</string>
+    <string name="readiness_recommendations_done">Les réglages supplémentaires sont terminés.</string>
+    <string name="readiness_body">Voyez ce qui est déjà activé. Touchez un élément pour le configurer.</string>
+    <string name="readiness_core">Pour traduire l’écran</string>
+    <string name="readiness_recommended">Pour plus de confort</string>
+    <string name="readiness_recommended_body">Ces réglages sont facultatifs. Choisissez ce dont vous avez besoin.</string>
+    <string name="readiness_hero">Compagnon flottant</string>
+    <string name="readiness_system_capture">Capture système. Android demande une autorisation au démarrage.</string>
+    <string name="readiness_shizuku_enabled">Shizuku est connecté</string>
+    <string name="readiness_not_enabled">Non activé</string>
+</resources>

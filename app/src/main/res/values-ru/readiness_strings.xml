@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="readiness_title">Готовность приложения</string>
+    <string name="readiness_core_progress">Основные настройки: %1$d из %2$d</string>
+    <string name="readiness_more_available">Откройте список, чтобы проверить настройки для удобной работы.</string>
+    <string name="readiness_recommendations_done">Дополнительные настройки выполнены.</string>
+    <string name="readiness_body">Здесь видно, что уже включено. Нажмите на любой пункт, чтобы настроить его.</string>
+    <string name="readiness_core">Для перевода экрана</string>
+    <string name="readiness_recommended">Для удобства</string>
+    <string name="readiness_recommended_body">Эти настройки необязательны. Выберите те, которые вам нужны.</string>
+    <string name="readiness_hero">Плавающий герой</string>
+    <string name="readiness_system_capture">Системный захват. Android спросит разрешение при запуске.</string>
+    <string name="readiness_shizuku_enabled">Shizuku подключён</string>
+    <string name="readiness_not_enabled">Не включено</string>
+</resources>

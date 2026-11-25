@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="process_text_replace">Заменить выделенное</string>
+    <string name="process_text_retry">Повторить</string>
+    <string name="process_text_too_long">Выделите не более %1$d символов. Ваш текст не изменён.</string>
+    <string name="process_text_copy_failed">Не удалось скопировать. Перевод остаётся доступен.</string>
+    <string name="process_text_interrupted">Перевод прерван. Нажмите «Повторить», чтобы продолжить.</string>
+    <string name="integration_tile_start">Начать перевод экрана</string>
+    <string name="integration_tile_stop">Остановить перевод экрана</string>
+    <string name="integration_tile_launch_failed">Не удалось открыть перевод экрана. Откройте приложение и повторите.</string>
+</resources>

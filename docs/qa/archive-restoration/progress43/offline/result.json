@@ -1,0 +1,48 @@
+{
+  "version_code": 43,
+  "apk_sha256": "fe3087c1132e367490be24117688d279addf085c377f9da5f83117f95a4d4efe",
+  "device": "isolated Android API 36 emulator, 4 KiB pages",
+  "cloud": {
+    "engine": "Google Translate",
+    "network": {
+      "airplane_mode_before": "0",
+      "restored": "Active default network: 103",
+      "wifi_on_after": "1",
+      "before": "Active default network: 101",
+      "mobile_data_before": "1",
+      "mobile_data_after": "1",
+      "wifi_on_before": "1",
+      "installed_sha256": "fe3087c1132e367490be24117688d279addf085c377f9da5f83117f95a4d4efe",
+      "offline": "Active default network: none",
+      "airplane_mode_after": "0"
+    },
+    "source": "Snow has covered the small wooden bridge.",
+    "retry_translation": "Снег покрыл небольшой деревянный мост.",
+    "source_preserved": true,
+    "prior_translation_cleared": true,
+    "diagnostic_code": "TF_OFFLINE_DNS"
+  },
+  "on_device": {
+    "engine": "Google ML Kit",
+    "source_language": "en",
+    "target_language": "ru",
+    "source": "The red bicycle stands beside the garden wall.",
+    "translation": "Красный велосипед подходит рядом с садовой стеной.",
+    "network": {
+      "mobile_data_before": "1",
+      "wifi_on_before": "1",
+      "offline_after_result": "Active default network: none",
+      "network_restored": "Active default network: 107",
+      "sample": "c43-offline-mlkit-proof-0",
+      "wifi_on_after": "1",
+      "airplane_mode_after": "0",
+      "mobile_data_after": "1",
+      "result": "Красный велосипед подходит рядом с садовой стеной. | [126,1896][954,2022] ",
+      "offline_before_request": "Active default network: none",
+      "airplane_mode_before": "0",
+      "source": "The red bicycle stands beside the garden wall."
+    },
+    "quality_note": "stands rendered as подходит"
+  },
+  "initial_engine_and_source_restored": true
+}

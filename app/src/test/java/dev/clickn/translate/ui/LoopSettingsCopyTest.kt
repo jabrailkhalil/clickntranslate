@@ -2,8 +2,11 @@
 package dev.clickn.translate.ui
 
 import java.io.File
+import java.util.Locale
 import javax.xml.parsers.DocumentBuilderFactory
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LoopSettingsCopyTest {
@@ -13,19 +16,30 @@ class LoopSettingsCopyTest {
         data class Case(
             val name: String,
             val resourcePath: String,
-            val expectedSmartLabel: String,
-            val expectedAutoRegionLabel: String,
         )
 
         val cases = listOf(
-            Case("English", "src/main/res/values/strings.xml", "Wait for text completion", "Auto"),
-            Case("Simplified Chinese", "src/main/res/values-zh-rCN/strings.xml", "智能等待文字完成", "自动"),
+            Case("English", "src/main/res/values/strings.xml"),
+            Case("Simplified Chinese", "src/main/res/values-zh-rCN/strings.xml"),
+            Case("Russian", "src/main/res/values-ru/strings.xml"),
+            Case("German", "src/main/res/values-de/strings.xml"),
+            Case("French", "src/main/res/values-fr/strings.xml"),
+            Case("Spanish", "src/main/res/values-es/strings.xml"),
         )
 
         cases.forEach { case ->
             val resources = readStringResources(case.resourcePath)
-            assertEquals(case.name, case.expectedSmartLabel, resources["settings_loop_trigger_smart"])
-            assertEquals(case.name, case.expectedAutoRegionLabel, resources["settings_loop_text_region_auto"])
+            val modes = listOf("settings_loop_trigger_smart", "settings_loop_trigger_settled", "settings_loop_trigger_fixed")
+                .map { resources[it].orEmpty().trim() }
+            val labels = modes + resources["settings_loop_text_region_auto"].orEmpty().trim()
+            assertTrue("${case.name}: every choice has a localized label", labels.all(String::isNotBlank))
+            assertEquals("${case.name}: the three modes must be distinguishable", 3, modes.toSet().size)
+            // Translation wording may improve; the UI must keep neutral choices in every locale.
+            labels.forEach { label ->
+                val lower = label.lowercase(Locale.ROOT)
+                assertFalse("${case.name}: choice must not be marked recommended: $label",
+                    listOf("recommend", "recomend", "recommand", "empfohlen", "рекоменду", "推荐").any(lower::contains))
+            }
         }
     }
 

@@ -10,7 +10,7 @@
     <string name="setup_translation">Sprachen und Übersetzung</string>
     <string name="setup_translation_body">Wähle die Sprachen und einen Übersetzungsdienst. Google benötigt keinen Schlüssel. Für MyMemory und Offline-Übersetzungen musst du eine konkrete Ausgangssprache wählen.</string>
     <string name="setup_overlay">Übersetzung über anderen Apps</string>
-    <string name="setup_overlay_body">Öffne die Android-Einstellungen, wähle Click’n’Translate und erlaube die Anzeige über anderen Apps. Kehre dann zurück. Der Status wird automatisch aktualisiert.</string>
+    <string name="setup_overlay_body">Öffne die Android-Einstellungen, wähle %1$s und erlaube die Anzeige über anderen Apps. Kehre dann zurück. Der Status wird automatisch aktualisiert.</string>
     <string name="setup_notifications">Notifikationen</string>
     <string name="setup_notifications_body">Mit Benachrichtigungen kannst du die Bildschirmaufnahme beenden und Modell-Downloads verfolgen. Die Übersetzung funktioniert auch ohne diese Berechtigung.</string>
     <string name="setup_enabled">Ermöglicht</string>

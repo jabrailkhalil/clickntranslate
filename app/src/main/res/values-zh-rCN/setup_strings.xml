@@ -10,7 +10,7 @@
     <string name="setup_translation">语言和翻译服务</string>
     <string name="setup_translation_body">选择你阅读的语言和翻译服务。Google 无需密钥。使用 MyMemory 或离线翻译时，请指定源语言。</string>
     <string name="setup_overlay">在其他应用上显示翻译</string>
-    <string name="setup_overlay_body">打开 Android 设置，找到 Click’n’Translate 并启用“显示在其他应用上层”。返回后，状态会自动更新。</string>
+    <string name="setup_overlay_body">打开 Android 设置，找到 %1$s 并启用“显示在其他应用上层”。返回后，状态会自动更新。</string>
     <string name="setup_notifications">通知</string>
     <string name="setup_notifications_body">允许通知后，你可以查看翻译服务状态、停止屏幕捕获并跟踪模型下载。不授予此权限也可以翻译。</string>
     <string name="setup_enabled">已启用</string>

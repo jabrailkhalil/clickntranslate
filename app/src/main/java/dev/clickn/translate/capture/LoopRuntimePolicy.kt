@@ -29,21 +29,37 @@ internal object LoopRuntimePolicy {
         configuredLoopIntervalMs: Long,
         mode: LoopTriggerMode,
         backendMinimumMs: Long,
+        sourceResultPresent: Boolean = false,
     ): Long = maxOf(
         LoopFrameStabilityPolicy.pollingIntervalMs(
             configuredLoopIntervalMs = configuredLoopIntervalMs,
             enabled = usesStabilityPolling(mode),
         ),
         backendMinimumMs.coerceAtLeast(0L),
+        // Text-completion probes can be fast while the first text is appearing. Once a page
+        // has been processed, avoid hiding/redrawing its translation five times a second.
+        if (sourceResultPresent && usesStabilityPolling(mode)) 1_500L else 0L,
     )
 
     fun activeResultDecision(
         hasBlockingResult: Boolean,
         translationInFlight: Boolean,
+        canCaptureCleanSource: Boolean = false,
     ): LoopActiveResultDecision {
         if (translationInFlight) return LoopActiveResultDecision.KEEP_TRANSLATING
-        if (!hasBlockingResult) return LoopActiveResultDecision.CAPTURE
+        if (!hasBlockingResult || canCaptureCleanSource) return LoopActiveResultDecision.CAPTURE
         return LoopActiveResultDecision.KEEP_VISIBLE
+    }
+
+    /** Interval/text modes tolerate animated backgrounds while their recognized source stays stable. */
+    fun sameSourceDuringTranslation(
+        mode: LoopTriggerMode,
+        sameFrame: Boolean,
+        sameText: Boolean?,
+    ): Boolean = if (mode != LoopTriggerMode.SETTLED_PAGE && sameText != null) {
+        sameText
+    } else {
+        sameFrame && sameText != false
     }
 
     fun indicatorSpec(

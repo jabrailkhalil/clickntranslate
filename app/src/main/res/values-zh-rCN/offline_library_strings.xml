@@ -1,0 +1,5 @@
+<resources>
+    <string name="offline_installed_translation_languages">已安装的翻译语言（%1$d）</string>
+    <string name="offline_installed_translation_help">点击已安装的语言可将其设为源语言。其他语言仍可在上方的源语言和目标语言选择器中查找。</string>
+    <string name="offline_builtin_english">ML Kit 内置</string>
+</resources>

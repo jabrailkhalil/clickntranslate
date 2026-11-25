@@ -31,6 +31,8 @@ internal enum class ModelDownloadNetworkTarget {
     PADDLE_OCR,
     MANGA_OCR,
     ORIENTATION,
+    TESSERACT_ARABIC,
+    ML_KIT_TRANSLATION,
 }
 
 internal enum class ModelDownloadNetworkFailureKind {
@@ -114,6 +116,8 @@ class ModelDownloadNetworkTester @Inject constructor(
     }
 
     private suspend fun sourceUrl(spec: ModelDownloadSpec): String = when (spec.type) {
+        ModelDownloadType.TESSERACT_ARABIC -> dev.clickn.translate.ocr.TesseractModelFiles.models.first().url
+        ModelDownloadType.ML_KIT_TRANSLATION -> error("ML Kit manages model download URLs")
         ModelDownloadType.LLM -> llmInstaller.downloadProbeUrl(LlmModelKind.valueOf(spec.variant))
         ModelDownloadType.PADDLE -> paddleInstaller.downloadProbeUrl(
             dev.clickn.translate.data.PaddleModelVersion.valueOf(spec.variant),
@@ -123,6 +127,8 @@ class ModelDownloadNetworkTester @Inject constructor(
     }
 
     private fun targetFor(spec: ModelDownloadSpec): ModelDownloadNetworkTarget = when (spec.type) {
+        ModelDownloadType.TESSERACT_ARABIC -> ModelDownloadNetworkTarget.TESSERACT_ARABIC
+        ModelDownloadType.ML_KIT_TRANSLATION -> ModelDownloadNetworkTarget.ML_KIT_TRANSLATION
         ModelDownloadType.LLM -> ModelDownloadNetworkTarget.LOCAL_LLM
         ModelDownloadType.PADDLE -> ModelDownloadNetworkTarget.PADDLE_OCR
         ModelDownloadType.MANGA_OCR -> ModelDownloadNetworkTarget.MANGA_OCR

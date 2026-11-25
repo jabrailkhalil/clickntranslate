@@ -150,6 +150,27 @@ class FloatingButtonManager(
      * API < 30 没这个 API，退回默认 wm（横竖屏切换时有 known limitation）。
      */
     private val wm: WindowManager by lazy { createDisplayBoundWm() }
+    private val sourceVisibility = sourceCaptureViewVisibility()
+    private var sourceTouchActive = false
+
+    fun canObserveSource(): Boolean = !sourceTouchActive && arcMenuView == null &&
+        tourStage == TourStage.NONE && !firstUseTourPending && !inputTranslationGuideVisible &&
+        !inputSingleTapPending && positionBeforeMenu == null &&
+        snapAnimX?.isRunning != true && snapAnimY?.isRunning != true
+
+    /** Suppression does not cancel an in-progress button action; callers first check eligibility. */
+    fun hideForSourceObservation(): SourceObservationLease = sourceVisibility.hideForSourceObservation()
+
+    private fun addSourceView(view: View, params: WindowManager.LayoutParams) {
+        sourceVisibility.track(view, if (hiddenForCapture) View.INVISIBLE else View.VISIBLE)
+        try { wm.addView(view, params) }
+        catch (failure: Throwable) { sourceVisibility.untrack(view); throw failure }
+    }
+
+    private fun removeSourceView(view: View) {
+        sourceVisibility.untrack(view)
+        wm.removeView(view)
+    }
 
     private fun createDisplayBoundWm(): WindowManager {
         val defaultWm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
@@ -170,6 +191,12 @@ class FloatingButtonManager(
     private var progressView: LoopProgressView? = null
     private var longPressGuideView: LongPressGuideView? = null
     private var hiddenForCapture: Boolean = false
+    private var cancelButtonGesture: (() -> Unit)? = null
+    private var disposeButtonTouchListener: (() -> Unit)? = null
+
+    private fun isCurrentButton(target: View, params: WindowManager.LayoutParams): Boolean =
+        view === target && layoutParams === params && target.isAttachedToWindow &&
+            target.visibility == View.VISIBLE && !hiddenForCapture
 
     private var snapAnimX: SpringAnimation? = null
     private var snapAnimY: SpringAnimation? = null
@@ -366,12 +393,14 @@ class FloatingButtonManager(
         container.isClickable = true
         container.isFocusable = true
         container.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
-        container.setOnClickListener { handleTap() }
+        container.setOnClickListener {
+            if (isCurrentButton(container, params)) handleTap()
+        }
         container.setOnLongClickListener {
-            showArcMenu()
+            if (isCurrentButton(container, params)) showArcMenu()
             true
         }
-        wm.addView(container, params)
+        addSourceView(container, params)
         view = container
         applySkillIcon()
         stopAppearanceObserver = CompanionPrefs.observe(context) {
@@ -402,7 +431,7 @@ class FloatingButtonManager(
         }
         layoutParams = params
         scheduleIdleHide()
-        if (hiddenForCapture) container.visibility = View.INVISIBLE
+        sourceVisibility.setDesired(container, if (hiddenForCapture) View.INVISIBLE else View.VISIBLE)
         updateAccessibilityDescription()
 
         // 启动时如果开了吸附但上次保存的位置不在边（用户上次拖到中间没吸边），自动吸一下。
@@ -528,6 +557,9 @@ class FloatingButtonManager(
     }
 
     fun hide() {
+        disposeButtonTouchListener?.invoke()
+        disposeButtonTouchListener = null
+        cancelButtonGesture = null
         idleHideHandler.removeCallbacks(idleHide)
         stopAppearanceObserver?.invoke()
         stopAppearanceObserver = null
@@ -563,7 +595,7 @@ class FloatingButtonManager(
             initialY = it.y
         }
         view?.let {
-            runCatching { wm.removeView(it) }
+            runCatching { removeSourceView(it) }
             view = null
             layoutParams = null
         }
@@ -579,9 +611,13 @@ class FloatingButtonManager(
             hiddenForCapture = false
             return false
         }
+        if (hidden) {
+            cancelButtonGesture?.invoke()
+            cancelPendingInputTap()
+        }
         hiddenForCapture = hidden
-        currentView.visibility = if (hidden) View.INVISIBLE else View.VISIBLE
-        arcMenuView?.visibility = if (hidden) View.INVISIBLE else View.VISIBLE
+        sourceVisibility.setDesired(currentView, if (hidden) View.INVISIBLE else View.VISIBLE)
+        arcMenuView?.let { sourceVisibility.setDesired(it, if (hidden) View.INVISIBLE else View.VISIBLE) }
         return true
     }
 
@@ -1199,6 +1235,7 @@ class FloatingButtonManager(
 
     @SuppressLint("ClickableViewAccessibility")
     private fun attachTouchListener(target: View, params: WindowManager.LayoutParams) {
+        disposeButtonTouchListener?.invoke()
         // 用系统标准 touchSlop 的 2 倍，避免轻微抖动被误判为"拖动"导致单击丢失
         val touchSlop = android.view.ViewConfiguration.get(context).scaledTouchSlop * 2f
         val longPressTimeout = android.view.ViewConfiguration.getLongPressTimeout().toLong()
@@ -1207,23 +1244,58 @@ class FloatingButtonManager(
         var downY = 0f
         var initX = 0
         var initY = 0
-        var downTime = 0L
+        var pressed = false
         var moved = false
         var longPressFired = false
 
         val longPressRunnable = Runnable {
-            if (!moved) {
+            if (pressed && !moved && isCurrentButton(target, params)) {
                 longPressFired = true
                 showArcMenu()
             }
         }
+        val restartTourRunnable = Runnable {
+            if (isCurrentButton(target, params) && tourStage == TourStage.WAITING_FOR_LONG_PRESS) {
+                showMainBallTourStep()
+            }
+        }
+        fun cancelGesture() {
+            pressed = false
+            sourceTouchActive = false
+            moved = false
+            longPressFired = false
+            target.removeCallbacks(longPressRunnable)
+            target.removeCallbacks(restartTourRunnable)
+        }
+        val attachmentListener = object : View.OnAttachStateChangeListener {
+            override fun onViewAttachedToWindow(v: View) = Unit
+            override fun onViewDetachedFromWindow(v: View) {
+                cancelGesture()
+                if (view === target) cancelPendingInputTap()
+            }
+        }
+        target.addOnAttachStateChangeListener(attachmentListener)
+        cancelButtonGesture = ::cancelGesture
+        disposeButtonTouchListener = {
+            cancelGesture()
+            target.removeOnAttachStateChangeListener(attachmentListener)
+            target.setOnTouchListener(null)
+        }
 
         target.setOnTouchListener { v, ev ->
+            if (!isCurrentButton(target, params)) {
+                cancelGesture()
+                return@setOnTouchListener true
+            }
             if (tourStage == TourStage.COMPLETION) {
+                cancelGesture()
                 return@setOnTouchListener true
             }
             when (ev.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
+                    cancelGesture()
+                    pressed = true
+                    sourceTouchActive = true
                     scheduleIdleHide()
                     // 取消自动贴边倒计时 + 上次的吸边动画 + 待机透明度。**不**立即 wake——
                     // 否则长按弹菜单时球会从贴边位置缩进 8dp，视觉错位。wake 推迟到拖动开始时。
@@ -1236,7 +1308,6 @@ class FloatingButtonManager(
                     downY = ev.rawY
                     initX = params.x  // 当前位置（可能还在 dock 状态）
                     initY = params.y
-                    downTime = System.currentTimeMillis()
                     moved = false
                     longPressFired = false
                     if (tourStage == TourStage.WAITING_FOR_LONG_PRESS) {
@@ -1246,6 +1317,7 @@ class FloatingButtonManager(
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
+                    if (!pressed) return@setOnTouchListener true
                     val dx = ev.rawX - downX
                     val dy = ev.rawY - downY
                     if (!moved && (abs(dx) > touchSlop || abs(dy) > touchSlop)) {
@@ -1273,7 +1345,17 @@ class FloatingButtonManager(
                     }
                     true
                 }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                MotionEvent.ACTION_CANCEL -> {
+                    cancelGesture()
+                    if (tourStage == TourStage.WAITING_FOR_LONG_PRESS) {
+                        longPressGuideView?.start()
+                    }
+                    true
+                }
+                MotionEvent.ACTION_UP -> {
+                    if (!pressed) return@setOnTouchListener true
+                    pressed = false
+                    sourceTouchActive = false
                     v.removeCallbacks(longPressRunnable)
                     // 只要没明显拖动 + 长按 callback 还没烧 → 都算单击
                     if (!moved && !longPressFired) {
@@ -1286,14 +1368,7 @@ class FloatingButtonManager(
                         // 拖动后松手 → 弹性吸附到最近的左/右边
                         snapToEdge()
                         if (tourStage == TourStage.WAITING_FOR_LONG_PRESS) {
-                            v.postDelayed(
-                                {
-                                    if (tourStage == TourStage.WAITING_FOR_LONG_PRESS) {
-                                        showMainBallTourStep()
-                                    }
-                                },
-                                TOUR_RESTART_DELAY_MS,
-                            )
+                            v.postDelayed(restartTourRunnable, TOUR_RESTART_DELAY_MS)
                         }
                     }
                     true
@@ -1349,6 +1424,8 @@ class FloatingButtonManager(
             android.util.Log.w(TAG_MENU, "  abort: layoutParams null")
             return
         }
+        val currentButton = view ?: return
+        if (!isCurrentButton(currentButton, params)) return
 
         val allItems = MenuItemRegistry.build(
             ids = menuItemOrder,
@@ -1375,7 +1452,9 @@ class FloatingButtonManager(
                 tourOverlay.dismiss()
             }
             dismissArcMenu(restorePosition = false)
-            view?.post { openArcMenuPage(nextIdx) }
+            currentButton.post {
+                if (isCurrentButton(currentButton, params)) openArcMenuPage(nextIdx)
+            }
         }
         val pageItems = pages.getOrNull(pageIndex) ?: pages.firstOrNull() ?: return
         if (pageItems.isEmpty()) return
@@ -1412,8 +1491,10 @@ class FloatingButtonManager(
             val targetY = params.y.coerceIn(yRange.first, yRange.last.coerceAtLeast(yRange.first))
             android.util.Log.d(TAG_MENU, "  → spring ball y ${params.y} -> $targetY, x unchanged ${params.x}")
             springBallToThen(params.x, targetY) {
-                android.util.Log.d(TAG_MENU, "  ← spring settled, reopen page=$pageIndex")
-                openArcMenuPage(pageIndex)
+                if (isCurrentButton(currentButton, params)) {
+                    android.util.Log.d(TAG_MENU, "  ← spring settled, reopen page=$pageIndex")
+                    openArcMenuPage(pageIndex)
+                }
             }
             return
         }
@@ -1531,7 +1612,7 @@ class FloatingButtonManager(
                 layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
             }
         }
-        val addResult = runCatching { wm.addView(root, menuParams) }
+        val addResult = runCatching { addSourceView(root, menuParams) }
         arcMenuView = root
         android.util.Log.d(TAG_MENU, "  addView root success=${addResult.isSuccess} buttons=${pageItems.size} baseAngle=${"%.2f".format(Math.toDegrees(baseAngle))}° spread=±${"%.2f".format(Math.toDegrees(spread))}°")
         addResult.exceptionOrNull()?.let { android.util.Log.e(TAG_MENU, "  addView failed", it) }
@@ -1555,7 +1636,7 @@ class FloatingButtonManager(
         android.util.Log.d(TAG_MENU, "dismissArcMenu(restore=$restorePosition) hadView=${arcMenuView != null} positionBeforeMenu=$positionBeforeMenu")
         stopTourPulse()
         restoreMenuTourVisuals()
-        arcMenuView?.let { runCatching { wm.removeView(it) } }
+        arcMenuView?.let { runCatching { removeSourceView(it) } }
         arcMenuView = null
         if (restorePosition) {
             positionBeforeMenu?.let { (origX, origY) ->

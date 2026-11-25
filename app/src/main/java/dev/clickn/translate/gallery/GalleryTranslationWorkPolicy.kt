@@ -71,9 +71,9 @@ internal object GalleryTranslationWorkPolicy {
     ): GalleryTaskStatus = when {
         canceled -> GalleryTaskStatus.CANCELED
         progress.total <= 0 -> GalleryTaskStatus.FAILED
-        progress.completed < progress.total -> GalleryTaskStatus.RUNNING
+        progress.completed + progress.canceled < progress.total -> GalleryTaskStatus.RUNNING
         progress.succeeded == progress.total -> GalleryTaskStatus.SUCCEEDED
-        progress.failed == progress.total -> GalleryTaskStatus.FAILED
+        progress.succeeded == 0 && progress.partial == 0 -> GalleryTaskStatus.FAILED
         else -> GalleryTaskStatus.PARTIAL
     }
 

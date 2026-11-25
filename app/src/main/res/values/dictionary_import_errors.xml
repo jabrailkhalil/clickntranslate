@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dictionary_error_storage">Could not save the dictionary package. Check free space and try again.</string>
+    <string name="dictionary_error_read">Could not read the selected file. Select it again and allow access.</string>
+    <string name="dictionary_error_too_large">This dictionary package exceeds the 2 GiB limit.</string>
+    <string name="dictionary_error_corrupt">This file is damaged or is not a valid SQLite dictionary package.</string>
+    <string name="dictionary_error_schema">This file does not use the supported dictionary package format.</string>
+    <string name="dictionary_error_wrong_pack">This package is for a different dictionary. Select the correct package for this dictionary.</string>
+    <string name="dictionary_error_version">This dictionary package version is not supported. Select a compatible package.</string>
+    <string name="dictionary_error_unknown">Could not process the dictionary package. Select a valid package and try again.</string>
+</resources>

@@ -102,7 +102,7 @@ class GalleryTranslatedPreviewPolicyTest {
             ),
             Case(
                 "missing cache can be rebuilt from saved source and segments",
-                store.contains("imageDecoder.decode(item)") &&
+                store.contains("imageDecoder.decode(item, checkpoint = { decodeContext.ensureActive() })") &&
                     store.contains("item.segmentsJson") &&
                     store.contains("renderer.render("),
             ),
@@ -111,9 +111,10 @@ class GalleryTranslatedPreviewPolicyTest {
                 repository.contains("translatedPreviewStore.deleteTask(taskId)"),
             ),
             Case(
-                "worker warms the preview before completing the result row",
-                worker.indexOf("translatedPreviewStore.storeTranslatedPreview(") <
-                    worker.indexOf("repository.completeItem("),
+                "worker publishes a preview only after its claimed result was committed",
+                worker.indexOf("repository.completeItem(") <
+                    worker.indexOf("translatedPreviewStore.storeTranslatedPreview(") &&
+                    worker.contains("item = completed"),
             ),
             Case(
                 "preview failures are isolated from translation completion",

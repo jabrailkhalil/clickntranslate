@@ -1,0 +1,16 @@
+{
+  "format": "clickntranslate.settings",
+  "version": 2,
+  "minimumReaderVersion": 2,
+  "settings": {
+    "values": {
+      "targetLang": "ar",
+      "overlayTextSizeSp": 19,
+      "translatorEngine": "FUTURE_FIXTURE_ENGINE",
+      "apiKey": "synthetic-must-not-import",
+      "baseUrl": "https://example.invalid/must-not-import"
+    }
+  },
+  "fonts": [],
+  "glossaryTerms": []
+}

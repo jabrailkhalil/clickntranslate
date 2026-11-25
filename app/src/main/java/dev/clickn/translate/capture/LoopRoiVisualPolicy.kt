@@ -37,10 +37,12 @@ internal object LoopRoiVisualFingerprintFactory {
             androidRect.width(),
             androidRect.height(),
         )
-        val scaled = Bitmap.createScaledBitmap(cropped, SAMPLE_WIDTH, SAMPLE_HEIGHT, true)
+        var scaled: Bitmap? = null
         return try {
+            val sampled = Bitmap.createScaledBitmap(cropped, SAMPLE_WIDTH, SAMPLE_HEIGHT, true)
+            scaled = sampled
             val pixels = IntArray(SAMPLE_WIDTH * SAMPLE_HEIGHT)
-            scaled.getPixels(pixels, 0, SAMPLE_WIDTH, 0, 0, SAMPLE_WIDTH, SAMPLE_HEIGHT)
+            sampled.getPixels(pixels, 0, SAMPLE_WIDTH, 0, 0, SAMPLE_WIDTH, SAMPLE_HEIGHT)
             val luminance = ByteArray(pixels.size) { index ->
                 val color = pixels[index]
                 val red = color shr 16 and 0xFF
@@ -55,8 +57,8 @@ internal object LoopRoiVisualFingerprintFactory {
                 edges = edgeSample(luminance, SAMPLE_WIDTH, SAMPLE_HEIGHT),
             )
         } finally {
-            if (scaled !== cropped) scaled.recycle()
-            cropped.recycle()
+            scaled?.takeIf { it !== cropped && it !== bitmap }?.recycle()
+            if (cropped !== bitmap) cropped.recycle()
         }
     }
 

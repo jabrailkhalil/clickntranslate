@@ -34,7 +34,7 @@ exifinterface = "1.4.2"
 coroutines = "1.9.0"
 timber = "5.0.1"
 shizuku = "13.1.5"
-onnxruntime = "1.20.0"
+onnxruntime = "1.21.1"
 
 junit = "4.13.2"
 androidxJunit = "1.2.1"
@@ -84,6 +84,7 @@ androidx-dynamicanimation = { group = "androidx.dynamicanimation", name = "dynam
 androidx-exifinterface = { group = "androidx.exifinterface", name = "exifinterface", version.ref = "exifinterface" }
 
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
+kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
 kotlinx-coroutines-play-services = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-play-services", version.ref = "coroutines" }
 timber = { group = "com.jakewharton.timber", name = "timber", version.ref = "timber" }
 shizuku-api = { group = "dev.rikka.shizuku", name = "api", version.ref = "shizuku" }

@@ -41,7 +41,8 @@ class MobileScreenshotTest {
                 ClickTranslateTheme(mode) {
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).komiPaperGrid(mode, MaterialTheme.colorScheme.onBackground)) {
                         ScreenHome(settings, false, true, {}, {}, {}, {}, {}, {}, {}, {}, readiness = {
-                            MobileReadinessPanel(settings, MobileModelState(false, true, true), true, false, true, false, {}, {}, {}, {}, {}, {}, {})
+                            MobileReadinessPanel(mobileReadinessItems(settings, MobileModelState(false, true, true), true,
+                                dev.clickn.translate.capture.CaptureStartMode.SYSTEM, false, true, true, false, false)) {}
                         })
                     }
                 }
@@ -89,7 +90,9 @@ class MobileScreenshotTest {
         }
     }
     @Test fun readiness() = render {
-        Box(Modifier.padding(24.dp)) { MobileReadinessPanel(settings, MobileModelState(false, true, true), false, false, true, false, {}, {}, {}, {}, {}, {}, {}) }
+        Box(Modifier.padding(24.dp)) { MobileReadinessSheet(mobileReadinessItems(settings, MobileModelState(false, true, true), false,
+            dev.clickn.translate.capture.CaptureStartMode.SYSTEM, false, true, true, false, false),
+            dev.clickn.translate.capture.CaptureStartMode.SYSTEM) {} }
     }
     @Test fun brandIcons() = render { BrandIconSheet({}) }
     @Test fun glossaryModes() = render {

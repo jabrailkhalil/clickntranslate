@@ -94,10 +94,7 @@ object AppLocalePrefs {
         .getString(KEY_TAG, "") ?: ""
 
     fun write(context: Context, tag: String) {
-        context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
-            .edit()
-            .putString(KEY_TAG, tag.trim())
-            .apply()
+        UiPreferenceTransfer.write(context, UiPreferenceField.LANGUAGE, tag.trim())
     }
 
     /**

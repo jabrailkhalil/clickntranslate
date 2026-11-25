@@ -1,0 +1,3 @@
+<resources>
+    <string name="gallery_item_partial_error">%1$d blocs traduits sur %2$d. Réessayez les blocs non traduits.</string>
+</resources>

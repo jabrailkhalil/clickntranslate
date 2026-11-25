@@ -3,6 +3,9 @@ package dev.clickn.translate.ocr
 
 import android.graphics.Bitmap
 import android.graphics.Rect
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.clickn.translate.R
 import android.os.SystemClock
 import dev.clickn.translate.data.MergeStrength
 import dev.clickn.translate.data.OcrEngineKind
@@ -36,6 +39,8 @@ class RoutingOcrEngine @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val performanceDiagnostics: RuntimePerformanceDiagnostics,
     private val automatic: AutomaticOcrRecognizer,
+    private val tesseract: TesseractOcrEngine,
+    @ApplicationContext private val context: Context,
 ) : OcrEngine {
 
     override suspend fun recognize(bitmap: Bitmap, kind: OcrEngineKind): List<TextBlock> {
@@ -129,6 +134,17 @@ class RoutingOcrEngine @Inject constructor(
             OcrEngineKind.PADDLE_AI_STUDIO -> paddleAiStudio.recognize(bitmap, kind, settings)
             OcrEngineKind.PADDLE_ONNX -> paddle.recognize(bitmap, kind, settings)
             OcrEngineKind.MANGA_OCR_JA -> manga.recognize(bitmap, kind, settings)
+            OcrEngineKind.TESSERACT_ARABIC -> {
+                require(OcrLanguageCapability.supports(settings.copy(ocrEngine = kind), settings.sourceLang)) {
+                    context.getString(R.string.settings_tesseract_language_scope)
+                }
+                try { tesseract.recognize(bitmap, kind, settings) }
+                catch (failure: TesseractModelException) {
+                    if (failure.failure == TesseractModelFailure.MISSING || failure.failure == TesseractModelFailure.INVALID)
+                        throw ModelNotReadyException(context.getString(R.string.settings_tesseract_models_missing))
+                    throw failure
+                }
+            }
             else -> mlKit.recognize(bitmap, kind, settings)
         }
 
@@ -156,6 +172,7 @@ class RoutingOcrEngine @Inject constructor(
         umi.close()
         luna.close()
         manga.close()
+        tesseract.close()
     }
 
     /**

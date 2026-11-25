@@ -98,6 +98,7 @@ class AutoOcrOptionPolicyTest {
             assertEquals(route.toString(), expected, autoOcrOptionGroup(route))
             when (route.engine) {
                 OcrEngineKind.PADDLE_ONNX -> assertEquals(ModelDownloadSpec.paddle(route.paddleVersion), autoOcrModelSpec(route))
+                OcrEngineKind.TESSERACT_ARABIC -> assertEquals(ModelDownloadSpec.tesseractArabic(), autoOcrModelSpec(route))
                 OcrEngineKind.MANGA_OCR_JA -> assertEquals(listOf(ModelDownloadSpec.paddle(PaddleModelVersion.V6_SMALL), ModelDownloadSpec.mangaOcr()),
                     ModelDownloadDependencies.expand(listOf(autoOcrModelSpec(route)!!)))
                 else -> assertNull(autoOcrModelSpec(route))

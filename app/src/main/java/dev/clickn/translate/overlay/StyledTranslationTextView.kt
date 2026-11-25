@@ -36,6 +36,17 @@ internal data class AdaptiveHorizontalTextLayoutSnapshot(
 @SuppressLint("AppCompatCustomView") // Platform TextView keeps the framework text-selection ActionMode.
 class StyledTranslationTextView(context: Context) : TextView(context) {
     var horizontalRightToLeft: Boolean = false
+
+    /** Resolve target paragraphs independently; source direction is only the neutral-text fallback. */
+    internal fun setTranslationText(value: String) {
+        textDirection = if (horizontalRightToLeft) {
+            View.TEXT_DIRECTION_FIRST_STRONG_RTL
+        } else {
+            View.TEXT_DIRECTION_FIRST_STRONG_LTR
+        }
+        text = horizontalRtlDisplayText(value)
+    }
+
     internal var adaptiveTextFitEnabled: Boolean = false
     internal var adaptiveTextLayoutPhase: AdaptiveTextLayoutPhase = AdaptiveTextLayoutPhase.FINAL
         set(value) {

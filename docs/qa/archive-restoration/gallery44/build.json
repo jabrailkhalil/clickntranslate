@@ -1,0 +1,27 @@
+{
+  "host_affinity": 15,
+  "java_active_processors": 4,
+  "source_commit": "5a578d60e68518c8891345ad62376d7c1540ca49",
+  "release_published": false,
+  "finished_utc": "2026-11-24T20:21:11.9924426+00:00",
+  "new_key_created": false,
+  "tasks": [
+    ":app:assembleDebug",
+    ":app:assembleDebugAndroidTest",
+    ":app:testDebugUnitTest",
+    ":app:lintDebug",
+    ":app:assembleRelease"
+  ],
+  "native_args": [
+    "-ParchiveNdkVersion=28.2.13676358",
+    "-ParchiveCpuDebug=false",
+    "-PnativeBuildStagingDir=C:/ct-native/archive054-vulkan",
+    "-PvulkanHostToolchain=C:/Users/Home-PC/.codex/worktrees/android-rewrite/clickntranslate/.tmp/native-vulkan-host/llvm-mingw-toolchain.cmake",
+    "-PandroidTestBuildType=debug",
+    "-Dorg.gradle.jvmargs=-Xmx6144m -Dfile.encoding=UTF-8 -XX:+HeapDumpOnOutOfMemoryError -XX:ActiveProcessorCount=4"
+  ],
+  "priority": "BelowNormal",
+  "started_utc": "2026-11-24T20:02:27.1068348+00:00",
+  "scope": "OPAQUE_GALLERY_EXPORT_1.8.3_CODE44",
+  "exit_code": 0
+}

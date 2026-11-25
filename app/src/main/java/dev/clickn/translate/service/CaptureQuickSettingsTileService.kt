@@ -11,6 +11,7 @@ import android.graphics.drawable.Icon
 import android.os.Build
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
+import android.widget.Toast
 import dev.clickn.translate.R
 import dev.clickn.translate.capture.CaptureStartRequestActivity
 import dagger.hilt.android.AndroidEntryPoint
@@ -53,7 +54,8 @@ class CaptureQuickSettingsTileService : TileService() {
             serviceRunning = CaptureServiceState.running.value,
         )
         if (action == CaptureQuickSettingsAction.STOP_SERVICE) {
-            startService(CaptureService.stopIntent(this))
+            runCatching { startService(CaptureService.stopIntent(this)) }
+                .onFailure { showLaunchFailure() }
             return
         }
         val startAction = Runnable {
@@ -68,11 +70,11 @@ class CaptureQuickSettingsTileService : TileService() {
     }
 
     private fun performStartAction(action: CaptureQuickSettingsAction) {
-        when (action) {
+        try { when (action) {
             CaptureQuickSettingsAction.STOP_SERVICE -> Unit
             CaptureQuickSettingsAction.REQUEST_START ->
                 launchActivity(CaptureStartRequestActivity.newIntent(this), CAPTURE_START_REQUEST_CODE)
-        }
+        } } catch (_: Exception) { showLaunchFailure() }
     }
 
     // The Intent overload is required below API 34; newer devices use PendingIntent.
@@ -93,11 +95,21 @@ class CaptureQuickSettingsTileService : TileService() {
     }
 
     private fun updateTileState(running: Boolean) {
+        val localized = dev.clickn.translate.data.AppLocalePrefs.live(this)
+        val actionLabel = localized.getString(if (running) R.string.integration_tile_stop else R.string.integration_tile_start)
         qsTile?.apply {
             state = if (running) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
             label = getString(R.string.quick_settings_tile_label)
+            contentDescription = "$label. $actionLabel"
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) subtitle = actionLabel
             updateTile()
         }
+    }
+
+    private fun showLaunchFailure() {
+        val localized = dev.clickn.translate.data.AppLocalePrefs.live(this)
+        Toast.makeText(localized, R.string.integration_tile_launch_failed, Toast.LENGTH_LONG).show()
+        updateTileState(CaptureServiceState.running.value)
     }
 
     companion object {

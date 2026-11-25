@@ -45,6 +45,7 @@ data class SettingsFieldRule(
 data class SettingsFieldDecodeResult(
     val settings: Settings,
     val skippedFields: List<String>,
+    val appliedFields: Set<String> = emptySet(),
 )
 
 internal fun settingsSearchEntryId(@StringRes itemLabelRes: Int): String = "res:$itemLabelRes"
@@ -385,11 +386,13 @@ object SettingsFieldPolicy {
     fun decodePortable(values: JsonObject): SettingsFieldDecodeResult {
         val defaults = json.encodeToJsonElement(Settings()).asObject().toMutableMap()
         val skipped = mutableListOf<String>()
+        val applied = linkedSetOf<String>()
         migratePortableAliases(values).forEach { (name, value) ->
             if (name !in portableFieldNames) return@forEach
             val candidate = JsonObject(defaults + (name to value))
             if (runCatching { json.decodeFromJsonElement<Settings>(candidate) }.isSuccess) {
                 defaults[name] = value
+                applied += name
             } else {
                 skipped += name
             }
@@ -399,6 +402,7 @@ object SettingsFieldPolicy {
                 json.decodeFromJsonElement<Settings>(JsonObject(defaults))
             ),
             skippedFields = skipped.sorted(),
+            appliedFields = applied,
         )
     }
 
@@ -411,11 +415,16 @@ object SettingsFieldPolicy {
         )
     }
 
-    fun applyPortable(current: Settings, imported: Settings): Settings {
+    fun applyPortable(
+        current: Settings,
+        imported: Settings,
+        fields: Set<String> = portableFieldNames,
+    ): Settings {
         val currentValues = json.encodeToJsonElement(current).asObject()
         val importedValues = json.encodeToJsonElement(imported).asObject()
         val merged = currentValues.toMutableMap()
-        portableFieldNames.forEach { name -> importedValues[name]?.let { merged[name] = it } }
+        fields.filter(portableFieldNames::contains)
+            .forEach { name -> importedValues[name]?.let { merged[name] = it } }
         return MangaOcrSettingsPolicy.normalize(
             json.decodeFromJsonElement<Settings>(JsonObject(merged)).copy(
                 runtimeTranslationContext = current.runtimeTranslationContext,

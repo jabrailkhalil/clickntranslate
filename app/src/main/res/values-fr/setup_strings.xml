@@ -10,7 +10,7 @@
     <string name="setup_translation">Langues et traduction</string>
     <string name="setup_translation_body">Choisis les langues et un service de traduction. Google fonctionne sans clé. MyMemory et la traduction hors ligne demandent une langue source précise.</string>
     <string name="setup_overlay">Traduction par-dessus les applications</string>
-    <string name="setup_overlay_body">Ouvre les paramètres Android, trouve Click’n’Translate et autorise l’affichage par-dessus les autres applications. Reviens ici : le statut se met à jour automatiquement.</string>
+    <string name="setup_overlay_body">Ouvre les paramètres Android, trouve %1$s et autorise l’affichage par-dessus les autres applications. Reviens ici : le statut se met à jour automatiquement.</string>
     <string name="setup_notifications">Notifications</string>
     <string name="setup_notifications_body">Les notifications permettent de suivre le traducteur, d’arrêter la capture et de voir les téléchargements de modèles. La traduction fonctionne aussi sans cette autorisation.</string>
     <string name="setup_enabled">Activé</string>

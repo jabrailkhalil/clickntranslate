@@ -3,15 +3,11 @@ package dev.clickn.translate.translate
 import dev.clickn.translate.data.Settings
 import dev.clickn.translate.data.TranslatorEngine
 import dev.clickn.translate.data.withApiTimeout
-import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.serialization.json.*
 import okhttp3.*
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
@@ -146,27 +142,8 @@ internal fun decodeTranslationEntities(value: String): String = Regex("&(#x[0-9a
         }
     }
 
-private suspend fun Call.awaitCommunityPayload(json: Json): JsonObject = suspendCancellableCoroutine { continuation ->
-    continuation.invokeOnCancellation { cancel() }
-    enqueue(object : Callback {
-        override fun onFailure(call: Call, e: IOException) { if (continuation.isActive) continuation.resumeWithException(e) }
-        override fun onResponse(call: Call, response: Response) {
-            // Read and parse on OkHttp's worker thread. Cancellation closes the socket even
-            // after headers arrived, while a slow or oversized body is still being read.
-            try {
-                val payload = response.use {
-                    check(it.isSuccessful) { "Translation service: HTTP ${it.code}" }
-                    val body = it.body?.source() ?: error("Empty service response")
-                    check(!body.request(1_048_577)) { "Service response is too large" }
-                    json.parseToJsonElement(body.readUtf8()).jsonObject
-                }
-                if (continuation.isActive) continuation.resume(payload)
-            } catch (error: Exception) {
-                if (continuation.isActive) continuation.resumeWithException(error)
-            }
-        }
-    })
-}
+private suspend fun Call.awaitCommunityPayload(json: Json): JsonObject =
+    awaitTranslationPayload { json.parseToJsonElement(it).jsonObject }
 
 val COMMUNITY_ENGINES = setOf(TranslatorEngine.LINGVA, TranslatorEngine.MYMEMORY, TranslatorEngine.LIBRETRANSLATE)
 

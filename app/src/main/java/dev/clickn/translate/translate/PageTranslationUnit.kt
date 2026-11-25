@@ -58,7 +58,9 @@ internal fun planPageTranslationUnits(
     val units = blocks.mapIndexed { index, block ->
         PageTranslationUnit(
             blockIndex = index,
-            sourceText = PageTranslationPresentationTextPolicy.normalize(presentation, block.text),
+            sourceText = PageTranslationPresentationTextPolicy.normalize(
+                presentation, OcrTranslationRequestTextPolicy.normalize(block.text),
+            ),
             geometry = DialogueGeometry.from(block.boundingBox),
         )
     }

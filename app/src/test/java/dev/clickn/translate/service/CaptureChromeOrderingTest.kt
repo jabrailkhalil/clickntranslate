@@ -282,7 +282,7 @@ class CaptureChromeOrderingTest {
         val mainIndex = snippet.indexOf("withContext(Dispatchers.Main)")
         val mainSnippet = snippet.substring(mainIndex.coerceAtLeast(0))
         val cases = listOf(
-            Case("overlay properties", "overlay?.apply"),
+            Case("overlay properties, including while Main hides presentation", "overlayManager?.apply"),
             Case(
                 "floating window resync uses the resolved fixed/adaptive style",
                 "syncFloatingWindowFromSettings(",

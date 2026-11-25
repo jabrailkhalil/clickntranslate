@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="shizuku_start_intro">Choisissez le mode de capture. Vous pourrez le modifier à tout moment.</string>
+    <string name="shizuku_start_system_body">Utilise l’autorisation de capture Android. Une confirmation apparaît si nécessaire.</string>
+    <string name="shizuku_start_body">Capture sans demandes répétées de partage d’écran. Installez et démarrez Shizuku séparément.</string>
+    <string name="shizuku_start_checking">Vérification de Shizuku…</string>
+    <string name="shizuku_start_ready">Shizuku est prêt. Vous pouvez traduire l’écran.</string>
+    <string name="shizuku_start_permission">Shizuku fonctionne. Autorisez l’accès pour Click’n’Translate.</string>
+    <string name="shizuku_start_no_privilege">Le service est connecté, mais l’accès ADB ou root n’est pas confirmé. Redémarrez-le dans Shizuku.</string>
+    <string name="shizuku_start_compatibility">Le service de compatibilité est déconnecté. Ouvrez le gestionnaire Shizuku installé.</string>
+    <string name="shizuku_start_not_installed">Shizuku n’est pas installé. La capture système est déjà disponible.</string>
+    <string name="shizuku_start_not_running">Shizuku ne fonctionne pas. Ouvrez-le et démarrez le service.</string>
+    <string name="shizuku_start_authorize">Utiliser Shizuku</string>
+    <string name="shizuku_start_authorizing">Attente de l’autorisation Shizuku et vérification de l’accès…</string>
+    <string name="shizuku_start_cancel">Annuler la connexion</string>
+    <string name="shizuku_start_not_confirmed">Connexion non confirmée. Autorisez cette application dans Shizuku, puis réessayez.</string>
+    <string name="shizuku_start_install">Installer Shizuku</string>
+    <string name="shizuku_start_open">Ouvrir Shizuku</string>
+    <string name="shizuku_start_guide">Guide</string>
+    <string name="shizuku_start_refresh">Vérifier à nouveau</string>
+</resources>

@@ -1,0 +1,3 @@
+<resources>
+    <string name="settings_bundle_ui_preferences_notice">Настройки интерфейса из файла тоже будут применены. Собственные изображения и значок приложения останутся на этом устройстве.</string>
+</resources>

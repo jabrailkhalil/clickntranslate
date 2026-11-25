@@ -31,7 +31,9 @@ if(DEFINED ANDROID_ABI)
     if(ANDROID_ABI STREQUAL "arm64-v8a")
         set(GGML_SYSTEM_ARCH "ARM")
         set(GGML_CPU_KLEIDIAI ON)
-        set(GGML_OPENMP ON)
+        # Use ggml's own pthread workers, as supported by docs/android.md. LLVM OpenMP
+        # affinity initialization can abort before the first decode on Android runtimes.
+        set(GGML_OPENMP OFF CACHE BOOL "Use portable ggml workers on Android" FORCE)
     else()
         message(FATAL_ERROR "Unsupported ABI: ${ANDROID_ABI} (Click'n'Translate仅支持 arm64-v8a)")
     endif()
@@ -41,11 +43,27 @@ endif()
 set(LLAMA_SRC ${CMAKE_CURRENT_LIST_DIR}/../../../../third_party/llama.cpp)
 set(UPSTREAM_CPP ${LLAMA_SRC}/examples/llama.android/lib/src/main/cpp)
 
-# Keep the upstream Android binding as the source of truth, while applying the two
-# ClickTranslate-specific correctness fixes in the build directory. Exact-match guards make
-# an upstream change fail at configure time instead of silently dropping either fix.
+# Keep the upstream Android binding as the source of truth, applying app fixes in the
+# build directory. Exact-match guards fail configuration when upstream changes.
 file(READ "${UPSTREAM_CPP}/ai_chat.cpp" CLICKTRANSLATE_AI_CHAT_SOURCE)
 string(REPLACE "\r\n" "\n" CLICKTRANSLATE_AI_CHAT_SOURCE "${CLICKTRANSLATE_AI_CHAT_SOURCE}")
+
+# Render the actual GGUF template. The legacy detector mistakes Hy-MT2's dense
+# template for Hunyuan-VL and places role tokens after the content, omitting the
+# assistant generation prefix. Single requests, batches and token budgets must
+# all use the same renderer. Jinja is already part of llama-common.
+set(CLICKTRANSLATE_CHAT_FORMAT_ORIGINAL
+    "g_chat_templates.get(), chat_msgs, new_msg, role == ROLE_USER, /* use_jinja */ false);")
+set(CLICKTRANSLATE_CHAT_FORMAT_PATCHED
+    "g_chat_templates.get(), chat_msgs, new_msg, role == ROLE_USER, /* use_jinja */ true);")
+string(FIND "${CLICKTRANSLATE_AI_CHAT_SOURCE}" "${CLICKTRANSLATE_CHAT_FORMAT_ORIGINAL}" CLICKTRANSLATE_CHAT_FORMAT_INDEX)
+if(CLICKTRANSLATE_CHAT_FORMAT_INDEX EQUAL -1)
+    message(FATAL_ERROR "ClickTranslate ai_chat chat-template patch no longer matches upstream")
+endif()
+string(REPLACE
+        "${CLICKTRANSLATE_CHAT_FORMAT_ORIGINAL}"
+        "${CLICKTRANSLATE_CHAT_FORMAT_PATCHED}"
+        CLICKTRANSLATE_AI_CHAT_SOURCE "${CLICKTRANSLATE_AI_CHAT_SOURCE}")
 
 # Keep the submodule untouched. Debug delegates to its original logger; Release
 # installs a no-op llama/ggml callback instead of falling back to stderr.
@@ -312,7 +330,7 @@ Java_dev_clickn_translate_llm_LlamaPromptMetrics_countUserPromptTokens(
                 base_messages,
                 user_message,
                 true,
-                /* use_jinja */ false);
+                /* use_jinja */ true);
     }
     env->ReleaseStringUTFChars(jprompt, prompt);
 
@@ -398,44 +416,53 @@ if(ANDROID AND GGML_VULKAN)
     # NDK 27 的 Vulkan C headers 是 1.3.275，但未附带 llama.cpp 使用的 Vulkan-Hpp。
     # 固定到相同 header 版本并校验归档哈希，避免浮动依赖或 C/C++ API 版本错配。
     include(FetchContent)
+    # FetchContent repeats its name in generated stamp paths. Keep it short so
+    # Ninja from the Android SDK works inside Windows worktrees (MAX_PATH=260).
     FetchContent_Declare(
-            clicktranslate_vulkan_headers
+            ct_vk
             URL "https://github.com/KhronosGroup/Vulkan-Headers/archive/refs/tags/v1.3.275.zip"
             URL_HASH "SHA256=2F8B6544E80EE083E11DABDA6B2474B7FF758584107DBA8468903D454A04EF2E")
-    FetchContent_GetProperties(clicktranslate_vulkan_headers)
-    if(NOT clicktranslate_vulkan_headers_POPULATED)
-        FetchContent_Populate(clicktranslate_vulkan_headers)
+    FetchContent_GetProperties(ct_vk)
+    if(NOT ct_vk_POPULATED)
+        FetchContent_Populate(ct_vk)
     endif()
-    include_directories(SYSTEM "${clicktranslate_vulkan_headers_SOURCE_DIR}/include")
+    include_directories(SYSTEM "${ct_vk_SOURCE_DIR}/include")
 
     if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
-        set(CLICKTRANSLATE_VSWHERE "C:/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe")
-        if(NOT EXISTS "${CLICKTRANSLATE_VSWHERE}")
-            message(FATAL_ERROR "Visual Studio locator not found: ${CLICKTRANSLATE_VSWHERE}")
-        endif()
-        execute_process(
-                COMMAND "${CLICKTRANSLATE_VSWHERE}" -latest -products *
-                        -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64
-                        -property installationPath
-                RESULT_VARIABLE CLICKTRANSLATE_VSWHERE_RESULT
-                OUTPUT_VARIABLE CLICKTRANSLATE_VS_INSTALLATION
-                OUTPUT_STRIP_TRAILING_WHITESPACE)
-        if(NOT CLICKTRANSLATE_VSWHERE_RESULT EQUAL 0 OR CLICKTRANSLATE_VS_INSTALLATION STREQUAL "")
-            message(FATAL_ERROR "Visual Studio C++ x64 toolchain was not found")
-        endif()
-        file(TO_CMAKE_PATH "${CLICKTRANSLATE_VS_INSTALLATION}" CLICKTRANSLATE_VS_INSTALLATION)
-        set(CLICKTRANSLATE_VCVARS64 "${CLICKTRANSLATE_VS_INSTALLATION}/VC/Auxiliary/Build/vcvars64.bat")
-        if(NOT EXISTS "${CLICKTRANSLATE_VCVARS64}")
-            message(FATAL_ERROR "Visual Studio vcvars64.bat not found: ${CLICKTRANSLATE_VCVARS64}")
-        endif()
-
         file(TO_CMAKE_PATH "${CMAKE_MAKE_PROGRAM}" CLICKTRANSLATE_HOST_NINJA)
-        configure_file(
-                "${CMAKE_CURRENT_LIST_DIR}/cmake/vulkan-host-toolchain.cmake.in"
-                "${CMAKE_BINARY_DIR}/clicktranslate-vulkan-host-toolchain.cmake"
-                @ONLY)
-        set(GGML_VULKAN_SHADERS_GEN_TOOLCHAIN
-                "${CMAKE_BINARY_DIR}/clicktranslate-vulkan-host-toolchain.cmake" CACHE FILEPATH "" FORCE)
+        # A portable host compiler may be supplied explicitly. Otherwise use
+        # the existing Visual Studio environment for the shader generator.
+        if(NOT GGML_VULKAN_SHADERS_GEN_TOOLCHAIN OR
+                GGML_VULKAN_SHADERS_GEN_TOOLCHAIN STREQUAL "${CMAKE_BINARY_DIR}/clicktranslate-vulkan-host-toolchain.cmake")
+            set(CLICKTRANSLATE_VSWHERE "C:/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe")
+            if(NOT EXISTS "${CLICKTRANSLATE_VSWHERE}")
+                message(FATAL_ERROR "Visual Studio locator not found: ${CLICKTRANSLATE_VSWHERE}")
+            endif()
+            execute_process(
+                    COMMAND "${CLICKTRANSLATE_VSWHERE}" -latest -products *
+                            -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64
+                            -property installationPath
+                    RESULT_VARIABLE CLICKTRANSLATE_VSWHERE_RESULT
+                    OUTPUT_VARIABLE CLICKTRANSLATE_VS_INSTALLATION
+                    OUTPUT_STRIP_TRAILING_WHITESPACE)
+            if(NOT CLICKTRANSLATE_VSWHERE_RESULT EQUAL 0 OR CLICKTRANSLATE_VS_INSTALLATION STREQUAL "")
+                message(FATAL_ERROR "Visual Studio C++ x64 toolchain was not found")
+            endif()
+            file(TO_CMAKE_PATH "${CLICKTRANSLATE_VS_INSTALLATION}" CLICKTRANSLATE_VS_INSTALLATION)
+            set(CLICKTRANSLATE_VCVARS64 "${CLICKTRANSLATE_VS_INSTALLATION}/VC/Auxiliary/Build/vcvars64.bat")
+            if(NOT EXISTS "${CLICKTRANSLATE_VCVARS64}")
+                message(FATAL_ERROR "Visual Studio vcvars64.bat not found: ${CLICKTRANSLATE_VCVARS64}")
+            endif()
+
+            configure_file(
+                    "${CMAKE_CURRENT_LIST_DIR}/cmake/vulkan-host-toolchain.cmake.in"
+                    "${CMAKE_BINARY_DIR}/clicktranslate-vulkan-host-toolchain.cmake"
+                    @ONLY)
+            set(GGML_VULKAN_SHADERS_GEN_TOOLCHAIN
+                    "${CMAKE_BINARY_DIR}/clicktranslate-vulkan-host-toolchain.cmake" CACHE FILEPATH "" FORCE)
+        elseif(NOT EXISTS "${GGML_VULKAN_SHADERS_GEN_TOOLCHAIN}")
+            message(FATAL_ERROR "Vulkan host toolchain not found: ${GGML_VULKAN_SHADERS_GEN_TOOLCHAIN}")
+        endif()
 
         set(CLICKTRANSLATE_REAL_CMAKE "${CMAKE_COMMAND}")
         configure_file(

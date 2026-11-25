@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="shizuku_start_intro">选择屏幕截图方式，之后可以随时更改。</string>
+    <string name="shizuku_start_system_body">使用 Android 屏幕截图权限，需要时会弹出确认窗口。</string>
+    <string name="shizuku_start_body">无需重复确认屏幕共享。需要另行安装并启动 Shizuku。</string>
+    <string name="shizuku_start_checking">正在检查 Shizuku…</string>
+    <string name="shizuku_start_ready">Shizuku 已就绪，可以翻译屏幕。</string>
+    <string name="shizuku_start_permission">Shizuku 正在运行，请允许 Click’n’Translate 访问。</string>
+    <string name="shizuku_start_no_privilege">服务已连接，但尚未确认 ADB 或 root 权限。请在 Shizuku 中重新启动服务。</string>
+    <string name="shizuku_start_compatibility">兼容服务尚未连接，请打开已安装的 Shizuku 管理器。</string>
+    <string name="shizuku_start_not_installed">尚未安装 Shizuku，系统截图方式已可使用。</string>
+    <string name="shizuku_start_not_running">Shizuku 未运行，请打开并启动服务。</string>
+    <string name="shizuku_start_authorize">使用 Shizuku</string>
+    <string name="shizuku_start_authorizing">正在等待 Shizuku 授权并检查访问权限…</string>
+    <string name="shizuku_start_cancel">取消连接</string>
+    <string name="shizuku_start_not_confirmed">尚未确认连接，请在 Shizuku 中授权本应用后重试。</string>
+    <string name="shizuku_start_install">安装 Shizuku</string>
+    <string name="shizuku_start_open">打开 Shizuku</string>
+    <string name="shizuku_start_guide">设置指南</string>
+    <string name="shizuku_start_refresh">重新检查</string>
+</resources>

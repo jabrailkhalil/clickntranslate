@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="readiness_title">App-Bereitschaft</string>
+    <string name="readiness_core_progress">Grundeinstellungen: %1$d von %2$d</string>
+    <string name="readiness_more_available">Öffne die Liste, um Einstellungen für eine bequeme Nutzung zu prüfen.</string>
+    <string name="readiness_recommendations_done">Zusätzliche Einstellungen sind abgeschlossen.</string>
+    <string name="readiness_body">Sieh, was bereits aktiviert ist. Tippe auf einen Eintrag, um ihn einzurichten.</string>
+    <string name="readiness_core">Für die Bildschirmübersetzung</string>
+    <string name="readiness_recommended">Für mehr Komfort</string>
+    <string name="readiness_recommended_body">Diese Einstellungen sind optional. Wähle, was du brauchst.</string>
+    <string name="readiness_hero">Schwebender Begleiter</string>
+    <string name="readiness_system_capture">Systemaufnahme. Android fragt beim Start nach der Berechtigung.</string>
+    <string name="readiness_shizuku_enabled">Shizuku ist verbunden</string>
+    <string name="readiness_not_enabled">Nicht aktiviert</string>
+</resources>

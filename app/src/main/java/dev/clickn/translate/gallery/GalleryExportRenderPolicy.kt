@@ -7,6 +7,7 @@ import dev.clickn.translate.data.OverlayStyleMode
 import dev.clickn.translate.data.OverlayTheme
 import dev.clickn.translate.data.RenderMode
 import dev.clickn.translate.data.Settings
+import dev.clickn.translate.data.builtInOverlayPalette
 import dev.clickn.translate.ocr.TextOrientation
 import dev.clickn.translate.ocr.TranslationOutputOrientationPolicy
 import kotlin.math.roundToInt
@@ -14,6 +15,7 @@ import kotlin.math.roundToInt
 internal enum class GalleryExportRenderMode {
     FIXED_BLOCKS,
     ADAPTIVE_BLOCKS,
+    /** No positional image can be rendered; export the translated text instead. */
     UNSUPPORTED_FLOATING,
 }
 
@@ -44,9 +46,11 @@ internal fun galleryCanExport(
     status: GalleryTaskStatus,
     successCount: Int,
     renderMode: GalleryExportRenderMode,
-): Boolean =
-    galleryCanExport(status, successCount) &&
-        renderMode != GalleryExportRenderMode.UNSUPPORTED_FLOATING
+): Boolean = when (renderMode) {
+    GalleryExportRenderMode.FIXED_BLOCKS,
+    GalleryExportRenderMode.ADAPTIVE_BLOCKS,
+    GalleryExportRenderMode.UNSUPPORTED_FLOATING -> galleryCanExport(status, successCount)
+}
 
 internal fun galleryExportOrientation(
     settings: Settings,
@@ -82,12 +86,9 @@ internal fun galleryExportPalette(
         BorderStyle.SOLID
     }
     val (background, foreground, border, baseBorderWidthPx) = when (settings.overlayTheme) {
-        OverlayTheme.CLASSIC_DARK -> listOf(
-            0xE6000000.toInt(),
-            0xFFFFFFFF.toInt(),
-            0x00000000,
-            0,
-        )
+        OverlayTheme.CLASSIC_DARK -> checkNotNull(builtInOverlayPalette(OverlayTheme.CLASSIC_DARK)).let { palette ->
+            listOf(palette.background, palette.foreground, 0, 0)
+        }
         OverlayTheme.AMBER_GOLD -> listOf(
             0xF0241608.toInt(),
             0xFFFFD27F.toInt(),

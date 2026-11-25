@@ -22,6 +22,7 @@ object OcrEngineCatalog {
         OcrEngineOption(OcrEngineKind.ML_KIT_LATIN, R.string.settings_ocr_chip_latin, OcrEngineGroup.ON_DEVICE),
         OcrEngineOption(OcrEngineKind.PADDLE_ONNX, R.string.settings_ocr_chip_paddle, OcrEngineGroup.ON_DEVICE),
         OcrEngineOption(OcrEngineKind.MANGA_OCR_JA, R.string.settings_ocr_chip_manga_ocr_ja, OcrEngineGroup.ON_DEVICE),
+        OcrEngineOption(OcrEngineKind.TESSERACT_ARABIC, R.string.settings_ocr_chip_tesseract_arabic, OcrEngineGroup.ON_DEVICE),
         OcrEngineOption(OcrEngineKind.UMI_OCR, R.string.settings_ocr_chip_umi, OcrEngineGroup.LOCAL),
         OcrEngineOption(OcrEngineKind.LUNA_OCR, R.string.settings_ocr_chip_luna, OcrEngineGroup.LOCAL),
         OcrEngineOption(OcrEngineKind.BAIDU, R.string.settings_ocr_chip_baidu, OcrEngineGroup.CLOUD),

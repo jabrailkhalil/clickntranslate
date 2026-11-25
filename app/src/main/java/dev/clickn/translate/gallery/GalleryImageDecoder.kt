@@ -5,8 +5,8 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
-import android.media.ExifInterface
 import android.net.Uri
+import androidx.exifinterface.media.ExifInterface
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.io.FileInputStream
@@ -24,15 +24,22 @@ data class GalleryDecodedImage(
 class GalleryImageDecoder @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
-    fun decode(item: GalleryTranslationItemEntity, maxDimension: Int = MAX_OCR_DIMENSION): GalleryDecodedImage {
+    fun decode(
+        item: GalleryTranslationItemEntity,
+        maxDimension: Int = MAX_OCR_DIMENSION,
+        checkpoint: () -> Unit = {},
+    ): GalleryDecodedImage {
         require(maxDimension > 0)
+        checkpoint()
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         open(item).use { BitmapFactory.decodeStream(it, null, bounds) }
         require(bounds.outWidth > 0 && bounds.outHeight > 0) {
             "Unsupported or damaged image."
         }
 
+        checkpoint()
         val orientation = readExifOrientation(item)
+        checkpoint()
         val sampleSize = sampleSize(bounds.outWidth, bounds.outHeight, maxDimension)
         val options = BitmapFactory.Options().apply {
             inSampleSize = sampleSize
@@ -43,7 +50,29 @@ class GalleryImageDecoder @Inject constructor(
                 "Unable to decode image."
             }
         }
-        val oriented = applyExifOrientation(decoded, orientation)
+        var ownedBitmap = decoded
+        try {
+            checkpoint()
+            ownedBitmap = applyExifOrientation(ownedBitmap, orientation)
+            // Some decoders round sampled dimensions up. Honour the same limit for
+            // thumbnails, previews and OCR even for extremely large source images.
+            val longestSide = maxOf(ownedBitmap.width, ownedBitmap.height)
+            if (longestSide > maxDimension) {
+                val scale = maxDimension.toDouble() / longestSide
+                val bounded = Bitmap.createScaledBitmap(
+                    ownedBitmap,
+                    (ownedBitmap.width * scale).toInt().coerceAtLeast(1),
+                    (ownedBitmap.height * scale).toInt().coerceAtLeast(1),
+                    true,
+                )
+                if (bounded !== ownedBitmap) ownedBitmap.recycle()
+                ownedBitmap = bounded
+            }
+            checkpoint()
+        } catch (error: Throwable) {
+            if (!ownedBitmap.isRecycled) ownedBitmap.recycle()
+            throw error
+        }
         val swapsDimensions = orientation in setOf(
             ExifInterface.ORIENTATION_TRANSPOSE,
             ExifInterface.ORIENTATION_ROTATE_90,
@@ -51,7 +80,7 @@ class GalleryImageDecoder @Inject constructor(
             ExifInterface.ORIENTATION_ROTATE_270,
         )
         return GalleryDecodedImage(
-            bitmap = oriented,
+            bitmap = ownedBitmap,
             originalWidth = if (swapsDimensions) bounds.outHeight else bounds.outWidth,
             originalHeight = if (swapsDimensions) bounds.outWidth else bounds.outHeight,
         )
@@ -147,7 +176,11 @@ class GalleryImageDecoder @Inject constructor(
 
     private fun sampleSize(width: Int, height: Int, maxDimension: Int): Int {
         var sample = 1
-        while (maxOf(width / sample, height / sample) > maxDimension && sample <= 32) {
+        val longestSide = maxOf(width, height).toLong()
+        while (
+            longestSide / sample > maxDimension &&
+            sample <= Int.MAX_VALUE / 2
+        ) {
             sample *= 2
         }
         return sample

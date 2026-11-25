@@ -1,0 +1,3 @@
+<resources>
+    <string name="settings_bundle_ui_preferences_notice">También se aplicarán las preferencias de interfaz de este archivo. Las imágenes propias y el icono de inicio permanecerán en este dispositivo.</string>
+</resources>

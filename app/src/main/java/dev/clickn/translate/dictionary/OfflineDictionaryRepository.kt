@@ -3,6 +3,7 @@ package dev.clickn.translate.dictionary
 
 import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
+import android.os.CancellationSignal
 import android.database.sqlite.SQLiteDatabase.NO_LOCALIZED_COLLATORS
 import android.database.sqlite.SQLiteDatabase.OPEN_READONLY
 import dev.clickn.translate.translate.WordResult
@@ -36,11 +37,13 @@ class OfflineDictionaryRepository @Inject constructor(
             if (normalized.isBlank()) return@withContext null
 
             try {
-                SQLiteDatabase.openDatabase(
-                    file.absolutePath,
-                    null,
-                    OPEN_READONLY or NO_LOCALIZED_COLLATORS,
-                ).use { database -> query(database, normalized) }.also { result ->
+                cancellableDictionaryRead { signal ->
+                    SQLiteDatabase.openDatabase(
+                        file.absolutePath,
+                        null,
+                        OPEN_READONLY or NO_LOCALIZED_COLLATORS,
+                    ).use { database -> query(database, normalized, signal) }
+                }.also { result ->
                     Timber.d("OfflineDictionary lookup pack=%s result=%s senses=%d", spec.id.wireId,
                         if (result == null) "miss" else "hit", result?.senses?.size ?: 0)
                 }
@@ -54,17 +57,21 @@ class OfflineDictionaryRepository @Inject constructor(
             }
         }
 
-    private fun query(database: SQLiteDatabase, normalized: String): WordResult? {
+    private fun query(database: SQLiteDatabase, normalized: String, signal: CancellationSignal): WordResult? {
         val entries = database.rawQuery(
             """
-            SELECT DISTINCT e.id, e.lemma, e.reading, e.phonetic, e.inflections
+            SELECT e.id, e.lemma, e.reading, e.phonetic, e.inflections
             FROM ${DictionaryPackContract.ENTRIES_TABLE} e
-            LEFT JOIN ${DictionaryPackContract.FORMS_TABLE} f ON f.entry_id = e.id
-            WHERE e.normalized_headword = ? OR f.normalized_form = ?
+            WHERE e.id IN (
+                SELECT id FROM ${DictionaryPackContract.ENTRIES_TABLE} WHERE normalized_headword = ?
+                UNION
+                SELECT entry_id FROM ${DictionaryPackContract.FORMS_TABLE} WHERE normalized_form = ?
+            )
             ORDER BY CASE WHEN e.normalized_headword = ? THEN 0 ELSE 1 END, e.id
             LIMIT 8
             """.trimIndent(),
             arrayOf(normalized, normalized, normalized),
+            signal,
         ).use { cursor ->
             buildList {
                 while (cursor.moveToNext()) {
@@ -82,7 +89,7 @@ class OfflineDictionaryRepository @Inject constructor(
         }
         if (entries.isEmpty()) return null
 
-        val senses = entries.flatMap { entry -> querySenses(database, entry.id) }
+        val senses = entries.flatMap { entry -> querySenses(database, entry.id, signal) }
         if (senses.isEmpty() && entries.all { it.phonetic.isBlank() && it.reading.isBlank() }) {
             return null
         }
@@ -95,7 +102,7 @@ class OfflineDictionaryRepository @Inject constructor(
         )
     }
 
-    private fun querySenses(database: SQLiteDatabase, entryId: Long): List<WordSense> =
+    private fun querySenses(database: SQLiteDatabase, entryId: Long, signal: CancellationSignal): List<WordSense> =
         database.rawQuery(
             """
             SELECT part_of_speech, definition, form_note
@@ -104,6 +111,7 @@ class OfflineDictionaryRepository @Inject constructor(
             ORDER BY position
             """.trimIndent(),
             arrayOf(entryId.toString()),
+            signal,
         ).use { cursor ->
             val grouped = linkedMapOf<Pair<String, String>, MutableList<String>>()
             while (cursor.moveToNext()) {

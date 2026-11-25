@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="paddle_version_v5_arabic">PP-OCRv5 阿拉伯语</string>
+    <string name="paddle_version_v5_arabic_desc">约13MB，在设备上识别阿拉伯语和英语。</string>
+    <string name="paddle_version_v5_arabic_languages">阿拉伯语、英语</string>
+    <string name="mobile_arabic_ocr">阿拉伯语文字识别</string>
+    <string name="mobile_arabic_ocr_body">下载一次即可在手机上识别阿拉伯语和英语。图片保留在设备上。</string>
+    <string name="mobile_arabic_ocr_download">下载并启用</string>
+    <string name="mobile_arabic_ocr_use">使用阿拉伯语识别</string>
+</resources>

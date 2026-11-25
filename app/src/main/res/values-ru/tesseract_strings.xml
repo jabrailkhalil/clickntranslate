@@ -1,0 +1,12 @@
+<resources>
+    <string name="settings_ocr_chip_tesseract_arabic">Tesseract: арабский + английский</string>
+    <string name="settings_tesseract_language_scope">Локальный OCR для арабского и английского. «Авто» распознаёт обе письменности. Скачайте модели один раз; распознавание выполняется на устройстве.</string>
+    <string name="settings_tesseract_models_missing">Модели арабского и английского OCR не установлены. Скачайте их здесь перед распознаванием арабского.</string>
+    <string name="settings_tesseract_models_ready">Модели арабского и английского OCR проверены и готовы.</string>
+    <string name="settings_tesseract_download">Скачать модели</string>
+    <string name="settings_tesseract_retry">Повторить загрузку</string>
+    <string name="settings_tesseract_cancel">Отменить загрузку</string>
+    <string name="settings_tesseract_delete">Удалить модели</string>
+    <string name="settings_tesseract_download_failed">Не удалось скачать модели OCR. Проверьте соединение и повторите попытку.</string>
+    <string name="settings_tesseract_models_invalid">Модели OCR повреждены. Скачайте их заново.</string>
+</resources>

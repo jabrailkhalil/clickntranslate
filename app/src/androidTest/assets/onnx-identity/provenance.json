@@ -1,0 +1,47 @@
+{
+  "authorship": "Locally authored graph and standard-library encoder; no upstream model weights",
+  "sourceRepository": "https://github.com/onnx/onnx",
+  "sourceTag": "v1.17.0",
+  "sourceCommit": "b8baa8446686496da4cc8fda09f2b6fe65c2a02c",
+  "sources": [
+    {
+      "url": "https://raw.githubusercontent.com/onnx/onnx/b8baa8446686496da4cc8fda09f2b6fe65c2a02c/onnx/onnx.proto",
+      "file": "onnx.proto",
+      "bytes": 37245,
+      "sha256": "2881fcc940635b6a34b7c95e5089b2faa89c3d6e382c1da1706e88c7f32452bc",
+      "sha512": "9b1d6f90ca39d636b563cea0f08152d5c841d1762bdc42b60a03616cd9a61cc7d390b219731633ed4c8037ec32f9b62cdeedaf3e900b8d04aaaa0bc14b12626e"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/onnx/onnx/b8baa8446686496da4cc8fda09f2b6fe65c2a02c/LICENSE",
+      "file": "ONNX-LICENSE",
+      "bytes": 11358,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "sha512": "98f6b79b778f7b0a15415bd750c3a8a097d650511cb4ec8115188e115c47053fe700f578895c097051c9bc3dfb6197c2b13a15de203273e1a3218884f86e90e8"
+    }
+  ],
+  "fixture": {
+    "file": "identity.onnx",
+    "bytes": 145,
+    "sha256": "bc17685c0865d15d61b6c76095b13f4bac4913448c2ec1767c25905a008ef16a",
+    "sha512": "d4004842ca94917e5ea65de73223d8ad4f5ba48be1a3146bf889b54546b9c923bd149287f59c8d1e52c1ca5b076005873d87e15062acb7dac9b6cbd66fc62005",
+    "irVersion": 8,
+    "opset": 13,
+    "input": {
+      "name": "X",
+      "type": "FLOAT",
+      "shape": [
+        1,
+        4
+      ]
+    },
+    "output": {
+      "name": "Y",
+      "type": "FLOAT",
+      "shape": [
+        1,
+        4
+      ]
+    },
+    "node": "Identity"
+  }
+}

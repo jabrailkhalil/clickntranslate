@@ -90,7 +90,13 @@ class PerformanceOverlayDragPolicyTest {
         )
         assertTrue(
             "service shutdown must explicitly remove diagnostics",
-            serviceSource.contains("overlay?.setPerformanceOverlayEnabled(false)"),
+            serviceSource.substringAfter("private fun cleanupCapture()")
+                .contains("overlayManager?.setPerformanceOverlayEnabled(false)"),
+        )
+        assertFalse(
+            "shutdown must also release diagnostics while presentation is hidden on Main",
+            serviceSource.substringAfter("private fun cleanupCapture()")
+                .contains("overlay?.setPerformanceOverlayEnabled(false)"),
         )
     }
 }

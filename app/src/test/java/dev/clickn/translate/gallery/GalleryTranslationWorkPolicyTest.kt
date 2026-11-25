@@ -240,6 +240,9 @@ class GalleryTranslationWorkPolicyTest {
             Case("all succeeded", GalleryTaskProgress(5, 5, 0), expected = GalleryTaskStatus.SUCCEEDED),
             Case("all failed", GalleryTaskProgress(5, 0, 5), expected = GalleryTaskStatus.FAILED),
             Case("partial success", GalleryTaskProgress(5, 3, 2), expected = GalleryTaskStatus.PARTIAL),
+            Case("retry excludes canceled remainder", GalleryTaskProgress(5, 3, 0, 2), expected = GalleryTaskStatus.PARTIAL),
+            Case("retry failed with canceled remainder", GalleryTaskProgress(5, 0, 3, 2), expected = GalleryTaskStatus.FAILED),
+            Case("retry still has pending work", GalleryTaskProgress(5, 1, 1, 2), expected = GalleryTaskStatus.RUNNING),
             Case(
                 "cancel overrides progress",
                 GalleryTaskProgress(5, 3, 2),

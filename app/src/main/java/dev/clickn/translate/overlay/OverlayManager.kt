@@ -85,7 +85,7 @@ class OverlayManager(
     },
     private val onFloatingWordDetailsRequested: (FloatingWordLookupOutcome) -> Unit = {},
     @Volatile var textSizeSp: Int = 14,
-    @Volatile var alpha: Float = 0.85f,
+    @Volatile var alpha: Float = 1f,
     @Volatile var regionOffset: android.graphics.Point = android.graphics.Point(0, 0),
     @Volatile var placement: OverlayPlacement = OverlayPlacement.BELOW,
     @Volatile var overlayStyleMode: OverlayStyleMode = OverlayStyleMode.FIXED,
@@ -119,6 +119,43 @@ class OverlayManager(
 ) {
 
     private val wm by lazy { context.getSystemService(Context.WINDOW_SERVICE) as WindowManager }
+    private val sourceVisibility = sourceCaptureViewVisibility()
+    private var sourceRootTouchActive = false
+    private var performanceTouchActive = false
+
+    /** Skip observation while native selection, scrolling, or a window drag owns a gesture. */
+    fun canObserveSource(): Boolean =
+        !sourceRootTouchActive && !performanceTouchActive &&
+            listOfNotNull(errorView, countdownView, loadingView).none { it.isPressed } &&
+            blockViews.values.none { (it as? TextView)?.hasSelection() == true } &&
+            floatingWindow.canObserveSource()
+
+    /** Includes the separately hosted persistent floating result window. Call and close on Main. */
+    fun hideForSourceObservation(): SourceObservationLease {
+        val own = sourceVisibility.hideForSourceObservation()
+        return try {
+            combineSourceObservationLeases(own, floatingWindow.hideForSourceObservation())
+        } catch (failure: Throwable) {
+            own.close()
+            throw failure
+        }
+    }
+
+    private fun addSourceView(view: View, params: WindowManager.LayoutParams) {
+        sourceVisibility.track(view, View.VISIBLE)
+        try { wm.addView(view, params) }
+        catch (failure: Throwable) { sourceVisibility.untrack(view); throw failure }
+    }
+
+    private fun removeSourceView(view: View) {
+        sourceVisibility.untrack(view)
+        wm.removeView(view)
+    }
+
+    private fun removeSourceViewImmediate(view: View) {
+        sourceVisibility.untrack(view)
+        wm.removeViewImmediate(view)
+    }
 
     fun updateDictionaryTapLookupEnabled(enabled: Boolean) {
         dictionaryTapLookupEnabled = enabled
@@ -174,10 +211,10 @@ class OverlayManager(
     internal fun setPerformanceOverlayHiddenForCapture(hidden: Boolean) {
         performanceCaptureHidden = hidden
         if (hidden) {
-            performanceView?.visibility = View.INVISIBLE
+            performanceView?.let { sourceVisibility.setDesired(it, View.INVISIBLE) }
         } else if (performanceOverlayEnabled) {
             showOrUpdatePerformanceOverlay()
-            performanceView?.visibility = View.VISIBLE
+            performanceView?.let { sourceVisibility.setDesired(it, View.VISIBLE) }
         }
     }
 
@@ -283,7 +320,7 @@ class OverlayManager(
         }
         configurePerformanceOverlayDrag(created)
         return runCatching {
-            wm.addView(created, params)
+            addSourceView(created, params)
             performanceView = created
             performanceLayoutParams = params
             created
@@ -302,6 +339,7 @@ class OverlayManager(
             val params = performanceLayoutParams ?: return@setOnTouchListener false
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
+                    performanceTouchActive = true
                     downRawX = event.rawX
                     downRawY = event.rawY
                     startX = params.x
@@ -325,7 +363,10 @@ class OverlayManager(
                     runCatching { wm.updateViewLayout(view, params) }
                     true
                 }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> true
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    performanceTouchActive = false
+                    true
+                }
                 else -> false
             }
         }
@@ -356,8 +397,11 @@ class OverlayManager(
         val view = performanceView ?: return
         val params = performanceLayoutParams ?: return
         if (!view.isAttachedToWindow) return
-        if (runCatching { wm.removeViewImmediate(view) }.isFailure) return
-        runCatching { wm.addView(view, params) }
+        if (runCatching { removeSourceViewImmediate(view) }.isFailure) {
+            sourceVisibility.track(view, View.VISIBLE)
+            return
+        }
+        runCatching { addSourceView(view, params) }
             .onFailure {
                 performanceView = null
                 performanceLayoutParams = null
@@ -366,7 +410,8 @@ class OverlayManager(
     }
 
     private fun dismissPerformanceOverlay() {
-        performanceView?.let { view -> runCatching { wm.removeView(view) } }
+        performanceTouchActive = false
+        performanceView?.let { view -> runCatching { removeSourceView(view) } }
         performanceView = null
         performanceLayoutParams = null
     }
@@ -432,6 +477,7 @@ class OverlayManager(
         val pb = android.widget.ProgressBar(context).apply {
             // indeterminate 默认转圈
             isIndeterminate = true
+            contentDescription = context.getString(R.string.word_card_loading)
             indeterminateTintList = android.content.res.ColorStateList.valueOf(0xFFFFFFFF.toInt())
         }
         val pbLp = FrameLayout.LayoutParams(size, size)
@@ -442,9 +488,12 @@ class OverlayManager(
             height = WindowManager.LayoutParams.WRAP_CONTENT
             gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
             y = (24 * density).toInt()
+            flags = flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+            // Android 12 rejects touches through an opaque application overlay.
+            alpha = 0.8f
         }
         return runCatching {
-            wm.addView(container, params)
+            addSourceView(container, params)
             loadingView = container
         }.onFailure {
             Timber.w(it, "Failed to show loading overlay")
@@ -453,7 +502,7 @@ class OverlayManager(
 
     /** 关闭 loading 圈。captureOnce 失败 / 帧差跳过等"没有译文要显示"的路径里调用，避免一直转圈。 */
     fun dismissLoading() {
-        loadingView?.let { runCatching { wm.removeView(it) } }
+        loadingView?.let { runCatching { removeSourceView(it) } }
         loadingView = null
     }
 
@@ -466,7 +515,7 @@ class OverlayManager(
      * 与 [showLoadingHint] 同链路，全屏游戏沉浸模式下也能可靠显示。
      */
     fun showErrorHint(message: String, durationMs: Long = 4500L) {
-        runCatching { errorView?.let { wm.removeView(it) } }
+        runCatching { errorView?.let { removeSourceView(it) } }
         errorView = null
 
         val density = context.resources.displayMetrics.density
@@ -499,27 +548,27 @@ class OverlayManager(
             gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
             y = (96 * density).toInt()
         }
-        runCatching { wm.addView(container, params) }
+        runCatching { addSourceView(container, params) }
         errorView = container
 
         // 用户点击立即关闭
         container.setOnClickListener {
             if (errorView === container) {
-                runCatching { wm.removeView(container) }
+                runCatching { removeSourceView(container) }
                 errorView = null
             }
         }
         // 定时自动关闭
         container.postDelayed({
             if (errorView === container) {
-                runCatching { wm.removeView(container) }
+                runCatching { removeSourceView(container) }
                 errorView = null
             }
         }, durationMs)
     }
 
     fun dismissError() {
-        errorView?.let { runCatching { wm.removeView(it) } }
+        errorView?.let { runCatching { removeSourceView(it) } }
         errorView = null
     }
 
@@ -565,6 +614,13 @@ class OverlayManager(
             setTextColor(0xFFFFFFFF.toInt())
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
             gravity = Gravity.CENTER
+            maxWidth = (context.resources.displayMetrics.widthPixels * 0.9f).toInt()
+            setPadding((16 * density).toInt(), (12 * density).toInt(),
+                (16 * density).toInt(), (12 * density).toInt())
+            background = GradientDrawable().apply {
+                setColor(0xE6303030.toInt())
+                cornerRadius = 12 * density
+            }
         }
         val container = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
@@ -584,14 +640,14 @@ class OverlayManager(
             height = WindowManager.LayoutParams.WRAP_CONTENT
             gravity = Gravity.CENTER
         }
-        runCatching { wm.addView(container, params) }
+        runCatching { addSourceView(container, params) }
         countdownView = container
 
         val handler = android.os.Handler(android.os.Looper.getMainLooper())
         fun tick(left: Int) {
             if (countdownView !== container) return // 已被 cancelStartCountdown
             if (left <= 0) {
-                runCatching { wm.removeView(container) }
+                runCatching { removeSourceView(container) }
                 if (countdownView === container) countdownView = null
                 // 给 WindowManager ~3 帧时间让圆圈真正从屏幕消失，再放调用方进 captureOnce
                 handler.postDelayed({ onFinish() }, 80L)
@@ -605,7 +661,7 @@ class OverlayManager(
 
     /** 倒计时未结束时调用：移除圆圈，**不** 触发 onFinish（适合「用户中途又切回 OFF」的场景）。 */
     fun cancelStartCountdown() {
-        countdownView?.let { runCatching { wm.removeView(it) } }
+        countdownView?.let { runCatching { removeSourceView(it) } }
         countdownView = null
     }
 
@@ -614,7 +670,7 @@ class OverlayManager(
      * 国产 ROM 对后台 Service 的 [android.widget.Toast.makeText] 会静默丢弃，这里用悬浮窗替代。
      */
     fun showInfoHint(message: String, durationMs: Long = 1800L) {
-        runCatching { errorView?.let { wm.removeView(it) } }
+        runCatching { errorView?.let { removeSourceView(it) } }
         errorView = null
 
         val density = context.resources.displayMetrics.density
@@ -646,18 +702,18 @@ class OverlayManager(
             gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
             y = (96 * density).toInt()
         }
-        runCatching { wm.addView(container, params) }
+        runCatching { addSourceView(container, params) }
         errorView = container
 
         container.setOnClickListener {
             if (errorView === container) {
-                runCatching { wm.removeView(container) }
+                runCatching { removeSourceView(container) }
                 errorView = null
             }
         }
         container.postDelayed({
             if (errorView === container) {
-                runCatching { wm.removeView(container) }
+                runCatching { removeSourceView(container) }
                 errorView = null
             }
         }, durationMs)
@@ -818,6 +874,14 @@ class OverlayManager(
         )
         floatingWindow.onConfigurationChanged()
         keepPerformanceOverlayOnScreen()
+    }
+
+    /** Retire screen-bound pixels without closing or resetting the user's floating window. */
+    fun clearForCaptureGeometryChange() {
+        clearBlocksAndLoading()
+        floatingFrameUpdateCoalescers.values.forEach { it.discardPending() }
+        floatingFrameUpdateCoalescers.clear()
+        floatingPendingIndexes.clear()
     }
 
     /**
@@ -1121,7 +1185,7 @@ class OverlayManager(
         }
         val diagPrefix = diagnosticId.toDiagPrefix()
 
-        val root = FrameLayout(context).apply {
+        val root = SourceObservationRoot(context) { sourceRootTouchActive = it }.apply {
             this.alpha = if (overlayStyleMode == OverlayStyleMode.ADAPTIVE) 1f else this@OverlayManager.alpha
         }
         val dm = context.resources.displayMetrics
@@ -1400,13 +1464,7 @@ class OverlayManager(
                 val horizontalRightToLeft = blockOrientation == TextOrientation.HORIZONTAL_RTL
                 StyledTranslationTextView(context).apply horizontalView@ {
                     this.horizontalRightToLeft = horizontalRightToLeft
-                    text = if (horizontalRightToLeft) horizontalRtlDisplayText(dst) else dst
-                    // RLO keeps logical paragraph order but lets Android reorder each wrapped line.
-                    textDirection = if (horizontalRightToLeft) {
-                        View.TEXT_DIRECTION_RTL
-                    } else {
-                        View.TEXT_DIRECTION_LTR
-                    }
+                    setTranslationText(dst)
                     gravity = if (horizontalRightToLeft) {
                         Gravity.END
                     } else {
@@ -1603,7 +1661,7 @@ class OverlayManager(
         val addResult = if (interactionPlan.useDecorViewActionModeHost) {
             showBlocksInActionModeDialog(root, params)
         } else {
-            runCatching { wm.addView(root, params) }
+            runCatching { addSourceView(root, params) }
         }
         addResult
             .onSuccess { VerticalDiagnosticLog.i("${diagPrefix}overlay window added host=$host") }
@@ -1650,10 +1708,15 @@ class OverlayManager(
             }
             window.decorView.setBackgroundColor(Color.TRANSPARENT)
             WindowCompat.setDecorFitsSystemWindows(window, false)
+            sourceVisibility.track(root, View.VISIBLE)
+            sourceVisibility.track(window.decorView, View.VISIBLE)
             dialog.show()
+            sourceVisibility.setDesired(window.decorView, View.VISIBLE)
             window.setLayout(params.width, params.height)
             blocksDialog = dialog
         }.onFailure {
+            sourceVisibility.untrack(root)
+            pendingDialog?.window?.decorView?.let(sourceVisibility::untrack)
             runCatching { pendingDialog?.dismiss() }
         }
     }
@@ -1662,7 +1725,7 @@ class OverlayManager(
         blocks: List<Pair<TextBlock, String>>,
         diagnosticId: Long?,
     ) {
-        val root = FrameLayout(context)
+        val root = SourceObservationRoot(context) { sourceRootTouchActive = it }
         val dm = context.resources.displayMetrics
         val physicalSize = physicalDisplaySize(context)
         val screenW = physicalSize.width
@@ -1710,7 +1773,7 @@ class OverlayManager(
         }
         root.setOnClickListener { clear() }
         val params = newLayoutParams()
-        runCatching { wm.addView(root, params) }
+        runCatching { addSourceView(root, params) }
             .onSuccess { raisePerformanceOverlayAboveTranslation() }
             .onFailure { Timber.w(it, "Failed to show OCR debug boxes") }
         blocksView = root
@@ -2206,10 +2269,10 @@ class OverlayManager(
                         }
                         v.adaptiveTextLayoutPhase = phase
                     }
-                    v.text = if (v is StyledTranslationTextView && v.horizontalRightToLeft) {
-                        horizontalRtlDisplayText(text)
+                    if (v is StyledTranslationTextView) {
+                        v.setTranslationText(text)
                     } else {
-                        text
+                        v.text = text
                     }
                 }
             }
@@ -2241,14 +2304,17 @@ class OverlayManager(
     }
 
     private fun clearBlockResults() {
+        sourceRootTouchActive = false
         dismissError()
         clearBubblePatches(restoreFallback = false)
         val dialog = blocksDialog
         blocksDialog = null
         if (dialog != null) {
+            blocksView?.let(sourceVisibility::untrack)
+            dialog.window?.decorView?.let(sourceVisibility::untrack)
             runCatching { dialog.dismiss() }
         } else {
-            blocksView?.let { runCatching { wm.removeView(it) } }
+            blocksView?.let { runCatching { removeSourceView(it) } }
         }
         blocksView = null
         blockViews.clear()
@@ -2365,13 +2431,7 @@ class OverlayManager(
 
     private fun themeBg(): GradientDrawable = GradientDrawable().apply {
         cornerRadius = 8f
-        setColor(when (theme) {
-            OverlayTheme.CLASSIC_DARK -> 0xF2000000.toInt()
-            OverlayTheme.AMBER_GOLD -> 0xF8241608.toInt()
-            OverlayTheme.PAPER_LIGHT -> 0xFCF5EFE0.toInt()
-            OverlayTheme.FROST_GLASS -> 0xF51E293B.toInt()
-            OverlayTheme.CUSTOM -> customBg
-        })
+        setColor(dev.clickn.translate.data.builtInOverlayPalette(theme)?.background ?: customBg)
         val density = context.resources.displayMetrics.density
         when (theme) {
             OverlayTheme.AMBER_GOLD -> setStroke(2, 0xFFE3B65B.toInt())

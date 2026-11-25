@@ -23,6 +23,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -41,6 +42,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -51,10 +53,12 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import dev.clickn.translate.R
 import dev.clickn.translate.data.DictionaryLookupMode
+import dev.clickn.translate.dictionary.DictionaryPackFailureKind
 import dev.clickn.translate.dictionary.DictionaryPackId
 import dev.clickn.translate.dictionary.DictionaryPackInstallResult
 import dev.clickn.translate.dictionary.DictionaryPackStatus
 import dev.clickn.translate.dictionary.supportsOnlineDictionaryLookup
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -69,17 +73,29 @@ fun DictionaryLibraryScreen(
     val settings by viewModel.settings.collectAsState()
     val statuses by viewModel.packStatuses.collectAsState()
     val visibleStatuses = remember(statuses) { visibleDictionaryPackStatuses(statuses) }
-    var pendingImport by remember { mutableStateOf<DictionaryPackId?>(null) }
+    var pendingImportName by rememberSaveable { mutableStateOf<String?>(null) }
+    var importJob by remember { mutableStateOf<Job?>(null) }
+    var importing by remember { mutableStateOf(false) }
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        val id = pendingImport
-        pendingImport = null
+        val id = DictionaryPackId.entries.firstOrNull { it.name == pendingImportName }
+        pendingImportName = null
         if (uri != null && id != null) {
-            scope.launch {
-                when (val result = viewModel.importPack(uri, id)) {
+            importing = true
+            importJob = scope.launch {
+                val result = try {
+                    viewModel.importPack(uri, id)
+                } finally {
+                    importing = false
+                    importJob = null
+                    viewModel.refresh()
+                }
+                when (result) {
                     is DictionaryPackInstallResult.Success -> snackbar.showSnackbar(
                         context.getString(R.string.dictionary_pack_imported)
                     )
-                    is DictionaryPackInstallResult.Failure -> snackbar.showSnackbar(result.reason)
+                    is DictionaryPackInstallResult.Failure -> snackbar.showSnackbar(
+                        context.getString(dictionaryPackFailureMessageResource(result.kind))
+                    )
                 }
             }
         }
@@ -92,6 +108,13 @@ fun DictionaryLibraryScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                    }
+                },
+                actions = {
+                    if (importing) {
+                        TextButton(onClick = { importJob?.cancel() }) {
+                            Text(stringResource(android.R.string.cancel))
+                        }
                     }
                 },
             )
@@ -122,13 +145,22 @@ fun DictionaryLibraryScreen(
                     },
                 )
             }
+            if (importing) {
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    }
+                }
+            }
             item {
                 DictionaryPackGroup(
                     statuses = visibleStatuses,
+                    enabled = !importing,
                     onImport = { status ->
-                        pendingImport = status.spec.id
+                        pendingImportName = status.spec.id.name
                         importLauncher.launch(
-                            arrayOf("application/vnd.sqlite3", "application/octet-stream")
+                            // Providers disagree on MIME types for .bin/.db; validate the actual SQLite format.
+                            arrayOf("*/*")
                         )
                     },
                     onDelete = { status ->
@@ -236,6 +268,7 @@ internal fun visibleDictionaryPackStatuses(statuses: List<DictionaryPackStatus>)
 @Composable
 private fun DictionaryPackGroup(
     statuses: List<DictionaryPackStatus>,
+    enabled: Boolean,
     onImport: (DictionaryPackStatus) -> Unit,
     onDelete: (DictionaryPackStatus) -> Unit,
 ) {
@@ -252,6 +285,7 @@ private fun DictionaryPackGroup(
                 statuses.forEachIndexed { index, status ->
                     DictionaryPackRow(
                         status = status,
+                        enabled = enabled,
                         onImport = { onImport(status) },
                         onDelete = { onDelete(status) },
                     )
@@ -270,11 +304,14 @@ private fun DictionaryPackGroup(
 @Composable
 private fun DictionaryPackRow(
     status: DictionaryPackStatus,
+    enabled: Boolean,
     onImport: () -> Unit,
     onDelete: () -> Unit,
 ) {
     val statusText = when {
-        status.invalidReason != null -> status.invalidReason
+        status.invalidReason != null || status.invalidKind != null -> stringResource(
+            dictionaryPackFailureMessageResource(status.invalidKind ?: DictionaryPackFailureKind.UNKNOWN)
+        )
         status.installed -> stringResource(R.string.dictionary_pack_installed)
         else -> stringResource(R.string.dictionary_pack_not_installed)
     }.orEmpty()
@@ -321,7 +358,7 @@ private fun DictionaryPackRow(
                 text = statusText,
                 style = MaterialTheme.typography.bodySmall,
                 color = when {
-                    status.invalidReason != null -> MaterialTheme.colorScheme.error
+                    status.invalidReason != null || status.invalidKind != null -> MaterialTheme.colorScheme.error
                     status.installed -> MaterialTheme.colorScheme.primary
                     else -> MaterialTheme.colorScheme.onSurfaceVariant
                 },
@@ -329,8 +366,8 @@ private fun DictionaryPackRow(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        if (status.installed || status.invalidReason != null) {
-            IconButton(onClick = onDelete) {
+        if (status.installed || status.invalidReason != null || status.invalidKind != null) {
+            IconButton(onClick = onDelete, enabled = enabled) {
                 Icon(
                     imageVector = Icons.Default.DeleteOutline,
                     contentDescription = stringResource(R.string.dictionary_pack_delete),
@@ -338,7 +375,7 @@ private fun DictionaryPackRow(
                 )
             }
         }
-        TextButton(onClick = onImport) {
+        TextButton(onClick = onImport, enabled = enabled) {
             Text(
                 text = stringResource(
                     if (status.installed) R.string.dictionary_pack_action_replace

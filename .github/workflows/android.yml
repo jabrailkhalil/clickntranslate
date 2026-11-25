@@ -1,0 +1,31 @@
+name: Android checks
+on:
+  push:
+    branches: [android, 'codex/android-rewrite']
+  pull_request:
+    branches: [android]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+      - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'ndk;28.2.13676358' 'cmake;3.22.1'
+      - run: python3 tools/check_android_tree.py --allow-project-reuse
+      - run: bash gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug --console plain -ParchiveCpuDebug=true -ParchiveNdkVersion=28.2.13676358
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-restoration-debug-checks
+          path: |
+            app/build/reports/
+            app/build/outputs/apk/

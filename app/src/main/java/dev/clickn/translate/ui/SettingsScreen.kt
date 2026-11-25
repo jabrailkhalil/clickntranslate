@@ -39,6 +39,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.border
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
@@ -156,6 +157,7 @@ import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.dp
@@ -405,6 +407,8 @@ fun SettingsScreen(
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val modelDownloadWorkInfos by viewModel.modelDownloadWorkInfos.collectAsState(initial = emptyList())
+    val tesseractModelState by viewModel.tesseractModelState.collectAsState()
+    LaunchedEffect(Unit) { viewModel.refreshTesseractModels() }
     val unfinishedModelDownloads = modelDownloadWorkInfos.filterNot { it.state.isFinished }
     val activeModelDownloads = unfinishedModelDownloads
         .sortedByDescending { it.state == WorkInfo.State.RUNNING }
@@ -442,6 +446,11 @@ fun SettingsScreen(
     val activeModelDownloadBySpec = activeModelDownloads
         .flatMap { item -> item.specs.ifEmpty { listOfNotNull(item.spec) }.map { it to item } }
         .toMap()
+    val tesseractQueued = activeModelDownloadBySpec[ModelDownloadSpec.tesseractArabic()]
+    val tesseractUiState = tesseractModelState.copy(busy = tesseractModelState.busy || tesseractQueued != null,
+        progress = tesseractModelState.progress ?: tesseractQueued?.takeIf { it.total > 0 }?.let {
+            (it.downloaded.toDouble() / it.total).toFloat().coerceIn(0f, 1f)
+        })
     val backgroundModelDownloadOwnerPresetId = activeModelDownloads
         .mapNotNull { it.ownerPresetId }
         .distinct()
@@ -810,6 +819,8 @@ fun SettingsScreen(
     var presetPaddleModelReady by remember { mutableStateOf<Map<PaddleModelVersion, Boolean>>(emptyMap()) }
     var presetMangaOcrModelReady by remember { mutableStateOf(false) }
     var presetOrientationModelReady by remember { mutableStateOf(false) }
+    var presetMlKitDownloadedLanguages by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var presetMlKitInventoryRevision by remember { mutableIntStateOf(0) }
     var downloadingPresetId by remember { mutableStateOf<String?>(null) }
     // 明文 HTTP 白名单：用户每行一个 host，UI 上用 String，保存时 split("\n")
     var cleartextHostsText by remember { mutableStateOf("") }
@@ -823,11 +834,12 @@ fun SettingsScreen(
         mutableStateOf(DEFAULT_ML_KIT_RECENT_SOURCE_LANGUAGES)
     }
 
-    // dirty 检测：load 时 capture 一份初始 Settings，之后跟 buildSnapshot() 比 equals。
-    // 旧版手写两份 List<Any?>，每加 Settings 字段都要在两个 list 同步加，反复犯"忘改一边"的 bug。
-    // 现在用 data class equals 自动覆盖所有字段——加字段只改 buildSnapshot() 一处。
+    // Persisted values seed metadata; the form round-trip baseline identifies user edits.
+    // The baseline stays separate from unsaved state retained across a locale change.
     var selectedCategory by rememberSaveable { mutableStateOf(initialSection?.takeIf { key -> advancedCategories.any { it.key == key } }) }
     var initialSettings by remember { mutableStateOf<Settings?>(null) }
+    var formBaseline by remember { mutableStateOf<Settings?>(null) }
+    var savingEditor by remember { mutableStateOf(false) }
     fun autoSaveFloatingButtonSettings() {
         if (initialSettings == null) return
         val save = viewModel.saveFloatingButtonSettings(
@@ -844,6 +856,7 @@ fun SettingsScreen(
                 val saved = save.await()
                 // Update only the saved fields in the dirty-check baseline, not other drafts.
                 initialSettings = initialSettings?.let(saved::applyTo)
+                formBaseline = formBaseline?.let(saved::applyTo)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
@@ -899,6 +912,7 @@ fun SettingsScreen(
         presetOrientationModelReady = state.ready
     }
     suspend fun refreshPresetModelReadiness(customPresets: List<TranslationPreset> = translationPresets) {
+        val inventoryRevision = presetMlKitInventoryRevision
         val presets = TranslationPresetCatalog.all(customPresets)
         val llmKinds = presets.mapNotNull { localLlmModelKindFor(it.translatorEngine) }.toSet()
         val paddleVersions = presets
@@ -927,6 +941,11 @@ fun SettingsScreen(
         presetPaddleModelReady = nextPaddleReady
         presetMangaOcrModelReady = nextMangaReady
         presetOrientationModelReady = nextOrientationReady
+        viewModel.refreshTesseractModels()
+        val installedMlKitLanguages = try { viewModel.getDownloadedMlKitLanguageModels() }
+        catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: Exception) { emptySet() }
+        if (inventoryRevision == presetMlKitInventoryRevision) presetMlKitDownloadedLanguages = installedMlKitLanguages
     }
     fun effectiveTranslatorEngine(): TranslatorEngine =
         if (isLocalLlmEngine(translatorEngine) && !localLlmDeviceCapable) {
@@ -1006,6 +1025,8 @@ fun SettingsScreen(
             translatorEngine != TranslatorEngine.GOOGLE_ML_KIT
         ) return
         mlKitModelDeleteRunning = true
+        presetMlKitInventoryRevision++
+        presetMlKitDownloadedLanguages = emptySet()
         mlKitMissingModelsPrompt = null
         mlKitModelPromptDismissedPair = confirmedPair
         mlKitDownload.reset()
@@ -1026,6 +1047,8 @@ fun SettingsScreen(
                 mlKitModelsReady = null
                 mlKitModelDeleteRunning = false
                 mlKitModelRefreshVersion++
+                presetMlKitInventoryRevision++
+                presetMlKitDownloadedLanguages = emptySet()
             }
         }
     }
@@ -1050,6 +1073,437 @@ fun SettingsScreen(
         scope.launch {
             modelNetworkTestResults = viewModel.testModelDownloadNetwork()
             modelNetworkTestRunning = false
+        }
+    }
+
+    // 从完整持久化快照起步，再覆盖本页尚未保存的草稿值。不能从 Settings() 默认值起步，否则
+    // 导出会把预设、固定语言、悬浮窗状态和本地 LLM 参数等非当前表单字段静默重置。
+    // 类型转换跟 doSave 保持一致（textSize.toInt() / loopInterval.toLongOrNull() 等）。
+    fun buildSnapshot(): Settings = (initialSettings ?: Settings()).copy(
+        translationPresets = translationPresets,
+        activeTranslationPresetId = activeTranslationPresetId,
+        pinnedLanguages = pinnedLanguages,
+        overlayFontFileName = overlayFontFileName,
+        overlayFontDisplayName = overlayFontDisplayName,
+        floatingWindowContentMode = floatingWindowContentMode,
+        floatingWindowLocked = floatingWindowLocked,
+        customBorderStyle = customBorderStyle,
+        captureRegionBorderEnabled = captureRegionBorderEnabled,
+        captureRegionBorderColor = captureRegionBorderColor,
+        captureRegionBorderWidthDp = captureRegionBorderWidth.toInt(),
+        captureRegionBorderStyle = captureRegionBorderStyle,
+        captureRegionAdjustmentEnabled = captureRegionAdjustmentEnabled,
+        floatingMenuItemOrder = menuOrder,
+        arcMenuPageSize = arcMenuPageSize.toInt(),
+        floatingButtonSkill = currentSkill,
+        inputTranslationDoubleAction = inputTranslationDoubleAction,
+        wordSelectPreciseAdjust = wordSelectPreciseAdjust,
+        wordSelectCardMode = wordSelectCardMode,
+        wordSelectRememberRegion = wordSelectRememberRegion,
+        floatingWindowAutoHideWhenObstructing = floatingWindowAutoHideWhenObstructing,
+        dictionaryPrompt = dictionaryPrompt,
+        paddleModelVersion = paddleModelVersion,
+        paddleDetectionProfile = paddleDetectionProfile,
+        localLlmMirror = llmMirrorChoice,
+        localLlmMirrorUrl = llmMirror,
+        textOrientationAutoDetect = textOrientAutoDetect,
+        captureContentOrientation = captureContentOrientation,
+        manualTextOrientation = manualTextOrient,
+        translationOutputFollowRecognition = translationOutputFollowRecognition,
+        translationOutputLayout = translationOutputLayout,
+        translationOutputDirection = translationOutputDirection,
+        translationGlossaryEnabled = translationGlossaryEnabled,
+        foregroundAppDetectionMode = foregroundAppDetectionMode,
+        sendAppNameToTranslator = sendAppNameToTranslator,
+        dbnetProbThresh = dbnetProb,
+        dbnetBoxScoreThresh = dbnetScore,
+        dbnetUnclipRatio = dbnetUnclip,
+        mangaOcrDbnetUnclipRatio = mangaOcrDbnetUnclip,
+        captureRegionHideOnCapture = captureRegionHideOnCapture,
+        wordSelectExtractOnly = wordSelectExtractOnly,
+        baseUrl = baseUrl,
+        apiKey = apiKey,
+        model = model,
+        anthropicBaseUrl = anthropicBaseUrl,
+        anthropicApiKey = anthropicApiKey,
+        anthropicModel = anthropicModel,
+        sourceLang = sourceLang,
+        targetLang = targetLang,
+        promptTemplate = prompt,
+        openAiRequestOptions = openAiRequestOptions.normalized(),
+        ocrEngine = ocrEngine,
+        autoOcr = autoOcr,
+        captureLoopIntervalMs = loopInterval.toLongOrNull() ?: 2000L,
+        loopTriggerMode = loopTriggerMode,
+        loopTextStableDurationMs = loopTextStableDurationMs,
+        loopSkipSimilarFrames = loopSkipSimilarFrames,
+        loopFrameSimilarityThreshold = loopFrameSimilarityThreshold,
+        loopTextRegionMode = loopTextRegionMode,
+        loopTranslateRegionOnly = loopTranslateRegionOnly,
+        developerOptionsEnabled = developerOptionsEnabled,
+        performanceOverlayEnabled = performanceOverlayEnabled,
+        ocrScreenshotSavingEnabled = ocrScreenshotSavingEnabled,
+        disableTranslationCache = disableTranslationCache,
+        batchCumulativeCompletionTimeEnabled = batchCumulativeCompletionTimeEnabled,
+        shareEntireScreen = shareEntireScreen,
+        ocrRedBoxModeEnabled = ocrRedBoxModeEnabled,
+        ocrRedBoxShowSourceText = ocrRedBoxShowSourceText,
+        ocrRedBoxShowTranslation = ocrRedBoxShowTranslation,
+        overlayTextSizeSp = textSize.toInt(),
+        overlayTextStyle = overlayTextStyle.normalized(),
+        overlayAlpha = alpha,
+        overlayFonts = overlayFontEntries,
+        streamingTranslate = streaming,
+        retryFailedTranslation = retryFailedTranslation,
+        ttsEnabled = ttsEnabled,
+        ttsProvider = ttsProvider,
+        ttsVoice = ttsVoice,
+        ttsEmotion = ttsEmotion,
+        ttsSpeed = ttsSpeed,
+        ttsPitch = ttsPitch,
+        ttsGainDb = ttsGainDb,
+        ttsHttpBaseUrl = ttsHttpBaseUrl,
+        ttsHttpBearerToken = ttsHttpBearerToken,
+        ttsHttpResponseMode = ttsHttpResponseMode,
+        ttsVolcengineResource = ttsVolcengineResource,
+        ttsVolcengineBaseUrl = ttsVolcengineBaseUrl,
+        ttsVolcengineApiKey = ttsVolcengineApiKey,
+        ttsVolcengineSpeaker = ttsVolcengineSpeaker,
+        ttsVolcengineModel = ttsVolcengineModel,
+        ttsVolcengineContext = ttsVolcengineContext,
+        ttsVolcenginePitch = ttsVolcenginePitch,
+        ttsVolcengineToneFidelity = ttsVolcengineToneFidelity,
+        ttsMiniMaxModel = ttsMiniMaxModel,
+        ttsMiniMaxBaseUrl = ttsMiniMaxBaseUrl,
+        ttsMiniMaxApiKey = ttsMiniMaxApiKey,
+        ttsMiniMaxVoice = ttsMiniMaxVoice,
+        ttsMiniMaxEmotion = ttsMiniMaxEmotion,
+        ttsMiniMaxSpeed = ttsMiniMaxSpeed,
+        ttsMiniMaxPitch = ttsMiniMaxPitch,
+        ttsMimoModel = ttsMimoModel,
+        ttsMimoBaseUrl = ttsMimoBaseUrl,
+        ttsMimoApiKey = ttsMimoApiKey,
+        ttsMimoVoice = ttsMimoVoice,
+        ttsMimoInstruction = ttsMimoInstruction,
+        ttsMimoVoiceDesignPrompt = ttsMimoVoiceDesignPrompt,
+        ttsMimoVoiceCloneInstruction = ttsMimoVoiceCloneInstruction,
+        ttsMimoVoiceSampleUri = ttsMimoVoiceSampleUri,
+        renderMode = renderMode,
+        translationBlockInteractionMode = translationBlockInteractionMode,
+        overlayPlacement = placement,
+        overlayStyleMode = overlayStyleMode,
+        overlayTheme = overlayTheme,
+        customBgColor = customBg,
+        customFgColor = customFg,
+        customBorderColor = customBorder,
+        customBorderWidth = customBorderW.toInt(),
+        overlayOffsetX = offsetX.toInt(),
+        overlayOffsetY = offsetY.toInt(),
+        preprocess = PreprocessOptions(preUpscale, preInvert, preBinarize),
+        baiduOcrApiKey = baiduKey,
+        baiduOcrSecretKey = baiduSecret,
+        baiduOcrEndpoint = baiduEndpoint,
+        baiduOcrLanguage = baiduLanguage,
+        umiOcrBaseUrl = umiOcrBaseUrl,
+        lunaOcrBaseUrl = lunaOcrBaseUrl,
+        paddleAiStudioToken = paddleAiStudioToken,
+        tencentSecretId = tencentId,
+        tencentSecretKey = tencentKey,
+        tencentRegion = tencentRegion,
+        tencentOcrEndpoint = tencentEndpoint,
+        tencentOcrLanguage = tencentLanguage,
+        a11yVolumeTrigger = a11yVolume,
+        translatorEngine = effectiveTranslatorEngine(),
+        deeplApiKey = deeplKey,
+        deeplPro = deeplPro,
+        deeplProtocol = deeplProtocol,
+        deeplBaseUrl = deeplBaseUrl,
+        deeplBearerAuth = deeplBearerAuth,
+        deeplCustomToken = deeplCustomToken,
+        niuTransMode = niuTransMode,
+        niuTransApiKey = niuTransApiKey,
+        niuTransAppId = niuTransAppId,
+        niuTransTermLibraryId = niuTransTermLibraryId,
+        niuTransMemoryLibraryId = niuTransMemoryLibraryId,
+        youdaoAppKey = youdaoAppKey,
+        youdaoAppSecret = youdaoAppSecret,
+        volcAccessKeyId = volcAk,
+        volcSecretAccessKey = volcSk,
+        volcRegion = volcRegion,
+        baiduFanyiAppId = baiduFanyiAppId,
+        baiduFanyiSecretKey = baiduFanyiSecret,
+        floatingButtonSizeDp = floatingSize.toInt(),
+        floatingButtonAlpha = floatingAlpha,
+        floatingButtonSnapToEdge = floatingSnapEdge,
+        floatingButtonAutoDock = floatingAutoDock,
+        floatingButtonDockInsetDp = floatingDockInset.toInt(),
+        overlayAllowWrap = allowWrap,
+        overlayAvoidCollision = avoidCollision,
+        apiTimeoutSeconds = apiTimeoutSec.toInt(),
+        mergeAdjacentBlocks = mergeAdjacent,
+        mergeStrength = mergeStrength,
+        translationContextMode = translationContextMode,
+        cleartextAllowedHosts = cleartextHostsWithLocalOcrUrls(
+            parseCleartextHosts(cleartextHostsText),
+            umiOcrBaseUrl,
+            lunaOcrBaseUrl,
+            ttsHttpBaseUrl
+        )
+    )
+
+    fun buildTranslationPresetSnapshot(): Settings = buildSnapshot().copy(
+        customBorderStyle = customBorderStyle,
+        overlayFontFileName = overlayFontFileName,
+        overlayFontDisplayName = overlayFontDisplayName,
+        dictionaryPrompt = dictionaryPrompt,
+        paddleModelVersion = paddleModelVersion,
+        paddleDetectionProfile = paddleDetectionProfile,
+        textOrientationAutoDetect = textOrientAutoDetect,
+        captureContentOrientation = captureContentOrientation,
+        manualTextOrientation = manualTextOrient,
+        translationOutputFollowRecognition = translationOutputFollowRecognition,
+        translationOutputLayout = translationOutputLayout,
+        translationOutputDirection = translationOutputDirection,
+        translationGlossaryEnabled = translationGlossaryEnabled,
+        sendAppNameToTranslator = sendAppNameToTranslator,
+        dbnetProbThresh = dbnetProb,
+        dbnetBoxScoreThresh = dbnetScore,
+        dbnetUnclipRatio = dbnetUnclip,
+        mangaOcrDbnetUnclipRatio = mangaOcrDbnetUnclip,
+        bubbleClusterGap = MangaOcrAdvancedSettingsPolicy.BUBBLE_CLUSTER_GAP,
+        mangaOcrCropPaddingPx = MangaOcrAdvancedSettingsPolicy.CROP_PADDING_PX
+    )
+
+    fun buildSettingsTransferSnapshot(): Settings = buildTranslationPresetSnapshot().copy(
+        foregroundAppDetectionMode = foregroundAppDetectionMode,
+    )
+
+    fun currentTranslationPresetHash(): String =
+        TranslationPresetCatalog.hashForSettings(buildTranslationPresetSnapshot())
+
+    fun currentMatchingTranslationPresetId(settingsHash: String = currentTranslationPresetHash()): String {
+        val presets = TranslationPresetCatalog.all(translationPresets)
+        val credentialSnapshot = dev.clickn.translate.data.PresetCredentialPolicy.capture("", buildTranslationPresetSnapshot())
+        if (credentialMatchSnapshot != credentialSnapshot) return ""
+        val activeMatch = presets.firstOrNull {
+            it.id == activeTranslationPresetId && it.id in credentialMatchedPresetIds &&
+                TranslationPresetCatalog.matchesHash(it, settingsHash)
+        }
+        return activeMatch?.id
+            ?: presets.firstOrNull { it.id in credentialMatchedPresetIds && TranslationPresetCatalog.matchesHash(it, settingsHash) }?.id
+            ?: ""
+    }
+
+    fun applySnapshotToForm(s: Settings) {
+        // suspend 操作必须在 Snapshot 块外做完
+        val migratedPrompt = s.promptTemplate
+        val paddleStatusPlaceholder = context.getString(R.string.settings_paddle_status_checking)
+        val mangaOcrStatusPlaceholder = context.getString(R.string.settings_manga_ocr_status_checking)
+        val orientationModelStatusPlaceholder = context.getString(R.string.settings_orientation_model_status_checking)
+        timber.log.Timber.tag("OcrLangLink").i(
+            "[load] sourceLang=%s ocrEngine=%s baiduEp=%s baiduLang=%s tencentEp=%s tencentLang=%s",
+            s.sourceLang, s.ocrEngine, s.baiduOcrEndpoint, s.baiduOcrLanguage,
+            s.tencentOcrEndpoint, s.tencentOcrLanguage
+        )
+        baseUrl = s.baseUrl
+        apiKey = s.apiKey
+        model = s.model
+        anthropicBaseUrl = s.anthropicBaseUrl
+        anthropicApiKey = s.anthropicApiKey
+        anthropicModel = s.anthropicModel
+        prompt = migratedPrompt
+        openAiRequestOptions = s.openAiRequestOptions
+        targetLang = s.targetLang
+        sourceLang = s.sourceLang
+        translatorEngine = if (isLocalLlmEngine(s.translatorEngine) && !localLlmDeviceCapable) {
+            TranslatorEngine.OPENAI
+        } else {
+            s.translatorEngine
+        }
+        deeplKey = s.deeplApiKey
+        youdaoAppKey = s.youdaoAppKey
+        volcAk = s.volcAccessKeyId
+        volcSk = s.volcSecretAccessKey
+        volcRegion = s.volcRegion
+        baiduFanyiAppId = s.baiduFanyiAppId
+        baiduFanyiSecret = s.baiduFanyiSecretKey
+        youdaoAppSecret = s.youdaoAppSecret
+        deeplPro = s.deeplPro
+        deeplProtocol = s.deeplProtocol
+        deeplBaseUrl = s.deeplBaseUrl
+        deeplBearerAuth = s.deeplBearerAuth
+        deeplCustomToken = s.deeplCustomToken
+        niuTransMode = s.niuTransMode
+        niuTransApiKey = s.niuTransApiKey
+        niuTransAppId = s.niuTransAppId
+        niuTransTermLibraryId = s.niuTransTermLibraryId
+        niuTransMemoryLibraryId = s.niuTransMemoryLibraryId
+        textSize = s.overlayTextSizeSp.toFloat()
+        overlayTextStyle = s.overlayTextStyle.normalized()
+        alpha = s.overlayAlpha
+        overlayFontFileName = s.overlayFontFileName
+        overlayFontDisplayName = s.overlayFontDisplayName
+        overlayFontEntries = OverlayFontPolicy.upsertImportedFont(
+            s.overlayFonts,
+            s.overlayFontFileName,
+            s.overlayFontDisplayName
+        )
+        loopInterval = s.captureLoopIntervalMs.toString()
+        loopTriggerMode = s.loopTriggerMode
+        loopTextStableDurationMs = s.loopTextStableDurationMs
+        loopSkipSimilarFrames = s.loopSkipSimilarFrames
+        loopFrameSimilarityThreshold = s.loopFrameSimilarityThreshold
+        developerOptionsEnabled = s.developerOptionsEnabled
+        performanceOverlayEnabled = s.performanceOverlayEnabled
+        ocrScreenshotSavingEnabled = s.ocrScreenshotSavingEnabled
+        disableTranslationCache = s.disableTranslationCache
+        batchCumulativeCompletionTimeEnabled = s.batchCumulativeCompletionTimeEnabled
+        shareEntireScreen = s.shareEntireScreen
+        ocrRedBoxModeEnabled = s.ocrRedBoxModeEnabled
+        ocrRedBoxShowSourceText = s.ocrRedBoxShowSourceText
+        ocrRedBoxShowTranslation = s.ocrRedBoxShowTranslation
+        streaming = s.streamingTranslate
+        retryFailedTranslation = s.retryFailedTranslation
+        ttsEnabled = s.ttsEnabled
+        ttsProvider = s.ttsProvider
+        ttsVoice = s.ttsVoice
+        ttsEmotion = s.ttsEmotion
+        ttsSpeed = s.ttsSpeed
+        ttsPitch = s.ttsPitch
+        ttsGainDb = s.ttsGainDb
+        ttsHttpBaseUrl = s.ttsHttpBaseUrl
+        ttsHttpBearerToken = s.ttsHttpBearerToken
+        ttsHttpResponseMode = s.ttsHttpResponseMode
+        ttsVolcengineResource = s.ttsVolcengineResource
+        ttsVolcengineBaseUrl = s.ttsVolcengineBaseUrl
+        ttsVolcengineApiKey = s.ttsVolcengineApiKey
+        ttsVolcengineSpeaker = s.ttsVolcengineSpeaker
+        ttsVolcengineModel = s.ttsVolcengineModel
+        ttsVolcengineContext = s.ttsVolcengineContext
+        ttsVolcenginePitch = s.ttsVolcenginePitch
+        ttsVolcengineToneFidelity = s.ttsVolcengineToneFidelity
+        ttsMiniMaxModel = s.ttsMiniMaxModel
+        ttsMiniMaxBaseUrl = s.ttsMiniMaxBaseUrl
+        ttsMiniMaxApiKey = s.ttsMiniMaxApiKey
+        ttsMiniMaxVoice = s.ttsMiniMaxVoice
+        ttsMiniMaxEmotion = s.ttsMiniMaxEmotion
+        ttsMiniMaxSpeed = s.ttsMiniMaxSpeed
+        ttsMiniMaxPitch = s.ttsMiniMaxPitch
+        ttsMimoModel = s.ttsMimoModel
+        ttsMimoBaseUrl = s.ttsMimoBaseUrl
+        ttsMimoApiKey = s.ttsMimoApiKey
+        ttsMimoVoice = s.ttsMimoVoice
+        ttsMimoInstruction = s.ttsMimoInstruction
+        ttsMimoVoiceDesignPrompt = s.ttsMimoVoiceDesignPrompt
+        ttsMimoVoiceCloneInstruction = s.ttsMimoVoiceCloneInstruction
+        ttsMimoVoiceSampleUri = s.ttsMimoVoiceSampleUri.ifBlank {
+            MIMO_BUILTIN_VOICE_REFERENCE_1
+        }
+        renderMode = s.renderMode
+        translationBlockInteractionMode = s.translationBlockInteractionMode
+        floatingWindowContentMode = s.floatingWindowContentMode
+        floatingWindowLocked = s.floatingWindowLocked
+        customBorderStyle = s.customBorderStyle
+        placement = s.overlayPlacement
+        overlayStyleMode = s.overlayStyleMode
+        overlayTheme = s.overlayTheme
+        customBg = s.customBgColor
+        customFg = s.customFgColor
+        customBorder = s.customBorderColor
+        customBorderW = s.customBorderWidth.toFloat()
+        captureRegionBorderEnabled = s.captureRegionBorderEnabled
+        captureRegionHideOnCapture = s.captureRegionHideOnCapture
+        captureRegionBorderColor = s.captureRegionBorderColor
+        captureRegionBorderWidth = s.captureRegionBorderWidthDp.toFloat()
+        captureRegionBorderStyle = s.captureRegionBorderStyle
+        captureRegionAdjustmentEnabled = s.captureRegionAdjustmentEnabled
+        offsetX = s.overlayOffsetX.toFloat()
+        offsetY = s.overlayOffsetY.toFloat()
+        ocrEngine = s.ocrEngine
+        autoOcr = s.autoOcr
+        baiduKey = s.baiduOcrApiKey
+        baiduSecret = s.baiduOcrSecretKey
+        baiduEndpoint = s.baiduOcrEndpoint
+        baiduLanguage = s.baiduOcrLanguage
+        umiOcrBaseUrl = s.umiOcrBaseUrl
+        lunaOcrBaseUrl = s.lunaOcrBaseUrl
+        paddleAiStudioToken = s.paddleAiStudioToken
+        tencentId = s.tencentSecretId
+        tencentKey = s.tencentSecretKey
+        tencentRegion = s.tencentRegion
+        tencentEndpoint = s.tencentOcrEndpoint
+        tencentLanguage = s.tencentOcrLanguage
+        paddleModelVersion = s.paddleModelVersion
+        llmMirrorChoice = s.localLlmMirror
+        llmMirror = s.localLlmMirrorUrl
+        // 不阻塞主线程：file.exists() + file.length() 走 IO Dispatcher。先给占位
+        // 文字，IO 完成后再覆盖；进设置的瞬间不卡顿。
+        paddleStatus = checkingPlaceholderIfUnresolved(paddleStatus, paddleStatusPlaceholder)
+        mangaOcrStatus = checkingPlaceholderIfUnresolved(mangaOcrStatus, mangaOcrStatusPlaceholder)
+        orientationModelStatus =
+            checkingPlaceholderIfUnresolved(orientationModelStatus, orientationModelStatusPlaceholder)
+        preUpscale = s.preprocess.upscale2x
+        preInvert = s.preprocess.invert
+        preBinarize = s.preprocess.binarize
+        a11yVolume = s.a11yVolumeTrigger
+        floatingSize = s.floatingButtonSizeDp.toFloat()
+        floatingAlpha = normalizedFloatingButtonAlpha(s.floatingButtonAlpha)
+        floatingSnapEdge = s.floatingButtonSnapToEdge
+        floatingAutoDock = s.floatingButtonAutoDock
+        floatingDockInset = s.floatingButtonDockInsetDp.toFloat()
+        menuOrder = s.floatingMenuItemOrder
+        arcMenuPageSize = s.arcMenuPageSize.toFloat()
+        currentSkill = s.floatingButtonSkill
+        inputTranslationDoubleAction = s.inputTranslationDoubleAction
+        wordSelectPreciseAdjust = s.wordSelectPreciseAdjust
+        wordSelectCardMode = s.wordSelectCardMode
+        wordSelectExtractOnly = s.wordSelectExtractOnly
+        wordSelectRememberRegion = s.wordSelectRememberRegion
+        floatingWindowAutoHideWhenObstructing = s.floatingWindowAutoHideWhenObstructing
+        dictionaryPrompt = s.dictionaryPrompt
+        translationPresets = s.translationPresets
+        activeTranslationPresetId = s.activeTranslationPresetId
+        pinnedLanguages = s.pinnedLanguages
+        mlKitRecentSources = mlKitRecentSourceLanguages(s.mlKitRecentSourceLanguages)
+        allowWrap = s.overlayAllowWrap
+        avoidCollision = s.overlayAvoidCollision
+        apiTimeoutSec = s.apiTimeoutSeconds.toFloat()
+        mergeAdjacent = s.mergeAdjacentBlocks
+        mergeStrength = s.mergeStrength
+        translationContextMode = s.translationContextMode
+        textOrientAutoDetect = s.textOrientationAutoDetect
+        captureContentOrientation = s.captureContentOrientation
+        dbnetProb = s.dbnetProbThresh
+        dbnetScore = s.dbnetBoxScoreThresh
+        dbnetUnclip = s.dbnetUnclipRatio
+        mangaOcrDbnetUnclip = s.mangaOcrDbnetUnclipRatio
+        paddleDetectionProfile = s.paddleDetectionProfile
+        manualTextOrient = s.manualTextOrientation
+        resolveTranslationOutputSettings(
+            s.translationOutputFollowRecognition,
+            s.translationOutputLayout,
+            s.translationOutputDirection,
+        ).let { output ->
+            translationOutputFollowRecognition = output.followRecognition
+            translationOutputLayout = output.layout
+            translationOutputDirection = output.direction
+        }
+        translationGlossaryEnabled = s.translationGlossaryEnabled
+        foregroundAppDetectionMode = s.foregroundAppDetectionMode
+        sendAppNameToTranslator = s.sendAppNameToTranslator
+        cleartextHostsText = s.cleartextAllowedHosts.joinToString("\n")
+    }
+
+    fun applyEditingSnapshot(editing: SettingsEditingSnapshot) {
+        val persisted = editing.persisted
+        val s = editing.draft
+        androidx.compose.runtime.snapshots.Snapshot.withMutableSnapshot {
+            initialSettings = persisted
+            applySnapshotToForm(persisted)
+            // Compare against the form's actual round-trip, not display normalization
+            // such as the built-in sample URI or a constrained numeric control.
+            formBaseline = editing.formBaseline ?: buildSnapshot()
+            if (s != persisted) applySnapshotToForm(s)
         }
     }
 
@@ -1251,6 +1705,15 @@ fun SettingsScreen(
         }
     }
 
+    fun applyCommittedPresetSettings(latest: Settings) {
+        val baseline = formBaseline ?: initialSettings ?: latest
+        applyPresetSettingsToUi(latest)
+        activeTranslationPresetId = latest.activeTranslationPresetId
+        val draft = buildSnapshot()
+        val rebased = dev.clickn.translate.data.SettingsEditorChanges.between(baseline, draft).applyTo(latest)
+        applyEditingSnapshot(SettingsEditingSnapshot(latest, rebased))
+    }
+
     val presetExportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument(SettingsBundleTransfer.MIME_TYPE)
     ) { uri ->
@@ -1336,7 +1799,9 @@ fun SettingsScreen(
                             importPreview.glossaryTerms.size,
                             importPreview.skippedSettingFields.size,
                             importPreview.protectedLocalFieldCount,
-                        )
+                        ) + if (importPreview.uiPreferences != null) {
+                            "\n\n" + stringResource(R.string.settings_bundle_ui_preferences_notice)
+                        } else ""
                     }
                 )
             },
@@ -1348,10 +1813,7 @@ fun SettingsScreen(
                     scope.launch {
                         runCatching { viewModel.importSettingsBundle(importUri!!) }
                             .onSuccess { result ->
-                                androidx.compose.runtime.snapshots.Snapshot.withMutableSnapshot {
-                                    applyPresetSettingsToUi(result.settings)
-                                    initialSettings = result.settings
-                                }
+                                applyCommittedPresetSettings(result.settings)
                                 refreshPresetModelReadiness(result.settings.translationPresets)
                                 presetMessage = context.getString(
                                     R.string.settings_bundle_imported_format,
@@ -1408,185 +1870,6 @@ fun SettingsScreen(
     val searchFocusRequester = remember { FocusRequester() }
     val searchTargetRegistry = remember { SettingsSearchTargetRegistry() }
 
-    // 从完整持久化快照起步，再覆盖本页尚未保存的草稿值。不能从 Settings() 默认值起步，否则
-    // 导出会把预设、固定语言、悬浮窗状态和本地 LLM 参数等非当前表单字段静默重置。
-    // 类型转换跟 doSave 保持一致（textSize.toInt() / loopInterval.toLongOrNull() 等）。
-    fun buildSnapshot(): Settings = (initialSettings ?: Settings()).copy(
-        captureRegionHideOnCapture = captureRegionHideOnCapture,
-        wordSelectExtractOnly = wordSelectExtractOnly,
-        baseUrl = baseUrl,
-        apiKey = apiKey,
-        model = model,
-        anthropicBaseUrl = anthropicBaseUrl,
-        anthropicApiKey = anthropicApiKey,
-        anthropicModel = anthropicModel,
-        sourceLang = sourceLang,
-        targetLang = targetLang,
-        promptTemplate = prompt,
-        openAiRequestOptions = openAiRequestOptions.normalized(),
-        ocrEngine = ocrEngine,
-        autoOcr = autoOcr,
-        captureLoopIntervalMs = loopInterval.toLongOrNull() ?: 2000L,
-        loopTriggerMode = loopTriggerMode,
-        loopTextStableDurationMs = loopTextStableDurationMs,
-        loopSkipSimilarFrames = loopSkipSimilarFrames,
-        loopFrameSimilarityThreshold = loopFrameSimilarityThreshold,
-        loopTextRegionMode = loopTextRegionMode,
-        loopTranslateRegionOnly = loopTranslateRegionOnly,
-        developerOptionsEnabled = developerOptionsEnabled,
-        performanceOverlayEnabled = performanceOverlayEnabled,
-        ocrScreenshotSavingEnabled = ocrScreenshotSavingEnabled,
-        disableTranslationCache = disableTranslationCache,
-        batchCumulativeCompletionTimeEnabled = batchCumulativeCompletionTimeEnabled,
-        shareEntireScreen = shareEntireScreen,
-        ocrRedBoxModeEnabled = ocrRedBoxModeEnabled,
-        ocrRedBoxShowSourceText = ocrRedBoxShowSourceText,
-        ocrRedBoxShowTranslation = ocrRedBoxShowTranslation,
-        overlayTextSizeSp = textSize.toInt(),
-        overlayTextStyle = overlayTextStyle.normalized(),
-        overlayAlpha = alpha,
-        overlayFonts = overlayFontEntries,
-        streamingTranslate = streaming,
-        retryFailedTranslation = retryFailedTranslation,
-        ttsEnabled = ttsEnabled,
-        ttsProvider = ttsProvider,
-        ttsVoice = ttsVoice,
-        ttsEmotion = ttsEmotion,
-        ttsSpeed = ttsSpeed,
-        ttsPitch = ttsPitch,
-        ttsGainDb = ttsGainDb,
-        ttsHttpBaseUrl = ttsHttpBaseUrl,
-        ttsHttpBearerToken = ttsHttpBearerToken,
-        ttsHttpResponseMode = ttsHttpResponseMode,
-        ttsVolcengineResource = ttsVolcengineResource,
-        ttsVolcengineBaseUrl = ttsVolcengineBaseUrl,
-        ttsVolcengineApiKey = ttsVolcengineApiKey,
-        ttsVolcengineSpeaker = ttsVolcengineSpeaker,
-        ttsVolcengineModel = ttsVolcengineModel,
-        ttsVolcengineContext = ttsVolcengineContext,
-        ttsVolcenginePitch = ttsVolcenginePitch,
-        ttsVolcengineToneFidelity = ttsVolcengineToneFidelity,
-        ttsMiniMaxModel = ttsMiniMaxModel,
-        ttsMiniMaxBaseUrl = ttsMiniMaxBaseUrl,
-        ttsMiniMaxApiKey = ttsMiniMaxApiKey,
-        ttsMiniMaxVoice = ttsMiniMaxVoice,
-        ttsMiniMaxEmotion = ttsMiniMaxEmotion,
-        ttsMiniMaxSpeed = ttsMiniMaxSpeed,
-        ttsMiniMaxPitch = ttsMiniMaxPitch,
-        ttsMimoModel = ttsMimoModel,
-        ttsMimoBaseUrl = ttsMimoBaseUrl,
-        ttsMimoApiKey = ttsMimoApiKey,
-        ttsMimoVoice = ttsMimoVoice,
-        ttsMimoInstruction = ttsMimoInstruction,
-        ttsMimoVoiceDesignPrompt = ttsMimoVoiceDesignPrompt,
-        ttsMimoVoiceCloneInstruction = ttsMimoVoiceCloneInstruction,
-        ttsMimoVoiceSampleUri = ttsMimoVoiceSampleUri,
-        renderMode = renderMode,
-        translationBlockInteractionMode = translationBlockInteractionMode,
-        overlayPlacement = placement,
-        overlayStyleMode = overlayStyleMode,
-        overlayTheme = overlayTheme,
-        customBgColor = customBg,
-        customFgColor = customFg,
-        customBorderColor = customBorder,
-        customBorderWidth = customBorderW.toInt(),
-        overlayOffsetX = offsetX.toInt(),
-        overlayOffsetY = offsetY.toInt(),
-        preprocess = PreprocessOptions(preUpscale, preInvert, preBinarize),
-        baiduOcrApiKey = baiduKey,
-        baiduOcrSecretKey = baiduSecret,
-        baiduOcrEndpoint = baiduEndpoint,
-        baiduOcrLanguage = baiduLanguage,
-        umiOcrBaseUrl = umiOcrBaseUrl,
-        lunaOcrBaseUrl = lunaOcrBaseUrl,
-        paddleAiStudioToken = paddleAiStudioToken,
-        tencentSecretId = tencentId,
-        tencentSecretKey = tencentKey,
-        tencentRegion = tencentRegion,
-        tencentOcrEndpoint = tencentEndpoint,
-        tencentOcrLanguage = tencentLanguage,
-        a11yVolumeTrigger = a11yVolume,
-        translatorEngine = effectiveTranslatorEngine(),
-        deeplApiKey = deeplKey,
-        deeplPro = deeplPro,
-        deeplProtocol = deeplProtocol,
-        deeplBaseUrl = deeplBaseUrl,
-        deeplBearerAuth = deeplBearerAuth,
-        deeplCustomToken = deeplCustomToken,
-        niuTransMode = niuTransMode,
-        niuTransApiKey = niuTransApiKey,
-        niuTransAppId = niuTransAppId,
-        niuTransTermLibraryId = niuTransTermLibraryId,
-        niuTransMemoryLibraryId = niuTransMemoryLibraryId,
-        youdaoAppKey = youdaoAppKey,
-        youdaoAppSecret = youdaoAppSecret,
-        volcAccessKeyId = volcAk,
-        volcSecretAccessKey = volcSk,
-        volcRegion = volcRegion,
-        baiduFanyiAppId = baiduFanyiAppId,
-        baiduFanyiSecretKey = baiduFanyiSecret,
-        floatingButtonSizeDp = floatingSize.toInt(),
-        floatingButtonAlpha = floatingAlpha,
-        floatingButtonSnapToEdge = floatingSnapEdge,
-        floatingButtonAutoDock = floatingAutoDock,
-        floatingButtonDockInsetDp = floatingDockInset.toInt(),
-        overlayAllowWrap = allowWrap,
-        overlayAvoidCollision = avoidCollision,
-        apiTimeoutSeconds = apiTimeoutSec.toInt(),
-        mergeAdjacentBlocks = mergeAdjacent,
-        mergeStrength = mergeStrength,
-        translationContextMode = translationContextMode,
-        cleartextAllowedHosts = cleartextHostsWithLocalOcrUrls(
-            parseCleartextHosts(cleartextHostsText),
-            umiOcrBaseUrl,
-            lunaOcrBaseUrl,
-            ttsHttpBaseUrl
-        )
-    )
-
-    fun buildTranslationPresetSnapshot(): Settings = buildSnapshot().copy(
-        customBorderStyle = customBorderStyle,
-        overlayFontFileName = overlayFontFileName,
-        overlayFontDisplayName = overlayFontDisplayName,
-        dictionaryPrompt = dictionaryPrompt,
-        paddleModelVersion = paddleModelVersion,
-        paddleDetectionProfile = paddleDetectionProfile,
-        textOrientationAutoDetect = textOrientAutoDetect,
-        captureContentOrientation = captureContentOrientation,
-        manualTextOrientation = manualTextOrient,
-        translationOutputFollowRecognition = translationOutputFollowRecognition,
-        translationOutputLayout = translationOutputLayout,
-        translationOutputDirection = translationOutputDirection,
-        translationGlossaryEnabled = translationGlossaryEnabled,
-        sendAppNameToTranslator = sendAppNameToTranslator,
-        dbnetProbThresh = dbnetProb,
-        dbnetBoxScoreThresh = dbnetScore,
-        dbnetUnclipRatio = dbnetUnclip,
-        mangaOcrDbnetUnclipRatio = mangaOcrDbnetUnclip,
-        bubbleClusterGap = MangaOcrAdvancedSettingsPolicy.BUBBLE_CLUSTER_GAP,
-        mangaOcrCropPaddingPx = MangaOcrAdvancedSettingsPolicy.CROP_PADDING_PX
-    )
-
-    fun buildSettingsTransferSnapshot(): Settings = buildTranslationPresetSnapshot().copy(
-        foregroundAppDetectionMode = foregroundAppDetectionMode,
-    )
-
-    fun currentTranslationPresetHash(): String =
-        TranslationPresetCatalog.hashForSettings(buildTranslationPresetSnapshot())
-
-    fun currentMatchingTranslationPresetId(settingsHash: String = currentTranslationPresetHash()): String {
-        val presets = TranslationPresetCatalog.all(translationPresets)
-        val credentialSnapshot = dev.clickn.translate.data.PresetCredentialPolicy.capture("", buildTranslationPresetSnapshot())
-        if (credentialMatchSnapshot != credentialSnapshot) return ""
-        val activeMatch = presets.firstOrNull {
-            it.id == activeTranslationPresetId && it.id in credentialMatchedPresetIds &&
-                TranslationPresetCatalog.matchesHash(it, settingsHash)
-        }
-        return activeMatch?.id
-            ?: presets.firstOrNull { it.id in credentialMatchedPresetIds && TranslationPresetCatalog.matchesHash(it, settingsHash) }?.id
-            ?: ""
-    }
-
     val credentialForm = buildTranslationPresetSnapshot()
     val credentialFormSnapshot = dev.clickn.translate.data.PresetCredentialPolicy.capture("", credentialForm)
     LaunchedEffect(initialSettings, translationPresets, credentialFormSnapshot) {
@@ -1609,6 +1892,10 @@ fun SettingsScreen(
             paddleVersions.forEach { add(ModelDownloadSpec.paddle(it)) }
             if (mangaMissing) add(ModelDownloadSpec.mangaOcr())
             if (orientationMissing) add(ModelDownloadSpec.orientation())
+            if (issues.any { it.kind == TranslationPresetModelIssueKind.TESSERACT_MISSING }) add(ModelDownloadSpec.tesseractArabic())
+            issues.filter { it.kind == TranslationPresetModelIssueKind.ML_KIT_MISSING }.forEach {
+                add(ModelDownloadSpec.mlKitTranslation(requireNotNull(it.sourceLanguage), requireNotNull(it.targetLanguage)))
+            }
         }
         if (specs.isEmpty()) return
 
@@ -1644,7 +1931,7 @@ fun SettingsScreen(
     // derivedStateOf 让 lambda 在依赖 state 变化时才重新计算 equals
     val dirty by remember {
         derivedStateOf {
-            val initial = initialSettings ?: return@derivedStateOf false
+            val initial = formBaseline ?: return@derivedStateOf false
             initial != buildSnapshot() || !cleartextHostsValidation.isValid
         }
     }
@@ -1662,6 +1949,7 @@ fun SettingsScreen(
                 if (revision > autoOcrSavedRevision) {
                     autoOcrSavedRevision = revision
                     initialSettings = initialSettings?.copy(autoOcr = saved)
+                    formBaseline = formBaseline?.copy(autoOcr = saved)
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -1674,121 +1962,136 @@ fun SettingsScreen(
         }
     }
 
-    val doSave: suspend () -> Unit = {
-        viewModel.save(
-            autoOcr = autoOcr,
-            baseUrl = baseUrl, apiKey = apiKey, model = model,
-            anthropicBaseUrl = anthropicBaseUrl,
-            anthropicApiKey = anthropicApiKey,
-            anthropicModel = anthropicModel,
-            targetLang = targetLang, sourceLang = sourceLang, prompt = prompt,
-            openAiRequestOptions = openAiRequestOptions,
-            textSize = textSize.toInt(), alpha = alpha,
-            overlayTextStyle = overlayTextStyle,
-            loopMs = loopInterval.toLongOrNull() ?: 2000L,
-            loopTriggerMode = loopTriggerMode,
-            loopTextStableDurationMs = loopTextStableDurationMs,
-            loopSkipSimilarFrames = loopSkipSimilarFrames,
-            loopFrameSimilarityThreshold = loopFrameSimilarityThreshold,
-            loopTextRegionMode = loopTextRegionMode,
-            loopTranslateRegionOnly = loopTranslateRegionOnly,
-            developerOptionsEnabled = developerOptionsEnabled,
-            performanceOverlayEnabled = performanceOverlayEnabled,
-            ocrScreenshotSavingEnabled = ocrScreenshotSavingEnabled,
-            disableTranslationCache = disableTranslationCache,
-            batchCumulativeCompletionTimeEnabled = batchCumulativeCompletionTimeEnabled,
-            shareEntireScreen = shareEntireScreen,
-            ocrRedBoxModeEnabled = ocrRedBoxModeEnabled,
-            ocrRedBoxShowSourceText = ocrRedBoxShowSourceText,
-            ocrRedBoxShowTranslation = ocrRedBoxShowTranslation,
-            streaming = streaming,
-            retryFailedTranslation = retryFailedTranslation,
-            ttsEnabled = ttsEnabled,
-            ttsProvider = ttsProvider,
-            ttsVoice = ttsVoice,
-            ttsEmotion = ttsEmotion,
-            ttsSpeed = ttsSpeed,
-            ttsPitch = ttsPitch,
-            ttsGainDb = ttsGainDb,
-            ttsHttpBaseUrl = ttsHttpBaseUrl,
-            ttsHttpBearerToken = ttsHttpBearerToken,
-            ttsHttpResponseMode = ttsHttpResponseMode,
-            ttsVolcengineResource = ttsVolcengineResource,
-            ttsVolcengineBaseUrl = ttsVolcengineBaseUrl,
-            ttsVolcengineApiKey = ttsVolcengineApiKey,
-            ttsVolcengineSpeaker = ttsVolcengineSpeaker,
-            ttsVolcengineModel = ttsVolcengineModel,
-            ttsVolcengineContext = ttsVolcengineContext,
-            ttsVolcenginePitch = ttsVolcenginePitch,
-            ttsVolcengineToneFidelity = ttsVolcengineToneFidelity,
-            ttsMiniMaxModel = ttsMiniMaxModel,
-            ttsMiniMaxBaseUrl = ttsMiniMaxBaseUrl,
-            ttsMiniMaxApiKey = ttsMiniMaxApiKey,
-            ttsMiniMaxVoice = ttsMiniMaxVoice,
-            ttsMiniMaxEmotion = ttsMiniMaxEmotion,
-            ttsMiniMaxSpeed = ttsMiniMaxSpeed,
-            ttsMiniMaxPitch = ttsMiniMaxPitch,
-            ttsMimoModel = ttsMimoModel,
-            ttsMimoBaseUrl = ttsMimoBaseUrl,
-            ttsMimoApiKey = ttsMimoApiKey,
-            ttsMimoVoice = ttsMimoVoice,
-            ttsMimoInstruction = ttsMimoInstruction,
-            ttsMimoVoiceDesignPrompt = ttsMimoVoiceDesignPrompt,
-            ttsMimoVoiceCloneInstruction = ttsMimoVoiceCloneInstruction,
-            ttsMimoVoiceSampleUri = ttsMimoVoiceSampleUri,
-            renderMode = renderMode,
-            translationBlockInteractionMode = translationBlockInteractionMode,
-            placement = placement,
-            overlayStyleMode = overlayStyleMode,
-            overlayTheme = overlayTheme,
-            customBg = customBg, customFg = customFg,
-            customBorder = customBorder, customBorderW = customBorderW.toInt(),
-            offsetX = offsetX.toInt(), offsetY = offsetY.toInt(),
-            ocrEngine = ocrEngine,
-            baiduKey = baiduKey, baiduSecret = baiduSecret, baiduEndpoint = baiduEndpoint,
-            baiduLanguage = baiduLanguage,
-            umiOcrBaseUrl = umiOcrBaseUrl,
-            lunaOcrBaseUrl = lunaOcrBaseUrl,
-            paddleAiStudioToken = paddleAiStudioToken,
-            tencentId = tencentId, tencentKey = tencentKey, tencentRegion = tencentRegion,
-            tencentEndpoint = tencentEndpoint,
-            tencentLanguage = tencentLanguage,
-            preprocess = PreprocessOptions(preUpscale, preInvert, preBinarize),
-            a11yVolume = a11yVolume,
-            floatingButtonSizeDp = floatingSize.toInt(),
-            floatingButtonAlpha = floatingAlpha,
-            floatingButtonSnapToEdge = floatingSnapEdge,
-            floatingButtonAutoDock = floatingAutoDock,
-            floatingButtonDockInsetDp = floatingDockInset.toInt(),
-            allowWrap = allowWrap,
-            avoidCollision = avoidCollision,
-            apiTimeoutSeconds = apiTimeoutSec.toInt(),
-            mergeAdjacentBlocks = mergeAdjacent,
-            mergeStrength = mergeStrength,
-            translationContextMode = translationContextMode,
-            cleartextAllowedHosts = parseCleartextHosts(cleartextHostsText),
-            translatorEngine = effectiveTranslatorEngine(),
-            deeplKey = deeplKey,
-            deeplPro = deeplPro,
-            deeplProtocol = deeplProtocol,
-            deeplBaseUrl = deeplBaseUrl,
-            deeplBearerAuth = deeplBearerAuth,
-            deeplCustomToken = deeplCustomToken,
-            niuTransMode = niuTransMode,
-            niuTransApiKey = niuTransApiKey,
-            niuTransAppId = niuTransAppId,
-            niuTransTermLibraryId = niuTransTermLibraryId,
-            niuTransMemoryLibraryId = niuTransMemoryLibraryId,
-            youdaoAppKey = youdaoAppKey,
-            youdaoAppSecret = youdaoAppSecret,
-            volcAccessKeyId = volcAk,
-            volcSecretAccessKey = volcSk,
-            volcRegion = volcRegion,
-            baiduFanyiAppId = baiduFanyiAppId,
-            baiduFanyiSecretKey = baiduFanyiSecret,
-            overlayFonts = overlayFontEntries,
-            activeTranslationPresetId = currentMatchingTranslationPresetId(),
-        )
+    val doSave: suspend () -> Unit = save@ {
+        if (savingEditor) return@save
+        savingEditor = true
+        try {
+            val submittedBaseline = checkNotNull(formBaseline)
+            val submittedDraft = buildSnapshot()
+            val saved = viewModel.save(
+                baseline = submittedBaseline,
+                draft = submittedDraft,
+                autoOcr = autoOcr,
+                baseUrl = baseUrl, apiKey = apiKey, model = model,
+                anthropicBaseUrl = anthropicBaseUrl,
+                anthropicApiKey = anthropicApiKey,
+                anthropicModel = anthropicModel,
+                targetLang = targetLang, sourceLang = sourceLang, prompt = prompt,
+                openAiRequestOptions = openAiRequestOptions,
+                textSize = textSize.toInt(), alpha = alpha,
+                overlayTextStyle = overlayTextStyle,
+                loopMs = loopInterval.toLongOrNull() ?: 2000L,
+                loopTriggerMode = loopTriggerMode,
+                loopTextStableDurationMs = loopTextStableDurationMs,
+                loopSkipSimilarFrames = loopSkipSimilarFrames,
+                loopFrameSimilarityThreshold = loopFrameSimilarityThreshold,
+                loopTextRegionMode = loopTextRegionMode,
+                loopTranslateRegionOnly = loopTranslateRegionOnly,
+                developerOptionsEnabled = developerOptionsEnabled,
+                performanceOverlayEnabled = performanceOverlayEnabled,
+                ocrScreenshotSavingEnabled = ocrScreenshotSavingEnabled,
+                disableTranslationCache = disableTranslationCache,
+                batchCumulativeCompletionTimeEnabled = batchCumulativeCompletionTimeEnabled,
+                shareEntireScreen = shareEntireScreen,
+                ocrRedBoxModeEnabled = ocrRedBoxModeEnabled,
+                ocrRedBoxShowSourceText = ocrRedBoxShowSourceText,
+                ocrRedBoxShowTranslation = ocrRedBoxShowTranslation,
+                streaming = streaming,
+                retryFailedTranslation = retryFailedTranslation,
+                ttsEnabled = ttsEnabled,
+                ttsProvider = ttsProvider,
+                ttsVoice = ttsVoice,
+                ttsEmotion = ttsEmotion,
+                ttsSpeed = ttsSpeed,
+                ttsPitch = ttsPitch,
+                ttsGainDb = ttsGainDb,
+                ttsHttpBaseUrl = ttsHttpBaseUrl,
+                ttsHttpBearerToken = ttsHttpBearerToken,
+                ttsHttpResponseMode = ttsHttpResponseMode,
+                ttsVolcengineResource = ttsVolcengineResource,
+                ttsVolcengineBaseUrl = ttsVolcengineBaseUrl,
+                ttsVolcengineApiKey = ttsVolcengineApiKey,
+                ttsVolcengineSpeaker = ttsVolcengineSpeaker,
+                ttsVolcengineModel = ttsVolcengineModel,
+                ttsVolcengineContext = ttsVolcengineContext,
+                ttsVolcenginePitch = ttsVolcenginePitch,
+                ttsVolcengineToneFidelity = ttsVolcengineToneFidelity,
+                ttsMiniMaxModel = ttsMiniMaxModel,
+                ttsMiniMaxBaseUrl = ttsMiniMaxBaseUrl,
+                ttsMiniMaxApiKey = ttsMiniMaxApiKey,
+                ttsMiniMaxVoice = ttsMiniMaxVoice,
+                ttsMiniMaxEmotion = ttsMiniMaxEmotion,
+                ttsMiniMaxSpeed = ttsMiniMaxSpeed,
+                ttsMiniMaxPitch = ttsMiniMaxPitch,
+                ttsMimoModel = ttsMimoModel,
+                ttsMimoBaseUrl = ttsMimoBaseUrl,
+                ttsMimoApiKey = ttsMimoApiKey,
+                ttsMimoVoice = ttsMimoVoice,
+                ttsMimoInstruction = ttsMimoInstruction,
+                ttsMimoVoiceDesignPrompt = ttsMimoVoiceDesignPrompt,
+                ttsMimoVoiceCloneInstruction = ttsMimoVoiceCloneInstruction,
+                ttsMimoVoiceSampleUri = ttsMimoVoiceSampleUri,
+                renderMode = renderMode,
+                translationBlockInteractionMode = translationBlockInteractionMode,
+                placement = placement,
+                overlayStyleMode = overlayStyleMode,
+                overlayTheme = overlayTheme,
+                customBg = customBg, customFg = customFg,
+                customBorder = customBorder, customBorderW = customBorderW.toInt(),
+                offsetX = offsetX.toInt(), offsetY = offsetY.toInt(),
+                ocrEngine = ocrEngine,
+                baiduKey = baiduKey, baiduSecret = baiduSecret, baiduEndpoint = baiduEndpoint,
+                baiduLanguage = baiduLanguage,
+                umiOcrBaseUrl = umiOcrBaseUrl,
+                lunaOcrBaseUrl = lunaOcrBaseUrl,
+                paddleAiStudioToken = paddleAiStudioToken,
+                tencentId = tencentId, tencentKey = tencentKey, tencentRegion = tencentRegion,
+                tencentEndpoint = tencentEndpoint,
+                tencentLanguage = tencentLanguage,
+                preprocess = PreprocessOptions(preUpscale, preInvert, preBinarize),
+                a11yVolume = a11yVolume,
+                floatingButtonSizeDp = floatingSize.toInt(),
+                floatingButtonAlpha = floatingAlpha,
+                floatingButtonSnapToEdge = floatingSnapEdge,
+                floatingButtonAutoDock = floatingAutoDock,
+                floatingButtonDockInsetDp = floatingDockInset.toInt(),
+                allowWrap = allowWrap,
+                avoidCollision = avoidCollision,
+                apiTimeoutSeconds = apiTimeoutSec.toInt(),
+                mergeAdjacentBlocks = mergeAdjacent,
+                mergeStrength = mergeStrength,
+                translationContextMode = translationContextMode,
+                cleartextAllowedHosts = parseCleartextHosts(cleartextHostsText),
+                translatorEngine = effectiveTranslatorEngine(),
+                deeplKey = deeplKey,
+                deeplPro = deeplPro,
+                deeplProtocol = deeplProtocol,
+                deeplBaseUrl = deeplBaseUrl,
+                deeplBearerAuth = deeplBearerAuth,
+                deeplCustomToken = deeplCustomToken,
+                niuTransMode = niuTransMode,
+                niuTransApiKey = niuTransApiKey,
+                niuTransAppId = niuTransAppId,
+                niuTransTermLibraryId = niuTransTermLibraryId,
+                niuTransMemoryLibraryId = niuTransMemoryLibraryId,
+                youdaoAppKey = youdaoAppKey,
+                youdaoAppSecret = youdaoAppSecret,
+                volcAccessKeyId = volcAk,
+                volcSecretAccessKey = volcSk,
+                volcRegion = volcRegion,
+                baiduFanyiAppId = baiduFanyiAppId,
+                baiduFanyiSecretKey = baiduFanyiSecret,
+                overlayFonts = overlayFontEntries,
+                activeTranslationPresetId = currentMatchingTranslationPresetId(),
+            )
+            // Keep any new edits made while the disk write was in flight.
+            val continued = rebaseSettingsEditingSnapshot(
+                SettingsEditingSnapshot(submittedDraft, buildSnapshot()), saved,
+            )
+            applyEditingSnapshot(continued)
+        } finally {
+            savingEditor = false
+        }
     }
 
     val modelDownloadBusy = backgroundModelDownloadActive || downloadingPresetId != null ||
@@ -1824,6 +2127,8 @@ fun SettingsScreen(
                 paddleModelReady = { version -> presetPaddleModelReady[version] == true },
                 mangaOcrModelReady = presetMangaOcrModelReady,
                 orientationModelReady = presetOrientationModelReady,
+                tesseractModelReady = tesseractModelState.ready,
+                mlKitDownloadedLanguages = presetMlKitDownloadedLanguages,
                 modelDownloading = modelDownloadBusy,
                 downloadingPresetId = downloadingPresetId ?: backgroundModelDownloadOwnerPresetId,
                 onExport = {
@@ -1854,9 +2159,7 @@ fun SettingsScreen(
                 onApply = { preset ->
                     scope.launch {
                         val applied = viewModel.applyTranslationPreset(preset.id) ?: return@launch
-                        applyPresetSettingsToUi(applied)
-                        activeTranslationPresetId = preset.id
-                        initialSettings = buildSnapshot()
+                        applyCommittedPresetSettings(applied)
                         presetMessage = context.getString(
                             R.string.settings_translation_preset_applied_format,
                             presetDisplayNameForMessage(preset)
@@ -2151,10 +2454,10 @@ fun SettingsScreen(
             text = { Text(stringResource(R.string.settings_unsaved_msg)) },
             confirmButton = {
                 TextButton(
-                    enabled = cleartextHostsValidation.isValid,
+                    enabled = cleartextHostsValidation.isValid && !savingEditor,
                     onClick = {
                         showUnsavedDialog = false
-                        scope.launch { doSave(); onBack() }
+                        scope.launch { doSave(); if (!dirty) onBack() }
                     }
                 ) { Text(stringResource(R.string.settings_unsaved_save)) }
             },
@@ -2775,214 +3078,17 @@ fun SettingsScreen(
     }
 
     LaunchedEffect(Unit) {
-        val persisted = viewModel.loadForScreen(context)
-        val s = viewModel.consumeLocaleChangeDraft() ?: persisted
-        // suspend 操作必须在 Snapshot 块外做完
-        val migratedPrompt = s.promptTemplate
-        val paddleStatusPlaceholder = context.getString(R.string.settings_paddle_status_checking)
-        val mangaOcrStatusPlaceholder = context.getString(R.string.settings_manga_ocr_status_checking)
-        val orientationModelStatusPlaceholder = context.getString(R.string.settings_orientation_model_status_checking)
-        timber.log.Timber.tag("OcrLangLink").i(
-            "[load] sourceLang=%s ocrEngine=%s baiduEp=%s baiduLang=%s tencentEp=%s tencentLang=%s",
-            s.sourceLang, s.ocrEngine, s.baiduOcrEndpoint, s.baiduOcrLanguage,
-            s.tencentOcrEndpoint, s.tencentOcrLanguage
-        )
-        // 关键性能：把 40+ state 写入封进同一个 mutable snapshot，原子 apply 后只触发
-        // 一次 observer 通知，避免 Compose 在每个 state 变化时 schedule 一次 recomposition
-        // / derivedStateOf 重算，进设置页那段"卡一下"主要来自这里。
-        androidx.compose.runtime.snapshots.Snapshot.withMutableSnapshot {
-            baseUrl = s.baseUrl
-            apiKey = s.apiKey
-            model = s.model
-            anthropicBaseUrl = s.anthropicBaseUrl
-            anthropicApiKey = s.anthropicApiKey
-            anthropicModel = s.anthropicModel
-            prompt = migratedPrompt
-            openAiRequestOptions = s.openAiRequestOptions
-            targetLang = s.targetLang
-            sourceLang = s.sourceLang
-            translatorEngine = if (isLocalLlmEngine(s.translatorEngine) && !localLlmDeviceCapable) {
-                TranslatorEngine.OPENAI
-            } else {
-                s.translatorEngine
-            }
-            deeplKey = s.deeplApiKey
-            youdaoAppKey = s.youdaoAppKey
-            volcAk = s.volcAccessKeyId
-            volcSk = s.volcSecretAccessKey
-            volcRegion = s.volcRegion
-            baiduFanyiAppId = s.baiduFanyiAppId
-            baiduFanyiSecret = s.baiduFanyiSecretKey
-            youdaoAppSecret = s.youdaoAppSecret
-            deeplPro = s.deeplPro
-            deeplProtocol = s.deeplProtocol
-            deeplBaseUrl = s.deeplBaseUrl
-            deeplBearerAuth = s.deeplBearerAuth
-            deeplCustomToken = s.deeplCustomToken
-            niuTransMode = s.niuTransMode
-            niuTransApiKey = s.niuTransApiKey
-            niuTransAppId = s.niuTransAppId
-            niuTransTermLibraryId = s.niuTransTermLibraryId
-            niuTransMemoryLibraryId = s.niuTransMemoryLibraryId
-            textSize = s.overlayTextSizeSp.toFloat()
-            overlayTextStyle = s.overlayTextStyle.normalized()
-            alpha = s.overlayAlpha
-            overlayFontFileName = s.overlayFontFileName
-            overlayFontDisplayName = s.overlayFontDisplayName
-            overlayFontEntries = OverlayFontPolicy.upsertImportedFont(
-                s.overlayFonts,
-                s.overlayFontFileName,
-                s.overlayFontDisplayName
-            )
-            loopInterval = s.captureLoopIntervalMs.toString()
-            loopTriggerMode = s.loopTriggerMode
-            loopTextStableDurationMs = s.loopTextStableDurationMs
-            loopSkipSimilarFrames = s.loopSkipSimilarFrames
-            loopFrameSimilarityThreshold = s.loopFrameSimilarityThreshold
-            developerOptionsEnabled = s.developerOptionsEnabled
-            performanceOverlayEnabled = s.performanceOverlayEnabled
-            ocrScreenshotSavingEnabled = s.ocrScreenshotSavingEnabled
-            disableTranslationCache = s.disableTranslationCache
-            batchCumulativeCompletionTimeEnabled = s.batchCumulativeCompletionTimeEnabled
-            shareEntireScreen = s.shareEntireScreen
-            ocrRedBoxModeEnabled = s.ocrRedBoxModeEnabled
-            ocrRedBoxShowSourceText = s.ocrRedBoxShowSourceText
-            ocrRedBoxShowTranslation = s.ocrRedBoxShowTranslation
-            streaming = s.streamingTranslate
-            retryFailedTranslation = s.retryFailedTranslation
-            ttsEnabled = s.ttsEnabled
-            ttsProvider = s.ttsProvider
-            ttsVoice = s.ttsVoice
-            ttsEmotion = s.ttsEmotion
-            ttsSpeed = s.ttsSpeed
-            ttsPitch = s.ttsPitch
-            ttsGainDb = s.ttsGainDb
-            ttsHttpBaseUrl = s.ttsHttpBaseUrl
-            ttsHttpBearerToken = s.ttsHttpBearerToken
-            ttsHttpResponseMode = s.ttsHttpResponseMode
-            ttsVolcengineResource = s.ttsVolcengineResource
-            ttsVolcengineBaseUrl = s.ttsVolcengineBaseUrl
-            ttsVolcengineApiKey = s.ttsVolcengineApiKey
-            ttsVolcengineSpeaker = s.ttsVolcengineSpeaker
-            ttsVolcengineModel = s.ttsVolcengineModel
-            ttsVolcengineContext = s.ttsVolcengineContext
-            ttsVolcenginePitch = s.ttsVolcenginePitch
-            ttsVolcengineToneFidelity = s.ttsVolcengineToneFidelity
-            ttsMiniMaxModel = s.ttsMiniMaxModel
-            ttsMiniMaxBaseUrl = s.ttsMiniMaxBaseUrl
-            ttsMiniMaxApiKey = s.ttsMiniMaxApiKey
-            ttsMiniMaxVoice = s.ttsMiniMaxVoice
-            ttsMiniMaxEmotion = s.ttsMiniMaxEmotion
-            ttsMiniMaxSpeed = s.ttsMiniMaxSpeed
-            ttsMiniMaxPitch = s.ttsMiniMaxPitch
-            ttsMimoModel = s.ttsMimoModel
-            ttsMimoBaseUrl = s.ttsMimoBaseUrl
-            ttsMimoApiKey = s.ttsMimoApiKey
-            ttsMimoVoice = s.ttsMimoVoice
-            ttsMimoInstruction = s.ttsMimoInstruction
-            ttsMimoVoiceDesignPrompt = s.ttsMimoVoiceDesignPrompt
-            ttsMimoVoiceCloneInstruction = s.ttsMimoVoiceCloneInstruction
-            ttsMimoVoiceSampleUri = s.ttsMimoVoiceSampleUri.ifBlank {
-                MIMO_BUILTIN_VOICE_REFERENCE_1
-            }
-            renderMode = s.renderMode
-            translationBlockInteractionMode = s.translationBlockInteractionMode
-            floatingWindowContentMode = s.floatingWindowContentMode
-            floatingWindowLocked = s.floatingWindowLocked
-            customBorderStyle = s.customBorderStyle
-            placement = s.overlayPlacement
-            overlayStyleMode = s.overlayStyleMode
-            overlayTheme = s.overlayTheme
-            customBg = s.customBgColor
-            customFg = s.customFgColor
-            customBorder = s.customBorderColor
-            customBorderW = s.customBorderWidth.toFloat()
-            captureRegionBorderEnabled = s.captureRegionBorderEnabled
-            captureRegionHideOnCapture = s.captureRegionHideOnCapture
-            captureRegionBorderColor = s.captureRegionBorderColor
-            captureRegionBorderWidth = s.captureRegionBorderWidthDp.toFloat()
-            captureRegionBorderStyle = s.captureRegionBorderStyle
-            captureRegionAdjustmentEnabled = s.captureRegionAdjustmentEnabled
-            offsetX = s.overlayOffsetX.toFloat()
-            offsetY = s.overlayOffsetY.toFloat()
-        ocrEngine = s.ocrEngine
-        autoOcr = s.autoOcr
-            baiduKey = s.baiduOcrApiKey
-            baiduSecret = s.baiduOcrSecretKey
-            baiduEndpoint = s.baiduOcrEndpoint
-            baiduLanguage = s.baiduOcrLanguage
-            umiOcrBaseUrl = s.umiOcrBaseUrl
-            lunaOcrBaseUrl = s.lunaOcrBaseUrl
-            paddleAiStudioToken = s.paddleAiStudioToken
-            tencentId = s.tencentSecretId
-            tencentKey = s.tencentSecretKey
-            tencentRegion = s.tencentRegion
-            tencentEndpoint = s.tencentOcrEndpoint
-            tencentLanguage = s.tencentOcrLanguage
-            paddleModelVersion = s.paddleModelVersion
-            llmMirrorChoice = s.localLlmMirror
-            llmMirror = s.localLlmMirrorUrl
-            // 不阻塞主线程：file.exists() + file.length() 走 IO Dispatcher。先给占位
-            // 文字，IO 完成后再覆盖；进设置的瞬间不卡顿。
-            paddleStatus = checkingPlaceholderIfUnresolved(paddleStatus, paddleStatusPlaceholder)
-            mangaOcrStatus = checkingPlaceholderIfUnresolved(mangaOcrStatus, mangaOcrStatusPlaceholder)
-            orientationModelStatus =
-                checkingPlaceholderIfUnresolved(orientationModelStatus, orientationModelStatusPlaceholder)
-            preUpscale = s.preprocess.upscale2x
-            preInvert = s.preprocess.invert
-            preBinarize = s.preprocess.binarize
-            a11yVolume = s.a11yVolumeTrigger
-            floatingSize = s.floatingButtonSizeDp.toFloat()
-            floatingAlpha = normalizedFloatingButtonAlpha(s.floatingButtonAlpha)
-            floatingSnapEdge = s.floatingButtonSnapToEdge
-            floatingAutoDock = s.floatingButtonAutoDock
-            floatingDockInset = s.floatingButtonDockInsetDp.toFloat()
-            menuOrder = s.floatingMenuItemOrder
-            arcMenuPageSize = s.arcMenuPageSize.toFloat()
-            currentSkill = s.floatingButtonSkill
-            inputTranslationDoubleAction = s.inputTranslationDoubleAction
-            wordSelectPreciseAdjust = s.wordSelectPreciseAdjust
-            wordSelectCardMode = s.wordSelectCardMode
-            wordSelectExtractOnly = s.wordSelectExtractOnly
-            wordSelectRememberRegion = s.wordSelectRememberRegion
-            floatingWindowAutoHideWhenObstructing = s.floatingWindowAutoHideWhenObstructing
-            dictionaryPrompt = s.dictionaryPrompt
-            translationPresets = s.translationPresets
-            activeTranslationPresetId = s.activeTranslationPresetId
-            pinnedLanguages = s.pinnedLanguages
-            mlKitRecentSources = mlKitRecentSourceLanguages(s.mlKitRecentSourceLanguages)
-            allowWrap = s.overlayAllowWrap
-            avoidCollision = s.overlayAvoidCollision
-            apiTimeoutSec = s.apiTimeoutSeconds.toFloat()
-            mergeAdjacent = s.mergeAdjacentBlocks
-            mergeStrength = s.mergeStrength
-            translationContextMode = s.translationContextMode
-            textOrientAutoDetect = s.textOrientationAutoDetect
-            captureContentOrientation = s.captureContentOrientation
-            dbnetProb = s.dbnetProbThresh
-            dbnetScore = s.dbnetBoxScoreThresh
-            dbnetUnclip = s.dbnetUnclipRatio
-            mangaOcrDbnetUnclip = s.mangaOcrDbnetUnclipRatio
-            paddleDetectionProfile = s.paddleDetectionProfile
-            manualTextOrient = s.manualTextOrientation
-            resolveTranslationOutputSettings(
-                s.translationOutputFollowRecognition,
-                s.translationOutputLayout,
-                s.translationOutputDirection,
-            ).let { output ->
-                translationOutputFollowRecognition = output.followRecognition
-                translationOutputLayout = output.layout
-                translationOutputDirection = output.direction
-            }
-            translationGlossaryEnabled = s.translationGlossaryEnabled
-            foregroundAppDetectionMode = s.foregroundAppDetectionMode
-            sendAppNameToTranslator = s.sendAppNameToTranslator
-            cleartextHostsText = s.cleartextAllowedHosts.joinToString("\n")
-            // Keep the complete repository value as the baseline. Rebuilding it while
-            // initialSettings is still null would start from Settings defaults and lose fields
-            // owned by services or other screens before the first export.
-            initialSettings = persisted
+        val editing = loadSettingsEditingSnapshot(viewModel.consumeLocaleChangeDraft()) {
+            viewModel.loadForScreen(context)
         }
+        observeSettingsEditing(
+            initial = editing,
+            updates = viewModel.settingsUpdates,
+            current = {
+                SettingsEditingSnapshot(checkNotNull(initialSettings), buildSnapshot(), formBaseline)
+            },
+            apply = ::applyEditingSnapshot,
+        )
     }
 
     // paddleStatus 独立异步加载：file.exists() / file.length() 走 IO 线程，避免阻塞首帧。
@@ -3008,6 +3114,7 @@ fun SettingsScreen(
         mlKitDownloadedLanguageModels = runCatching {
             viewModel.getDownloadedMlKitLanguageModels()
         }.getOrDefault(emptySet())
+        presetMlKitDownloadedLanguages = mlKitDownloadedLanguageModels
         if (
             sourceLang.isBlank() ||
             sourceLang.equals(Languages.AUTO.code, ignoreCase = true) ||
@@ -3166,15 +3273,7 @@ fun SettingsScreen(
                     stringResource(R.string.settings_overlay_theme_label),
                     style = MaterialTheme.typography.labelLarge,
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    EngineChip(overlayTheme, OverlayTheme.CLASSIC_DARK, stringResource(R.string.settings_theme_classic_dark)) { overlayTheme = it }
-                    EngineChip(overlayTheme, OverlayTheme.AMBER_GOLD, stringResource(R.string.settings_theme_amber_gold)) { overlayTheme = it }
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    EngineChip(overlayTheme, OverlayTheme.PAPER_LIGHT, stringResource(R.string.settings_theme_paper_light)) { overlayTheme = it }
-                    EngineChip(overlayTheme, OverlayTheme.FROST_GLASS, stringResource(R.string.settings_theme_frost_glass)) { overlayTheme = it }
-                    EngineChip(overlayTheme, OverlayTheme.CUSTOM, stringResource(R.string.settings_theme_custom)) { overlayTheme = it }
-                }
+                OverlayThemeChoices(overlayTheme) { overlayTheme = it }
                 if (overlayTheme == OverlayTheme.CUSTOM) {
                     CustomThemeEditor(
                         bg = customBg,
@@ -3190,7 +3289,7 @@ fun SettingsScreen(
                         stringResource(R.string.settings_floating_window_border_style_label),
                         style = MaterialTheme.typography.labelLarge,
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SettingsOptionGroup {
                         EngineChip(customBorderStyle, dev.clickn.translate.data.BorderStyle.SOLID, stringResource(R.string.settings_border_style_solid)) {
                             customBorderStyle = it
                             scope.launch { viewModel.saveCustomBorderStyle(it) }
@@ -3203,8 +3302,6 @@ fun SettingsScreen(
                             customBorderStyle = it
                             scope.launch { viewModel.saveCustomBorderStyle(it) }
                         }
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         EngineChip(customBorderStyle, dev.clickn.translate.data.BorderStyle.DOUBLE, stringResource(R.string.settings_border_style_double)) {
                             customBorderStyle = it
                             scope.launch { viewModel.saveCustomBorderStyle(it) }
@@ -3258,7 +3355,6 @@ fun SettingsScreen(
                             }
                         },
                         label = defaultOverlayFontName,
-                        onLongClick = {},
                     )
                     overlayFontChipEntries.forEach { font ->
                         OverlayFontChip(
@@ -3390,11 +3486,16 @@ fun SettingsScreen(
         AutoOcrSettingsScreen(
             settings = buildSnapshot(),
             loadAvailable = viewModel::availableAutoOcrRoutes,
-            availabilityRevision = modelDownloadWorkInfos.map { it.id to it.state } to autoOcrModelRefresh,
+            availabilityRevision = (modelDownloadWorkInfos.map { it.id to it.state } to autoOcrModelRefresh) to tesseractModelState.ready,
             activeModels = activeModelDownloadBySpec.keys,
-            downloadBusy = modelDownloadBusy || autoOcrDownloadPending,
+            downloadBusy = modelDownloadBusy || autoOcrDownloadPending || tesseractModelState.busy,
             downloadStatus = {
                 modelDownloadFeedback(true)
+                if (tesseractModelState.busy || tesseractModelState.error != null) TesseractModelSection(
+                    tesseractUiState, { requestModelDownload(context.getString(R.string.settings_ocr_chip_tesseract_arabic)) {
+                        viewModel.downloadTesseractModels()
+                    } },
+                    viewModel::cancelTesseractModelDownload, viewModel::deleteTesseractModels)
                 if (autoOcrDownloadComplete && activeModelDownloads.isEmpty() && !autoOcrDownloadPending) {
                     Text(
                         stringResource(R.string.settings_auto_ocr_download_complete),
@@ -3440,6 +3541,11 @@ fun SettingsScreen(
         }, onAdvanced = { showFloatingPicture = false })
     }
 
+    // Keep the snapshot reader as one capture. Calling the local function from
+    // Scaffold content otherwise adds every form delegate to its constructor,
+    // exceeding DEX's 255 argument-word limit as settings grow.
+    val readFormSnapshot: () -> Settings = ::buildSnapshot
+
     Scaffold(
         modifier = modifier.fillMaxSize(),
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -3472,7 +3578,9 @@ fun SettingsScreen(
                                     } else {
                                         R.string.settings_title
                                     }
-                                )
+                                ),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                             )
                         }
                     },
@@ -3515,12 +3623,14 @@ fun SettingsScreen(
                     // 防护：load 完成前 state 是默认占位值，此时保存会把空字符串 / 默认 enum
                     // 写入 DataStore，覆盖用户实际数据。LaunchedEffect 完成（~13ms）才把
                     // initialSettings 设值，那之后才允许保存。
-                    if (initialSettings == null || !cleartextHostsValidation.isValid) {
+                    if (initialSettings == null || !cleartextHostsValidation.isValid || savingEditor) {
                         return@ExtendedFloatingActionButton
                     }
                     scope.launch {
                         doSave()
-                        if (overlayRenderingOpen) overlayRenderingOpen = false else onBack()
+                        if (!dirty) {
+                            if (overlayRenderingOpen) overlayRenderingOpen = false else onBack()
+                        }
                     }
                 },
                 icon = { Icon(Icons.Default.Save, contentDescription = null) },
@@ -3558,7 +3668,7 @@ fun SettingsScreen(
                     }
                 }
             } else if (selectedCategory == null) {
-                AdvancedSettingsDirectory(if (settingsLoaded) buildSnapshot() else null) { key ->
+                AdvancedSettingsDirectory(if (settingsLoaded) readFormSnapshot() else null) { key ->
                     selectedCategory = key
                     scope.launch { listState.scrollToItem(0) }
                 }
@@ -3583,7 +3693,11 @@ fun SettingsScreen(
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold,
                         )
-                        AppLanguageSelector(beforeChange = { viewModel.retainLocaleChangeDraft(if (dirty) buildSnapshot() else null) })
+                        AppLanguageSelector(beforeChange = {
+                            initialSettings?.let { persisted ->
+                                viewModel.retainLocaleChangeDraft(persisted, if (dirty) readFormSnapshot() else null, formBaseline)
+                            }
+                        })
                     }
                     HorizontalDivider()
                     SettingsSearchTarget(searchTargetRegistry, *SEARCH_TARGET_THEME_MODE) {
@@ -3888,7 +4002,7 @@ fun SettingsScreen(
                             stringResource(R.string.settings_deepl_protocol_label),
                             style = MaterialTheme.typography.labelLarge
                         )
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SettingsOptionGroup {
                             EngineChip(deeplProtocol, dev.clickn.translate.data.DeeplProtocol.OFFICIAL,
                                 stringResource(R.string.settings_deepl_protocol_official)) { deeplProtocol = it }
                             EngineChip(deeplProtocol, dev.clickn.translate.data.DeeplProtocol.DEEPLX,
@@ -4219,7 +4333,7 @@ fun SettingsScreen(
                 // OpenAI 顺便拉 model 列表回填到上方下拉。状态文字按成功/失败着色，下次点击覆盖。
                 if (translatorEngine != TranslatorEngine.GOOGLE_ML_KIT) {
                 TranslatorConnectionTestPanel(
-                    inputKey = buildSnapshot(),
+                    inputKey = readFormSnapshot(),
                     onTest = {
                         viewModel.testTranslator(
                                         translatorEngine = translatorEngine,
@@ -4541,7 +4655,7 @@ fun SettingsScreen(
                             testMessage = ttsTestMessage,
                             testSuccess = ttsTestSuccess,
                             onTest = { text ->
-                                val draftSettings = buildSnapshot()
+                                val draftSettings = readFormSnapshot()
                                 val generation = ttsTestGeneration + 1
                                 ttsTestGeneration = generation
                                 ttsTestRunning = true
@@ -4616,7 +4730,7 @@ fun SettingsScreen(
                             onGenerateMiniMaxVoiceDescription = { draft ->
                                 viewModel.generateMiniMaxVoiceDescription(
                                     draft = draft,
-                                    settings = buildSnapshot(),
+                                    settings = readFormSnapshot(),
                                     outputLanguageTag = context.resources.configuration.locales[0]
                                         .toLanguageTag(),
                                 )
@@ -4624,7 +4738,7 @@ fun SettingsScreen(
                             onPreviewMiniMaxVoice = { voiceId, previewText ->
                                 viewModel.testTts(
                                     previewText,
-                                    buildSnapshot().copy(
+                                    readFormSnapshot().copy(
                                         ttsEnabled = true,
                                         ttsProvider = TtsProvider.MINIMAX,
                                         ttsMiniMaxVoice = voiceId,
@@ -4683,7 +4797,7 @@ fun SettingsScreen(
                                             MimoTtsModel.VOICE_DESIGN -> Unit
                                         }
                                     } else {
-                                        val draftSettings = buildSnapshot()
+                                        val draftSettings = readFormSnapshot()
                                         val outputLanguageTag =
                                             context.resources.configuration.locales[0].toLanguageTag()
                                         when (model) {
@@ -4751,7 +4865,7 @@ fun SettingsScreen(
                                     )
                                     return@TtsSettings
                                 }
-                                val draftSettings = buildSnapshot()
+                                val draftSettings = readFormSnapshot()
                                 val outputLanguageTag = context.resources.configuration.locales[0]
                                     .toLanguageTag()
                                 ttsMimoVoiceDesignGenerating = true
@@ -4842,12 +4956,10 @@ fun SettingsScreen(
                         stringResource(R.string.settings_baidu_endpoint_label),
                         style = MaterialTheme.typography.labelLarge
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                    SettingsOptionGroup {
                         EngineChip(baiduEndpoint, dev.clickn.translate.data.BaiduOcrEndpoint.GENERAL_BASIC, stringResource(R.string.settings_baidu_endpoint_standard)) { baiduEndpoint = it }
                         EngineChip(baiduEndpoint, dev.clickn.translate.data.BaiduOcrEndpoint.GENERAL, stringResource(R.string.settings_baidu_endpoint_standard_loc)) { baiduEndpoint = it }
                         EngineChip(baiduEndpoint, dev.clickn.translate.data.BaiduOcrEndpoint.WEBIMAGE, stringResource(R.string.settings_baidu_endpoint_webimage)) { baiduEndpoint = it }
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
                         EngineChip(baiduEndpoint, dev.clickn.translate.data.BaiduOcrEndpoint.ACCURATE_BASIC, stringResource(R.string.settings_baidu_endpoint_accurate)) { baiduEndpoint = it }
                         EngineChip(baiduEndpoint, dev.clickn.translate.data.BaiduOcrEndpoint.ACCURATE, stringResource(R.string.settings_baidu_endpoint_accurate_loc)) { baiduEndpoint = it }
                     }
@@ -4946,7 +5058,7 @@ fun SettingsScreen(
                         stringResource(R.string.settings_tencent_endpoint_label),
                         style = MaterialTheme.typography.labelLarge
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                    SettingsOptionGroup {
                         EngineChip(tencentEndpoint, dev.clickn.translate.data.TencentOcrEndpoint.GENERAL_BASIC, stringResource(R.string.settings_tencent_endpoint_general_basic)) { tencentEndpoint = it }
                         EngineChip(tencentEndpoint, dev.clickn.translate.data.TencentOcrEndpoint.GENERAL_ACCURATE, stringResource(R.string.settings_tencent_endpoint_general_accurate)) { tencentEndpoint = it }
                         EngineChip(tencentEndpoint, dev.clickn.translate.data.TencentOcrEndpoint.RECOGNIZE_AGENT, stringResource(R.string.settings_tencent_endpoint_recognize_agent)) { tencentEndpoint = it }
@@ -5018,6 +5130,13 @@ fun SettingsScreen(
                         label = stringResource(R.string.settings_paddle_ai_studio_token),
                         modifier = Modifier.fillMaxWidth()
                     )
+                }
+
+                if (ocrEngine == OcrEngineKind.TESSERACT_ARABIC || ocrEngine == OcrEngineKind.ML_KIT_AUTO) {
+                    TesseractModelSection(tesseractUiState,
+                        onDownload = { requestModelDownload(context.getString(R.string.settings_ocr_chip_tesseract_arabic)) {
+                            viewModel.downloadTesseractModels()
+                        } }, onCancel = viewModel::cancelTesseractModelDownload, onDelete = viewModel::deleteTesseractModels)
                 }
 
                 if (ocrEngine == OcrEngineKind.PADDLE_ONNX) {
@@ -5408,7 +5527,7 @@ fun SettingsScreen(
                             stringResource(R.string.settings_floating_window_content_label),
                             style = MaterialTheme.typography.labelLarge,
                         )
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SettingsOptionGroup {
                             EngineChip(
                                 floatingWindowContentMode,
                                 dev.clickn.translate.data.FloatingWindowContentMode.SRC_AND_DST,
@@ -5532,7 +5651,7 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.labelLarge,
                         modifier = Modifier.alpha(if (layoutControlsEnabled) 1f else 0.4f),
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SettingsOptionGroup {
                         EngineChip(effectivePlacement, OverlayPlacement.BELOW, stringResource(R.string.settings_placement_below_chip), enabled = layoutControlsEnabled) { placement = it }
                         EngineChip(effectivePlacement, OverlayPlacement.OVERLAP, stringResource(R.string.settings_placement_overlap_chip), enabled = layoutControlsEnabled) { placement = it }
                         EngineChip(effectivePlacement, OverlayPlacement.ABOVE, stringResource(R.string.settings_placement_above_chip), enabled = layoutControlsEnabled) { placement = it }
@@ -5655,6 +5774,7 @@ fun SettingsScreen(
                         try {
                             viewModel.saveWordSelectExtractOnly(enabled)
                             initialSettings = initialSettings?.copy(wordSelectExtractOnly = enabled)
+                            formBaseline = formBaseline?.copy(wordSelectExtractOnly = enabled)
                         } catch (cancelled: CancellationException) {
                             throw cancelled
                         } catch (error: Exception) {
@@ -5789,7 +5909,7 @@ fun SettingsScreen(
                         stringResource(R.string.settings_floating_window_border_style_label),
                         style = MaterialTheme.typography.labelLarge,
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SettingsOptionGroup {
                         EngineChip(
                             captureRegionBorderStyle,
                             CaptureRegionBorderStyle.SOLID,
@@ -5942,7 +6062,11 @@ fun SettingsScreen(
                 } else {
                     Text(
                         stringResource(
-                            R.string.settings_loop_text_stable_duration_format,
+                            if (loopTriggerMode == LoopTriggerMode.SETTLED_PAGE) {
+                                R.string.settings_loop_screen_stable_duration_format
+                            } else {
+                                R.string.settings_loop_text_stable_duration_format
+                            },
                             loopTextStableDurationMs,
                         ),
                         style = MaterialTheme.typography.labelLarge,
@@ -5969,6 +6093,13 @@ fun SettingsScreen(
                         )
                         Text(
                             stringResource(R.string.settings_loop_text_stable_complete),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (loopTriggerMode == LoopTriggerMode.SETTLED_PAGE) {
+                        Text(
+                            stringResource(R.string.settings_loop_screen_stable_hint),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -8796,7 +8927,7 @@ private fun OverlayPreviewCard(
                     AndroidView(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(80.dp),
+                            .heightIn(min = 80.dp),
                         factory = { ctx ->
                             StyledTranslationTextView(ctx).apply {
                                 setIncludeFontPadding(true)
@@ -9082,7 +9213,8 @@ private fun overlayThemeColors(
     customBorderW: Int
 ): ThemeColors = when (theme) {
     OverlayTheme.CLASSIC_DARK ->
-        ThemeColors(bg = 0xF2000000.toInt(), fg = 0xFFFFFFFF.toInt(), border = 0, borderDp = 0)
+        ThemeColors(bg = dev.clickn.translate.data.builtInOverlayPalette(theme)!!.background,
+            fg = 0xFFFFFFFF.toInt(), border = 0, borderDp = 0)
     OverlayTheme.AMBER_GOLD ->
         ThemeColors(bg = 0xF8241608.toInt(), fg = 0xFFFFD27F.toInt(), border = 0xFFE3B65B.toInt(), borderDp = 2)
     OverlayTheme.PAPER_LIGHT ->
@@ -9796,6 +9928,8 @@ private fun TranslationPresetSection(
     paddleModelReady: (PaddleModelVersion) -> Boolean,
     mangaOcrModelReady: Boolean,
     orientationModelReady: Boolean,
+    tesseractModelReady: Boolean,
+    mlKitDownloadedLanguages: Set<String>,
     modelDownloading: Boolean,
     downloadingPresetId: String?,
     onExport: () -> Unit,
@@ -9853,7 +9987,9 @@ private fun TranslationPresetSection(
             llmModelReady = llmModelReady,
             paddleModelReady = paddleModelReady,
             mangaOcrModelReady = mangaOcrModelReady,
-            orientationModelReady = orientationModelReady
+            orientationModelReady = orientationModelReady,
+            tesseractModelReady = tesseractModelReady,
+            mlKitDownloadedLanguages = mlKitDownloadedLanguages,
         )
         TranslationPresetRow(
             preset = preset,
@@ -10090,6 +10226,8 @@ private fun modelDownloadSpecDisplayName(
             context.getString(R.string.settings_manga_ocr_model_name)
         ModelDownloadType.ORIENTATION ->
             context.getString(R.string.settings_orientation_model_name)
+        ModelDownloadType.TESSERACT_ARABIC -> context.getString(R.string.settings_ocr_chip_tesseract_arabic)
+        ModelDownloadType.ML_KIT_TRANSLATION -> "Google ML Kit: ${spec.variant.replace(':', '→')}"
     }
 }.getOrDefault(spec.encode())
 
@@ -10299,6 +10437,8 @@ private fun translationPresetModelIssueLabel(
     context: Context,
     issue: TranslationPresetModelIssue
 ): String = when (issue.kind) {
+    TranslationPresetModelIssueKind.TESSERACT_MISSING -> context.getString(R.string.settings_ocr_chip_tesseract_arabic)
+    TranslationPresetModelIssueKind.ML_KIT_MISSING -> "Google ML Kit: ${issue.sourceLanguage}→${issue.targetLanguage}"
     TranslationPresetModelIssueKind.LOCAL_LLM_UNSUPPORTED ->
         context.getString(R.string.settings_translation_preset_local_llm_unsupported)
     TranslationPresetModelIssueKind.LOCAL_LLM_MISSING ->
@@ -10325,7 +10465,8 @@ private fun translationPresetDownloadModelLabel(
         issues = issues,
         paddleModelLabel = { version -> context.getString(version.displayNameRes) },
         mangaOcrModelLabel = context.getString(R.string.settings_manga_ocr_model_name),
-        orientationModelLabel = context.getString(R.string.settings_orientation_model_name)
+        orientationModelLabel = context.getString(R.string.settings_orientation_model_name),
+        tesseractModelLabel = context.getString(R.string.settings_ocr_chip_tesseract_arabic),
     )
     return labels.joinToString(
         separator = context.getString(R.string.settings_translation_preset_download_model_separator)
@@ -10355,10 +10496,7 @@ private fun presetLlmLabel(preset: TranslationPreset): String = when (preset.tra
     }
     TranslatorEngine.LOCAL_SAKURA -> stringResource(R.string.settings_engine_local_sakura)
     TranslatorEngine.LOCAL_HY_MT2 -> stringResource(R.string.settings_engine_local_hymt2)
-    TranslatorEngine.GOOGLE_ML_KIT -> stringResource(
-        MlKitQuickSourceLanguage.fromLanguageTag(preset.sourceLang)?.labelRes
-            ?: R.string.settings_translator_group_on_device
-    )
+    TranslatorEngine.GOOGLE_ML_KIT -> stringResource(R.string.settings_translation_service_mlkit)
     else -> translatorEngineLabel(preset.translatorEngine)
 }
 
@@ -10378,6 +10516,7 @@ private fun ocrEngineLabel(engine: OcrEngineKind): String = stringResource(
         OcrEngineKind.LUNA_OCR -> R.string.settings_ocr_chip_luna
         OcrEngineKind.PADDLE_ONNX -> R.string.settings_ocr_chip_paddle
         OcrEngineKind.MANGA_OCR_JA -> R.string.settings_ocr_chip_manga_ocr_ja
+        OcrEngineKind.TESSERACT_ARABIC -> R.string.settings_ocr_chip_tesseract_arabic
     }
 )
 
@@ -10855,13 +10994,14 @@ internal fun <T> EngineChip(
     )
 }
 
-/** OCR 引擎 → 用户可读 chip 标签资源 id（联动提示 dialog 复用）。 */
+/** Font choices share selection and optional deletion without fixed text height. */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun OverlayFontChip(
+internal fun OverlayFontChip(
     selected: Boolean,
     label: String,
     onClick: () -> Unit,
-    onLongClick: () -> Unit
+    onLongClick: (() -> Unit)? = null,
 ) {
     val bg = if (selected) {
         MaterialTheme.colorScheme.secondaryContainer
@@ -10880,24 +11020,26 @@ private fun OverlayFontChip(
     }
     Box(
         modifier = Modifier
-            .height(36.dp)
-            .widthIn(max = 180.dp)
+            .heightIn(min = 48.dp)
+            .widthIn(max = 240.dp)
+            .clip(RoundedCornerShape(8.dp))
             .background(bg, RoundedCornerShape(8.dp))
             .border(1.dp, border, RoundedCornerShape(8.dp))
-            .pointerInput(label, selected) {
-                detectTapGestures(
-                    onTap = { onClick() },
-                    onLongPress = { onLongClick() }
-                )
-            }
-            .padding(horizontal = 12.dp),
+            .combinedClickable(
+                role = Role.RadioButton,
+                onClick = onClick,
+                onLongClick = onLongClick,
+                onLongClickLabel = if (onLongClick != null) stringResource(R.string.settings_overlay_font_delete_action) else null,
+            )
+            .semantics { this.selected = selected }
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(
             label,
             color = fg,
             style = MaterialTheme.typography.labelLarge,
-            maxLines = 1,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis
         )
     }
@@ -11047,12 +11189,16 @@ internal enum class TranslationPresetModelIssueKind {
     PADDLE_MISSING,
     MANGA_OCR_MISSING,
     ORIENTATION_MISSING,
+    TESSERACT_MISSING,
+    ML_KIT_MISSING,
 }
 
 internal data class TranslationPresetModelIssue(
     val kind: TranslationPresetModelIssueKind,
     val llmModelKind: LlmModelKind? = null,
     val paddleModelVersion: PaddleModelVersion? = null,
+    val sourceLanguage: String? = null,
+    val targetLanguage: String? = null,
 ) {
     val downloadable: Boolean
         get() = kind != TranslationPresetModelIssueKind.LOCAL_LLM_UNSUPPORTED
@@ -11065,7 +11211,19 @@ internal fun translationPresetModelIssues(
     paddleModelReady: (PaddleModelVersion) -> Boolean,
     mangaOcrModelReady: Boolean,
     orientationModelReady: Boolean,
+    tesseractModelReady: Boolean = false,
+    mlKitDownloadedLanguages: Set<String> = emptySet(),
 ): List<TranslationPresetModelIssue> = buildList {
+    if ((preset.ocrEngine == OcrEngineKind.TESSERACT_ARABIC ||
+        preset.ocrEngine == OcrEngineKind.ML_KIT_AUTO && dev.clickn.translate.data.AutoOcrSettings.languageKey(preset.sourceLang) == "ar") &&
+        !tesseractModelReady) add(TranslationPresetModelIssue(TranslationPresetModelIssueKind.TESSERACT_MISSING))
+    if (preset.translatorEngine == TranslatorEngine.GOOGLE_ML_KIT) {
+        val pair = runCatching { ModelDownloadSpec.mlKitTranslation(preset.sourceLang, preset.targetLang).mlKitLanguages() }.getOrNull()
+        if (pair != null && pair.first != pair.second && !mlKitDownloadedLanguages.containsAll(
+                MlKitLanguagePolicy.requiredDownloadLanguages(pair.first, pair.second)))
+            add(TranslationPresetModelIssue(TranslationPresetModelIssueKind.ML_KIT_MISSING,
+                sourceLanguage = pair.first, targetLanguage = pair.second))
+    }
     localLlmModelKindFor(preset.translatorEngine)?.let { kind ->
         if (!localLlmDeviceCapable) {
             add(TranslationPresetModelIssue(TranslationPresetModelIssueKind.LOCAL_LLM_UNSUPPORTED))
@@ -11112,7 +11270,8 @@ internal fun translationPresetModelIssues(
         OcrEngineKind.YOUDAO,
         OcrEngineKind.PADDLE_AI_STUDIO,
         OcrEngineKind.UMI_OCR,
-        OcrEngineKind.LUNA_OCR -> Unit
+        OcrEngineKind.LUNA_OCR,
+        OcrEngineKind.TESSERACT_ARABIC -> Unit
     }
     // Preserve the optional model readiness implementation without surfacing a hidden package as
     // a required preset download. Geometry-based orientation fallback remains available.
@@ -11198,10 +11357,13 @@ internal fun translationPresetDownloadModelLabels(
     paddleModelLabel: (PaddleModelVersion) -> String,
     mangaOcrModelLabel: String,
     orientationModelLabel: String,
+    tesseractModelLabel: String = "Tesseract: Arabic + English",
 ): List<String> = issues.asSequence()
     .filter { it.downloadable }
     .mapNotNull { issue ->
         when (issue.kind) {
+            TranslationPresetModelIssueKind.TESSERACT_MISSING -> tesseractModelLabel
+            TranslationPresetModelIssueKind.ML_KIT_MISSING -> "Google ML Kit: ${issue.sourceLanguage}→${issue.targetLanguage}"
             TranslationPresetModelIssueKind.LOCAL_LLM_MISSING ->
                 issue.llmModelKind?.displayName
             TranslationPresetModelIssueKind.PADDLE_MISSING ->
@@ -11236,7 +11398,8 @@ internal fun isCloudOcrEngineForUpscaleWarning(engine: OcrEngineKind): Boolean =
     OcrEngineKind.UMI_OCR,
     OcrEngineKind.LUNA_OCR,
     OcrEngineKind.PADDLE_ONNX,
-    OcrEngineKind.MANGA_OCR_JA -> false
+    OcrEngineKind.MANGA_OCR_JA,
+    OcrEngineKind.TESSERACT_ARABIC -> false
 }
 
 internal fun cloudOcrUpscaleWarningVisible(
@@ -12226,6 +12389,8 @@ internal fun checkingPlaceholderIfUnresolved(currentStatus: String, checkingPlac
     currentStatus.ifBlank { checkingPlaceholder }
 
 private fun modelNetworkTargetLabel(target: ModelDownloadNetworkTarget): Int = when (target) {
+    ModelDownloadNetworkTarget.TESSERACT_ARABIC -> R.string.settings_ocr_chip_tesseract_arabic
+    ModelDownloadNetworkTarget.ML_KIT_TRANSLATION -> R.string.settings_translation_service_mlkit
     ModelDownloadNetworkTarget.LOCAL_LLM -> R.string.settings_model_network_target_llm
     ModelDownloadNetworkTarget.PADDLE_OCR -> R.string.settings_model_network_target_paddle
     ModelDownloadNetworkTarget.MANGA_OCR -> R.string.settings_model_network_target_manga

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="readiness_title">App readiness</string>
+    <string name="readiness_core_progress">Essential settings: %1$d of %2$d</string>
+    <string name="readiness_more_available">Open the checklist to review settings for convenient use.</string>
+    <string name="readiness_recommendations_done">Additional settings are complete.</string>
+    <string name="readiness_body">See what is already enabled. Tap any item to configure it.</string>
+    <string name="readiness_core">For screen translation</string>
+    <string name="readiness_recommended">For convenience</string>
+    <string name="readiness_recommended_body">These settings are optional. Choose what you need.</string>
+    <string name="readiness_hero">Floating companion</string>
+    <string name="readiness_system_capture">System capture. Android asks for permission when you start.</string>
+    <string name="readiness_shizuku_enabled">Shizuku is connected</string>
+    <string name="readiness_not_enabled">Not enabled</string>
+</resources>

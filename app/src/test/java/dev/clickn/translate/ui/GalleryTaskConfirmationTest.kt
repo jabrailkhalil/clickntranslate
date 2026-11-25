@@ -8,7 +8,7 @@ import org.junit.Test
 class GalleryTaskConfirmationTest {
 
     @Test
-    fun `create and cancel actions require catalyst confirmation`() {
+    fun `large batches retain confirmation and ordinary photo translation starts directly`() {
         val screen = sourceFile(
             "src/main/java/dev/clickn/translate/ui/GalleryTranslationScreens.kt"
         ).readText()
@@ -30,21 +30,23 @@ class GalleryTaskConfirmationTest {
 
         listOf(
             Case(
-                "create button only opens confirmation",
-                createScreen.contains("onClick = { showCreateDialog = true }"),
+                "large batch requests confirmation while small selection starts directly",
+                createScreen.contains("submission.uris.size >= GalleryTranslationWorkPolicy.FOREGROUND_IMAGE_THRESHOLD") &&
+                    createScreen.contains("pendingSubmission = submission") &&
+                    createScreen.contains("startSubmission(submission)"),
             ),
             Case(
                 "create confirmation uses catalyst dialog",
-                createScreen.contains("if (showCreateDialog)") &&
+                createScreen.contains("pendingSubmission?.let { submission ->") &&
                     createScreen.substring(
-                        createScreen.indexOf("if (showCreateDialog)"),
+                        createScreen.indexOf("pendingSubmission?.let { submission ->"),
                         createScreen.indexOf("Scaffold("),
                     ).contains("CatalystAlertDialog("),
             ),
             Case(
-                "task is created only by the confirm action",
-                createScreen.indexOf("viewModel.createAndEnqueue(selectedUris)") <
-                    createScreen.indexOf("Scaffold("),
+                "submission binds the reviewed image list and settings snapshot",
+                createScreen.contains("GallerySubmission(selectedUris.toList(), current)") &&
+                    createScreen.contains("viewModel.createAndEnqueue(submission.uris, submission.settings)"),
             ),
             Case(
                 "create message includes selected image count",

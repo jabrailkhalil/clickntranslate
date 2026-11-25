@@ -2,6 +2,8 @@
 package dev.clickn.translate.shizuku
 
 import android.content.pm.PackageManager
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
@@ -29,7 +31,9 @@ import kotlin.coroutines.resume
 @Singleton
 class ShizukuManager @Inject constructor() {
 
-    private val PERMISSION_REQUEST_CODE = 0xC4A
+    private val permissionRequests = AtomicInteger(0xC4A)
+    private val binderRevision = AtomicLong()
+    private val permissionMutex = Mutex()
 
     private val _binderAlive = MutableStateFlow(safePingBinder())
     /**
@@ -53,10 +57,13 @@ class ShizukuManager @Inject constructor() {
     init {
         runCatching {
             Shizuku.addBinderReceivedListener {
+                binderRevision.incrementAndGet()
+                _shellPrivilegeOk.value = false
                 _binderAlive.value = true
                 verifyScope.launch { verifyShellPrivilegeAsync() }
             }
             Shizuku.addBinderDeadListener {
+                binderRevision.incrementAndGet()
                 _binderAlive.value = false
                 _shellPrivilegeOk.value = false
             }
@@ -73,6 +80,7 @@ class ShizukuManager @Inject constructor() {
      */
     suspend fun verifyShellPrivilegeAsync() = withContext(Dispatchers.IO) {
         verifyMutex.withLock {
+            val revision = binderRevision.get()
             val ok = runCatching {
                 val binderAlive = safePingBinder()
                 _binderAlive.value = binderAlive
@@ -86,7 +94,10 @@ class ShizukuManager @Inject constructor() {
                 Timber.w(t, "[shizuku-verify] verify threw")
                 false
             }
-            _shellPrivilegeOk.value = ok
+            // A verification begun for a previous Binder must never resurrect READY after death.
+            val stillAlive = safePingBinder()
+            _binderAlive.value = stillAlive
+            _shellPrivilegeOk.value = ok && stillAlive && revision == binderRevision.get() && hasPermission()
         }
     }
 
@@ -168,29 +179,39 @@ class ShizukuManager @Inject constructor() {
      * 请求 Shizuku 权限。挂起到用户授权 / 拒绝。
      * 返回 true = 授权成功，false = 拒绝 / 未就绪。
      */
-    suspend fun requestPermission(): Boolean {
-        if (!isServiceRunning()) return false
-        if (hasPermission()) return true
-        if (Shizuku.shouldShowRequestPermissionRationale()) {
-            Timber.w("Shizuku says we should explain — but we just ask anyway")
-        }
-        return suspendCancellableCoroutine { cont ->
-            val listener = object : Shizuku.OnRequestPermissionResultListener {
-                override fun onRequestPermissionResult(requestCode: Int, grantResult: Int) {
-                    if (requestCode != PERMISSION_REQUEST_CODE) return
-                    Shizuku.removeRequestPermissionResultListener(this)
-                    if (cont.isActive) cont.resume(grantResult == PackageManager.PERMISSION_GRANTED)
+    suspend fun requestPermission(): Boolean = permissionMutex.withLock {
+        withContext(Dispatchers.Main.immediate) {
+            if (!isServiceRunning()) return@withContext false
+            if (hasPermission()) return@withContext true
+            // The official API uses this value for "deny and do not ask again".
+            if (runCatching { Shizuku.shouldShowRequestPermissionRationale() }.getOrDefault(true)) {
+                return@withContext false
+            }
+            // A canceled request's late reply must not satisfy the next request.
+            val request = permissionRequests.getAndIncrement()
+            suspendCancellableCoroutine { continuation ->
+                lateinit var permissionListener: Shizuku.OnRequestPermissionResultListener
+                lateinit var deathListener: Shizuku.OnBinderDeadListener
+                fun cleanup() {
+                    runCatching { Shizuku.removeRequestPermissionResultListener(permissionListener) }
+                    runCatching { Shizuku.removeBinderDeadListener(deathListener) }
                 }
-            }
-            Shizuku.addRequestPermissionResultListener(listener)
-            try {
-                Shizuku.requestPermission(PERMISSION_REQUEST_CODE)
-            } catch (t: Throwable) {
-                Shizuku.removeRequestPermissionResultListener(listener)
-                if (cont.isActive) cont.resume(false)
-            }
-            cont.invokeOnCancellation {
-                Shizuku.removeRequestPermissionResultListener(listener)
+                fun complete(granted: Boolean) {
+                    cleanup()
+                    if (!granted) _shellPrivilegeOk.value = false
+                    if (continuation.isActive) continuation.resume(granted)
+                }
+                permissionListener = Shizuku.OnRequestPermissionResultListener { code, result ->
+                    if (code == request) complete(result == PackageManager.PERMISSION_GRANTED)
+                }
+                deathListener = Shizuku.OnBinderDeadListener { complete(false) }
+                try {
+                    Shizuku.addRequestPermissionResultListener(permissionListener)
+                    Shizuku.addBinderDeadListener(deathListener)
+                    continuation.invokeOnCancellation { cleanup() }
+                    if (continuation.isActive && isServiceRunning()) Shizuku.requestPermission(request)
+                    else complete(false)
+                } catch (_: Exception) { complete(false) }
             }
         }
     }

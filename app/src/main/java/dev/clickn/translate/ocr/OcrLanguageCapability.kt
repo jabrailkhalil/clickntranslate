@@ -111,6 +111,7 @@ object OcrLanguageCapability {
             OcrEngineKind.PADDLE_ONNX -> when (paddleModelVersion) {
                 PaddleModelVersion.V5_MOBILE -> code in PADDLE_V5_LANGS
                 PaddleModelVersion.V5_KOREAN -> code in PADDLE_V5_KOREAN_LANGS
+                PaddleModelVersion.V5_ARABIC -> code == "ar" || code == "en"
                 PaddleModelVersion.V6_TINY -> code in PADDLE_V6_BASE_LANGS
                 PaddleModelVersion.V6_SMALL,
                 PaddleModelVersion.V6_MEDIUM -> code in PADDLE_V6_AI_STUDIO_LANGS
@@ -124,6 +125,7 @@ object OcrLanguageCapability {
             OcrEngineKind.LUNA_OCR -> true
             // manga-ocr 仅训练日文，专门处理日漫气泡
             OcrEngineKind.MANGA_OCR_JA -> code == "ja"
+            OcrEngineKind.TESSERACT_ARABIC -> code == "ar" || code == "en"
         }
     }
 
@@ -148,6 +150,7 @@ object OcrLanguageCapability {
         OcrEngineKind.YOUDAO -> true
         OcrEngineKind.UMI_OCR -> true
         OcrEngineKind.LUNA_OCR -> true
+        OcrEngineKind.TESSERACT_ARABIC -> true // Its installed ara+eng pair reads both scripts.
         OcrEngineKind.ML_KIT_LATIN,
         OcrEngineKind.ML_KIT_JAPANESE,
         OcrEngineKind.ML_KIT_KOREAN,
@@ -306,6 +309,7 @@ object OcrLanguageCapability {
 
         // 2) ML Kit 端侧（用户不在云端 / key 未配 / 当前云端不支持该语种）
         when {
+            code == "ar" -> return Recommendation(OcrEngineKind.TESSERACT_ARABIC)
             code == "ja" -> return Recommendation(OcrEngineKind.ML_KIT_JAPANESE)
             code == "ko" -> return Recommendation(OcrEngineKind.ML_KIT_KOREAN)
             code.startsWith("zh") -> return Recommendation(OcrEngineKind.ML_KIT_CHINESE)
@@ -371,6 +375,7 @@ object OcrLanguageCapability {
         OcrEngineKind.PADDLE_AI_STUDIO,
         OcrEngineKind.UMI_OCR,
         OcrEngineKind.LUNA_OCR -> null
+        OcrEngineKind.TESSERACT_ARABIC -> null
         // manga-ocr 在 sourceLang=auto 时不合适（仅训练日文），推回 ML_KIT_AUTO
         OcrEngineKind.MANGA_OCR_JA -> Recommendation(OcrEngineKind.ML_KIT_AUTO)
         OcrEngineKind.BAIDU -> if (hasBaiduKey) {
@@ -488,7 +493,8 @@ object OcrLanguageCapability {
         // 有道 OCR 由 sourceLang 反向映射 langType，没有单独的"OCR 内部语种"字段
         OcrEngineKind.YOUDAO,
         OcrEngineKind.UMI_OCR,
-        OcrEngineKind.LUNA_OCR -> null
+        OcrEngineKind.LUNA_OCR,
+        OcrEngineKind.TESSERACT_ARABIC -> null
         OcrEngineKind.MANGA_OCR_JA -> "ja"
         OcrEngineKind.BAIDU -> baiduLanguage.bcp47
         OcrEngineKind.TENCENT -> tencentLanguage.bcp47

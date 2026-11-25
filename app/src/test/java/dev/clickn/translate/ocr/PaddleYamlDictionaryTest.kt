@@ -40,6 +40,11 @@ class PaddleYamlDictionaryTest {
                 expected = listOf("A", "B", "\n"),
             ),
             Case(
+                name = "official Arabic apostrophe keeps one CTC dictionary character",
+                yaml = "character_dict:\n  - '!'\n  - '\"'\n  - ''''\n  - ا\n",
+                expected = listOf("!", "\"", "'", "ا"),
+            ),
+            Case(
                 name = "missing dictionary",
                 yaml = "Global:\n  model_name: PP-OCRv5_mobile_rec",
                 expected = emptyList(),

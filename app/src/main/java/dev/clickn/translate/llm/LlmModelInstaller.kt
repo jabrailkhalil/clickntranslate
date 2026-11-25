@@ -12,6 +12,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
@@ -20,6 +22,9 @@ import timber.log.Timber
 import java.io.File
 import java.io.FileOutputStream
 import java.io.RandomAccessFile
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 
 /**
  * 端侧 LLM GGUF 模型安装器。每个 [LlmModelKind] 对应一个 .gguf 文件，下载到
@@ -42,6 +47,8 @@ class LlmModelInstaller @Inject constructor(
     val modelsDir: File by lazy { File(context.filesDir, "models/llm").apply { mkdirs() } }
 
     fun checkInstalled(kind: LlmModelKind): File? {
+        // Local imports and pre-pinning installations remain usable. This is a
+        // structural readiness check, not certification of publisher provenance.
         val file = File(modelsDir, kind.fileName)
         val validationError = validateGgufFile(file, minimumSizeBytes(kind))
         if (validationError != null) {
@@ -117,18 +124,8 @@ class LlmModelInstaller @Inject constructor(
         customBase: String?,
     ): List<String> = buildList {
         when (choice) {
-            LlmMirrorChoice.HF_OFFICIAL -> when (kind) {
-                LlmModelKind.SAKURA_1_5B_Q4 ->
-                    add("https://huggingface.co/shing3232/Sakura-1.5B-Qwen2.5-v1.0-GGUF-IMX/resolve/main/${kind.fileName}")
-                LlmModelKind.HY_MT2_1_8B_Q4_K_M ->
-                    add("https://huggingface.co/tencent/Hy-MT2-1.8B-GGUF/resolve/main/${kind.fileName}")
-            }
-            LlmMirrorChoice.HF_MIRROR -> when (kind) {
-                LlmModelKind.SAKURA_1_5B_Q4 ->
-                    add("https://hf-mirror.com/shing3232/Sakura-1.5B-Qwen2.5-v1.0-GGUF-IMX/resolve/main/${kind.fileName}")
-                LlmModelKind.HY_MT2_1_8B_Q4_K_M ->
-                    add("https://hf-mirror.com/tencent/Hy-MT2-1.8B-GGUF/resolve/main/${kind.fileName}")
-            }
+            LlmMirrorChoice.HF_OFFICIAL -> add(kind.downloadUrl)
+            LlmMirrorChoice.HF_MIRROR -> add(kind.downloadUrl.replace("https://huggingface.co/", "https://hf-mirror.com/"))
             LlmMirrorChoice.CUSTOM -> {
                 if (!customBase.isNullOrBlank()) add(ensureSlash(customBase) + kind.fileName)
             }
@@ -145,7 +142,12 @@ class LlmModelInstaller @Inject constructor(
         kind: LlmModelKind,
         mirror: String,
     ) {
-        downloader.download(url, dest, { validateGgufFile(it, minimumSizeBytes(kind)) }) { downloaded, total ->
+        val transferContext = currentCoroutineContext()
+        downloader.download(url, dest, { file ->
+            validateGgufFile(file, minimumSizeBytes(kind)) ?: LlmModelIntegrity.validate(
+                file, kind.expectedSizeBytes, kind.expectedSha256, checkpoint = { transferContext.ensureActive() },
+            )
+        }) { downloaded, total ->
             channel.trySend(Progress(kind, mirror, downloaded, total, false))
         }
     }
@@ -169,8 +171,10 @@ class LlmModelInstaller @Inject constructor(
         uris: List<android.net.Uri>,
         defaultKind: LlmModelKind,
     ): Int = kotlinx.coroutines.withContext(Dispatchers.IO) {
+        val importContext = currentCoroutineContext()
         var imported = 0
         for (uri in uris) {
+            importContext.ensureActive()
             val name = queryDisplayName(uri) ?: continue
             val lower = name.lowercase()
             val kind = when {
@@ -179,25 +183,38 @@ class LlmModelInstaller @Inject constructor(
                 else -> defaultKind
             }
             val dest = File(modelsDir, kind.fileName)
-            val tmp = File(modelsDir, kind.fileName + ".tmp")
+            val tmp = File.createTempFile(kind.fileName + ".import-", ".tmp", modelsDir)
             try {
                 context.contentResolver.openInputStream(uri)?.use { input ->
                     FileOutputStream(tmp).use { output ->
-                        input.copyTo(output, bufferSize = 1024 * 1024)
+                        val buffer = ByteArray(64 * 1024)
+                        while (true) {
+                            importContext.ensureActive()
+                            val count = input.read(buffer)
+                            importContext.ensureActive()
+                            if (count < 0) break
+                            output.write(buffer, 0, count)
+                        }
                     }
                 } ?: continue
                 val validationError = validateGgufFile(tmp, minimumSizeBytes(kind))
                 if (validationError != null) {
                     throw RuntimeException("invalid LLM model $name: $validationError")
                 }
-                if (dest.exists()) dest.delete()
-                if (tmp.renameTo(dest)) {
-                    imported++
-                    Timber.i("LLM imported $name → ${kind.fileName} (${dest.length() / 1024 / 1024}MB)")
+                importContext.ensureActive()
+                try {
+                    Files.move(tmp.toPath(), dest.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+                } catch (_: AtomicMoveNotSupportedException) {
+                    Files.move(tmp.toPath(), dest.toPath(), StandardCopyOption.REPLACE_EXISTING)
                 }
+                imported++
+                Timber.i("LLM imported $name → ${kind.fileName} (${dest.length() / 1024 / 1024}MB)")
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (t: Throwable) {
-                tmp.delete()
                 Timber.w(t, "Import LLM model failed: $uri")
+            } finally {
+                tmp.delete()
             }
         }
         imported

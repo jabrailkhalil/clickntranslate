@@ -13,6 +13,7 @@ import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 import dev.clickn.translate.glossary.GlossaryTermEntity
 import dev.clickn.translate.glossary.normalizeGlossaryTerm
+import dev.clickn.translate.util.decodeStrictUtf8
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
@@ -37,6 +38,8 @@ data class SettingsBundlePreview(
     val formatVersion: Int = 0,
     val skippedSettingFields: List<String> = emptyList(),
     val protectedLocalFieldCount: Int = 0,
+    val appliedSettingFields: Set<String>? = null,
+    val uiPreferences: PortableUiPreferences? = null,
 )
 
 data class SettingsBundleExportResult(
@@ -62,14 +65,14 @@ data class SettingsBundleImportResult(
 
 /** Cross-device settings package. Authentication credentials are deliberately excluded. */
 object SettingsBundleTransfer {
-    const val DEFAULT_FILE_NAME: String = "clickntranslate-settings.ctsettings"
+    const val DEFAULT_FILE_NAME: String = "clickntranslate-settings.zip"
     const val MIME_TYPE: String = "application/zip"
     const val MAX_FONT_COUNT: Int = 32
     const val MAX_TOTAL_FONT_BYTES: Long = 200L * 1024L * 1024L
     const val MAX_GLOSSARY_TERM_COUNT: Int = 5_000
 
     private const val FORMAT = "clickntranslate.settings"
-    private const val VERSION = 2
+    private const val VERSION = 3
     private const val MIN_SUPPORTED_VERSION = 1
     private const val MANIFEST_ENTRY = "manifest.json"
     private const val FONT_ENTRY_PREFIX = "fonts/"
@@ -116,8 +119,20 @@ object SettingsBundleTransfer {
         output: OutputStream,
         settings: Settings,
         glossaryTerms: List<GlossaryTermEntity> = emptyList(),
+        uiPreferences: PortableUiPreferences? = null,
         resolveFontFile: (String) -> File?,
+    ): SettingsBundleExportResult = write(output, settings, glossaryTerms, uiPreferences, resolveFontFile, checkpoint = {})
+
+    internal fun write(
+        output: OutputStream,
+        settings: Settings,
+        glossaryTerms: List<GlossaryTermEntity>,
+        uiPreferences: PortableUiPreferences? = null,
+        resolveFontFile: (String) -> File?,
+        checkpoint: () -> Unit,
     ): SettingsBundleExportResult {
+        checkpoint()
+        uiPreferences?.validate()
         val portable = portableSettings(settings)
         val portableGlossary = portableGlossaryTerms(glossaryTerms)
         require(portable.overlayFonts.size <= MAX_FONT_COUNT) {
@@ -150,18 +165,41 @@ object SettingsBundleTransfer {
                 )
             },
             glossaryTerms = portableGlossary,
+            uiPreferences = uiPreferences,
         )
+        val manifestBytes = json.encodeToString(manifest).toByteArray(Charsets.UTF_8)
+        require(manifestBytes.size <= MAX_MANIFEST_BYTES) { "Settings package manifest is too large." }
 
         ZipOutputStream(output.buffered()).use { zip ->
+            checkpoint()
             zip.putNextEntry(stableEntry(MANIFEST_ENTRY))
-            zip.write(json.encodeToString(manifest).toByteArray(Charsets.UTF_8))
+            zip.write(manifestBytes)
             zip.closeEntry()
-            fontSources.forEach { (font, file) ->
+            fontSources.forEachIndexed { index, (font, file) ->
+                checkpoint()
                 zip.putNextEntry(stableEntry(FONT_ENTRY_PREFIX + font.fileName))
-                file.inputStream().buffered().use { it.copyTo(zip) }
+                file.inputStream().buffered().use { input ->
+                    val buffer = ByteArray(8 * 1024)
+                    var copied = 0L
+                    while (true) {
+                        checkpoint()
+                        val count = input.read(buffer)
+                        checkpoint()
+                        if (count < 0) break
+                        copied += count
+                        require(copied <= manifest.fonts[index].byteCount) {
+                            "Font file changed during settings export."
+                        }
+                        zip.write(buffer, 0, count)
+                    }
+                    require(copied == manifest.fonts[index].byteCount) {
+                        "Font file changed during settings export."
+                    }
+                }
                 zip.closeEntry()
             }
         }
+        checkpoint()
         return SettingsBundleExportResult(
             presetCount = portable.translationPresets.size,
             fontCount = fontSources.size,
@@ -177,10 +215,19 @@ object SettingsBundleTransfer {
         onFont: (SettingsBundleFont, InputStream) -> Unit,
     ): SettingsBundlePreview = readInternal(input, consumeFonts = true, onFont = onFont)
 
+    internal fun read(
+        input: InputStream,
+        checkpoint: () -> Unit,
+        onFont: (SettingsBundleFont, InputStream) -> Unit,
+    ): SettingsBundlePreview = readInternal(
+        CheckpointInputStream(input, checkpoint), consumeFonts = true, onFont = onFont,
+    )
+
     fun mergeImportedSettings(
         current: Settings,
         imported: Settings,
         availableFonts: List<OverlayFontEntry>,
+        fields: Set<String>? = null,
     ): SettingsBundleMergeResult {
         val portable = portableSettings(imported)
         val presetResult = TranslationPresetTransfer.mergeImportedPresets(
@@ -193,20 +240,24 @@ object SettingsBundleTransfer {
             current.overlayFonts + portable.overlayFonts.mapNotNull { availableByName[it.fileName] },
         )
         val selectedFont = availableByName[portable.overlayFontFileName]
+        val selectsActivePreset = fields == null || "activeTranslationPresetId" in fields
         val importedActiveName = portable.translationPresets
-            .firstOrNull { it.id == portable.activeTranslationPresetId }
+            .firstOrNull { selectsActivePreset && it.id == portable.activeTranslationPresetId }
             ?.name
         val activeId = importedActiveName?.let { name ->
             presetResult.presets.firstOrNull {
                 it.name.trim().lowercase(Locale.ROOT) == name.trim().lowercase(Locale.ROOT)
             }?.id
         } ?: current.activeTranslationPresetId.takeIf { currentId ->
-            presetResult.presets.any { it.id == currentId }
+            TranslationPresetCatalog.find(presetResult.presets, currentId) != null
         }.orEmpty()
 
-        val merged = SettingsFieldPolicy.applyPortable(current, portable).copy(
-            overlayFontFileName = selectedFont?.fileName.orEmpty(),
-            overlayFontDisplayName = selectedFont?.displayName.orEmpty(),
+        val selectsFont = fields == null || "overlayFontFileName" in fields
+        val merged = SettingsFieldPolicy.applyPortable(
+            current, portable, fields ?: SettingsFieldPolicy.portableFieldNames,
+        ).copy(
+            overlayFontFileName = if (selectsFont) selectedFont?.fileName.orEmpty() else current.overlayFontFileName,
+            overlayFontDisplayName = if (selectsFont) selectedFont?.displayName.orEmpty() else current.overlayFontDisplayName,
             overlayFonts = mergedFonts,
             translationPresets = presetResult.presets,
             activeTranslationPresetId = activeId,
@@ -221,7 +272,16 @@ object SettingsBundleTransfer {
     ): SettingsBundlePreview {
         val source = PushbackInputStream(input.buffered(), 4)
         val header = ByteArray(4)
-        val read = source.read(header)
+        var read = 0
+        while (read < header.size) {
+            val count = source.read(header, read, header.size - read)
+            if (count < 0) break
+            if (count == 0) {
+                val byte = source.read()
+                if (byte < 0) break
+                header[read++] = byte.toByte()
+            } else read += count
+        }
         if (read > 0) source.unread(header, 0, read)
         val isZip = read >= 2 && header[0] == 'P'.code.toByte() && header[1] == 'K'.code.toByte()
         if (!isZip) {
@@ -261,6 +321,8 @@ object SettingsBundleTransfer {
                 formatVersion = manifest.version,
                 skippedSettingFields = decodedSettings.skippedFields,
                 protectedLocalFieldCount = SettingsFieldPolicy.protectedFieldNames.size,
+                appliedSettingFields = decodedSettings.appliedFields,
+                uiPreferences = manifest.uiPreferences,
             )
             if (!consumeFonts) return preview
 
@@ -297,6 +359,10 @@ object SettingsBundleTransfer {
         require(manifest.minimumReaderVersion <= VERSION) {
             "Settings package requires reader version ${manifest.minimumReaderVersion}."
         }
+        require(manifest.version >= 3 || manifest.uiPreferences == null) {
+            "Interface preferences require a V3 settings package."
+        }
+        manifest.uiPreferences?.validate()
         require(manifest.fonts.size <= MAX_FONT_COUNT) { "Settings package has too many fonts." }
         require(manifest.fonts.map { it.fileName }.distinct().size == manifest.fonts.size) {
             "Settings package contains duplicate fonts."
@@ -321,7 +387,7 @@ object SettingsBundleTransfer {
     private fun decodeManifestSettings(manifest: SettingsBundleManifest): SettingsFieldDecodeResult {
         val values = when (manifest.version) {
             1 -> manifest.settings
-            2 -> runCatching {
+            2, 3 -> runCatching {
                 json.decodeFromJsonElement<SettingsExportV2>(manifest.settings).values
             }.getOrElse { throw IllegalArgumentException("Invalid V2 settings payload.", it) }
             else -> error("Unsupported settings package version: ${manifest.version}")
@@ -353,12 +419,16 @@ object SettingsBundleTransfer {
     }
 
     private fun portablePreset(preset: TranslationPreset): TranslationPreset {
-        val defaults = Settings()
-        return preset.copy(
-            baseUrl = defaults.baseUrl,
-            deeplBaseUrl = defaults.deeplBaseUrl,
-            umiOcrBaseUrl = defaults.umiOcrBaseUrl,
-            lunaOcrBaseUrl = defaults.lunaOcrBaseUrl,
+        // Apply the same allowlist recursively: newly added private connections
+        // must not leak through a preset nested inside an otherwise portable bundle.
+        val portable = SettingsFieldPolicy.decodePortable(
+            SettingsFieldPolicy.encodePortable(preset.applyTo(Settings())),
+        ).settings
+        return TranslationPresetCatalog.fromSettings(
+            id = preset.id,
+            name = preset.name,
+            shortName = preset.shortName,
+            settings = portable,
         )
     }
 
@@ -373,10 +443,25 @@ object SettingsBundleTransfer {
             require(total <= maxBytes) { "Settings package manifest is too large." }
             output.write(buffer, 0, count)
         }
-        return output.toString(Charsets.UTF_8.name())
+        return decodeStrictUtf8(output.toByteArray()).removePrefix("\uFEFF")
     }
 
     private fun stableEntry(name: String): ZipEntry = ZipEntry(name).apply { time = 0L }
+}
+
+private class CheckpointInputStream(
+    input: InputStream,
+    private val checkpoint: () -> Unit,
+) : FilterInputStream(input) {
+    override fun read(): Int {
+        checkpoint()
+        return super.read().also { checkpoint() }
+    }
+
+    override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+        checkpoint()
+        return super.read(buffer, offset, length).also { checkpoint() }
+    }
 }
 
 @Serializable
@@ -387,6 +472,7 @@ private data class SettingsBundleManifest(
     val settings: JsonObject,
     val fonts: List<SettingsBundleFontManifest>,
     val glossaryTerms: List<GlossaryTermEntity> = emptyList(),
+    val uiPreferences: PortableUiPreferences? = null,
 )
 
 @Serializable

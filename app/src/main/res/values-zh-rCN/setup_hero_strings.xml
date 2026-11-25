@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="setup_hero_title">选择你的伙伴</string>
+    <string name="setup_hero_body">这张图片将显示在其他应用上方的悬浮按钮上。选择一个伙伴、操作图标或标志。之后可以随时更改。</string>
+    <string name="setup_hero_custom_unavailable">预览不可用。已保留你的选择。</string>
+</resources>

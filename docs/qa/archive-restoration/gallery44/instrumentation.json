@@ -1,0 +1,13 @@
+{
+  "shell_exit": 0,
+  "ignored": 0,
+  "errors": 0,
+  "passed": 110,
+  "source_commit": "dd2613d4d55ec6ceeb3e1b648a0a2bf082211719",
+  "scope": "AndroidJUnitRunner, default arguments with declared test permissions, isolated API 36 disk",
+  "failures": 0,
+  "assumptions_skipped": 5,
+  "version_code": 44,
+  "runner": "dev.clickn.translate.debug.test/androidx.test.runner.AndroidJUnitRunner",
+  "terminal_status": -1
+}

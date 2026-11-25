@@ -10,6 +10,7 @@
     <string name="mobile_stop">Stop translation</string>
     <string name="mobile_ready">Ready to translate</string>
     <string name="mobile_running">Screen translation is on</string>
+    <string name="mobile_running_next_step">Open the app you want to translate. Use the floating hero to control translation; press and hold to open its menu.</string>
     <string name="mobile_pair">Languages</string>
     <string name="mobile_source">From</string>
     <string name="mobile_target">To</string>
@@ -24,7 +25,6 @@
     <string name="mobile_change">Change</string>
     <string name="mobile_permission_title">Allow the floating button</string>
     <string name="mobile_permission_body">One permission lets you translate inside other apps. Screen capture is requested when you start.</string>
-    <string name="mobile_permission_enable">Allow overlay</string>
     <string name="mobile_permission_done">Permission granted</string>
     <string name="mobile_help">How it works</string>
     <string name="mobile_text_title">Your words, translated.</string>
@@ -104,4 +104,23 @@
     <string name="settings_engine_lingva" translatable="false">Lingva</string>
     <string name="settings_engine_mymemory" translatable="false">MyMemory</string>
     <string name="settings_engine_libretranslate" translatable="false">LibreTranslate</string>
-    </resources>
+    <string name="mobile_history_loading">Loading history…</string>
+    <string name="mobile_history_import_error">Previous history could not be imported. Its original data is preserved; new translations can still be saved.</string>
+    <string name="mobile_history_erase_error">History is cleared, but removing its old backup could not finish. Try again to complete removal.</string>
+    <string name="mobile_history_storage_error">History is unavailable. The translation remains on the Text screen. Try loading history again.</string>
+    <string name="mobile_history_retry">Try again</string>
+    <string name="mobile_history_entry_title">Saved translation</string>
+    <string name="mobile_history_original">Original text</string>
+    <string name="mobile_history_close">Close</string>
+    <string name="mobile_history_use_source">Open in translator</string>
+    <string name="mobile_failure_connection">Could not connect to the translation service. Check your connection or choose another service.</string>
+    <string name="mobile_failure_timeout">The service did not respond in time. Try again.</string>
+    <string name="mobile_failure_access">The service denied access. Check its settings or choose another service.</string>
+    <string name="mobile_failure_limit">The service has limited requests. Try again later.</string>
+    <string name="mobile_failure_tls">Could not establish a trusted secure connection to the service.</string>
+    <string name="mobile_failure_service">The translation service is unavailable. Try again later.</string>
+    <string name="mobile_failure_response">The service returned an unreadable or empty response. Try again or choose another service.</string>
+    <string name="mobile_failure_details">Diagnostics</string>
+    <string name="mobile_failure_details_body">This code describes the error. It contains no request text, response content or API key.</string>
+    <string name="mobile_checking_models">Checking readiness…</string>
+</resources>

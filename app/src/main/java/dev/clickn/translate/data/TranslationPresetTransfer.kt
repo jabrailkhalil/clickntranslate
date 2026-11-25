@@ -1,6 +1,8 @@
 // Modified for Click'n'Translate on October 3, 2026.
 package dev.clickn.translate.data
 
+import dev.clickn.translate.util.decodeStrictUtf8
+
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.security.MessageDigest
@@ -99,7 +101,7 @@ object TranslationPresetTransfer {
             throw IllegalArgumentException("Preset export decrypt failed.", it)
         }
         val payload = runCatching {
-            json.decodeFromString<TranslationPresetExportPayload>(plainText.toString(Charsets.UTF_8))
+            json.decodeFromString<TranslationPresetExportPayload>(decodeStrictUtf8(plainText).removePrefix("\uFEFF"))
         }.getOrElse {
             throw IllegalArgumentException("Invalid preset export payload.", it)
         }
@@ -122,7 +124,7 @@ object TranslationPresetTransfer {
             require(total <= maxBytes) { "Preset export file is too large." }
             output.write(buffer, 0, read)
         }
-        return output.toString(Charsets.UTF_8.name())
+        return decodeStrictUtf8(output.toByteArray()).removePrefix("\uFEFF")
     }
 
     fun planImport(

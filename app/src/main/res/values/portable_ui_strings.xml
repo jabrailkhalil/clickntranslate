@@ -1,0 +1,3 @@
+<resources>
+    <string name="settings_bundle_ui_preferences_notice">The interface choices in this file will also be applied. Custom pictures and the launcher icon stay on this device.</string>
+</resources>

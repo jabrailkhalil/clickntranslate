@@ -85,7 +85,7 @@ data class Settings(
     val overlayStyleMode: OverlayStyleMode = OverlayStyleMode.FIXED,
     val overlayTextSizeSp: Int = 14,
     val overlayTextStyle: OverlayTextStyle = OverlayTextStyle(),
-    val overlayAlpha: Float = 0.85f,
+    val overlayAlpha: Float = 1f,
     val overlayFontFileName: String = "",
     val overlayFontDisplayName: String = "",
     val overlayFonts: List<OverlayFontEntry> = emptyList(),
@@ -1274,6 +1274,15 @@ enum class PaddleModelVersion(
         false,
         "v5ko"
     ),
+    /** Official Arabic PP-OCRv5 mobile recognizer paired with the v5 mobile detector. */
+    V5_ARABIC(
+        R.string.paddle_version_v5_arabic,
+        R.string.paddle_version_v5_arabic_desc,
+        2,
+        R.string.paddle_version_v5_arabic_languages,
+        false,
+        "v5ar"
+    ),
     /** PP-OCRv6 tiny（det ~1.5M params + rec ~1.5M params，极轻量极快） */
     V6_TINY(
         R.string.paddle_version_v6_tiny,
@@ -1685,7 +1694,8 @@ enum class OcrEngineKind {
     YOUDAO,           // 有道智云通用文字识别 ocrapi（云端，需要 AppKey + AppSecret）
     PADDLE_AI_STUDIO, // PaddleOCR AI Studio async jobs API (cloud, requires bearer token)
     PADDLE_ONNX,      // PaddleOCR PP-OCRv5 mobile (ONNX Runtime 端侧，按需下载模型)
-    MANGA_OCR_JA      // l0wgear/manga-ocr-2025-onnx 日漫专用（端侧；复用 PaddleOCR DBNet 检测；~140MB 按需下载，需开代理）
+    MANGA_OCR_JA,     // l0wgear/manga-ocr-2025-onnx 日漫专用（端侧；复用 PaddleOCR DBNet 检测；~140MB 按需下载，需开代理）
+    TESSERACT_ARABIC, // Local Arabic + English; explicit verified ara/eng model download.
 }
 
 @Serializable

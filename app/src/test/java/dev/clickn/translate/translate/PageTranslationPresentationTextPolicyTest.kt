@@ -29,7 +29,7 @@ class PageTranslationPresentationTextPolicyTest {
     }
 
     @Test
-    fun pageUnits_tableDriven_changeOnlyFloatingWindowText() {
+    fun pageUnits_tableDriven_prepareSoftWrapsForBothPresentations() {
         data class Case(
             val presentation: RenderMode,
             val expected: List<String>,
@@ -40,7 +40,7 @@ class PageTranslationPresentationTextPolicyTest {
             block("two\nwords", 90),
         )
         listOf(
-            Case(RenderMode.BLOCKS, listOf("教室では\n聞こえない", "two\nwords")),
+            Case(RenderMode.BLOCKS, listOf("教室では聞こえない", "two words")),
             Case(RenderMode.FLOATING_WINDOW, listOf("教室では聞こえない", "two words")),
         ).forEach { case ->
             val units = planPageTranslationUnits(blocks, case.presentation)
@@ -50,6 +50,26 @@ class PageTranslationPresentationTextPolicyTest {
             assertEquals(case.presentation.name, listOf(20, 20), units.map { it.geometry.top })
             assertEquals(case.presentation.name, listOf(60, 140), units.map { it.geometry.right })
             assertEquals(case.presentation.name, listOf(80, 80), units.map { it.geometry.bottom })
+        }
+    }
+
+    @Test
+    fun requestPreparationKeepsOriginalSourceBoxesAndBlockMembershipForNativeRendering() {
+        val firstSource = "Bright rivers run through quiet\nvalleys."
+        val secondSource = "The small orange fox reads a\nuseful book."
+        val firstBoxes = listOf(block("", 10).boundingBox, block("", 15).boundingBox)
+        val first = block(firstSource, 10).copy(sourceBoxes = firstBoxes)
+        val second = block(secondSource, 90)
+        val blocks = listOf(first, second)
+        for (presentation in RenderMode.entries) {
+            val units = planPageTranslationUnits(blocks, presentation)
+            assertEquals(listOf("Bright rivers run through quiet valleys.", "The small orange fox reads a useful book."), units.map { it.sourceText })
+            assertEquals(listOf(listOf(0), listOf(1)), units.map { it.blockIndexes })
+            assertEquals(listOf(firstSource, secondSource), blocks.map { it.text })
+            assertSame(first, blocks[0]); assertSame(second, blocks[1])
+            assertSame(firstBoxes, blocks[0].sourceBoxes)
+            assertEquals(listOf(10, 90), blocks.map { it.boundingBox.left })
+            assertEquals(listOf(60, 140), blocks.map { it.boundingBox.right })
         }
     }
 

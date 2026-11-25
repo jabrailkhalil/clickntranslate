@@ -23,6 +23,9 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.Serializable
+import dev.clickn.translate.data.SettingsImportRecoveryGate
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.emptyFlow
 
 @Serializable
 enum class GlossaryTermCategory { PERSON, PLACE, ORGANIZATION, TERM, PRESERVE_SOURCE }
@@ -113,30 +116,77 @@ interface TranslationGlossaryDao {
     }
 
     @Transaction
-    suspend fun importTermsAtomically(terms: List<GlossaryTermEntity>): Int {
-        terms.forEach { term ->
-            val now = System.currentTimeMillis()
-            val normalizedSource = normalizeGlossaryTerm(term.sourceTerm, term.caseSensitive)
-            require(normalizedSource.isNotBlank()) { "Source term is empty." }
-            require(term.targetTerm.isNotBlank()) { "Target term is empty." }
-            val existing = findTerm(
-                scopePackage = term.scopePackage,
-                sourceLang = term.sourceLang,
-                targetLang = term.targetLang,
-                normalizedSourceTerm = normalizedSource,
-                caseSensitive = term.caseSensitive,
-            )
-            val normalized = term.copy(
-                id = existing?.id ?: 0,
-                sourceTerm = term.sourceTerm.trim(),
-                normalizedSourceTerm = normalizedSource,
-                targetTerm = term.targetTerm.trim(),
-                createdAtMs = existing?.createdAtMs ?: now,
-                updatedAtMs = now,
-            )
-            if (existing == null) insert(normalized) else update(normalized)
+    suspend fun importTermsAtomically(terms: List<GlossaryTermEntity>): Int =
+        importTermsAtomically(terms, journal = null)
+
+    @Transaction
+    suspend fun importTermsAtomically(
+        terms: List<GlossaryTermEntity>,
+        journal: GlossaryImportRollback?,
+    ): Int {
+        journal?.begin()
+        try {
+            terms.forEach { term ->
+                val now = System.currentTimeMillis()
+                val normalizedSource = normalizeGlossaryTerm(term.sourceTerm, term.caseSensitive)
+                require(normalizedSource.isNotBlank()) { "Source term is empty." }
+                require(term.targetTerm.isNotBlank()) { "Target term is empty." }
+                val existing = findTerm(
+                    scopePackage = term.scopePackage,
+                    sourceLang = term.sourceLang,
+                    targetLang = term.targetLang,
+                    normalizedSourceTerm = normalizedSource,
+                    caseSensitive = term.caseSensitive,
+                )
+                val normalized = term.copy(
+                    id = existing?.id ?: 0,
+                    sourceTerm = term.sourceTerm.trim(),
+                    normalizedSourceTerm = normalizedSource,
+                    targetTerm = term.targetTerm.trim(),
+                    createdAtMs = existing?.createdAtMs ?: now,
+                    updatedAtMs = now,
+                )
+                if (existing == null) {
+                    val id = insert(normalized)
+                    journal?.record(null, normalized.copy(id = id))
+                } else {
+                    update(normalized)
+                    journal?.record(existing, normalized)
+                }
+            }
+            journal?.persistBeforeCommit()
+            return terms.size
+        } catch (error: Throwable) {
+            // Room rolls this transaction back; do not retain an uncommitted journal.
+            journal?.discard()
+            throw error
         }
-        return terms.size
+    }
+
+    @Transaction
+    suspend fun rollbackSettingsImportAtomically(journal: GlossaryImportRollback) {
+        val changes = journal.reverseChanges()
+        if (changes.isEmpty()) return
+        val current = listAll().associateBy { it.id }.toMutableMap()
+        val externallyChanged = mutableSetOf<Long>()
+        changes.forEach { change ->
+            val id = change.after.id
+            if (id in externallyChanged) return@forEach
+            if (current[id] != change.after) {
+                // A later edit/deletion owns this ID. Do not undo an earlier import
+                // of the same ID even if that earlier value happens to match it.
+                externallyChanged += id
+                return@forEach
+            }
+            val before = change.before
+            if (before == null) {
+                delete(id)
+                current.remove(id)
+            } else {
+                update(before)
+                current[id] = before
+            }
+        }
     }
 
     @Transaction
@@ -286,7 +336,12 @@ fun normalizeGlossaryTerm(value: String, caseSensitive: Boolean): String {
 class TranslationGlossaryRepository @Inject constructor(
     private val dao: TranslationGlossaryDao,
     @ApplicationContext private val context: Context? = null,
+    private val recoveryGate: SettingsImportRecoveryGate? = null,
 ) {
+    private suspend fun <T> afterRecovery(action: suspend () -> T): T {
+        recoveryGate?.awaitReady()
+        return action()
+    }
     private val bundledSounds: Set<String> by lazy {
         context?.assets?.open(SOURCE_PRESERVATION_ASSET)?.bufferedReader()?.useLines { lines ->
             lines.map(String::trim).filter { it.isNotEmpty() && !it.startsWith("#") }.toSet()
@@ -310,11 +365,14 @@ class TranslationGlossaryRepository @Inject constructor(
         }
     }
 
-    fun observeAll(): Flow<List<GlossaryTermEntity>> = dao.observeAll().map(::userTerms)
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    fun observeAll(): Flow<List<GlossaryTermEntity>> = recoveryGate?.state?.flatMapLatest { status ->
+        if (status == dev.clickn.translate.data.SettingsImportRecoveryState.READY) dao.observeAll().map(::userTerms) else emptyFlow()
+    } ?: dao.observeAll().map(::userTerms)
 
-    suspend fun listAll(): List<GlossaryTermEntity> = userTerms(dao.listAll())
+    suspend fun listAll(): List<GlossaryTermEntity> = afterRecovery { userTerms(dao.listAll()) }
 
-    suspend fun listEnabled(): List<GlossaryTermEntity> = userTerms(dao.listEnabled())
+    suspend fun listEnabled(): List<GlossaryTermEntity> = afterRecovery { userTerms(dao.listEnabled()) }
 
     suspend fun preservationTerms(includeMangaSounds: Boolean): List<GlossaryTermEntity> =
         SourcePresetPolicy.activeTerms(listAll(), bundledSounds, includeMangaSounds)
@@ -333,6 +391,7 @@ class TranslationGlossaryRepository @Inject constructor(
     )
 
     suspend fun upsert(term: GlossaryTermEntity): Long {
+        recoveryGate?.awaitReady()
         val now = System.currentTimeMillis()
         val normalizedSource = normalizeGlossaryTerm(term.sourceTerm, term.caseSensitive)
         require(normalizedSource.isNotBlank()) { "Source term is empty." }
@@ -361,6 +420,7 @@ class TranslationGlossaryRepository @Inject constructor(
     }
 
     suspend fun findConflict(term: GlossaryTermEntity): GlossaryTermEntity? {
+        recoveryGate?.awaitReady()
         val normalizedSource = normalizeGlossaryTerm(term.sourceTerm, term.caseSensitive)
         if (normalizedSource.isBlank()) return null
         return dao.findTerm(
@@ -390,20 +450,32 @@ class TranslationGlossaryRepository @Inject constructor(
         )
     }
 
-    suspend fun delete(id: Long) = dao.delete(id)
+    suspend fun delete(id: Long) = afterRecovery { dao.delete(id) }
 
     suspend fun importTerms(terms: List<GlossaryTermEntity>): Int =
-        dao.importTermsAtomically(terms.map { it.copy(id = 0) })
+        afterRecovery { dao.importTermsAtomically(terms.map { it.copy(id = 0) }) }
+
+    internal suspend fun importTermsForSettingsImport(
+        terms: List<GlossaryTermEntity>,
+        journal: GlossaryImportRollback,
+    ): Int = afterRecovery { dao.importTermsAtomically(terms.map { it.copy(id = 0) }, journal) }
+
+    internal suspend fun rollbackSettingsImport(journal: GlossaryImportRollback) =
+        afterRecovery { dao.rollbackSettingsImportAtomically(journal) }
+
+    /** Startup-only journal recovery, before the public repository gate opens. */
+    internal suspend fun recoverSettingsImport(changes: List<GlossaryImportRollback.Change>) =
+        dao.rollbackSettingsImportAtomically(GlossaryImportRollback.restoreToken(changes))
 
     suspend fun importUserTerms(
         terms: List<GlossaryTermEntity>,
         conflictPolicy: GlossaryImportConflictPolicy,
-    ): GlossaryImportCommitResult = dao.importUserTermsAtomically(
+    ): GlossaryImportCommitResult = afterRecovery { dao.importUserTermsAtomically(
         terms = terms.map { it.copy(id = 0) },
         conflictPolicy = conflictPolicy,
-    )
+    ) }
 
-    suspend fun restoreTerms(terms: List<GlossaryTermEntity>) = dao.replaceAllAtomically(terms)
+    suspend fun restoreTerms(terms: List<GlossaryTermEntity>) = afterRecovery { dao.replaceAllAtomically(terms) }
 
     private companion object {
         const val SOURCE_PRESERVATION_PREFS = "source_preservation_presets"

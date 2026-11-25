@@ -31,7 +31,7 @@ class GalleryResultTextPanelTest {
         listOf(
             Case(
                 "filename and status share the top row",
-                "GalleryItemStatusText(item.status)",
+                "GalleryItemStatusText(item.status, hasResult)",
                 true,
             ),
             Case(
@@ -45,8 +45,8 @@ class GalleryResultTextPanelTest {
                 true,
             ),
             Case(
-                "text panel height follows the thumbnail ratio",
-                "galleryResultTextPaneHeightDp(thumbnailRatio).dp",
+                "text panel height follows the thumbnail ratio and system font scale",
+                "galleryResultTextPaneHeightDp(thumbnailRatio, LocalDensity.current.fontScale).dp",
                 true,
             ),
             Case(
@@ -79,7 +79,7 @@ class GalleryResultTextPanelTest {
         }
         assertTrue(
             "status follows the filename and occupies the right side",
-            resultItem.indexOf("GalleryItemStatusText(item.status)") >
+            resultItem.indexOf("GalleryItemStatusText(item.status, hasResult)") >
                 resultItem.indexOf("item.displayName"),
         )
         assertEquals(
@@ -147,23 +147,27 @@ class GalleryResultTextPanelTest {
     }
 
     @Test
-    fun `text pane follows tall thumbnails and keeps a readable landscape minimum`() {
+    fun `text pane leaves room below both action rows at every supported font scale`() {
         data class Case(
             val name: String,
             val thumbnailRatio: Float,
             val expectedHeightDp: Float,
+            val fontScale: Float = 1f,
         )
 
         listOf(
-            Case("square", 1f, 112f),
-            Case("landscape keeps minimum", 2f, 112f),
-            Case("portrait follows thumbnail", 0.5f, 224f),
+            Case("square has room for text below actions", 1f, 240f),
+            Case("landscape has room for text below actions", 2f, 240f),
+            Case("portrait has room for text below actions", 0.5f, 240f),
             Case("tall clamped ratio remains fully matched", 0.45f, 112f / 0.45f),
+            Case("larger system text remains readable", 2f, 360f, 1.5f),
+            Case("largest system text remains readable", 2f, 480f, 2f),
+            Case("small text cannot collapse below action rows", 2f, 240f, 0.85f),
         ).forEach { case ->
             assertEquals(
                 case.name,
                 case.expectedHeightDp,
-                galleryResultTextPaneHeightDp(case.thumbnailRatio),
+                galleryResultTextPaneHeightDp(case.thumbnailRatio, case.fontScale),
                 0.0001f,
             )
         }

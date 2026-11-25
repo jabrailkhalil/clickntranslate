@@ -10,7 +10,7 @@
     <string name="setup_translation">Languages and translation</string>
     <string name="setup_translation_body">Choose the language you read and a translation service. Google works without a key. For MyMemory and offline translation, choose a specific source language.</string>
     <string name="setup_overlay">Show translations over other apps</string>
-    <string name="setup_overlay_body">Open Android settings, find Click’n’Translate and enable “Display over other apps”. Return here; the status updates automatically.</string>
+    <string name="setup_overlay_body">Open Android settings, find %1$s and enable “Display over other apps”. Return here; the status updates automatically.</string>
     <string name="setup_notifications">Notifications</string>
     <string name="setup_notifications_body">Allow notifications to see the running translator, stop capture and follow model downloads. Translation can also work without this permission.</string>
     <string name="setup_enabled">Enabled</string>

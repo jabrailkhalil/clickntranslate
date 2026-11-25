@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dictionary_error_storage">Das Wörterbuchpaket konnte nicht gespeichert werden. Prüfen Sie den freien Speicherplatz und versuchen Sie es erneut.</string>
+    <string name="dictionary_error_read">Die ausgewählte Datei konnte nicht gelesen werden. Wählen Sie sie erneut aus und erlauben Sie den Zugriff.</string>
+    <string name="dictionary_error_too_large">Dieses Wörterbuchpaket überschreitet die Grenze von 2 GiB.</string>
+    <string name="dictionary_error_corrupt">Die Datei ist beschädigt oder kein gültiges SQLite-Wörterbuchpaket.</string>
+    <string name="dictionary_error_schema">Die Datei entspricht nicht dem unterstützten Wörterbuchpaketformat.</string>
+    <string name="dictionary_error_wrong_pack">Dieses Paket gehört zu einem anderen Wörterbuch. Wählen Sie das passende Paket aus.</string>
+    <string name="dictionary_error_version">Diese Version des Wörterbuchpakets wird nicht unterstützt. Wählen Sie ein kompatibles Paket aus.</string>
+    <string name="dictionary_error_unknown">Das Wörterbuchpaket konnte nicht verarbeitet werden. Wählen Sie ein gültiges Paket aus und versuchen Sie es erneut.</string>
+</resources>

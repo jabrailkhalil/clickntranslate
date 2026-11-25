@@ -63,6 +63,8 @@ class TranslationBlockCopyOverlay(
     }
     private var dialog: Dialog? = null
 
+    fun isShown(): Boolean = dialog?.isShowing == true
+
     fun dismiss() {
         val current = dialog
         dialog = null

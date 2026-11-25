@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dictionary_error_storage">Impossible de sauvegarder le paquet de dictionnaire. Vérifiez la place disponible et réessayez.</string>
+    <string name="dictionary_error_read">Impossible de lire le fichier sélectionné. Sélectionnez-le à nouveau et autorisez son accès.</string>
+    <string name="dictionary_error_too_large">Ce paquet de dictionnaire dépasse la limite de 2 Gio.</string>
+    <string name="dictionary_error_corrupt">Ce fichier est endommagé ou ne constitue pas un paquet de dictionnaire SQLite valide.</string>
+    <string name="dictionary_error_schema">Ce fichier ne respecte pas le format de paquet de dictionnaire pris en charge.</string>
+    <string name="dictionary_error_wrong_pack">Ce paquet correspond à un autre dictionnaire. Sélectionnez le paquet adapté à ce dictionnaire.</string>
+    <string name="dictionary_error_version">Cette version du paquet de dictionnaire est incompatible. Sélectionnez un paquet compatible.</string>
+    <string name="dictionary_error_unknown">Impossible de traiter le paquet de dictionnaire. Sélectionnez un paquet valide et réessayez.</string>
+</resources>

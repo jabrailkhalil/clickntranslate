@@ -1,0 +1,14 @@
+{
+  "format": "clickntranslate.settings",
+  "version": 2,
+  "minimumReaderVersion": 2,
+  "settings": { "values": { "targetLang": "ar" } },
+  "fonts": [
+    {
+      "fileName": "0000000000000000000000000000000000000000000000000000000000000000.ttf",
+      "displayName": "Synthetic missing font.ttf",
+      "byteCount": 1
+    }
+  ],
+  "glossaryTerms": []
+}

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="setup_hero_title">Choose your companion</string>
+    <string name="setup_hero_body">This picture appears on the floating button over other apps. Choose a companion, the action icon or the logo. You can change it later.</string>
+    <string name="setup_hero_custom_unavailable">Preview unavailable. Your choice is saved.</string>
+</resources>

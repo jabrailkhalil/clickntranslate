@@ -5,14 +5,18 @@ import android.content.Context
 import android.graphics.Typeface
 import android.net.Uri
 import android.provider.OpenableColumns
+import android.util.AtomicFile
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.io.InputStream
+import java.io.FileOutputStream
 import java.security.MessageDigest
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import timber.log.Timber
 
 internal data class StagedOverlayFont(
@@ -32,13 +36,26 @@ class OverlayFontManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val settingsRepository: SettingsRepository
 ) {
+    private val mutationMutex = Mutex()
+
+    internal suspend fun <T> withImportMutationLock(action: suspend () -> T): T {
+        settingsRepository.awaitImportRecovery()
+        return mutationMutex.withLock {
+            // A call may have queued while the preceding import failed and closed its gate.
+            settingsRepository.awaitImportRecovery()
+            action()
+        }
+    }
+
     private val fontDir: File
         get() = File(context.filesDir, OverlayFontPolicy.FONT_DIR_NAME)
 
     @Volatile private var cachedFileName: String? = null
     @Volatile private var cachedTypeface: Typeface? = null
 
-    suspend fun importFont(uri: Uri): OverlayFontImportResult = withContext(Dispatchers.IO) {
+    suspend fun importFont(uri: Uri): OverlayFontImportResult = withImportMutationLock { importFontLocked(uri) }
+
+    private suspend fun importFontLocked(uri: Uri): OverlayFontImportResult = withContext(Dispatchers.IO) {
         val displayName = OverlayFontPolicy.sanitizeDisplayName(queryDisplayName(uri) ?: uri.lastPathSegment)
         OverlayFontPolicy.validateCandidate(displayName, byteCount = 1L)?.let {
             return@withContext OverlayFontImportResult.Failure(it)
@@ -114,7 +131,9 @@ class OverlayFontManager @Inject constructor(
         )
     }
 
-    suspend fun resetFont() = withContext(Dispatchers.IO) {
+    suspend fun resetFont() = withImportMutationLock { resetFontLocked() }
+
+    private suspend fun resetFontLocked() = withContext(Dispatchers.IO) {
         val current = settingsRepository.get()
         val retainedFonts = OverlayFontPolicy.upsertImportedFont(
             current.overlayFonts,
@@ -131,7 +150,10 @@ class OverlayFontManager @Inject constructor(
         invalidateCache()
     }
 
-    suspend fun selectFont(fileName: String, displayName: String): Boolean = withContext(Dispatchers.IO) {
+    suspend fun selectFont(fileName: String, displayName: String): Boolean =
+        withImportMutationLock { selectFontLocked(fileName, displayName) }
+
+    private suspend fun selectFontLocked(fileName: String, displayName: String): Boolean = withContext(Dispatchers.IO) {
         val normalized = OverlayFontPolicy.normalizeStoredFileName(fileName) ?: return@withContext false
         val cleanDisplayName = OverlayFontPolicy.sanitizeDisplayName(displayName)
         val file = File(fontDir, normalized)
@@ -153,7 +175,9 @@ class OverlayFontManager @Inject constructor(
         true
     }
 
-    suspend fun deleteFont(fileName: String): Boolean = withContext(Dispatchers.IO) {
+    suspend fun deleteFont(fileName: String): Boolean = withImportMutationLock { deleteFontLocked(fileName) }
+
+    private suspend fun deleteFontLocked(fileName: String): Boolean = withContext(Dispatchers.IO) {
         val normalized = OverlayFontPolicy.normalizeStoredFileName(fileName) ?: return@withContext false
         val current = settingsRepository.get()
         val nextFonts = OverlayFontPolicy.removeImportedFont(current.overlayFonts, normalized)
@@ -180,6 +204,7 @@ class OverlayFontManager @Inject constructor(
 
     @Synchronized
     fun typefaceFor(fileName: String): Typeface? {
+        if (!settingsRepository.isImportRecoveryReady()) return null
         val normalized = OverlayFontPolicy.normalizeStoredFileName(fileName) ?: run {
             invalidateCache()
             return null
@@ -207,6 +232,7 @@ class OverlayFontManager @Inject constructor(
     }
 
     internal fun transferFileFor(fileName: String): File? {
+        if (!settingsRepository.isImportRecoveryReady()) return null
         val normalized = OverlayFontPolicy.normalizeStoredFileName(fileName) ?: return null
         return File(fontDir, normalized).takeIf { it.isFile }
     }
@@ -270,6 +296,8 @@ class OverlayFontManager @Inject constructor(
                 "Transferred font checksum does not match its file name."
             }
             require(canLoadTypeface(tmp)) { "Transferred font cannot be loaded." }
+            FileOutputStream(tmp, true).use { it.fd.sync() }
+            SettingsImportJournal.syncDirectory(stagingDir)
             return StagedOverlayFont(
                 entry = OverlayFontEntry(normalizedFileName, displayName),
                 file = tmp,
@@ -280,27 +308,42 @@ class OverlayFontManager @Inject constructor(
         }
     }
 
-    internal fun commitTransferredFont(staged: StagedOverlayFont): OverlayFontCommit {
+    internal fun commitTransferredFont(
+        staged: StagedOverlayFont,
+        beforePublish: ((ImportFontChange) -> Unit)? = null,
+        afterPublish: ((String) -> Unit)? = null,
+    ): OverlayFontCommit {
         val dir = fontDir
         require(dir.exists() || dir.mkdirs()) { "Could not create the font directory." }
         val target = File(dir, staged.entry.fileName)
-        if (target.isFile && canLoadTypeface(target)) {
+        SettingsImportJournal.ensureNoLinks(dir)
+        SettingsImportJournal.ensureNoLinks(target)
+        restoreAtomicFontIfNeeded(target)
+        val afterHash = fontSha256(staged.file)
+        if (target.isFile && fontSha256(target) == afterHash && canLoadTypeface(target)) {
             return OverlayFontCommit(staged.entry, target, backup = null, modified = false)
         }
 
         val backup = target.takeIf(File::exists)?.let { existing ->
             File(staged.file.parentFile, "backup-${staged.entry.fileName}").also { backupFile ->
-                existing.copyTo(backupFile, overwrite = true)
+                SettingsImportJournal.copyAndSync(existing, backupFile)
             }
         }
         return try {
-            staged.file.copyTo(target, overwrite = true)
+            // Intent and original bytes are durable before AtomicFile can rename the target.
+            beforePublish?.invoke(ImportFontChange(staged.entry.fileName, backup?.name,
+                backup?.let(::fontSha256), afterHash))
+            publishAtomicFont(staged.file, target)
+            afterPublish?.invoke(staged.entry.fileName)
             require(canLoadTypeface(target)) { "Committed font cannot be loaded." }
             invalidateCache()
             OverlayFontCommit(staged.entry, target, backup, modified = true)
         } catch (error: Throwable) {
             if (backup?.isFile == true) {
-                backup.copyTo(target, overwrite = true)
+                runCatching {
+                    publishAtomicFont(backup, target)
+                    backup.delete()
+                }.exceptionOrNull()?.let(error::addSuppressed)
             } else {
                 runCatching { target.delete() }
             }
@@ -312,7 +355,8 @@ class OverlayFontManager @Inject constructor(
     internal fun rollbackTransferredFont(commit: OverlayFontCommit) {
         if (!commit.modified) return
         if (commit.backup?.isFile == true) {
-            commit.backup.copyTo(commit.target, overwrite = true)
+            publishAtomicFont(commit.backup, commit.target)
+            commit.backup.delete()
         } else {
             require(!commit.target.exists() || commit.target.delete()) {
                 "Could not roll back imported font ${commit.entry.displayName}."
@@ -324,6 +368,73 @@ class OverlayFontManager @Inject constructor(
     internal fun finishTransferredFont(commit: OverlayFontCommit) {
         runCatching { commit.backup?.delete() }
         invalidateCache()
+    }
+
+    /** Startup-only bypass; the gate prevents any public font operation until this finishes. */
+    internal fun recoverTransferredFont(change: ImportFontChange, staging: File, referenced: Set<String>) {
+        require(OverlayFontPolicy.normalizeStoredFileName(change.fileName) == change.fileName)
+        val target = File(fontDir, change.fileName)
+        SettingsImportJournal.ensureNoLinks(fontDir)
+        SettingsImportJournal.ensureNoLinks(target)
+        restoreAtomicFontIfNeeded(target)
+        val currentHash = target.takeIf(File::isFile)?.let(::fontSha256)
+        if (currentHash != null && currentHash == change.beforeSha256) return
+        // Published targets use CAS. Before publication was recorded, the import held the
+        // font mutex: an API26 interrupted first AtomicFile write may still be partial.
+        if (change.published && currentHash != change.afterSha256) return
+        if (change.backupName == null) {
+            if (change.referencedBefore || change.fileName !in referenced) {
+                AtomicFile(target).delete()
+                check(!target.exists()) { "Could not roll back imported font." }
+                SettingsImportJournal.syncDirectory(fontDir)
+            }
+        } else {
+            require(change.backupName == "backup-${change.fileName}")
+            val backup = File(staging, change.backupName)
+            check(backup.canonicalFile.parentFile == staging.canonicalFile)
+            SettingsImportJournal.ensureNoLinks(backup)
+            check(backup.isFile && fontSha256(backup) == change.beforeSha256) { "Original imported font backup is unavailable." }
+            publishAtomicFont(backup, target)
+        }
+        invalidateCache()
+    }
+
+    private fun restoreAtomicFontIfNeeded(target: File) {
+        listOf(target, File(target.path + ".bak"), File(target.path + ".new"))
+            .forEach { SettingsImportJournal.ensureNoLinks(it) }
+        val atomic = AtomicFile(target)
+        if (target.exists() || File(target.path + ".bak").exists()) atomic.openRead().use { }
+    }
+
+    private fun publishAtomicFont(source: File, target: File) {
+        listOf(target, File(target.path + ".bak"), File(target.path + ".new"))
+            .forEach { SettingsImportJournal.ensureNoLinks(it) }
+        val atomic = AtomicFile(target)
+        val output = atomic.startWrite()
+        var published = false
+        try {
+            source.inputStream().use { it.copyTo(output) }
+            output.fd.sync()
+            atomic.finishWrite(output)
+            published = true
+            SettingsImportJournal.syncDirectory(checkNotNull(target.parentFile))
+        } catch (error: Throwable) {
+            // On API26 failWrite can remove the sole base file after finishWrite has already
+            // published it. A directory-sync failure must not destroy that committed font.
+            if (!published) atomic.failWrite(output)
+            throw error
+        }
+    }
+
+    private fun fontSha256(file: File): String = file.inputStream().use { source ->
+        val digest = MessageDigest.getInstance("SHA-256")
+        val buffer = ByteArray(8 * 1024)
+        while (true) {
+            val size = source.read(buffer)
+            if (size < 0) break
+            digest.update(buffer, 0, size)
+        }
+        digest.digest().toHexString()
     }
 
     private fun queryDisplayName(uri: Uri): String? {

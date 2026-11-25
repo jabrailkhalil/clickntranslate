@@ -3,6 +3,8 @@ package dev.clickn.translate.ui.theme
 import android.content.Context
 import androidx.compose.runtime.compositionLocalOf
 import dev.clickn.translate.R
+import dev.clickn.translate.data.UiPreferenceField
+import dev.clickn.translate.data.UiPreferenceTransfer
 
 enum class ThemeAccent(val lightColor: Long, val darkColor: Long, val label: Int) {
     LAVENDER(0xFF6F3BBB, 0xFFB69AF7, R.string.mobile_lavender),
@@ -19,9 +21,11 @@ object ThemeAccentPrefs {
     }.getOrDefault(ThemeAccent.LAVENDER)
 
     fun write(context: Context, accent: ThemeAccent) {
-        context.getSharedPreferences("clickn_appearance", Context.MODE_PRIVATE).edit()
-            .putString("accent", accent.name).apply()
+        UiPreferenceTransfer.write(context, UiPreferenceField.ACCENT, accent.name)
     }
+
+    fun observe(context: Context, onChange: () -> Unit): () -> Unit =
+        UiPreferenceTransfer.observe(context, UiPreferenceField.ACCENT, onChange)
 }
 
 data class ThemeAccentController(val accent: ThemeAccent, val setAccent: (ThemeAccent) -> Unit)

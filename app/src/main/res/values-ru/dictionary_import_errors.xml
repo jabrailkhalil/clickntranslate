@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dictionary_error_storage">Не удалось сохранить пакет словаря. Проверьте свободное место и повторите попытку.</string>
+    <string name="dictionary_error_read">Не удалось прочитать выбранный файл. Выберите его заново и разрешите доступ.</string>
+    <string name="dictionary_error_too_large">Этот пакет словаря превышает ограничение 2 ГиБ.</string>
+    <string name="dictionary_error_corrupt">Файл повреждён или не является корректным SQLite-пакетом словаря.</string>
+    <string name="dictionary_error_schema">Файл не соответствует поддерживаемому формату пакета словаря.</string>
+    <string name="dictionary_error_wrong_pack">Этот пакет предназначен для другого словаря. Выберите файл для этого словаря.</string>
+    <string name="dictionary_error_version">Версия пакета словаря не поддерживается. Выберите совместимый пакет.</string>
+    <string name="dictionary_error_unknown">Не удалось обработать пакет словаря. Выберите корректный пакет и повторите попытку.</string>
+</resources>

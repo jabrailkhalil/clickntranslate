@@ -6,6 +6,8 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material3.*
@@ -19,11 +21,23 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import dev.clickn.translate.R
-import dev.clickn.translate.capture.CaptureStartMode
-import dev.clickn.translate.capture.CaptureStartPreference
 import dev.clickn.translate.data.Settings
 import dev.clickn.translate.data.AppLocalePrefs
+import dev.clickn.translate.data.CompanionPrefs
 import dev.clickn.translate.data.TranslatorEngine
+import dev.clickn.translate.data.defaultTranslationTarget
+import java.util.Locale
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+internal object MobileSetupSteps {
+    const val LANGUAGE = 0
+    const val THEME = 1
+    const val HERO = 2
+    const val LANGUAGES = 3
+    const val COUNT = 4
+}
 
 internal fun openSetupAndroidSettings(context: Context, primary: Intent, fallback: Intent? = null) {
     val opened = runCatching { context.startActivity(primary); true }.getOrDefault(false)
@@ -33,64 +47,102 @@ internal fun openSetupAndroidSettings(context: Context, primary: Intent, fallbac
 }
 
 @Composable
-fun MobileSetupScreen(onFinished: () -> Unit, onAdvanced: (String) -> Unit, viewModel: MobileViewModel = hiltViewModel()) {
+fun MobileSetupScreen(onFinished: () -> Unit, onAdvanced: (String) -> Unit, firstRun: Boolean = false,
+    viewModel: MobileViewModel = hiltViewModel()) {
     val settings by viewModel.settings.collectAsState()
+    val captureModeInitialized by viewModel.captureModeInitialized.collectAsState()
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var finishing by remember { mutableStateOf(false) }
     var appLanguage by remember { mutableStateOf(AppLocalePrefs.read(context)) }
-    var step by rememberSaveable { mutableIntStateOf(0) }
+    var step by rememberSaveable { mutableIntStateOf(MobileSetupSteps.LANGUAGE) }
+    val optionsState = rememberSaveable(step, saver = LazyListState.Saver) { LazyListState() }
+    val companionChoice by rememberCompanionChoice(context)
+    var companionPicture by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+    LaunchedEffect(context, step) {
+        if (step == MobileSetupSteps.HERO) {
+            companionPicture = withContext(Dispatchers.IO) { BrandIconPrefs.bitmap(context, floating = true) }
+        }
+    }
     var sheet by rememberSaveable { mutableStateOf("") }
-    val finish = {
-        if (CaptureStartPreference.mode.value == null) CaptureStartPreference.select(CaptureStartMode.SYSTEM)
-        onFinished()
+    var pairEdited by rememberSaveable { mutableStateOf(false) }
+    var automaticTarget by rememberSaveable { mutableStateOf(
+        defaultTranslationTarget(android.content.res.Resources.getSystem().configuration.locales[0])) }
+    val finish: () -> Unit = {
+        if (!finishing) {
+            finishing = true
+            scope.launch {
+                try {
+                    viewModel.ensureCaptureModeInitialized()
+                    onFinished()
+                } finally { finishing = false }
+            }
+        }
     }
     Scaffold(
         topBar = { TopAppBar(title = { Text(stringResource(R.string.setup_title)) }, navigationIcon = {
-            if (step > 0) IconButton(onClick = { step-- }) {
+            if (step > MobileSetupSteps.LANGUAGE) IconButton(onClick = { step-- }) {
                 Icon(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(R.string.setup_previous))
             }
         }) },
         bottomBar = {
             Surface {
                 Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(20.dp)) {
-                    Button(onClick = { if (step < 2) step++ else finish() },
-                        enabled = step < 2 || setupLanguagePairReady(settings),
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
-                        Text(stringResource(if (step < 2) R.string.setup_next else R.string.setup_finish))
+                    Button(onClick = {
+                        if (step == MobileSetupSteps.HERO) CompanionPrefs.confirmSelection(context)
+                        if (step < MobileSetupSteps.LANGUAGES) step++ else finish()
+                    }, enabled = !finishing && (step != MobileSetupSteps.LANGUAGES ||
+                        setupLanguagePairReady(settings) && captureModeInitialized),
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).testTag("setup-next")) {
+                        Text(stringResource(if (step < MobileSetupSteps.LANGUAGES) R.string.setup_next else R.string.setup_finish))
                     }
                 }
             }
         },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.TopCenter) {
-            LazyColumn(Modifier.widthIn(max = 640.dp).fillMaxWidth().testTag("setup-options"),
+            LazyColumn(Modifier.widthIn(max = 640.dp).fillMaxWidth().testTag("setup-options").selectableGroup(),
+                state = optionsState,
                 contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 item {
-                    Text(stringResource(R.string.setup_step, step + 1, 3), color = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(R.string.setup_step, step + 1, MobileSetupSteps.COUNT), color = MaterialTheme.colorScheme.primary)
                     Text(stringResource(when (step) {
-                        0 -> R.string.mobile_interface_language
-                        1 -> R.string.polish_choose_theme
+                        MobileSetupSteps.LANGUAGE -> R.string.mobile_interface_language
+                        MobileSetupSteps.THEME -> R.string.polish_choose_theme
+                        MobileSetupSteps.HERO -> R.string.setup_hero_title
                         else -> R.string.setup_translation
                     }),
                         Modifier.padding(top = 12.dp), style = MaterialTheme.typography.headlineMedium)
                     Text(stringResource(when (step) {
-                        0 -> R.string.setup_choose_language_body
-                        1 -> R.string.setup_simple_appearance
+                        MobileSetupSteps.LANGUAGE -> R.string.setup_choose_language_body
+                        MobileSetupSteps.THEME -> R.string.setup_simple_appearance
+                        MobileSetupSteps.HERO -> R.string.setup_hero_body
                         else -> R.string.setup_simple_languages
                     }),
                         Modifier.padding(top = 8.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                if (step == 0) {
+                if (step == MobileSetupSteps.LANGUAGE) {
                     item { SetupLanguageChoices(appLanguage) { tag ->
                         appLanguage = tag
                         AppLocalePrefs.write(context, tag)
+                        val locale = if (tag.isBlank()) android.content.res.Resources.getSystem().configuration.locales[0]
+                            else Locale.forLanguageTag(tag)
+                        val previousTarget = automaticTarget
+                        automaticTarget = defaultTranslationTarget(locale)
+                        viewModel.update { setupInterfaceLanguageSettings(it, locale, firstRun, pairEdited, previousTarget) }
                     } }
-                } else if (step == 1) {
+                } else if (step == MobileSetupSteps.THEME) {
                     item { BrandLogo(Modifier.size(56.dp)) }
                     themeChoices.chunked(2).forEach { choices -> item { ThemeChoiceRow(choices) } }
+                } else if (step == MobileSetupSteps.HERO) {
+                    companionChoices(companionChoice, companionPicture) { CompanionPrefs.write(context, it) }
                 } else {
                     settings?.let { current ->
                         item { LanguagePair(current, { sheet = "source" }, { sheet = "target" }, {
-                            if (current.sourceLang != "auto") viewModel.update { it.copy(sourceLang = current.targetLang, targetLang = current.sourceLang) }
+                            if (current.sourceLang != "auto") {
+                                pairEdited = true
+                                viewModel.update { it.copy(sourceLang = current.targetLang, targetLang = current.sourceLang) }
+                            }
                         }) }
                         if (!setupLanguagePairReady(current)) item {
                             Text(stringResource(R.string.mobile_explicit_source), color = MaterialTheme.colorScheme.error)
@@ -116,13 +168,21 @@ fun MobileSetupScreen(onFinished: () -> Unit, onAdvanced: (String) -> Unit, view
                 LanguageSheet(source, if (source) current.sourceLang else current.targetLang,
                     allowAuto = current.translatorEngine !in setOf(TranslatorEngine.MYMEMORY, TranslatorEngine.GOOGLE_ML_KIT),
                     allowedCodes = if (current.translatorEngine == TranslatorEngine.GOOGLE_ML_KIT) dev.clickn.translate.translate.MlKitLanguagePolicy.supportedLanguageTags else null) { code ->
+                    pairEdited = true
                     viewModel.update { mobileLanguagePair(it, source, code) }; sheet = ""
                 }
             }
         }
     }
-    BackHandler(step > 0 && sheet.isEmpty()) { step-- }
+    BackHandler(step > MobileSetupSteps.LANGUAGE && sheet.isEmpty()) { step-- }
 }
+
+/** A new installation translates into the chosen interface language until the pair is edited. */
+internal fun setupInterfaceLanguageSettings(current: Settings, locale: Locale,
+    firstRun: Boolean, pairEdited: Boolean, previousAutomaticTarget: String): Settings =
+    if (firstRun && !pairEdited && current.sourceLang == "auto" && current.targetLang == previousAutomaticTarget)
+        current.copy(targetLang = defaultTranslationTarget(locale))
+    else current
 
 internal fun setupLanguagePairReady(settings: Settings?): Boolean = settings != null &&
     settings.targetLang.isNotBlank() && settings.targetLang != "auto" &&

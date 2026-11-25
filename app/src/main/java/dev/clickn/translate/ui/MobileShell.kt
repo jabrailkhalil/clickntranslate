@@ -1,7 +1,6 @@
 package dev.clickn.translate.ui
 
 import android.app.Activity
-import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
@@ -48,6 +47,9 @@ import dev.clickn.translate.BuildConfig
 import dev.clickn.translate.R
 import dev.clickn.translate.capture.CaptureStartRequestActivity
 import dev.clickn.translate.data.*
+import dev.clickn.translate.history.TextHistoryEntry
+import dev.clickn.translate.history.TextHistoryIssue
+import dev.clickn.translate.history.TextHistoryState
 import dev.clickn.translate.service.CaptureService
 import dev.clickn.translate.service.CaptureServiceState
 import dev.clickn.translate.ui.theme.*
@@ -58,6 +60,7 @@ import dev.clickn.translate.capture.CaptureStartPreference
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.launch
 
 internal enum class MobileTab(val title: Int, val icon: ImageVector) {
     SCREEN(R.string.mobile_nav_screen, Icons.Outlined.CropFree),
@@ -91,7 +94,17 @@ fun MobileShell(
     val iconChoice = remember(iconRevision) { BrandIconPrefs.read(context) }
     var provider by remember { mutableStateOf<TranslatorEngine?>(null) }
     var confirmClear by remember { mutableStateOf(false) }
+    var historyEntryId by rememberSaveable { mutableStateOf<Long?>(null) }
     val modelState by viewModel.modelState.collectAsState()
+    val captureMode by CaptureStartPreference.mode.collectAsState()
+    val shizukuState by viewModel.shizukuState.collectAsState()
+    val shizukuReady = if (shizukuState.checking || shizukuState.authorizing) null
+        else shizukuState.availability == dev.clickn.translate.shizuku.ShizukuCapabilities.Availability.READY
+    var heroSelected by remember { mutableStateOf(CompanionPrefs.hasSelection(context)) }
+    DisposableEffect(context) {
+        val stop = CompanionPrefs.observe(context) { heroSelected = CompanionPrefs.hasSelection(context) }
+        onDispose { stop() }
+    }
     var pendingStart by rememberSaveable { mutableStateOf(false) }
     var explanation by remember { mutableStateOf<Pair<Int, () -> Unit>?>(null) }
     var accessibility by remember { mutableStateOf(dev.clickn.translate.trigger.AccessibilityServiceStatus.isEnabled(context)) }
@@ -101,9 +114,7 @@ fun MobileShell(
     val notificationRequest = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { notifications = it }
     LaunchedEffect(settings) { settings?.let(viewModel::refreshModels) }
     var overlayAllowed by remember { mutableStateOf(AndroidSettings.canDrawOverlays(context)) }
-    LaunchedEffect(Unit) {
-        if (CaptureStartPreference.mode.value == null) CaptureStartPreference.select(CaptureStartMode.SYSTEM)
-    }
+    LaunchedEffect(Unit) { viewModel.refreshShizuku() }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     DisposableEffect(lifecycle, settings) {
         val observer = LifecycleEventObserver { _, event ->
@@ -112,6 +123,8 @@ fun MobileShell(
                 accessibility = dev.clickn.translate.trigger.AccessibilityServiceStatus.isEnabled(context)
                 notifications = hasMobileNotifications(context)
                 battery = hasMobileBatteryExemption(context)
+                heroSelected = CompanionPrefs.hasSelection(context)
+                viewModel.refreshShizuku()
                 settings?.let(viewModel::refreshModels)
             }
         }
@@ -125,12 +138,42 @@ fun MobileShell(
     fun openService() { sheet = "services" }
     fun editInput(value: String) { input = value; viewModel.resetTranslation() }
     fun grantOverlay() { explanation = R.string.setup_overlay_body to { openOverlayPermissionSettings(context) } }
+    val readinessItems = settings?.let { current -> mobileReadinessItems(current, modelState, overlayAllowed,
+        captureMode, shizukuReady, heroSelected, notifications, battery, accessibility) }.orEmpty()
+    fun openReadinessItem(item: MobileReadinessKey) {
+        sheet = ""
+        when (item) {
+            MobileReadinessKey.LANGUAGES -> sheet = if (settings?.targetLang.isNullOrBlank() || settings?.targetLang == "auto") "target" else "source"
+            MobileReadinessKey.SERVICE -> openService()
+            MobileReadinessKey.OCR -> explanation = R.string.setup_recognition_body to { onAdvancedSection("ocr") }
+            MobileReadinessKey.TRANSLATION_MODELS -> sheet = "offline"
+            MobileReadinessKey.OVERLAY -> grantOverlay()
+            MobileReadinessKey.CAPTURE -> sheet = "capture"
+            MobileReadinessKey.HERO -> sheet = "floating"
+            MobileReadinessKey.ACCESSIBILITY -> explanation = R.string.setup_accessibility_body to {
+                openSetupAndroidSettings(context, Intent("android.settings.ACCESSIBILITY_DETAILS_SETTINGS")
+                    .putExtra("android.intent.extra.COMPONENT_NAME", android.content.ComponentName(context, dev.clickn.translate.trigger.ClickTranslateAccessibilityService::class.java)),
+                    Intent(AndroidSettings.ACTION_ACCESSIBILITY_SETTINGS))
+            }
+            MobileReadinessKey.NOTIFICATIONS -> explanation = R.string.setup_notifications_body to {
+                if (android.os.Build.VERSION.SDK_INT >= 33 && !notifications && !permissionPrefs.getBoolean("notifications_requested", false)) {
+                    permissionPrefs.edit().putBoolean("notifications_requested", true).apply()
+                    notificationRequest.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                } else openSetupAndroidSettings(context, Intent(AndroidSettings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(AndroidSettings.EXTRA_APP_PACKAGE, context.packageName))
+            }
+            MobileReadinessKey.BATTERY -> explanation = R.string.setup_background_body to {
+                openSetupAndroidSettings(context, Intent(AndroidSettings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")),
+                    Intent(AndroidSettings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+            }
+        }
+    }
     fun preflight(current: Settings, screen: Boolean): Boolean {
         if (current.sourceLang == "auto" && current.translatorEngine in setOf(TranslatorEngine.MYMEMORY, TranslatorEngine.GOOGLE_ML_KIT)) { sheet = "source"; return false }
         if (translationNeedsConfiguration(current)) { provider = current.translatorEngine; return false }
         if (modelState.checking) return false
         if (current.translatorEngine in offlineTranslationEngines && modelState.translationReady != true) { sheet = "offline"; return false }
         if (screen && modelState.ocrReady != true) { onAdvancedSection("ocr"); return false }
+        if (screen && (captureMode == null || captureMode == CaptureStartMode.SHIZUKU && shizukuReady != true)) { sheet = "capture"; return false }
         if (screen && !overlayAllowed) { pendingStart = true; grantOverlay(); return false }
         return true
     }
@@ -185,23 +228,10 @@ fun MobileShell(
                         onPermission = ::grantOverlay,
                         onPhoto = { gallery.launch("image/*") }, onText = { tabName = MobileTab.TEXT.name },
                         checking = modelState.checking,
+                        ready = mobileScreenReady(current, modelState, overlayAllowed, captureMode, shizukuReady),
                         onShowButton = { context.startService(Intent(context, CaptureService::class.java).setAction(CaptureService.ACTION_SHOW_BUTTON)) },
                         readiness = {
-                            MobileReadinessPanel(current, modelState, overlayAllowed, accessibility, notifications, battery,
-                                onOverlay = ::grantOverlay, onService = ::openService, onOcr = { explanation = R.string.setup_recognition_body to { onAdvancedSection("ocr") } }, onModels = { sheet = "offline" },
-                                onAccessibility = { explanation = R.string.setup_accessibility_body to {
-                                    openSetupAndroidSettings(context, Intent("android.settings.ACCESSIBILITY_DETAILS_SETTINGS")
-                                        .putExtra("android.intent.extra.COMPONENT_NAME", android.content.ComponentName(context, dev.clickn.translate.trigger.ClickTranslateAccessibilityService::class.java)), Intent(AndroidSettings.ACTION_ACCESSIBILITY_SETTINGS))
-                                } },
-                                onNotifications = { explanation = R.string.setup_notifications_body to {
-                                    if (android.os.Build.VERSION.SDK_INT >= 33 && !notifications && !permissionPrefs.getBoolean("notifications_requested", false)) {
-                                        permissionPrefs.edit().putBoolean("notifications_requested", true).apply()
-                                        notificationRequest.launch(android.Manifest.permission.POST_NOTIFICATIONS)
-                                    } else openSetupAndroidSettings(context, Intent(AndroidSettings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(AndroidSettings.EXTRA_APP_PACKAGE, context.packageName))
-                                } },
-                                onBattery = { explanation = R.string.setup_background_body to {
-                                    openSetupAndroidSettings(context, Intent(AndroidSettings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")), Intent(AndroidSettings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
-                                } }, onCapture = { explanation = R.string.refine_capture_ready_body to { sheet = "capture" } })
+                            MobileReadinessPanel(readinessItems) { sheet = "readiness" }
                         },
                     )
                     MobileTab.TEXT -> TextWorkspace(current, input, translation,
@@ -212,17 +242,17 @@ fun MobileShell(
                         } },
                         onProvider = ::openService,
                         onTranslate = { if (translation.busy) viewModel.resetTranslation() else if (preflight(current, false)) viewModel.translate(input) },
+                        checkingModels = modelState.checking,
                     )
                     MobileTab.HISTORY -> HistoryWorkspace(history, onImageHistory,
-                        onClear = { confirmClear = true }, onEntry = {
-                            editInput(it.source)
-                            viewModel.update { currentSettings -> currentSettings.copy(sourceLang = it.from, targetLang = it.to) }
-                            tabName = MobileTab.TEXT.name
+                        onClear = { confirmClear = true }, onRetry = viewModel::reloadHistory, onEntry = {
+                            historyEntryId = it.id
                         })
                     MobileTab.SETTINGS -> SettingsHub(current, onProvider = ::openService,
                         onAppearance = { sheet = "appearance" }, onLanguage = { sheet = "language" },
                         onAdvanced, onGlossary, onDictionaries, onLogs, onCapture = { sheet = "capture" }, onIcon = { sheet = "icon" }, onOffline = { sheet = "offline" },
-                        onFloating = { sheet = "floating" })
+                        onFloating = { sheet = "floating" },
+                        readiness = { MobileReadinessPanel(readinessItems) { sheet = "readiness" } })
                 }
             }
         }
@@ -247,6 +277,7 @@ fun MobileShell(
                 "appearance" -> AppearanceSheet()
                 "language" -> InterfaceLanguageSheet { sheet = "" }
                 "capture" -> CaptureMethodSheet(viewModel)
+                "readiness" -> MobileReadinessSheet(readinessItems, captureMode, ::openReadinessItem)
                 "icon" -> BrandIconSheet { iconRevision++ }
                 "floating" -> FloatingAppearanceSheet(current, { viewModel.update(it) }) {
                     sheet = ""; onAdvancedSection("floating")
@@ -262,9 +293,12 @@ fun MobileShell(
             })
     }
     explanation?.let { (body, action) ->
+        val message = if (body == R.string.setup_overlay_body) {
+            stringResource(body, context.applicationInfo.loadLabel(context.packageManager).toString())
+        } else stringResource(body)
         AlertDialog(onDismissRequest = { explanation = null; pendingStart = false },
-            title = { Text(stringResource(R.string.refine_readiness)) }, text = { Text(stringResource(body)) },
-            confirmButton = { TextButton(onClick = { explanation = null; action() }) { Text(stringResource(R.string.mobile_permission_enable)) } },
+            title = { Text(stringResource(R.string.refine_readiness)) }, text = { Text(message) },
+            confirmButton = { TextButton(onClick = { explanation = null; action() }) { Text(stringResource(R.string.mobile_configure)) } },
             dismissButton = { TextButton(onClick = { explanation = null; pendingStart = false }) { Text(stringResource(R.string.mobile_cancel)) } })
     }
     if (confirmClear) AlertDialog(onDismissRequest = { confirmClear = false },
@@ -272,6 +306,14 @@ fun MobileShell(
         text = { Text(stringResource(R.string.mobile_clear_history_body)) },
         confirmButton = { TextButton(onClick = { viewModel.clearHistory(); confirmClear = false }) { Text(stringResource(R.string.mobile_clear)) } },
         dismissButton = { TextButton(onClick = { confirmClear = false }) { Text(stringResource(R.string.mobile_cancel)) } })
+    history.entries.firstOrNull { it.id == historyEntryId }?.let { entry ->
+        HistoryEntryDialog(entry, onDismiss = { historyEntryId = null }, onUseSource = {
+            editInput(entry.source)
+            viewModel.update { it.copy(sourceLang = entry.from, targetLang = entry.to) }
+            tabName = MobileTab.TEXT.name
+            historyEntryId = null
+        })
+    }
     BackHandler(tab != MobileTab.SCREEN && sheet.isEmpty() && provider == null) { tabName = MobileTab.SCREEN.name }
 }
 
@@ -279,34 +321,44 @@ fun MobileShell(
 internal fun ScreenHome(settings: Settings, running: Boolean, allowed: Boolean,
     onSource: () -> Unit, onTarget: () -> Unit, onSwap: () -> Unit, onProvider: () -> Unit,
     onStart: () -> Unit, onPermission: () -> Unit, onPhoto: () -> Unit, onText: () -> Unit,
-    checking: Boolean = false, readiness: @Composable () -> Unit = {}, onShowButton: () -> Unit = {}) {
+    checking: Boolean = false, readiness: @Composable () -> Unit = {}, onShowButton: () -> Unit = {},
+    ready: Boolean = allowed) {
     LazyColumn(contentPadding = PaddingValues(24.dp, 4.dp, 24.dp, 24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
         item {
             Column(Modifier.fillMaxWidth().background(
                 MaterialTheme.colorScheme.primaryContainer, MaterialTheme.shapes.large).padding(20.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Box(Modifier.size(8.dp).background(if (running) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = .4f), CircleShape))
-                    Text(stringResource(if (running) R.string.mobile_running else R.string.mobile_ready),
+                    Text(stringResource(when {
+                        running -> R.string.mobile_running
+                        checking -> R.string.refine_checking
+                        !ready -> R.string.refine_required
+                        else -> R.string.mobile_ready
+                    }),
                         style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onPrimaryContainer)
                 }
                 Text(stringResource(R.string.mobile_hero_title), Modifier.padding(top = 12.dp),
                     style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                Text(stringResource(R.string.mobile_hero_body), Modifier.padding(top = 8.dp, bottom = 16.dp),
+                Text(stringResource(if (running) R.string.mobile_running_next_step else R.string.mobile_hero_body), Modifier.padding(top = 8.dp, bottom = 16.dp),
                     style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
                 Button(onClick = if (running) onShowButton else onStart, enabled = running || !checking, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
                     colors = ButtonDefaults.buttonColors()) {
                     Icon(if (running) Icons.Outlined.Visibility else Icons.Outlined.CropFree, null)
                     Spacer(Modifier.width(10.dp))
-                    Text(stringResource(if (running) R.string.floating_show_button else R.string.mobile_start), fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(when {
+                        running -> R.string.floating_show_button
+                        checking -> R.string.mobile_checking_models
+                        else -> R.string.mobile_start
+                    }), fontWeight = FontWeight.SemiBold)
                 }
                 if (running) TextButton(onClick = onStart, modifier = Modifier.fillMaxWidth()) {
                     Text(stringResource(R.string.mobile_stop))
                 }
             }
         }
+        item { readiness() }
         item { LanguagePair(settings, onSource, onTarget, onSwap) }
         item { ServiceRow(settings, onProvider) }
-        item { readiness() }
         item { SectionLabel(R.string.mobile_quick_actions) }
         item { Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             ActionTile(R.string.mobile_photo, R.string.mobile_photo_body, Icons.Outlined.Image, onPhoto, Modifier.weight(1f).fillMaxHeight())
@@ -338,7 +390,7 @@ private fun LanguageCell(label: Int, code: String, onClick: () -> Unit, modifier
 }
 
 @Composable
-private fun languageName(code: String): String = if (code == "auto") stringResource(R.string.mobile_auto)
+internal fun languageName(code: String): String = if (code == "auto") stringResource(R.string.mobile_auto)
     else Locale.forLanguageTag(code).getDisplayName(LocalContext.current.resources.configuration.locales[0]).replaceFirstChar { it.titlecase() }
 
 @Composable
@@ -364,12 +416,11 @@ private fun ActionTile(title: Int, body: Int, icon: ImageVector, onClick: () -> 
 @Composable
 internal fun TextWorkspace(settings: Settings, input: String, state: MobileTranslationState,
     onInput: (String) -> Unit, onSource: () -> Unit, onTarget: () -> Unit, onSwap: () -> Unit,
-    onProvider: () -> Unit, onTranslate: () -> Unit) {
+    onProvider: () -> Unit, onTranslate: () -> Unit, checkingModels: Boolean = false) {
     val context = LocalContext.current
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-    var copied by remember { mutableStateOf(false) }
-    LaunchedEffect(state.result) { copied = false }
     val needsSource = settings.sourceLang == "auto" && settings.translatorEngine in setOf(TranslatorEngine.MYMEMORY, TranslatorEngine.GOOGLE_ML_KIT)
+    val preparing = checkingModels && !state.busy
     LazyColumn(contentPadding = PaddingValues(24.dp, 4.dp, 24.dp, 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.imePadding()) {
         item { LanguagePair(settings, onSource, onTarget, onSwap) }
         item { OutlinedTextField(input, onInput, modifier = Modifier.fillMaxWidth(),
@@ -382,56 +433,64 @@ internal fun TextWorkspace(settings: Settings, input: String, state: MobileTrans
         } }
         item { ServiceRow(settings, onProvider) }
         if (needsSource) item { Text(stringResource(R.string.mobile_explicit_source), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium) }
-        item { Button(onClick = onTranslate, enabled = input.isNotBlank() && !needsSource,
+        item { Button(onClick = onTranslate, enabled = input.isNotBlank() && !needsSource && !preparing,
             modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
-            if (state.busy) { CircularProgressIndicator(Modifier.size(20.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp); Spacer(Modifier.width(12.dp)) }
+            if (state.busy || preparing) { CircularProgressIndicator(Modifier.size(20.dp), color = if (state.busy) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant, strokeWidth = 2.dp); Spacer(Modifier.width(12.dp)) }
             else { Icon(Icons.Outlined.Translate, null); Spacer(Modifier.width(12.dp)) }
-            Text(stringResource(if (state.busy) R.string.mobile_cancel else R.string.mobile_translate))
+            Text(stringResource(when { state.busy -> R.string.mobile_cancel; preparing -> R.string.mobile_checking_models; else -> R.string.mobile_translate }))
         } }
         item { Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainerLow) {
             Column(Modifier.fillMaxWidth().padding(24.dp)) {
                 SectionLabel(R.string.mobile_result)
-                Text(if (state.error != null) stringResource(R.string.mobile_error)
-                    else state.result.ifEmpty { stringResource(if (state.busy) R.string.mobile_translating else R.string.mobile_result_empty) },
-                    Modifier.padding(top = 16.dp), style = MaterialTheme.typography.bodyLarge,
-                    color = if (state.error != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
-                if (state.error != null) TextButton(onClick = onProvider) { Text(stringResource(R.string.mobile_configure)) }
-                if (state.result.isNotEmpty()) Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = { clipboard?.setPrimaryClip(ClipData.newPlainText(AppBrand.DISPLAY_NAME, state.result)); copied = clipboard != null }) {
-                        Icon(Icons.Outlined.ContentCopy, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text(stringResource(if (copied) R.string.mobile_copied else R.string.mobile_copy))
-                    }
-                    TextButton(onClick = { context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
-                        type = "text/plain"; putExtra(Intent.EXTRA_TEXT, state.result)
-                    }, null)) }) { Icon(Icons.Outlined.Share, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.mobile_share)) }
-                }
+                if (state.error != null) TranslationFailureNotice(state.error, onTranslate, onProvider, retryEnabled = !checkingModels)
+                else Text(state.result.ifEmpty { stringResource(if (state.busy) R.string.mobile_translating else R.string.mobile_result_empty) },
+                    Modifier.padding(top = 16.dp), style = MaterialTheme.typography.bodyLarge)
+                if (state.result.isNotEmpty()) TextOutputActions(state.result, Modifier.padding(top = 16.dp))
             }
         } }
     }
 }
 
 @Composable
-internal fun HistoryWorkspace(entries: List<MobileHistoryEntry>, onImages: () -> Unit, onClear: () -> Unit, onEntry: (MobileHistoryEntry) -> Unit) {
+internal fun HistoryWorkspace(state: TextHistoryState, onImages: () -> Unit, onClear: () -> Unit,
+    onRetry: () -> Unit, onEntry: (TextHistoryEntry) -> Unit) {
+    val entries = state.entries
     val locale = LocalContext.current.resources.configuration.locales[0]
     LazyColumn(contentPadding = PaddingValues(24.dp, 4.dp, 24.dp, 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { SettingsRow(Icons.Outlined.PhotoLibrary, stringResource(R.string.mobile_image_history), stringResource(R.string.mobile_photo_body), onImages) }
-        if (entries.isEmpty()) item { Column(Modifier.fillMaxWidth().padding(vertical = 48.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        if (state.loading) item {
+            LinearProgressIndicator(Modifier.fillMaxWidth())
+            Text(stringResource(R.string.mobile_history_loading), Modifier.padding(top = 8.dp))
+        }
+        state.issue?.let { issue -> item {
+            Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.errorContainer) {
+                Column(Modifier.fillMaxWidth().padding(20.dp)) {
+                    Text(stringResource(when (issue) {
+                        TextHistoryIssue.LEGACY_IMPORT -> R.string.mobile_history_import_error
+                        TextHistoryIssue.LEGACY_ERASE -> R.string.mobile_history_erase_error
+                        TextHistoryIssue.STORAGE -> R.string.mobile_history_storage_error
+                    }))
+                    TextButton(onClick = onRetry) { Text(stringResource(R.string.mobile_history_retry)) }
+                }
+            }
+        } }
+        if (entries.isNotEmpty() || state.issue != null) item { Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.mobile_saved), Modifier.weight(1f), fontWeight = FontWeight.Bold)
+            TextButton(onClick = onClear, enabled = !state.loading) { Text(stringResource(R.string.mobile_clear_history)) }
+        } }
+        if (entries.isEmpty() && !state.loading && state.issue == null) item { Column(Modifier.fillMaxWidth().padding(vertical = 48.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Icon(Icons.Outlined.History, null, Modifier.size(48.dp), tint = MaterialTheme.colorScheme.primary)
             Text(stringResource(R.string.mobile_history_empty), Modifier.padding(top = 20.dp), style = MaterialTheme.typography.titleLarge)
             Text(stringResource(R.string.mobile_history_body), Modifier.padding(top = 12.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
-        } } else {
-            item { Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.mobile_saved), Modifier.weight(1f), fontWeight = FontWeight.Bold)
-                TextButton(onClick = onClear) { Text(stringResource(R.string.mobile_clear_history)) }
-            } }
-            items(entries, key = { it.id }) { entry ->
-                Surface(onClick = { onEntry(entry) }, shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainerLow) {
-                    Column(Modifier.fillMaxWidth().padding(20.dp)) {
-                        Text("${languageName(entry.from)} → ${languageName(entry.to)}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                        Text(entry.translated, Modifier.padding(top = 10.dp), maxLines = 3, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium)
-                        Text(entry.source, Modifier.padding(top = 6.dp), maxLines = 2, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT, locale).format(Date(entry.id)),
-                            Modifier.padding(top = 12.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+        } }
+        items(entries, key = { it.id }) { entry ->
+            Surface(onClick = { onEntry(entry) }, shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainerLow) {
+                Column(Modifier.fillMaxWidth().padding(20.dp)) {
+                    Text("${languageName(entry.from)} → ${languageName(entry.to)}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                    Text(entry.translated, Modifier.padding(top = 10.dp), maxLines = 3, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium)
+                    Text(entry.source, Modifier.padding(top = 6.dp), maxLines = 2, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT, locale).format(Date(entry.createdAtMs)),
+                        Modifier.padding(top = 12.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -440,11 +499,13 @@ internal fun HistoryWorkspace(entries: List<MobileHistoryEntry>, onImages: () ->
 
 @Composable
 internal fun SettingsHub(settings: Settings, onProvider: () -> Unit, onAppearance: () -> Unit, onLanguage: () -> Unit,
-    onAdvanced: () -> Unit, onGlossary: () -> Unit, onDictionaries: () -> Unit, onLogs: () -> Unit, onCapture: () -> Unit = {}, onIcon: () -> Unit = {}, onOffline: () -> Unit = {}, onFloating: () -> Unit = {}) {
+    onAdvanced: () -> Unit, onGlossary: () -> Unit, onDictionaries: () -> Unit, onLogs: () -> Unit, onCapture: () -> Unit = {}, onIcon: () -> Unit = {}, onOffline: () -> Unit = {}, onFloating: () -> Unit = {},
+    readiness: @Composable () -> Unit = {}) {
     val context = LocalContext.current
     val capture by CaptureStartPreference.mode.collectAsState()
     fun browse(url: String) { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
     LazyColumn(contentPadding = PaddingValues(24.dp, 4.dp, 24.dp, 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        item { readiness() }
         item { SettingsRow(Icons.Outlined.Download, stringResource(R.string.refine_offline), stringResource(R.string.refine_offline_body), onOffline) }
         item { SettingsRow(Icons.Outlined.Image, stringResource(R.string.refine_icon), stringResource(R.string.refine_brand_logo), onIcon) }
         item { SettingsRow(Icons.Outlined.TouchApp, stringResource(R.string.refine_floating), stringResource(R.string.polish_floating_summary), onFloating) }
@@ -465,31 +526,6 @@ internal fun SettingsHub(settings: Settings, onProvider: () -> Unit, onAppearanc
         item { SettingsRow(Icons.AutoMirrored.Outlined.Chat, stringResource(R.string.mobile_community), "Telegram", { browse(AppBrand.COMMUNITY_URL) }) }
         item { Text("${stringResource(R.string.mobile_version)} ${BuildConfig.VERSION_NAME}",
             Modifier.fillMaxWidth().padding(vertical = 16.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-    }
-}
-
-@Composable
-private fun CaptureMethodSheet(viewModel: MobileViewModel) {
-    val context = LocalContext.current
-    val selected by CaptureStartPreference.mode.collectAsState()
-    val ready by viewModel.captureReady.collectAsState()
-    Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text(stringResource(R.string.setup_capture), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        ListItem(headlineContent = { Text(stringResource(R.string.main_capture_system)) },
-            supportingContent = { Text(stringResource(R.string.setup_capture_body)) },
-            leadingContent = { RadioButton(selected != CaptureStartMode.SHIZUKU, null) },
-            modifier = Modifier.clickable { CaptureStartPreference.select(CaptureStartMode.SYSTEM) })
-        ListItem(headlineContent = { Text("Shizuku") },
-            supportingContent = { Text(stringResource(R.string.main_hint_shizuku_not_paired)) },
-            leadingContent = { RadioButton(selected == CaptureStartMode.SHIZUKU, null) },
-            modifier = Modifier.clickable { viewModel.prepareShizuku() })
-        ready?.let { Text(stringResource(if (it) R.string.main_hint_shizuku_ready else R.string.main_snack_shizuku_unavailable),
-            color = if (it) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error) }
-        OutlinedButton(onClick = {
-            val launch = context.packageManager.getLaunchIntentForPackage("moe.shizuku.privileged.api")
-            if (launch != null) openSetupAndroidSettings(context, launch)
-            else android.widget.Toast.makeText(context, R.string.main_hint_shizuku_not_installed, android.widget.Toast.LENGTH_LONG).show()
-        }, modifier = Modifier.fillMaxWidth()) { Text("Shizuku") }
     }
 }
 
@@ -581,6 +617,10 @@ private data class ProviderField(val label: String, val secret: Boolean = false,
 internal fun ProviderSheet(current: Settings, engine: TranslatorEngine, viewModel: MobileViewModel,
     onDismiss: () -> Unit, onAdvanced: () -> Unit) {
     var draft by remember(engine) { mutableStateOf(if (engine == TranslatorEngine.GOOGLE_ML_KIT) mobileMlKitPair(current) else current.copy(translatorEngine = engine)) }
+    var savePending by remember(engine) { mutableStateOf(false) }
+    val saveStatus by viewModel.providerSaveState.collectAsState()
+    val saving = savePending || saveStatus == ProviderSaveStatus.SAVING
+    val saveScope = rememberCoroutineScope()
     val testing by viewModel.testing.collectAsState()
     val connection by viewModel.connection.collectAsState()
     val server = stringResource(R.string.mobile_server)
@@ -606,44 +646,69 @@ internal fun ProviderSheet(current: Settings, engine: TranslatorEngine, viewMode
         else -> true
     }
     val local = engine in setOf(TranslatorEngine.GOOGLE_ML_KIT, TranslatorEngine.LOCAL_SAKURA, TranslatorEngine.LOCAL_HY_MT2)
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    fun saveAndConfirm(onSaved: () -> Unit) {
+        if (savePending || viewModel.providerSaveState.value == ProviderSaveStatus.SAVING) return
+        savePending = true
+        val saved = draft
+        val commit = viewModel.saveProvider { existing ->
+            fields.fold(if (engine == TranslatorEngine.GOOGLE_ML_KIT) mobileMlKitPair(existing) else existing.copy(translatorEngine = engine)) { s, field ->
+                field.write(s, field.read(saved))
+            }.let { if (engine == TranslatorEngine.DEEPL) it.copy(deeplPro = saved.deeplPro) else it }
+        }
+        saveScope.launch {
+            try { confirmProviderSave(commit, onSaved) }
+            finally { savePending = false }
+        }
+    }
+    val canDismiss by rememberUpdatedState({ !savePending && viewModel.providerSaveState.value != ProviderSaveStatus.SAVING })
+    val sheetState = rememberModalBottomSheetState(confirmValueChange = { value -> value != SheetValue.Hidden || canDismiss() })
+    ModalBottomSheet(onDismissRequest = { if (canDismiss()) onDismiss() }, sheetState = sheetState) {
         LazyColumn(Modifier.fillMaxWidth().heightIn(max = 600.dp).imePadding(), contentPadding = PaddingValues(24.dp, 0.dp, 24.dp, 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             item { Text(providerName(engine), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold) }
             if (fields.isEmpty()) item { Text(stringResource(if (local) R.string.mobile_models_body else R.string.mobile_no_key), color = MaterialTheme.colorScheme.onSurfaceVariant) }
             if (engine == TranslatorEngine.MYMEMORY) item { Text(stringResource(R.string.mobile_explicit_source), style = MaterialTheme.typography.bodyMedium) }
             items(fields) { field ->
                 var visible by remember { mutableStateOf(false) }
-                OutlinedTextField(field.read(draft), { draft = field.write(draft, it); viewModel.clearConnection() }, Modifier.fillMaxWidth(),
+                OutlinedTextField(field.read(draft), { draft = field.write(draft, it); viewModel.clearConnection() }, Modifier.fillMaxWidth(), enabled = !saving,
                     label = { Text(field.label) }, isError = field.label == server && !validConfig, singleLine = true, shape = MaterialTheme.shapes.small,
                     visualTransformation = if (field.secret && !visible) PasswordVisualTransformation() else VisualTransformation.None,
-                    trailingIcon = if (field.secret) ({ IconButton(onClick = { visible = !visible }) {
+                    trailingIcon = if (field.secret) ({ IconButton(onClick = { visible = !visible }, enabled = !saving) {
                         Icon(if (visible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
                             stringResource(if (visible) R.string.mobile_hide_key else R.string.mobile_show_key))
                     } }) else null)
             }
             if (engine == TranslatorEngine.DEEPL) item {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text("DeepL API Pro", Modifier.weight(1f)); Switch(draft.deeplPro, { draft = draft.copy(deeplPro = it); viewModel.clearConnection() })
+                    Text("DeepL API Pro", Modifier.weight(1f)); Switch(draft.deeplPro, { draft = draft.copy(deeplPro = it); viewModel.clearConnection() }, enabled = !saving)
                 }
             }
             item { connection?.let { Text(stringResource(if (it.success) R.string.mobile_test_ok else R.string.mobile_error),
                 color = if (it.success) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error) } }
+            if (saveStatus == ProviderSaveStatus.FAILED) item {
+                Text(stringResource(R.string.mobile_provider_save_error), color = MaterialTheme.colorScheme.error)
+            }
             item { Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedButton(onClick = { viewModel.test(draft) }, enabled = !testing && validConfig, modifier = Modifier.weight(1f).heightIn(min = 52.dp)) {
+                OutlinedButton(onClick = { viewModel.test(draft) }, enabled = !saving && !testing && validConfig, modifier = Modifier.weight(1f).heightIn(min = 52.dp)) {
                     if (testing) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
                     else Text(stringResource(R.string.mobile_test))
                 }
-                Button(onClick = {
-                    viewModel.resetTranslation()
-                    val saved = draft
-                    viewModel.update { existing ->
-                        fields.fold(if (engine == TranslatorEngine.GOOGLE_ML_KIT) mobileMlKitPair(existing) else existing.copy(translatorEngine = engine)) { s,field -> field.write(s, field.read(saved)) }
-                            .let { if (engine == TranslatorEngine.DEEPL) it.copy(deeplPro = saved.deeplPro) else it }
+                Button(onClick = { saveAndConfirm(onDismiss) }, enabled = !saving && !testing && validConfig,
+                    modifier = Modifier.weight(1f).heightIn(min = 52.dp).testTag("provider-save")) {
+                    if (saving) {
+                        CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                        Spacer(Modifier.width(8.dp))
                     }
-                    onDismiss()
-                }, enabled = validConfig, modifier = Modifier.weight(1f).heightIn(min = 52.dp)) { Text(stringResource(R.string.mobile_save)) }
+                    Text(stringResource(when {
+                        saving -> R.string.mobile_provider_saving
+                        saveStatus == ProviderSaveStatus.FAILED -> R.string.mobile_provider_save_retry
+                        else -> R.string.mobile_save
+                    }))
+                }
             } }
-            item { TextButton(onClick = onAdvanced, modifier = Modifier.fillMaxWidth()) { Text(stringResource(if (local) R.string.mobile_manage_models else R.string.mobile_advanced)) } }
+            item { TextButton(onClick = { saveAndConfirm(onAdvanced) }, enabled = !saving && !testing,
+                modifier = Modifier.fillMaxWidth().testTag("provider-advanced")) {
+                Text(stringResource(if (local) R.string.mobile_manage_models else R.string.mobile_advanced))
+            } }
         }
     }
 }

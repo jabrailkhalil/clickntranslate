@@ -134,16 +134,15 @@
                 android:value="true" />
         </service>
 
-        <!-- 系统「文字选中」菜单入口：用户在任意 App 长按文字选词，系统菜单会列出本项。
-             无 UI，立即 finish；翻译走 application scope；结果浮卡显示在原 App 上层。 -->
+        <!-- PROCESS_TEXT: editable text returns only after review/Replace; read-only may use the
+             original overlay. Review also works without overlay permission and survives rotation. -->
         <activity
             android:name=".translate.ProcessTextTranslateActivity"
             android:exported="true"
             android:label="@string/process_text_label"
             android:icon="@drawable/ic_menu_word_select"
             android:theme="@style/Theme.ClickTranslate.Transparent"
-            android:excludeFromRecents="true"
-            android:noHistory="true">
+            android:excludeFromRecents="true">
             <intent-filter>
                 <action android:name="android.intent.action.PROCESS_TEXT" />
                 <category android:name="android.intent.category.DEFAULT" />

@@ -10,7 +10,7 @@
     <string name="setup_translation">Языки и перевод</string>
     <string name="setup_translation_body">Выбери язык, на котором читаешь, и сервис перевода. Google работает без ключа. Для MyMemory и офлайн-перевода укажи язык оригинала.</string>
     <string name="setup_overlay">Перевод поверх приложений</string>
-    <string name="setup_overlay_body">Открой настройки Android, найди Click’n’Translate и включи «Поверх других приложений». Вернись сюда — статус обновится автоматически.</string>
+    <string name="setup_overlay_body">Открой настройки Android, найди %1$s и включи «Поверх других приложений». Вернись сюда — статус обновится автоматически.</string>
     <string name="setup_notifications">Уведомления</string>
     <string name="setup_notifications_body">Разреши уведомления: так можно видеть работу переводчика, останавливать захват и следить за загрузкой моделей. Перевод работает и без этого разрешения.</string>
     <string name="setup_enabled">Включено</string>

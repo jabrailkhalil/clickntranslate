@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="gallery_export_text_action">Export translated text (.txt)</string>
+    <string name="gallery_text_actions">Text actions</string>
+    <string name="gallery_text_copy">Copy</string>
+    <string name="gallery_text_share">Share</string>
+</resources>

@@ -64,7 +64,10 @@ class DictionaryLibraryViewModel @Inject constructor(
             uri = uri,
             expectedId = id,
         )
-        _packStatuses.value = installer.statuses()
+        if (result is DictionaryPackInstallResult.Success) {
+            val installed = result.status
+            _packStatuses.value = _packStatuses.value.filterNot { it.spec.id == installed.spec.id } + installed
+        }
         return result
     }
 

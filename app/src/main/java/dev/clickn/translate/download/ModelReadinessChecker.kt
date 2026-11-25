@@ -8,6 +8,10 @@ import dev.clickn.translate.llm.LocalLlmDeviceCapability
 import dev.clickn.translate.ocr.MangaOcrModelInstaller
 import dev.clickn.translate.ocr.OrientationModelInstaller
 import dev.clickn.translate.ocr.PaddleModelInstaller
+import dev.clickn.translate.ocr.TesseractModelStore
+import dev.clickn.translate.ocr.TesseractModelFiles
+import dev.clickn.translate.translate.MlKitOnDeviceTranslator
+import dev.clickn.translate.translate.MlKitLanguagePolicy
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -49,12 +53,41 @@ class ModelReadinessChecker @Inject constructor(
     private val orientationModelInstaller: OrientationModelInstaller,
     private val llmInstaller: LlmModelInstaller,
     private val localLlmDeviceCapability: LocalLlmDeviceCapability,
+    private val tesseractModels: TesseractModelStore,
+    private val mlKit: MlKitOnDeviceTranslator,
 ) {
+    @Volatile private var downloadedMlKitLanguages: Set<String> = emptySet()
+    private val mlKitInventoryLock = Any()
+    private var mlKitInventoryRevision = 0L
+
+    fun invalidateMlKitInventory() = synchronized(mlKitInventoryLock) {
+        mlKitInventoryRevision++
+        downloadedMlKitLanguages = emptySet()
+    }
+
+    /** Explicit inventory refresh only; never initiates a model download. */
+    suspend fun refresh(specs: List<ModelDownloadSpec>) {
+        if (specs.any { it.type == ModelDownloadType.TESSERACT_ARABIC }) tesseractModels.refresh()
+        if (specs.any { it.type == ModelDownloadType.ML_KIT_TRANSLATION }) {
+            val revision = synchronized(mlKitInventoryLock) { mlKitInventoryRevision }
+            val installed = mlKit.getDownloadedLanguageModels()
+            synchronized(mlKitInventoryLock) {
+                if (revision == mlKitInventoryRevision) downloadedMlKitLanguages = installed
+            }
+        }
+    }
     fun check(spec: ModelDownloadSpec): ModelReadiness =
         modelReadinessWithDependencies(spec, ::checkArtifact)
 
     /** Downloads skip valid files independently even when another required component is missing. */
     fun checkArtifact(spec: ModelDownloadSpec): ModelReadiness = when (spec.type) {
+        ModelDownloadType.TESSERACT_ARABIC -> ModelReadiness(spec, tesseractModels.state.value.ready, true,
+            if (tesseractModels.state.value.ready) TesseractModelFiles.models.sumOf { it.bytes } else 0L)
+        ModelDownloadType.ML_KIT_TRANSLATION -> {
+            val (source, target) = spec.mlKitLanguages()
+            ModelReadiness(spec, source == target || downloadedMlKitLanguages.containsAll(
+                MlKitLanguagePolicy.requiredDownloadLanguages(source, target)), true)
+        }
         ModelDownloadType.PADDLE -> {
             val files = paddleInstaller.checkInstalled(PaddleModelVersion.valueOf(spec.variant))
             ModelReadiness(
@@ -103,6 +136,7 @@ class ModelReadinessChecker @Inject constructor(
     fun mangaOcr(): ModelReadiness = check(ModelDownloadSpec.mangaOcr())
 
     fun orientation(): ModelReadiness = check(ModelDownloadSpec.orientation())
+    fun tesseractArabic(): ModelReadiness = check(ModelDownloadSpec.tesseractArabic())
 
     fun llm(kind: LlmModelKind): ModelReadiness = check(ModelDownloadSpec.llm(kind))
 
