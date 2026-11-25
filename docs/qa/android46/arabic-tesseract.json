@@ -1,0 +1,225 @@
+{
+  "fixtureOnly": true,
+  "width": 1272,
+  "height": 2772,
+  "modelProfile": "ara-best-e12c65a91594_eng-fast-65727574dfcd",
+  "cropOnly": false,
+  "applicationAutoParagraphs": [
+    {
+      "text": "تجرى الأنهار الهادئة بين الجبال؛\nوتصل إلى قرية صغيرة يسكنها\nأناس طيبون.",
+      "confidence": 0.914635,
+      "box": [
+        203,
+        746,
+        1187,
+        1149
+      ]
+    },
+    {
+      "text": "Share owned photo to Clickn QA",
+      "confidence": 0.9518022,
+      "box": [
+        282,
+        2580,
+        992,
+        2626
+      ]
+    }
+  ],
+  "nativeModes": [
+    {
+      "name": "auto",
+      "mode": 3,
+      "utf8": "تجرى الأنهار الهادئة بين الجبال؛\nوتصل إلى قرية صغيرة يسكنها\nأناس طيبون.\n\nShare owned photo to Clickn QA",
+      "paragraphs": [
+        {
+          "text": "تجرى الأنهار الهادئة بين الجبال؛\nوتصل إلى قرية صغيرة يسكنها\nأناس طيبون.\n\n",
+          "box": [
+            203,
+            746,
+            1187,
+            1149
+          ],
+          "atParagraphBeginning": true,
+          "confidence": 91.4635
+        },
+        {
+          "text": "Share owned photo to Clickn QA\n",
+          "box": [
+            282,
+            2580,
+            992,
+            2626
+          ],
+          "atParagraphBeginning": true,
+          "confidence": 95.18022
+        }
+      ],
+      "lines": [
+        {
+          "text": "تجرى الأنهار الهادئة بين الجبال؛\n",
+          "box": [
+            203,
+            746,
+            1187,
+            839
+          ],
+          "atParagraphBeginning": true,
+          "confidence": 92.759575
+        },
+        {
+          "text": "وتصل إلى قرية صغيرة يسكنها\n",
+          "box": [
+            229,
+            909,
+            1183,
+            994
+          ],
+          "atParagraphBeginning": false,
+          "confidence": 89.7763
+        },
+        {
+          "text": "أناس طيبون.\n\n",
+          "box": [
+            775,
+            1064,
+            1182,
+            1149
+          ],
+          "atParagraphBeginning": false,
+          "confidence": 88.681046
+        },
+        {
+          "text": "Share owned photo to Clickn QA\n",
+          "box": [
+            282,
+            2580,
+            992,
+            2626
+          ],
+          "atParagraphBeginning": true,
+          "confidence": 95.18022
+        }
+      ]
+    },
+    {
+      "name": "sparse",
+      "mode": 11,
+      "utf8": "تجري الأنهار الهادئة بين الجبال.\n\nوتصل إلى قرية صغيرة يسكنها\n\nأناس طيبون.\n\nكل ‎clue‏ ويستخدم كلمة ‎OCR‏\n\nShare owned photo to Clickn QA",
+      "paragraphs": [
+        {
+          "text": "تجري الأنهار الهادئة بين الجبال.\n\n",
+          "box": [
+            203,
+            746,
+            1187,
+            856
+          ],
+          "atParagraphBeginning": true,
+          "confidence": 91.51466
+        },
+        {
+          "text": "وتصل إلى قرية صغيرة يسكنها\n\n",
+          "box": [
+            229,
+            909,
+            1183,
+            994
+          ],
+          "atParagraphBeginning": true,
+          "confidence": 92.79702
+        },
+        {
+          "text": "أناس طيبون.\n\n",
+          "box": [
+            775,
+            1044,
+            1182,
+            1149
+          ],
+          "atParagraphBeginning": true,
+          "confidence": 90.41159
+        },
+        {
+          "text": "كل ‎clue‏ ويستخدم كلمة ‎OCR‏\n\n",
+          "box": [
+            186,
+            1593,
+            1186,
+            1686
+          ],
+          "atParagraphBeginning": true,
+          "confidence": 95.8304
+        },
+        {
+          "text": "Share owned photo to Clickn QA\n",
+          "box": [
+            282,
+            2580,
+            992,
+            2626
+          ],
+          "atParagraphBeginning": true,
+          "confidence": 95.18022
+        }
+      ],
+      "lines": [
+        {
+          "text": "تجري الأنهار الهادئة بين الجبال.\n\n",
+          "box": [
+            203,
+            746,
+            1183,
+            839
+          ],
+          "atParagraphBeginning": true,
+          "confidence": 91.51466
+        },
+        {
+          "text": "وتصل إلى قرية صغيرة يسكنها\n\n",
+          "box": [
+            229,
+            909,
+            1183,
+            994
+          ],
+          "atParagraphBeginning": true,
+          "confidence": 92.79702
+        },
+        {
+          "text": "أناس طيبون.\n\n",
+          "box": [
+            775,
+            1044,
+            1182,
+            1149
+          ],
+          "atParagraphBeginning": true,
+          "confidence": 90.41159
+        },
+        {
+          "text": "كل ‎clue‏ ويستخدم كلمة ‎OCR‏\n\n",
+          "box": [
+            186,
+            1593,
+            1186,
+            1686
+          ],
+          "atParagraphBeginning": true,
+          "confidence": 95.8304
+        },
+        {
+          "text": "Share owned photo to Clickn QA\n",
+          "box": [
+            282,
+            2580,
+            992,
+            2626
+          ],
+          "atParagraphBeginning": true,
+          "confidence": 95.18022
+        }
+      ]
+    }
+  ]
+}

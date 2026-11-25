@@ -1,0 +1,268 @@
+{
+  "checkedOn": "2026-11-25",
+  "app": "Click’n’Translate Android",
+  "version": "1.8.3",
+  "versionCode": 46,
+  "buildType": "CPU debug",
+  "applicationId": "dev.clickn.translate.debug",
+  "testedCommit": "00cbb3ab905371e30c5e961605a7a0b042d75dd4",
+  "mainSourceTree": "ab79a44f123bdbb11f0926303789594d18e4ef10",
+  "actionRun": "https://github.com/jabrailkhalil/clickntranslate/actions/runs/45655014840",
+  "device": {
+    "fingerprint": "google/sdk_gphone64_x86_64/emu64xa:15/AE3A.240806.043/12960925:userdebug/dev-keys",
+    "abis": [
+      "x86_64",
+      "arm64-v8a"
+    ],
+    "screen": [
+      "Physical size: 320x640",
+      "Physical density: 160"
+    ],
+    "environment": "Android 15 emulator on KVM, ARM64 via native bridge"
+  },
+  "local": {
+    "jvm": {
+      "tests": 1927,
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0,
+      "suites": 495
+    },
+    "lint": {
+      "errors": 0,
+      "warnings": 978,
+      "information": 42
+    },
+    "apk": {
+      "sha256": "a5f29dfb7534d8bda3c39d5a71e9c22450d08c97c5380d0a718f9f1162f49c1e",
+      "bytes": 82258877,
+      "minSdk": 26,
+      "targetSdk": 35,
+      "libraries": 18,
+      "elfLoadsAligned16K": 58,
+      "zipalign16K": "Verification succesful",
+      "baselineApi26LibrariesChecked": 11,
+      "api26NativeImportsChecked": 1403
+    }
+  },
+  "instrumentation": {
+    "uniquePassed": 121,
+    "uniqueDiscovered": 122,
+    "untested": [
+      "dev.clickn.translate.llm.LocalLlmTemplateIntegrationTest#pinnedGgufTemplateMatchesTokenBudgetAndIndependentNativeGeneration"
+    ],
+    "passedByPackage": {
+      "appcontext": 1,
+      "capture": 14,
+      "data": 19,
+      "dictionary": 3,
+      "gallery": 53,
+      "glossary": 2,
+      "history": 10,
+      "ocr": 10,
+      "overlay": 2,
+      "translate": 2,
+      "tts": 1,
+      "ui": 2,
+      "update": 2
+    },
+    "groups": {
+      "device-suite": {
+        "tests": 122,
+        "passed": 116,
+        "skipped": 6,
+        "failed": 0,
+        "seconds": 26.488,
+        "sha256": "7d84d5f2bc2f58f52cdec5bffd983229d694629be978d0b8a78428acda9f58dc"
+      },
+      "screen-consent": {
+        "tests": 1,
+        "passed": 1,
+        "skipped": 0,
+        "failed": 0,
+        "seconds": 10.388,
+        "sha256": "83cb35950a5115752f17a7b3ac7c684b4d77682551a858fd0a9d385bc2a98f3b"
+      },
+      "arabic-ocr": {
+        "tests": 3,
+        "passed": 3,
+        "skipped": 0,
+        "failed": 0,
+        "seconds": 12.645,
+        "sha256": "91ef873ecd90e0d509367c00aaafbe0c36fa7c118ae54d8061186141a1a1a64f"
+      },
+      "paddle-arabic": {
+        "tests": 1,
+        "passed": 1,
+        "skipped": 0,
+        "failed": 0,
+        "seconds": 16.784,
+        "sha256": "538e05f47ae06ea638d3aac00d61bdb601d43093b01d2ea508dd20cadbd8a473"
+      },
+      "native-page": {
+        "tests": 1,
+        "passed": 1,
+        "skipped": 0,
+        "failed": 0,
+        "seconds": 10.915,
+        "sha256": "3b893aa0985463eebf4442527bd2ca67b4527241f6aae48c9b9c5685fa1da4e4"
+      }
+    }
+  },
+  "freshInstall": {
+    "stages": [
+      "step-1",
+      "step-2",
+      "step-3",
+      "step-4",
+      "home",
+      "settings",
+      "shell-after-restart",
+      "home-after-restart"
+    ],
+    "launcher": [
+      {
+        "stage": "first-launch",
+        "component": "dev.clickn.translate.debug/dev.clickn.translate.LauncherLogo",
+        "LaunchState": "COLD",
+        "TotalTime": 3340,
+        "WaitTime": 3380
+      },
+      {
+        "stage": "cold-launch",
+        "component": "dev.clickn.translate.debug/dev.clickn.translate.LauncherLogo",
+        "LaunchState": "COLD",
+        "TotalTime": 5760,
+        "WaitTime": 5793
+      }
+    ]
+  },
+  "screenTranslation": {
+    "firstFrameMs": 175,
+    "renderedTranslationMs": 1056,
+    "sample": "Green door → Зелёная дверь",
+    "translator": "local HTTP test service; real system projection, OCR and result UI",
+    "sampleType": "one restart on the emulator, following system revocation"
+  },
+  "realReleaseFixture": {
+    "releaseUrl": "https://github.com/jabrailkhalil/clickntranslate/releases/tag/v1.8.2",
+    "apiUrl": "https://api.github.com/repos/jabrailkhalil/clickntranslate/releases/latest",
+    "releaseId": 421036522,
+    "published": "2026-10-22T19:39:01Z",
+    "observedHttpDate": "Wed, 25 Nov 2026 16:32:08 GMT",
+    "assetId": 666672257,
+    "assetUrl": "https://github.com/jabrailkhalil/clickntranslate/releases/download/v1.8.2/ClicknTranslate-1.8.2-arm64.apk",
+    "assetLabel": "",
+    "installedNothing": true,
+    "bytes": 60487261,
+    "sha256": "3a8d5d6ce41b368642f0b03bd1745e9764908aa9a1229660bd67b1557b114d63",
+    "gitHubDigestMatches": true,
+    "packageName": "dev.clickn.translate",
+    "versionName": "1.8.2",
+    "versionCode": 7,
+    "minSdk": 26,
+    "targetSdk": 35,
+    "abi": "arm64-v8a",
+    "signers": 1,
+    "signedV2Valid": true,
+    "signerCertificateSHA256": "1746bfc27cbbb823021ce32c1e7a2640584393d058b85e3d784711954bcafe85",
+    "archivedVerifiedProductionCertificateMatches": true,
+    "kotlinResults": {
+      "clientVersion": "1.8.3",
+      "clientCode": 46,
+      "releaseTag": "v1.8.2",
+      "hasUpdate": false,
+      "noCompatiblePackage": false,
+      "extraReleaseRequests": 0,
+      "copyVerifiedBytes": 60487261,
+      "metadataDigest": "3a8d5d6ce41b368642f0b03bd1745e9764908aa9a1229660bd67b1557b114d63",
+      "signedProductionIdentityAcceptsFromSimulatedCode6": true,
+      "downgradeAtIdentityCheck": "InvalidApk",
+      "rejectsDebugPackageAndOtherCertificate": true
+    }
+  },
+  "onlineProviderObservations": {
+    "environment": "production Kotlin client on host JVM, synthetic input",
+    "services": {
+      "myMemoryText": {
+        "input": "The blue door is open.",
+        "pair": "en|ru",
+        "http": 200,
+        "output": "Дверца открыта.",
+        "requestsForTwoCalls": 1,
+        "note": "Service output omitted the colour."
+      },
+      "myMemoryHyperlink": {
+        "pair": "en|ru",
+        "http": 200,
+        "servicePreservedOriginal": true,
+        "beforeQuery": "?id=1&litude=2>opic=3",
+        "afterQuery": "?id=1&amplitude=2&gtopic=3"
+      },
+      "myMemoryConnectionCheck": {
+        "configuredPair": "fr|en",
+        "before": {
+          "requestPair": "en|en",
+          "success": false
+        },
+        "after": {
+          "requestPair": "fr|en",
+          "success": true,
+          "sampleTranslation": "French"
+        }
+      },
+      "google": {
+        "pair": "en|ru",
+        "http": 429,
+        "translationCompleted": false
+      }
+    }
+  },
+  "strings": {
+    "default_key_count": 158,
+    "localized": {
+      "ru": {
+        "matched": 158,
+        "missing": [],
+        "empty": [],
+        "format_mismatch": []
+      },
+      "de": {
+        "matched": 158,
+        "missing": [],
+        "empty": [],
+        "format_mismatch": []
+      },
+      "fr": {
+        "matched": 158,
+        "missing": [],
+        "empty": [],
+        "format_mismatch": []
+      },
+      "es": {
+        "matched": 158,
+        "missing": [],
+        "empty": [],
+        "format_mismatch": []
+      },
+      "zh-rCN": {
+        "matched": 158,
+        "missing": [],
+        "empty": [],
+        "format_mismatch": []
+      }
+    }
+  },
+  "screenshots": {
+    "home": {
+      "path": "home.png",
+      "sha256": "59f2c67463fc3c907ef987fafd4b435823926e83fe004825157064030b5299ca"
+    },
+    "translation": {
+      "path": "screen-translation.png",
+      "sha256": "c12206d6dcd25cf3b4cf3f42e2376d6f63ccae8411b82f34695af8463b82d3d1"
+    }
+  },
+  "physicalArm64TestedOnThisCommit": false,
+  "productionUpgradeToThisCommitTested": false
+}

@@ -1,0 +1,97 @@
+{
+  "fixtureOnly": true,
+  "model": "V5_ARABIC",
+  "freshVerifiedDownload": true,
+  "width": 1272,
+  "height": 2772,
+  "mergeAdjacentBlocks": false,
+  "blocks": [
+    {
+      "text": "تجري الأنهار الهادئة بين الجبال،\nوتصل إلى قرية صغيرة يسكنها\nأناس طيبون",
+      "language": "ar",
+      "orientation": "HORIZONTAL_RTL",
+      "granularity": "PARAGRAPH",
+      "confidence": 0.97278655,
+      "box": [
+        195,
+        733,
+        1204,
+        1175
+      ],
+      "sourceBoxes": [
+        [
+          195,
+          733,
+          1199,
+          855
+        ],
+        [
+          223,
+          896,
+          1187,
+          997
+        ],
+        [
+          755,
+          1031,
+          1204,
+          1175
+        ]
+      ]
+    },
+    {
+      "text": "يقرأ الثعلب الصغير كتابَا عن السفر\nكل مساء، ويستخدم كلمة OCR\nلوصف التعرف على النص",
+      "language": "ar",
+      "orientation": "HORIZONTAL_RTL",
+      "granularity": "PARAGRAPH",
+      "confidence": 0.95808446,
+      "box": [
+        108,
+        1418,
+        1193,
+        1853
+      ],
+      "sourceBoxes": [
+        [
+          108,
+          1418,
+          1192,
+          1537
+        ],
+        [
+          175,
+          1572,
+          1193,
+          1691
+        ],
+        [
+          367,
+          1731,
+          1191,
+          1853
+        ]
+      ]
+    },
+    {
+      "text": "Share owned photo to Clickn QA",
+      "language": "en",
+      "orientation": "HORIZONTAL_LTR",
+      "granularity": "LINE",
+      "confidence": 0.9911903,
+      "box": [
+        276,
+        2564,
+        995,
+        2629
+      ],
+      "sourceBoxes": [
+        [
+          276,
+          2564,
+          995,
+          2629
+        ]
+      ]
+    }
+  ]
+}
