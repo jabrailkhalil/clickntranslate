@@ -4,14 +4,37 @@ import android.graphics.Rect
 import kotlin.math.abs
 
 internal data class PaddleArabicTextLine(val text: String, val bounds: MergeDebugRect)
+private data class ArabicColumnGap(val row: Int, val left: Int, val right: Int, val top: Int)
 
-/** Join only mixed-script fragments of one detected row; unrelated Arabic columns remain separate. */
-internal fun groupPaddleArabicTextRows(lines: List<PaddleArabicTextLine>): List<List<Int>> =
-    groupHorizontalLineRects(lines.map { it.bounds }, List(lines.size) { null },
-        alignmentTolerance = 0.25f, adjacentGapRatio = 0.5f, heightRatioLimit = 1.5f).flatMap { row ->
+/** Reassemble adjacent parts of a line in reading order; a recurring gutter separates columns. */
+internal fun groupPaddleArabicTextRows(lines: List<PaddleArabicTextLine>): List<List<Int>> {
+    val rows = groupHorizontalLineRects(lines.map { it.bounds }, List(lines.size) { null },
+        alignmentTolerance = 0.25f, adjacentGapRatio = 0.5f, heightRatioLimit = 1.5f)
+    val gaps = if (rows.size < 2) emptyList() else rows.flatMapIndexed { index, row ->
+        row.zipWithNext().mapNotNull { (a, b) ->
+            val left = lines[a].bounds
+            val right = lines[b].bounds
+            if (left.right < right.left) ArabicColumnGap(index, left.right, right.left, left.top) else null
+        }
+    }
+    return rows.flatMapIndexed { index, row ->
         val hasArabic = row.any { TesseractTextPolicy.language(lines[it].text) == "ar" }
         val hasLatin = row.any { TesseractTextPolicy.language(lines[it].text) == "en" }
-        if (row.size > 1 && hasArabic && hasLatin) {
+        if (row.size > 1 && hasArabic && !hasLatin && row.all { TesseractTextPolicy.rtl(lines[it].text) }) {
+            val groups = mutableListOf(mutableListOf(row.first()))
+            for ((leftId, rightId) in row.zipWithNext()) {
+                val left = lines[leftId].bounds
+                val right = lines[rightId].bounds
+                // A narrow two-column table can have a gap as small as an ordinary word space.
+                val gutter = right.left > left.right && gaps.any { other ->
+                    other.row != index && abs(other.top - left.top) in 1..(3 * left.height) &&
+                        minOf(right.left, other.right) > maxOf(left.right, other.left)
+                }
+                if (gutter) groups.add(mutableListOf())
+                groups.last().add(rightId)
+            }
+            groups.asReversed().map { it.asReversed() }
+        } else if (row.size > 1 && hasArabic && hasLatin) {
             // The row runs right to left, while a product name such as "Android Studio"
             // can be split into several OCR boxes that still read left to right.
             val logical = row.sortedByDescending { lines[it].bounds.right }.toMutableList()
@@ -26,6 +49,7 @@ internal fun groupPaddleArabicTextRows(lines: List<PaddleArabicTextLine>): List<
         } else row.map { listOf(it) }
     }.sortedWith(compareBy({ row -> row.minOf { lines[it].bounds.top } },
         { row -> -row.maxOf { lines[it].bounds.right } }))
+}
 
 private fun isLtrFragment(text: String): Boolean =
     TesseractTextPolicy.language(text) == "en" || (text.any(Char::isDigit) && text.none(Char::isLetter))

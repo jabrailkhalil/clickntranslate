@@ -28,6 +28,18 @@ class PaddleArabicParagraphsTest {
         assertEquals(listOf(listOf(0, 1)), groupPaddleArabicTextRows(rows))
     }
 
+    @Test fun separateArabicWordsOnASingleBaselineReachTheTranslatorInReadingOrder() {
+        val words = listOf(line("قلمًا", 185, 53, 259, 93), line("اشترى", 410, 54, 525, 104),
+            line("جديدًا", 45, 55, 168, 102), line("الطالب", 271, 55, 393, 95))
+        assertEquals(listOf(listOf(1, 3, 0, 2)), groupPaddleArabicTextRows(words))
+    }
+
+    @Test fun tightlySpacedArabicColumnsKeepTheirRecurringGutter() {
+        val rows = listOf(line("يمين", 220, 10, 390, 54), line("يسار", 40, 10, 204, 54),
+            line("متابعة", 220, 76, 390, 120), line("أخرى", 43, 76, 203, 120))
+        assertEquals(listOf(listOf(0), listOf(1), listOf(2), listOf(3)), groupPaddleArabicTextRows(rows))
+    }
+
     @Test fun separateLatinWordsInArabicAreReadLeftToRightWithinTheirRun() {
         // Visual order, left to right: اليوم | Android | Studio | نستخدم
         val fragments = listOf(

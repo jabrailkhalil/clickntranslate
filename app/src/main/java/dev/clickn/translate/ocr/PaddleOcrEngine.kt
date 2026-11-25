@@ -366,6 +366,7 @@ class PaddleOcrEngine @Inject constructor(
     private var detSession: OrtSession? = null
     private var recSession: OrtSession? = null
     private var keys: List<String> = emptyList()
+    private var fathatanClass = 0
     /** 当前已加载的模型版本。版本切换时 invalidate session 强制重新加载。 */
     private var loadedVersion: PaddleModelVersion? = null
     private val runCounter = AtomicLong(0L)
@@ -482,6 +483,7 @@ class PaddleOcrEngine @Inject constructor(
                 .map { it.trim('\r', '\n', ' ', '\t') }
                 .filter { it.isNotEmpty() }
         }
+        fathatanClass = if (version == PaddleModelVersion.V5_ARABIC) keys.indexOf(ArabicFathatanEvidence.FATHATAN) + 1 else 0
         loadedVersion = version
         Timber.i(
             "PaddleOCR ready version=%s elapsed=%dms det=%dKB rec=%dKB keys=%d " +
@@ -1213,12 +1215,18 @@ class PaddleOcrEngine @Inject constructor(
                     results[item.boxIndex] = candidate
                 }
             }
-            refineKoreanRecognitionCrops(prepared, indexedQuads.toMap(), results, session, e, runId)
+            val quadsByIndex = indexedQuads.toMap()
+            refineKoreanRecognitionCrops(prepared, quadsByIndex, results, session, e, runId)
             if (loadedVersion == PaddleModelVersion.V5_ARABIC) {
                 val budget = ArabicLatinCropRefiner.Budget()
+                val wordBudget = ArabicWordMarks.Budget()
                 for (item in prepared) {
                     val original = results[item.boxIndex] ?: continue
-                    results[item.boxIndex] = ArabicLatinCropRefiner.refine(item.crop, original, budget, checkActive) { word ->
+                    val marked = ArabicFathatanEvidence.refine(item.crop, original, checkActive)
+                    val latin = ArabicLatinCropRefiner.refine(item.crop, marked, budget, checkActive) { word ->
+                        recognizeCrop(word, item.orientation, session, e, runId, item.boxIndex)
+                    }
+                    results[item.boxIndex] = ArabicWordMarks.refine(src, quadsByIndex.getValue(item.boxIndex), latin, wordBudget, checkActive) { word ->
                         recognizeCrop(word, item.orientation, session, e, runId, item.boxIndex)
                     }
                 }
@@ -1585,8 +1593,13 @@ class PaddleOcrEngine @Inject constructor(
                 val keyIdx = best - 1
                 when {
                     keyIdx in keys.indices -> {
-                        sb.append(keys[keyIdx])
-                        if (loadedVersion == PaddleModelVersion.V5_ARABIC) tokens += PaddleCtcToken(keys[keyIdx], stepIndex, bestVal)
+                        val symbol = keys[keyIdx]
+                        sb.append(symbol)
+                        if (loadedVersion == PaddleModelVersion.V5_ARABIC) {
+                            val alternate = if (symbol == ArabicFathatanEvidence.FATHA && fathatanClass in 1 until step.size)
+                                step[fathatanClass] else 0f
+                            tokens += PaddleCtcToken(symbol, stepIndex, bestVal, alternate)
+                        }
                         emittedScoreTotal += bestVal
                         emittedChars++
                     }

@@ -81,6 +81,7 @@ class PaddleArabicParagraphIntegrationTest {
             assertEquals("All three middle rows and the embedded Latin token must reach one MT unit.\n$diagnostic",
                 normalized("يقرأ الثعلب الصغير كتابًا عن السفر كل مساء، ويستخدم كلمة OCR لوصف التعرف على النص."),
                 normalized(arabic[1].text))
+            assertTrue("The double stroke in the source word must survive OCR.\n$diagnostic", "كتابًا" in arabic[1].text)
             arabic.forEach { block ->
                 assertEquals(diagnostic, TextOrientation.HORIZONTAL_RTL, block.layoutOrientation)
                 assertEquals(diagnostic, TextRegionGranularity.PARAGRAPH, block.regionGranularity)
