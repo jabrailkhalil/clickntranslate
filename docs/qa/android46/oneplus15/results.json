@@ -1,0 +1,665 @@
+{
+  "date": "2026-11-25",
+  "app": {
+    "version": "1.8.3",
+    "versionCode": 46,
+    "sourceCommit": "8490a238bd9cc2606ef30d9c79094590811c7b4b",
+    "package": "dev.clickn.translate.debug",
+    "buildType": "arm64 CPU debug",
+    "appSha256": "730449aae4d83276695972ec6f12d498a2e94d868066f11fc8545444bec79176",
+    "testApkSha256": "79aa2a796dea785186ffff6f865a1e090dfcad3ad335c76fa9c9eb297136de20"
+  },
+  "device": {
+    "model": "OnePlus 15 (CPH2745)",
+    "os": "OxygenOS 17.0.0",
+    "api": 37,
+    "abi": "arm64-v8a",
+    "pageBytes": 4096,
+    "ephemeralSecondaryUser": true
+  },
+  "instrumentation": {
+    "distinctPassed": 128,
+    "distinctSkippedWithoutPass": 2,
+    "groups": {
+      "application": {
+        "passed": 113,
+        "skipped": 11,
+        "failed": 0,
+        "seconds": 16.982,
+        "logSha256": "40ca4c216a10564284ee7a9c36d6cdc82c6d1b13378ce43cbc3752b73b8621fa"
+      },
+      "activityAndPermissions": {
+        "passed": 4,
+        "skipped": 0,
+        "failed": 0,
+        "seconds": 93.797,
+        "logSha256": "46ff465ad71892296e05b52eba4a58701c4735ceaa3f131868ef1366e57292f0"
+      },
+      "tesseractRaster": {
+        "passed": 3,
+        "skipped": 0,
+        "failed": 0,
+        "seconds": 8.446,
+        "logSha256": "18988f8c01b9b5441533f3a41c70f9552deb05e6d183bed5426df244ed025793"
+      },
+      "paddleRaster": {
+        "passed": 1,
+        "skipped": 0,
+        "failed": 0,
+        "seconds": 4.632,
+        "logSha256": "a075614a3e130f16f52f09d54e54ff3b7ecae92a9aed272e815c2100072e6dcc"
+      },
+      "tesseractNativeSamePage": {
+        "passed": 1,
+        "skipped": 0,
+        "failed": 0,
+        "seconds": 2.088,
+        "logSha256": "b32dd68a76419a4939095f54b892924b12a7dcbc7ca82766072f581cefb47e60"
+      },
+      "fixedPagesSoak": {
+        "passed": 1,
+        "skipped": 0,
+        "failed": 0,
+        "seconds": 127.663,
+        "logSha256": "b927e7c61df040a82b9778b4d29d3261a39529dccaa15e289198eeb5ad308228"
+      },
+      "hyMt2": {
+        "passed": 1,
+        "skipped": 0,
+        "failed": 0,
+        "seconds": 14.585,
+        "logSha256": "3ef352b4134ed47ec57020d8b04b1541cfd3d2b2a87e7db3fa9886754f6b3121"
+      },
+      "hyMt2Diacritics": {
+        "passed": 1,
+        "skipped": 0,
+        "failed": 0,
+        "seconds": 15.374,
+        "logSha256": "fe2e88e0a70eb45c9edf8fd0b6fd42fa16f60c1c477a14b6a55524747dfdb179"
+      },
+      "sakura": {
+        "passed": 1,
+        "skipped": 0,
+        "failed": 0,
+        "seconds": 6.809,
+        "logSha256": "d2ff96c07946b7aba5322269bb38f013a6c50f5f92808d379b92d5c439c17714"
+      },
+      "manualModelImport": {
+        "passed": 1,
+        "skipped": 0,
+        "failed": 0,
+        "seconds": 7.507,
+        "logSha256": "9df26754256c529307aeec3435240691db419ec1f453ddbb81d43861cd840f3a"
+      },
+      "synthesizedVoices": {
+        "passed": 1,
+        "skipped": 1,
+        "failed": 0,
+        "seconds": 0.991,
+        "logSha256": "44a148b351aea2ecca9943d8eed5622ea8e2c8c5ae08382c41b624311975b48b"
+      },
+      "systemCaptureSingleApp": {
+        "passed": 1,
+        "skipped": 0,
+        "failed": 0,
+        "seconds": 9.588,
+        "logSha256": "e21521a84597e342096c1ded63a3243e81b08855d10d5df09580d8222ebc1907"
+      },
+      "systemCaptureEntireScreen": {
+        "passed": 1,
+        "skipped": 0,
+        "failed": 0,
+        "seconds": 2.847,
+        "logSha256": "e4a70599bbeb60b223dd7db24948590e94d824c8040b1c86f1a139fd39b8d85f"
+      }
+    }
+  },
+  "upgrade": {
+    "qaPackage": "dev.clickn.translate.upgradeqa",
+    "fromVersionCode": 7,
+    "toVersionCode": 46,
+    "sameQaSigner": true,
+    "productionSignerUsed": false,
+    "onCancel": {
+      "systemResultCode": 0,
+      "installedVersion": 7,
+      "firstInstallTimePreserved": true,
+      "historyExact": true,
+      "theme": "OCEAN"
+    },
+    "onUpdate": {
+      "systemResultCode": -1,
+      "installedVersion": 46,
+      "firstInstallTimePreserved": true,
+      "roomHistoryExact": true,
+      "theme": "OCEAN"
+    }
+  },
+  "ocr": {
+    "sameOwnedPageAsAndroid15": true,
+    "paddle": {
+      "paragraphs": 3,
+      "textMatchesEmulator": true
+    },
+    "tesseract": {
+      "paragraphs": 2,
+      "autoParagraphTextMatchesEmulator": true,
+      "nativeModesMatchEmulator": true
+    }
+  },
+  "syntheticSurface": {
+    "source": "hardware Surface and ImageReader",
+    "translation": "on-device adapter and loopback server with fixed answers",
+    "durationMs": 127520,
+    "frames": 647,
+    "pages": 30,
+    "translations": 30,
+    "maxOcrMs": 533
+  },
+  "localTranslation": {
+    "hyMt2": {
+      "modelSha256": "dc5f44fcf1fa496ee7ad725982c0c8c553a4de00259b53af84c4b89fb0c06699",
+      "singleEnglishToRussian": "Серебряные поезда проходят за горами.",
+      "batchOutputs": [
+        "Тихие реки течут между горами, и они впадают в маленькую деревню, где живут добрые люди.",
+        "Маленький лисенок каждый вечер читает книгу о путешествиях, а слово OCR используется для описания процесса распознавания текста.",
+        "Серебряные поезда дальше, за горы."
+      ],
+      "nativeModelDestroyed": true,
+      "effectOfOneOcrDiacritic": {
+        "codepoints": [
+          "U+064B",
+          "U+064E"
+        ],
+        "cases": [
+          {
+            "source": "يقرأ الثعلب الصغير كتابًا عن السفر كل مساء، ويستخدم كلمة OCR لوصف التعرف على النص.",
+            "label": "reference",
+            "inputTokens": 60,
+            "translation": "Маленький лисенок каждый вечер читает книгу о путешествиях, а слово OCR используется для описания процесса распознавания текста."
+          },
+          {
+            "source": "يقرأ الثعلب الصغير كتابَا عن السفر كل مساء، ويستخدم كلمة OCR لوصف التعرف على النص.",
+            "label": "observedPaddleForm",
+            "inputTokens": 60,
+            "translation": "Маленький лисенок каждый вечер читает два книги о путешествиях. Он использует термин OCR для описания процесса распознавания текста."
+          }
+        ]
+      }
+    },
+    "sakura": {
+      "fixtureOnly": true,
+      "model": "sakura-1.5b-qwen2.5-v1.0-Q5KS.gguf",
+      "cases": [
+        {
+          "source": "明日の朝、駅で会いましょう。",
+          "output": "明天早上，在车站见。",
+          "elapsedMs": 3960
+        },
+        {
+          "source": "窓を閉めてください。",
+          "output": "请关上窗户。",
+          "elapsedMs": 439
+        }
+      ],
+      "modelBytes": 1259173504,
+      "pssBeforeKb": 210782,
+      "assertionsPassed": true,
+      "pssBeforeUnloadKb": 2597390,
+      "modelReleased": true,
+      "pssAfterUnloadKb": 1560358
+    },
+    "sakuraFollowUp": {
+      "fixtureOnly": true,
+      "model": "sakura-1.5b-qwen2.5-v1.0-Q5KS.gguf",
+      "cases": [
+        {
+          "source": "明日の朝、駅で会いましょう。",
+          "output": "明天早上，在车站见。",
+          "elapsedMs": 3847
+        },
+        {
+          "source": "窓を閉めてください。",
+          "output": "请关上窗户。",
+          "elapsedMs": 428
+        }
+      ],
+      "modelBytes": 1259173504,
+      "memorySamples": [
+        {
+          "pssKb": 213889,
+          "nativePssKb": 12978,
+          "dalvikPssKb": 3379,
+          "otherPssKb": 195238,
+          "nativeHeapAllocatedKb": 9700,
+          "nativeHeapFreeKb": 2587,
+          "rollupAvailable": true,
+          "rollupKb": {
+            "Rss": 325356,
+            "Pss": 213559,
+            "Pss_Anon": 203328,
+            "Pss_File": 5054,
+            "Pss_Shmem": 5176,
+            "Private_Clean": 1776,
+            "Private_Dirty": 203048,
+            "SwapPss": 562
+          },
+          "mapsAvailable": true,
+          "ggufMappings": 0,
+          "ggufMappedKb": 0,
+          "stage": "beforeLoad"
+        },
+        {
+          "pssKb": 2602980,
+          "nativePssKb": 1357323,
+          "dalvikPssKb": 5358,
+          "otherPssKb": 1162269,
+          "nativeHeapAllocatedKb": 1986494,
+          "nativeHeapFreeKb": 5185,
+          "rollupAvailable": true,
+          "rollupKb": {
+            "Rss": 2637164,
+            "Pss": 2525154,
+            "Pss_Anon": 1473077,
+            "Pss_File": 1046744,
+            "Pss_Shmem": 5332,
+            "Private_Clean": 1045424,
+            "Private_Dirty": 1471132,
+            "SwapPss": 77838
+          },
+          "mapsAvailable": true,
+          "ggufMappings": 1,
+          "ggufMappedKb": 1036904,
+          "stage": "beforeUnload"
+        },
+        {
+          "pssKb": 1559224,
+          "nativePssKb": 1356272,
+          "dalvikPssKb": 3211,
+          "otherPssKb": 127440,
+          "nativeHeapAllocatedKb": 12797,
+          "nativeHeapFreeKb": 24578,
+          "rollupAvailable": true,
+          "rollupKb": {
+            "Rss": 1597064,
+            "Pss": 1484735,
+            "Pss_Anon": 1469446,
+            "Pss_File": 9876,
+            "Pss_Shmem": 5412,
+            "Private_Clean": 10124,
+            "Private_Dirty": 1465880,
+            "SwapPss": 74501
+          },
+          "mapsAvailable": true,
+          "ggufMappings": 0,
+          "ggufMappedKb": 0,
+          "stage": "afterUnload",
+          "msSinceUnload": 118
+        },
+        {
+          "pssKb": 213320,
+          "nativePssKb": 1353964,
+          "dalvikPssKb": 4611,
+          "otherPssKb": 127400,
+          "nativeHeapAllocatedKb": 12776,
+          "nativeHeapFreeKb": 22551,
+          "rollupAvailable": true,
+          "rollupKb": {
+            "Rss": 239416,
+            "Pss": 127119,
+            "Pss_Anon": 111874,
+            "Pss_File": 9832,
+            "Pss_Shmem": 5412,
+            "Private_Clean": 10112,
+            "Private_Dirty": 108308,
+            "SwapPss": 86213
+          },
+          "mapsAvailable": true,
+          "ggufMappings": 0,
+          "ggufMappedKb": 0,
+          "stage": "after100ms",
+          "msSinceUnload": 361
+        },
+        {
+          "pssKb": 210803,
+          "nativePssKb": 6700,
+          "dalvikPssKb": 1867,
+          "otherPssKb": 107583,
+          "nativeHeapAllocatedKb": 12810,
+          "nativeHeapFreeKb": 22517,
+          "rollupAvailable": true,
+          "rollupKb": {
+            "Rss": 226904,
+            "Pss": 114486,
+            "Pss_Anon": 99202,
+            "Pss_File": 9826,
+            "Pss_Shmem": 5456,
+            "Private_Clean": 11568,
+            "Private_Dirty": 94156,
+            "SwapPss": 96333
+          },
+          "mapsAvailable": true,
+          "ggufMappings": 0,
+          "ggufMappedKb": 0,
+          "stage": "after600ms",
+          "msSinceUnload": 714
+        },
+        {
+          "pssKb": 212207,
+          "nativePssKb": 6700,
+          "dalvikPssKb": 3267,
+          "otherPssKb": 99907,
+          "nativeHeapAllocatedKb": 12812,
+          "nativeHeapFreeKb": 22515,
+          "rollupAvailable": true,
+          "rollupKb": {
+            "Rss": 222416,
+            "Pss": 109998,
+            "Pss_Anon": 94714,
+            "Pss_File": 9826,
+            "Pss_Shmem": 5456,
+            "Private_Clean": 11568,
+            "Private_Dirty": 89668,
+            "SwapPss": 102221
+          },
+          "mapsAvailable": true,
+          "ggufMappings": 0,
+          "ggufMappedKb": 0,
+          "stage": "after2000ms",
+          "msSinceUnload": 2116
+        }
+      ],
+      "pssBeforeKb": 213889,
+      "assertionsPassed": true,
+      "pssBeforeUnloadKb": 2602980,
+      "modelReleased": true,
+      "pssAfterUnloadKb": 1559224
+    },
+    "sakuraMemoryBaseline": {
+      "fixtureOnly": true,
+      "model": "sakura-1.5b-qwen2.5-v1.0-Q5KS.gguf",
+      "cases": [
+        {
+          "source": "明日の朝、駅で会いましょう。",
+          "output": "明天早上，在车站见。",
+          "elapsedMs": 3653
+        },
+        {
+          "source": "窓を閉めてください。",
+          "output": "请关上窗户。",
+          "elapsedMs": 424
+        }
+      ],
+      "modelBytes": 1259173504,
+      "memorySamples": [
+        {
+          "pssKb": 203006,
+          "nativePssKb": 3369,
+          "dalvikPssKb": 3370,
+          "otherPssKb": 193409,
+          "nativeHeapAllocatedKb": 9354,
+          "nativeHeapFreeKb": 2933,
+          "rollupAvailable": true,
+          "rollupKb": {
+            "Rss": 316872,
+            "Pss": 202860,
+            "Pss_Anon": 193386,
+            "Pss_File": 4415,
+            "Pss_Shmem": 5058,
+            "Private_Clean": 580,
+            "Private_Dirty": 193260,
+            "SwapPss": 560
+          },
+          "mapsAvailable": true,
+          "ggufMappings": 0,
+          "ggufMappedKb": 0,
+          "stage": "beforeLoad"
+        },
+        {
+          "pssKb": 2602312,
+          "nativePssKb": 1359070,
+          "dalvikPssKb": 5698,
+          "otherPssKb": 1236788,
+          "nativeHeapAllocatedKb": 1986256,
+          "nativeHeapFreeKb": 5423,
+          "rollupAvailable": true,
+          "rollupKb": {
+            "Rss": 2714744,
+            "Pss": 2601671,
+            "Pss_Anon": 1549508,
+            "Pss_File": 1046754,
+            "Pss_Shmem": 5408,
+            "Private_Clean": 1043744,
+            "Private_Dirty": 1549252,
+            "SwapPss": 649
+          },
+          "mapsAvailable": true,
+          "ggufMappings": 1,
+          "ggufMappedKb": 1036904,
+          "stage": "beforeUnload"
+        },
+        {
+          "pssKb": 1561721,
+          "nativePssKb": 1359316,
+          "dalvikPssKb": 3258,
+          "otherPssKb": 200656,
+          "nativeHeapAllocatedKb": 12555,
+          "nativeHeapFreeKb": 28916,
+          "rollupAvailable": true,
+          "rollupKb": {
+            "Rss": 1674956,
+            "Pss": 1561564,
+            "Pss_Anon": 1545430,
+            "Pss_File": 10689,
+            "Pss_Shmem": 5444,
+            "Private_Clean": 7680,
+            "Private_Dirty": 1545076,
+            "SwapPss": 169
+          },
+          "mapsAvailable": true,
+          "ggufMappings": 0,
+          "ggufMappedKb": 0,
+          "stage": "afterUnload",
+          "msSinceUnload": 116
+        },
+        {
+          "pssKb": 214441,
+          "nativePssKb": 1357532,
+          "dalvikPssKb": 4670,
+          "otherPssKb": 200660,
+          "nativeHeapAllocatedKb": 12534,
+          "nativeHeapFreeKb": 24841,
+          "rollupAvailable": true,
+          "rollupKb": {
+            "Rss": 327680,
+            "Pss": 214288,
+            "Pss_Anon": 198154,
+            "Pss_File": 10689,
+            "Pss_Shmem": 5444,
+            "Private_Clean": 7680,
+            "Private_Dirty": 197800,
+            "SwapPss": 169
+          },
+          "mapsAvailable": true,
+          "ggufMappings": 0,
+          "ggufMappedKb": 0,
+          "stage": "after100ms",
+          "msSinceUnload": 352
+        },
+        {
+          "pssKb": 211902,
+          "nativePssKb": 8836,
+          "dalvikPssKb": 1910,
+          "otherPssKb": 200881,
+          "nativeHeapAllocatedKb": 12540,
+          "nativeHeapFreeKb": 24835,
+          "rollupAvailable": true,
+          "rollupKb": {
+            "Rss": 325208,
+            "Pss": 211749,
+            "Pss_Anon": 195614,
+            "Pss_File": 10690,
+            "Pss_Shmem": 5444,
+            "Private_Clean": 7672,
+            "Private_Dirty": 195260,
+            "SwapPss": 169
+          },
+          "mapsAvailable": true,
+          "ggufMappings": 0,
+          "ggufMappedKb": 0,
+          "stage": "after600ms",
+          "msSinceUnload": 713
+        },
+        {
+          "pssKb": 212574,
+          "nativePssKb": 8064,
+          "dalvikPssKb": 3350,
+          "otherPssKb": 200897,
+          "nativeHeapAllocatedKb": 12537,
+          "nativeHeapFreeKb": 24838,
+          "rollupAvailable": true,
+          "rollupKb": {
+            "Rss": 325940,
+            "Pss": 212429,
+            "Pss_Anon": 196238,
+            "Pss_File": 10690,
+            "Pss_Shmem": 5500,
+            "Private_Clean": 7680,
+            "Private_Dirty": 195880,
+            "SwapPss": 153
+          },
+          "mapsAvailable": true,
+          "ggufMappings": 0,
+          "ggufMappedKb": 0,
+          "stage": "after2000ms",
+          "msSinceUnload": 2121
+        }
+      ],
+      "pssBeforeKb": 203006,
+      "assertionsPassed": true,
+      "pssBeforeUnloadKb": 2602312,
+      "modelReleased": true,
+      "pssAfterUnloadKb": 1561721
+    }
+  },
+  "voice": {
+    "en-US": {
+      "synthesizedToFile": true,
+      "samples": 37730,
+      "sampleRateHz": 24000,
+      "channels": 1,
+      "bitsPerSample": 16,
+      "durationSeconds": 1.572,
+      "peakAbsSample": 17171,
+      "audioSha256": "f57ca4be87ec436da3814128c4d3fbe6f04db9644b3814d1891d324fb7c67f63"
+    },
+    "ru-RU": {
+      "state": "no offline voice installed in QA user"
+    },
+    "speakerPlaybackTested": false
+  },
+  "limits": {
+    "productionUpgrade": "Requires code46 signed with the production Android certificate.",
+    "shizuku": "The manager is absent in the owner profile. Version 13.6.0 requires it for server startup.",
+    "otherDevices": "No physical Android 8 or 16 KiB pages in this run."
+  },
+  "hostFailedInferenceSetup": {
+    "result": "pass",
+    "originalStatus": 11,
+    "patchedStatus": 0,
+    "fault": "init_context returned null after model load",
+    "old": "previous model is retained",
+    "verified": [
+      "failure frees exactly one model",
+      "second failure frees nothing",
+      "no batch, sampler or chat template allocated on failure",
+      "successful retry initializes all three"
+    ]
+  },
+  "cleanup": {
+    "ownerProfileRestored": true,
+    "ephemeralQaProfileRemoved": true,
+    "qaAppsInOwner": false,
+    "projectionStoppedBeforeReturn": true
+  },
+  "modelImport": {
+    "model": "Hy-MT2-1.8B-Q4_K_M.gguf",
+    "installedBytes": 1133080448,
+    "rejectedBytes": 13,
+    "sameInode": true,
+    "temporaryFiles": 0,
+    "renamedTruncatedBytes": 1124691840,
+    "renamedTruncatedRejected": true,
+    "retriedIncompleteInstallation": true,
+    "retainedAfterDownloadFailure": true,
+    "customImportVerifiedSha256": "dc5f44fcf1fa496ee7ad725982c0c8c553a4de00259b53af84c4b89fb0c06699",
+    "validDownloadReusedFile": true
+  },
+  "systemCapture": {
+    "singleApp": {
+      "nativeConsentTestPassed": true,
+      "observations": [
+        "scope=selected_task firstDisplay=9 restartDisplay=10 bluePending=true greenRendered=true greenMs=1583"
+      ]
+    },
+    "defaultScreen": {
+      "nativeConsentTestPassed": true,
+      "observations": [
+        "scope=default_display display=11 knownRequests=1 greenRendered=true greenMs=1144",
+        "capture=MediaProjectionScreenshotter/37/true cropStats=576/0.000/0.045/241.0/0..255/false finalOcr=1 firstOcr=ML_KIT_LATIN/1 fixtureDisplay=1272x2772 frame=1272x2772 fullStats=1272x2772/576/0.000/0.010/251.4/0..255/false lastOcrKind=known-green lastPostKind=known-green lastPostLength=10 requestedCrop=53,1108,1219,1664 screen=1272x2772/(53,1108,1219,1664) work=1166x556/(53,1108,1219,1664)"
+      ]
+    }
+  },
+  "hostChecks": {
+    "jvm": {
+      "tests": 1929,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "androidLint": {
+      "Error": 0,
+      "Fatal": 0,
+      "Warning": 975,
+      "Information": 42
+    }
+  },
+  "emulatorRegression": {
+    "api": 35,
+    "url": "https://github.com/jabrailkhalil/clickntranslate/actions/runs/45675737884",
+    "sourceCommit": "8490a238bd9cc2606ef30d9c79094590811c7b4b",
+    "conclusion": "success",
+    "groups": {
+      "device-suite": {
+        "passed": 117,
+        "skipped": 14,
+        "failed": 0,
+        "seconds": 139.247
+      },
+      "arabic-ocr": {
+        "passed": 3,
+        "skipped": 0,
+        "failed": 0,
+        "seconds": 18.396
+      },
+      "paddle-arabic": {
+        "passed": 1,
+        "skipped": 0,
+        "failed": 0,
+        "seconds": 20.975
+      },
+      "native-page": {
+        "passed": 1,
+        "skipped": 0,
+        "failed": 0,
+        "seconds": 13.777
+      },
+      "screen-consent": {
+        "passed": 1,
+        "skipped": 0,
+        "failed": 0,
+        "seconds": 14.477
+      }
+    }
+  }
+}
