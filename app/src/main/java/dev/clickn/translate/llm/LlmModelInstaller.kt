@@ -20,7 +20,8 @@ import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.flowOn
 import timber.log.Timber
 import java.io.File
-import java.io.FileOutputStream
+import java.io.IOException
+import java.io.InputStream
 import java.io.RandomAccessFile
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
@@ -79,9 +80,9 @@ class LlmModelInstaller @Inject constructor(
     /** 下载 [kind] 的模型；HTTP Range 续传；emit 进度。已下载完整文件时直接 short-circuit。 */
     fun download(kind: LlmModelKind): Flow<Progress> = channelFlow {
         val dest = File(modelsDir, kind.fileName)
-        // 已就位（文件存在且大小达到 [MIN_VALID_SIZE_BYTES]）→ 跳过下载。
-        // 避免用户重复点 Download 重新拉一遍 GB 级文件，也避免 LFS 重定向 Range 边界条件触发误报错。
-        val installedError = validateGgufFile(dest, minimumSizeBytes(kind))
+        // A previous install may have accepted a truncated file with a valid header.
+        // Only an explicit download checks its tensor index before reusing the weights.
+        val installedError = validateGgufFile(dest, minimumSizeBytes(kind)) ?: GgufTensorRanges.validate(dest)
         if (installedError == null) {
             send(Progress(kind, "(already installed)", dest.length(), dest.length(), done = true))
             return@channelFlow
@@ -183,38 +184,18 @@ class LlmModelInstaller @Inject constructor(
                 else -> defaultKind
             }
             val dest = File(modelsDir, kind.fileName)
-            val tmp = File.createTempFile(kind.fileName + ".import-", ".tmp", modelsDir)
             try {
                 context.contentResolver.openInputStream(uri)?.use { input ->
-                    FileOutputStream(tmp).use { output ->
-                        val buffer = ByteArray(64 * 1024)
-                        while (true) {
-                            importContext.ensureActive()
-                            val count = input.read(buffer)
-                            importContext.ensureActive()
-                            if (count < 0) break
-                            output.write(buffer, 0, count)
-                        }
+                    installImportedModel(input, dest, minimumSizeBytes(kind), LlmModelIntegrity.importPin(kind, name)) {
+                        importContext.ensureActive()
                     }
                 } ?: continue
-                val validationError = validateGgufFile(tmp, minimumSizeBytes(kind))
-                if (validationError != null) {
-                    throw RuntimeException("invalid LLM model $name: $validationError")
-                }
-                importContext.ensureActive()
-                try {
-                    Files.move(tmp.toPath(), dest.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
-                } catch (_: AtomicMoveNotSupportedException) {
-                    Files.move(tmp.toPath(), dest.toPath(), StandardCopyOption.REPLACE_EXISTING)
-                }
                 imported++
                 Timber.i("LLM imported $name → ${kind.fileName} (${dest.length() / 1024 / 1024}MB)")
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (t: Throwable) {
                 Timber.w(t, "Import LLM model failed: $uri")
-            } finally {
-                tmp.delete()
             }
         }
         imported
@@ -240,6 +221,30 @@ class LlmModelInstaller @Inject constructor(
         internal fun minimumSizeBytes(kind: LlmModelKind): Long {
             val expected = kind.approxSizeMb.toLong() * 1024L * 1024L * MIN_EXPECTED_SIZE_PERCENT / 100L
             return maxOf(MIN_VALID_SIZE_BYTES, expected)
+        }
+
+        internal fun installImportedModel(
+            input: InputStream,
+            destination: File,
+            minimumSize: Long,
+            pin: LlmModelIntegrity.Pin?,
+            checkpoint: () -> Unit,
+        ) {
+            val staged = File.createTempFile(destination.name + ".import-", ".tmp", destination.parentFile)
+            try {
+                val error = staged.outputStream().use { output ->
+                    LlmModelIntegrity.copyAndVerify(input, output, pin, checkpoint)
+                } ?: validateGgufFile(staged, minimumSize) ?: if (pin == null) GgufTensorRanges.validate(staged) else null
+                if (error != null) throw IOException("Invalid model ${destination.name}: $error")
+                checkpoint()
+                try {
+                    Files.move(staged.toPath(), destination.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+                } catch (_: AtomicMoveNotSupportedException) {
+                    Files.move(staged.toPath(), destination.toPath(), StandardCopyOption.REPLACE_EXISTING)
+                }
+            } finally {
+                staged.delete()
+            }
         }
 
         internal fun validateGgufFile(file: File, minSizeBytes: Long): String? {

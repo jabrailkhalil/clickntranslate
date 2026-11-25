@@ -162,8 +162,7 @@ class TesseractArabicOcrIntegrationTest {
     }
 
     private fun writeFixture(image: Bitmap, blocks: List<TextBlock>) {
-        val directory = requireNotNull(context.getExternalFilesDir("qa"))
-        check(directory.isDirectory || directory.mkdirs())
+        val directory = context.ocrFixtureOutput("qa")
         File(directory, "arabic-english-ocr-fixture.png").outputStream().use { check(image.compress(Bitmap.CompressFormat.PNG, 100, it)) }
         val report = JSONObject().put("sdk", Build.VERSION.SDK_INT).put("nativeLanguages", "ara+eng")
             .put("arabicModelSource", "tessdata_best").put("arabicModelRevision", TesseractModelFiles.ARABIC_REVISION)
@@ -180,8 +179,7 @@ class TesseractArabicOcrIntegrationTest {
     /** Only this synthetic fixture is recorded. No production screen, OCR hook or relaxed assertion. */
     private suspend fun writeNativeFixtureDiagnostics(models: TesseractModelStore, fixture: Bitmap) {
         models.withOcrModels { path -> withContext(Dispatchers.Default) {
-            val directory = requireNotNull(context.getExternalFilesDir("qa"))
-            check(directory.isDirectory || directory.mkdirs())
+            val directory = context.ocrFixtureOutput("qa")
             for ((label, mode) in listOf("auto" to TessBaseAPI.PageSegMode.PSM_AUTO,
                 "sparse" to TessBaseAPI.PageSegMode.PSM_SPARSE_TEXT,
                 "single-column" to TessBaseAPI.PageSegMode.PSM_SINGLE_COLUMN,

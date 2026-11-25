@@ -27,7 +27,7 @@ class TesseractOwnedScreenProbeTest {
         val cropOnly = InstrumentationRegistry.getArguments().getString("tessProbeCrop") == "true"
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
-        val directory = requireNotNull(context.getExternalFilesDir(if (cropOnly) "tess-probe-crop-result" else "tess-probe-result")).apply { mkdirs() }
+        val directory = context.ocrFixtureOutput(if (cropOnly) "tess-probe-crop-result" else "tess-probe-result")
         val input = requireNotNull(context.getExternalFilesDir("tess-probe-input"))
         val owned = Files.createTempDirectory(context.cacheDir.toPath(), "owned-screen-tess-").toFile()
         val modelDirectory = File(owned, "verified-${TesseractModelFiles.REVISION}/tessdata").apply { mkdirs() }

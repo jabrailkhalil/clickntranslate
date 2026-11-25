@@ -48,6 +48,29 @@ set(UPSTREAM_CPP ${LLAMA_SRC}/examples/llama.android/lib/src/main/cpp)
 file(READ "${UPSTREAM_CPP}/ai_chat.cpp" CLICKTRANSLATE_AI_CHAT_SOURCE)
 string(REPLACE "\r\n" "\n" CLICKTRANSLATE_AI_CHAT_SOURCE "${CLICKTRANSLATE_AI_CHAT_SOURCE}")
 
+# load() already transferred model ownership when context creation fails in prepare().
+# Kotlin can reset this error for a retry without ever entering the normal unload path.
+set(CLICKTRANSLATE_PREPARE_FAILURE_ORIGINAL [=[
+    auto *context = init_context(g_model);
+    if (!context) { return 1; }
+    g_context = context;
+]=])
+set(CLICKTRANSLATE_PREPARE_FAILURE_PATCHED [=[
+    auto *context = init_context(g_model);
+    if (!context) {
+        llama_model_free(g_model);
+        g_model = nullptr;
+        return 1;
+    }
+    g_context = context;
+]=])
+string(FIND "${CLICKTRANSLATE_AI_CHAT_SOURCE}" "${CLICKTRANSLATE_PREPARE_FAILURE_ORIGINAL}" CLICKTRANSLATE_PREPARE_FAILURE_INDEX)
+if(CLICKTRANSLATE_PREPARE_FAILURE_INDEX EQUAL -1)
+    message(FATAL_ERROR "ClickTranslate ai_chat failed-prepare cleanup patch no longer matches upstream")
+endif()
+string(REPLACE "${CLICKTRANSLATE_PREPARE_FAILURE_ORIGINAL}" "${CLICKTRANSLATE_PREPARE_FAILURE_PATCHED}"
+        CLICKTRANSLATE_AI_CHAT_SOURCE "${CLICKTRANSLATE_AI_CHAT_SOURCE}")
+
 # Render the actual GGUF template. The legacy detector mistakes Hy-MT2's dense
 # template for Hunyuan-VL and places role tokens after the content, omitting the
 # assistant generation prefix. Single requests, batches and token budgets must
@@ -477,6 +500,7 @@ add_subdirectory(${LLAMA_SRC} build-llama)
 
 add_library(${CMAKE_PROJECT_NAME} SHARED
         ${CLICKTRANSLATE_AI_CHAT_CPP}
+        gguf_import_validation.cpp
         llama_thread_policy.cpp)
 
 target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
@@ -502,5 +526,6 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
 target_link_libraries(${CMAKE_PROJECT_NAME}
         llama
         llama-common
+        ggml-base
         android
         log)

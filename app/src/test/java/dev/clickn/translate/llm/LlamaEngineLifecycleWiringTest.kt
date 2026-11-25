@@ -9,6 +9,14 @@ import org.junit.Test
 class LlamaEngineLifecycleWiringTest {
 
     @Test
+    fun failedContextCreationReleasesTheLoadedModelBeforeKotlinRetries() {
+        val nativeBuild = source("llama-android/src/main/cpp/CMakeLists.txt").replace("\r\n", "\n")
+        val failure = nativeBuild.substringAfter("set(CLICKTRANSLATE_PREPARE_FAILURE_PATCHED [=[")
+            .substringBefore("]=])")
+        assertTrue(failure.contains("if (!context) {\n        llama_model_free(g_model);\n        g_model = nullptr;\n        return 1;"))
+    }
+
+    @Test
     fun nativeStateAccesses_shareTheLifecycleSession() {
         val holder = source("app/src/main/java/dev/clickn/translate/llm/LlamaEngineHolder.kt")
         val translator = source("app/src/main/java/dev/clickn/translate/translate/LocalLlamaTranslator.kt")

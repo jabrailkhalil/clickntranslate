@@ -2,8 +2,11 @@
 package dev.clickn.translate.llm
 
 import java.io.File
+import java.io.IOException
+import java.security.MessageDigest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -13,6 +16,38 @@ class LlmModelInstallerValidationTest {
 
     @get:Rule
     val temp = TemporaryFolder()
+
+    @Test
+    fun pinnedImportChecksTheCompleteFileBeforeReplacingTheInstalledModel() {
+        val original = "GGUFprevious-usable-model".toByteArray()
+        val published = "GGUFcomplete-published-model".toByteArray()
+        val publishedHash = MessageDigest.getInstance("SHA-256").digest(published)
+            .joinToString("") { "%02x".format(it) }
+        val pin = LlmModelIntegrity.Pin(published.size.toLong(), publishedHash)
+        val kind = LlmModelKind.HY_MT2_1_8B_Q4_K_M
+        val destination = File(temp.root, kind.fileName).apply { writeBytes(original) }
+        val minimum = (published.size * 0.8).toLong()
+        val damaged = listOf(
+            published.copyOf(published.size - 1),
+            published.copyOf().also { it[it.lastIndex] = 0 },
+            published + byteArrayOf(1),
+        )
+        for (source in damaged) {
+            assertTrue(source.size >= minimum)
+            assertThrows(IOException::class.java) {
+                LlmModelInstaller.installImportedModel(source.inputStream(), destination, minimum, pin) {}
+            }
+            assertTrue(original.contentEquals(destination.readBytes()))
+            assertEquals(listOf(destination), temp.root.listFiles()?.toList())
+        }
+        LlmModelInstaller.installImportedModel(published.inputStream(), destination, minimum, pin) {}
+        assertTrue(published.contentEquals(destination.readBytes()))
+        assertEquals(kind.expectedSha256, LlmModelIntegrity.importPin(kind, kind.fileName.uppercase())?.sha256)
+        val customPin = LlmModelIntegrity.importPin(kind, "My-Hy-MT2-Q6.gguf")
+        assertNull(customPin)
+        LlmModelInstaller.installImportedModel(original.inputStream(), destination, minimum, customPin) {}
+        assertTrue(original.contentEquals(destination.readBytes()))
+    }
 
     @Test
     fun validateGgufFile_coversInstallAndImportCases() {
