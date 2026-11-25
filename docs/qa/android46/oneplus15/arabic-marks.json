@@ -1,0 +1,864 @@
+{
+  "device": "OnePlus 15 (CPH2745), Android API 37, arm64 CPU",
+  "appVersion": "1.8.3 / 46, debug",
+  "sourceCommit": "ff2c740da4f5c1f4e5fb5e1f1b8e1db50b6ea4fd",
+  "assets": {
+    "paddleRecognitionSha256": "799113ebf267fbe742deb99eb36e8d42c9ddc5291ceacf92add41b4d52a59110",
+    "paddleDetectionSha256": "a431985659dc921974177a95adcfbb90fd9e51989a5e04d70d0b75f597b6e61d",
+    "paddleDictionarySha256": "21368419e6c016c31db55d316d59e11c128e1913e6e6fe10287084710043d3a6",
+    "hymt2Q4KMSha256": "dc5f44fcf1fa496ee7ad725982c0c8c553a4de00259b53af84c4b89fb0c06699",
+    "finalDebugApkSha256": "5fa91b1272e4ebab09ae6d75e54a13dba20c7371e8d4924ca30d49ef65eb7903"
+  },
+  "protocol": {
+    "initial": "41 images on the unmodified app from branch head ea3d98f. Two renders per phrase plus the archived page.",
+    "additional": "16 independent images. Their control build contains only the pixel-based final fathatan check. Word rereading and RTL reassembly are absent in both control builds.",
+    "ordinary": "Unique reference and OCR strings translated separately with the ordinary Hy-MT2 CPU settings and application prompt. Original punctuation retained. For initially split cards, blocks were joined with a space for a comparable full-sentence translation.",
+    "paired": "Identical surrounding text including terminal punctuation. Four independent standard-mode runs with presentation order alternated. Greedy comparison used the same GGUF and application prompt, top-k 1 and temperature 0, independent native sequences.",
+    "metrics": "NFC. Levenshtein alignment of letters and digits ignores punctuation and spaces. Only U+064B to U+0652 count as vowel marks, attached to the aligned identical base. Hamza-bearing letters stay distinct. This is an OCR score, not a semantic score.",
+    "timing": "Four interleaved device runs on 56 single-line cards, excluding the first page used to load the model. Control contains only the final-fathatan fix."
+  },
+  "counts": {
+    "initial": {
+      "before": {
+        "cards": 41,
+        "lettersDigits": 715,
+        "baseEditDistance": 112,
+        "exactLettersAndMarks": 1,
+        "exactLetters": 12,
+        "referenceMarks": 87,
+        "outputMarks": 50,
+        "sameMarkOnSameLetter": 32
+      },
+      "after": {
+        "cards": 41,
+        "lettersDigits": 715,
+        "baseEditDistance": 43,
+        "exactLettersAndMarks": 7,
+        "exactLetters": 16,
+        "referenceMarks": 87,
+        "outputMarks": 53,
+        "sameMarkOnSameLetter": 44
+      }
+    },
+    "additional": {
+      "before": {
+        "cards": 16,
+        "lettersDigits": 258,
+        "baseEditDistance": 59,
+        "exactLettersAndMarks": 2,
+        "exactLetters": 5,
+        "referenceMarks": 32,
+        "outputMarks": 23,
+        "sameMarkOnSameLetter": 16
+      },
+      "after": {
+        "cards": 16,
+        "lettersDigits": 258,
+        "baseEditDistance": 9,
+        "exactLettersAndMarks": 3,
+        "exactLetters": 9,
+        "referenceMarks": 32,
+        "outputMarks": 25,
+        "sameMarkOnSameLetter": 21
+      }
+    }
+  },
+  "blockCounts": {
+    "splitBefore": 18,
+    "splitAfter": 1
+  },
+  "timing": [
+    {
+      "version": "control",
+      "warmCards": 56,
+      "medianMs": 72.0,
+      "p95Ms": 182
+    },
+    {
+      "version": "final",
+      "warmCards": 56,
+      "medianMs": 93.0,
+      "p95Ms": 177
+    },
+    {
+      "version": "final",
+      "warmCards": 56,
+      "medianMs": 93.0,
+      "p95Ms": 175
+    },
+    {
+      "version": "control",
+      "warmCards": 56,
+      "medianMs": 74.0,
+      "p95Ms": 179
+    }
+  ],
+  "pairedMeaning": [
+    {
+      "id": "fox",
+      "style": "page",
+      "beforeArabic": "يقرأ الثعلب الصغير كتابَا عن السفر كل مساء، ويستخدم كلمة OCR لوصف التعرف على النص",
+      "afterArabic": "يقرأ الثعلب الصغير كتابًا عن السفر كل مساء، ويستخدم كلمة OCR لوصف التعرف على النص",
+      "beforeGreedy": "Маленький лисенок каждый вечер читает две книги о путешествиях. Он использует термин OCR для описания процесса распознавания текста.",
+      "afterGreedy": "Маленький лисенок каждый вечер читает книгу о путешествиях. Он использует термин OCR для описания процесса распознавания текста.",
+      "ordinaryBefore": [
+        "Маленький лисенок каждый вечер читает две книги о путешествиях. Он использует термин OCR для описания процесса распознавания текста.",
+        "Маленький лисенок каждый вечер читает два книги о путешествиях. Он использует термин OCR для описания процесса распознавания текста.",
+        "Маленький лисенок каждый вечер читает два книги о путешествиях. Он использует термин OCR для описания процесса распознавания текста.",
+        "Маленький лисенок каждый вечер читает две книги о путешествиях. Он использует термин OCR для описания процесса распознавания текста."
+      ],
+      "ordinaryAfter": [
+        "Маленький лисенок каждый вечер читает книгу о путешествиях. Он использует термин OCR для описания процесса распознавания текста.",
+        "Маленький лисенок каждый вечер читает книгу о путешествиях. Он использует термин OCR для описания процесса распознавания текста.",
+        "Маленький лисенок каждый вечер читает книгу о путешествиях. Он использует термин OCR для описания процесса распознавания текста.",
+        "Маленький лисенок каждый вечер читает книгу о путешествиях. Он использует технологию OCR для распознавания текста."
+      ]
+    },
+    {
+      "id": "flag",
+      "style": "light34",
+      "beforeArabic": "هذا عَلم جديد",
+      "afterArabic": "هذا عَلَم جديد",
+      "beforeGreedy": "Это новая наука.",
+      "afterGreedy": "Это новый знак.",
+      "ordinaryBefore": [
+        "Это новая наука.",
+        "Это новая наука.",
+        "Это новая наука.",
+        "Это новая наука."
+      ],
+      "ordinaryAfter": [
+        "Это новый знак.",
+        "Это новый знак.",
+        "Это новый знак.",
+        "Это новый знак."
+      ]
+    },
+    {
+      "id": "angel",
+      "style": "light34",
+      "beforeArabic": "ظهر مَلك في القصة",
+      "afterArabic": "ظهر مَلَك في القصة",
+      "beforeGreedy": "В истории появился король.",
+      "afterGreedy": "В истории появился ангел.",
+      "ordinaryBefore": [
+        "В истории появился король.",
+        "В истории появился король.",
+        "В истории появился король.",
+        "В истории появился король."
+      ],
+      "ordinaryAfter": [
+        "В истории появился ангел.",
+        "В истории появился ангел.",
+        "В истории появился ангел.",
+        "В истории появился ангел."
+      ]
+    },
+    {
+      "id": "was-written",
+      "style": "dark54",
+      "beforeArabic": "كتِبَ الدرس فى الدفتر",
+      "afterArabic": "كُتِبَ الدرس فى الدفتر",
+      "beforeGreedy": "Напишите урок в тетради.",
+      "afterGreedy": "Урок был записан в тетради.",
+      "ordinaryBefore": [
+        "Напишите урок в тетради.",
+        "Напишите урок в тетради.",
+        "Напишите урок в тетради.",
+        "Напишите урок в тетради."
+      ],
+      "ordinaryAfter": [
+        "Урок был записан в тетради.",
+        "Урок был записан в тетради.",
+        "Урок был записан в тетради.",
+        "Урок был записан в тетради."
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "id": "fox",
+      "render": "page",
+      "reference": "يقرأ الثعلب الصغير كتابًا عن السفر كل مساء، ويستخدم كلمة OCR لوصف التعرف على النص.",
+      "before": "يقرأ الثعلب الصغير كتابَا عن السفر كل مساء، ويستخدم كلمة OCR لوصف التعرف على النص",
+      "after": "يقرأ الثعلب الصغير كتابًا عن السفر كل مساء، ويستخدم كلمة OCR لوصف التعرف على النص",
+      "blocksBefore": 1,
+      "blocksAfter": 1,
+      "referenceRu": "Маленький лисенок каждый вечер читает книгу о путешествиях, а слово OCR используется для описания процесса распознавания текста.",
+      "beforeRu": "Маленький лисенок каждый вечер читает два книги о путешествиях. Он использует термин OCR для описания процесса распознавания текста.",
+      "afterRu": "Маленький лисенок каждый вечер читает книгу о путешествиях. Он использует технологию OCR для распознавания текста."
+    },
+    {
+      "id": "book",
+      "render": "light34",
+      "reference": "يقرأ الطفل كتابًا كل مساء.",
+      "before": "قرأ الطفل كتابا كل مساء",
+      "after": "قرأ الطفل كتابا كل مساء",
+      "blocksBefore": 1,
+      "blocksAfter": 1,
+      "referenceRu": "Дети читают книгу каждый вечер.",
+      "beforeRu": "Ребенок читал книгу каждый вечер.",
+      "afterRu": "Ребенок читал книгу каждый вечер."
+    },
+    {
+      "id": "book",
+      "render": "dark54",
+      "reference": "يقرأ الطفل كتابًا كل مساء.",
+      "before": "بقرا الطفل كتابا كل مساء",
+      "after": "بقرا الطفل كتابا كل مساء",
+      "blocksBefore": 2,
+      "blocksAfter": 1,
+      "referenceRu": "Дети читают книгу каждый вечер.",
+      "beforeRu": "Каждый вечер читаю ребенку книгу.",
+      "afterRu": "Каждый вечер читаю детям книгу"
+    },
+    {
+      "id": "pen",
+      "render": "light34",
+      "reference": "اشترى الطالب قلمًا جديدًا.",
+      "before": "شترى الطالب قلمًا جديدًا",
+      "after": "شترى الطالب قلمًا جديدًا",
+      "blocksBefore": 1,
+      "blocksAfter": 1,
+      "referenceRu": "Ученик купил новый карандаш.",
+      "beforeRu": "Ученик купил новый карандаш.",
+      "afterRu": "Ученик купил новый карандаш."
+    },
+    {
+      "id": "pen",
+      "render": "dark54",
+      "reference": "اشترى الطالب قلمًا جديدًا.",
+      "before": "قلمًا اشترى جديدًا الطالب",
+      "after": "اشترى الطالب قلمًا جديدًا",
+      "blocksBefore": 4,
+      "blocksAfter": 1,
+      "referenceRu": "Ученик купил новый карандаш.",
+      "beforeRu": "Ученик купил новый карандаш.",
+      "afterRu": "Ученик купил новый карандаш."
+    },
+    {
+      "id": "door",
+      "render": "light34",
+      "reference": "فتح العامل بابًا في الجدار.",
+      "before": "فتح العامل بابا في الجدار",
+      "after": "فتح العامل بابا في الجدار",
+      "blocksBefore": 1,
+      "blocksAfter": 1,
+      "referenceRu": "Работник открыл дверь в стене.",
+      "beforeRu": "Действующий человек открыл дверь в стене.",
+      "afterRu": "Действующий человек открыл дверь в стене."
+    },
+    {
+      "id": "door",
+      "render": "dark54",
+      "reference": "فتح العامل بابًا في الجدار.",
+      "before": "فتح العامل بابَا فى الجدار",
+      "after": "فتح العامل بابَا فى الجدار",
+      "blocksBefore": 3,
+      "blocksAfter": 1,
+      "referenceRu": "Работник открыл дверь в стене.",
+      "beforeRu": "Действие открыл дверь в стене",
+      "afterRu": "Обработчик открыл дверь в стене"
+    },
+    {
+      "id": "flag",
+      "render": "light34",
+      "reference": "هذا عَلَم جديد.",
+      "before": "هذا عَلم جديد",
+      "after": "هذا عَلَم جديد",
+      "blocksBefore": 1,
+      "blocksAfter": 1,
+      "referenceRu": "Это новый знак.",
+      "beforeRu": "Это новая наука.",
+      "afterRu": "Это новый знак."
+    },
+    {
+      "id": "flag",
+      "render": "dark54",
+      "reference": "هذا عَلَم جديد.",
+      "before": "هذا عَلم جديد",
+      "after": "هذا عَلم جديد",
+      "blocksBefore": 1,
+      "blocksAfter": 1,
+      "referenceRu": "Это новый знак.",
+      "beforeRu": "Это новая наука.",
+      "afterRu": "Это новая наука."
+    },
+    {
+      "id": "knowledge",
+      "render": "light34",
+      "reference": "هذا عِلْم جديد.",
+      "before": "هذا عِلم جديد",
+      "after": "هذا عِلم جديد",
+      "blocksBefore": 1,
+      "blocksAfter": 1,
+      "referenceRu": "Это новая наука.",
+      "beforeRu": "Это новая наука.",
+      "afterRu": "Это новая наука."
+    },
+    {
+      "id": "knowledge",
+      "render": "dark54",
+      "reference": "هذا عِلْم جديد.",
+      "before": "هذا علم جديد",
+      "after": "هذا علم جديد",
+      "blocksBefore": 1,
+      "blocksAfter": 1,
+      "referenceRu": "Это новая наука.",
+      "beforeRu": "Это новая наука.",
+      "afterRu": "Это новая наука."
+    },
+    {
+      "id": "king",
+      "render": "light34",
+      "reference": "ظهر مَلِك في القصة.",
+      "before": "طهر مَلِك في القصة",
+      "after": "طهر مَلِك في القصة",
+      "blocksBefore": 1,
+      "blocksAfter": 1,
+      "referenceRu": "В истории появился король.",
+      "beforeRu": "Король очищен в истории",
+      "afterRu": "Король очищен в истории"
+    },
+    {
+      "id": "king",
+      "render": "dark54",
+      "reference": "ظهر مَلِك في القصة.",
+      "before": "القصة ظهر مَلِك في",
+      "after": "ظهر مَلِك في القصة",
+      "blocksBefore": 2,
+      "blocksAfter": 1,
+      "referenceRu": "В истории появился король.",
+      "beforeRu": "История рассказывает о короле.",
+      "afterRu": "В истории появился король."
+    },
+    {
+      "id": "angel",
+      "render": "light34",
+      "reference": "ظهر مَلَك في القصة.",
+      "before": "ظهر مَلك في القصة",
+      "after": "ظهر مَلَك في القصة",
+      "blocksBefore": 1,
+      "blocksAfter": 1,
+      "referenceRu": "В истории появился ангел.",
+      "beforeRu": "В истории появился король.",
+      "afterRu": "В истории появился ангел."
+    },
+    {
+      "id": "angel",
+      "render": "dark54",
+      "reference": "ظهر مَلَك في القصة.",
+      "before": "ظهر مَلك في القصة",
+      "after": "ظهر مَلك في القصة",
+      "blocksBefore": 2,
+      "blocksAfter": 1,
+      "referenceRu": "В истории появился ангел.",
+      "beforeRu": "В истории появился король.",
+      "afterRu": "В истории появился король."
+    },
+    {
+      "id": "oman",
+      "render": "light34",
+      "reference": "سافرت إلى عُمان أمس.",
+      "before": "سافرت إلى غُمان أمس",
+      "after": "سافرت إلى غُمان أمس",
+      "blocksBefore": 1,
+      "blocksAfter": 1,
+      "referenceRu": "Вчера я поехала в Оман.",
+      "beforeRu": "Вчера я путешествовала в Гоман.",
+      "afterRu": "Вчера я путешествовала в Гоман."
+    },
+    {
+      "id": "oman",
+      "render": "dark54",
+      "reference": "سافرت إلى عُمان أمس.",
+      "before": "سافرت إلى غمان أمس",
+      "after": "سافرت إلى غمان أمس",
+      "blocksBefore": 1,
+      "blocksAfter": 1,
+      "referenceRu": "Вчера я поехала в Оман.",
+      "beforeRu": "Вчера я поехала в Гаман.",
+      "afterRu": "Вчера я поехала в Гаман."
+    },
+    {
+      "id": "amman",
+      "render": "light34",
+      "reference": "سافرت إلى عَمّان أمس.",
+      "before": "سافرت إلى عَقَان أمس",
+      "after": "سافرت إلى عَقَان أمس",
+      "blocksBefore": 1,
+      "blocksAfter": 1,
+      "referenceRu": "Вчера я поехала в Амман.",
+      "beforeRu": "Вчера я путешествовала в Акан.",
+      "afterRu": "Вчера я путешествовала в Акан."
+    },
+    {
+      "id": "amman",
+      "render": "dark54",
+      "reference": "سافرت إلى عَمّان أمس.",
+      "before": "سافرت إلى عَقّان أمس",
+      "after": "سافرت إلى عَقّان أمس",
+      "blocksBefore": 1,
+      "blocksAfter": 1,
+      "referenceRu": "Вчера я поехала в Амман.",
+      "beforeRu": "Вчера я путешествовала в Аккан.",
+      "afterRu": "Вчера я путешествовала в Аккан."
+    },
+    {
+      "id": "wrote",
+      "render": "light34",
+      "reference": "كَتَبَ الطالب الدرس.",
+      "before": "كشبَ الطالب الدرس",
+      "after": "كشبَ الطالب الدرس",
+      "blocksBefore": 1,
+      "blocksAfter": 1,
+      "referenceRu": "Ученик написал учебник.",
+      "beforeRu": "Ученик сделал урок",
+      "afterRu": "Ученик не выполнил задание"
+    },
+    {
+      "id": "wrote",
+      "render": "dark54",
+      "reference": "كَتَبَ الطالب الدرس.",
+      "before": "كتبَ الطالب الدرس",
+      "after": "كتبَ الطالب الدرس",
+      "blocksBefore": 3,
+      "blocksAfter": 1,
+      "referenceRu": "Ученик написал учебник.",
+      "beforeRu": "Ученик написал урок.",
+      "afterRu": "Ученик написал урок."
+    },
+    {
+      "id": "was-written",
+      "render": "light34",
+      "reference": "كُتِبَ الدرس في الدفتر.",
+      "before": "كتِبَ الدرس في الدفتر",
+      "after": "كتِبَ الدرس في الدفتر",
+      "blocksBefore": 1,
+      "blocksAfter": 1,
+      "referenceRu": "Урок записан в тетради.",
+      "beforeRu": "Напишите урок в тетради.",
+      "afterRu": "Напишите урок в тетради."
+    },
+    {
+      "id": "was-written",
+      "render": "dark54",
+      "reference": "كُتِبَ الدرس في الدفتر.",
+      "before": "كتِبَ الدرس فى الدفتر",
+      "after": "كُتِبَ الدرس فى الدفتر",
+      "blocksBefore": 1,
+      "blocksAfter": 1,
+      "referenceRu": "Урок записан в тетради.",
+      "beforeRu": "Напишите урок в тетради.",
+      "afterRu": "Урок был записан в тетради."
+    },
+    {
+      "id": "teaches",
+      "render": "light34",
+      "reference": "هو يُدَرِّسُ في الجامعة.",
+      "before": "هو يدَرّش فى ألجامعة",
+      "after": "هو يدَرّش فى ألجامعة",
+      "blocksBefore": 1,
+      "blocksAfter": 1,
+      "referenceRu": "Он учится в университете.",
+      "beforeRu": "Он учится в университете.",
+      "afterRu": "Он учится в университете."
+    },
+    {
+      "id": "teaches",
+      "render": "dark54",
+      "reference": "هو يُدَرِّسُ في الجامعة.",
+      "before": "هو يدَرّْش في الجامعة",
+      "after": "هو يدَرّْش في الجامعة",
+      "blocksBefore": 1,
+      "blocksAfter": 1,
+      "referenceRu": "Он учится в университете.",
+      "beforeRu": "Он учится в университете.",
+      "afterRu": "Он учится в университете."
+    },
+    {
+      "id": "studies",
+      "render": "light34",
+      "reference": "هو يَدْرُسُ في الجامعة.",
+      "before": "هو يذّرْش في الجامعة",
+      "after": "هو يذّرْش في الجامعة",
+      "blocksBefore": 1,
+      "blocksAfter": 1,
+      "referenceRu": "Он учится в университете.",
+      "beforeRu": "Он учится в университете.",
+      "afterRu": "Он учится в университете."
+    },
+    {
+      "id": "studies",
+      "render": "dark54",
+      "reference": "هو يَدْرُسُ في الجامعة.",
+      "before": "هو يذرُش في الجامعة",
+      "after": "هو يذرُش في الجامعة",
+      "blocksBefore": 1,
+      "blocksAfter": 1,
+      "referenceRu": "Он учится в университете.",
+      "beforeRu": "Он учится в университете.",
+      "afterRu": "Он учится в университете."
+    },
+    {
+      "id": "two-wrote",
+      "render": "light34",
+      "reference": "الطالبان كَتَبَا الدرس معًا.",
+      "before": "الطالبان كتبًا الدرس مقا",
+      "after": "الطالبان كتبًا الدرس مقا",
+      "blocksBefore": 1,
+      "blocksAfter": 1,
+      "referenceRu": "Ученики вместе написали урок.",
+      "beforeRu": "Ученики пишут учебные работы.",
+      "afterRu": "Ученики пишут учебные работы."
+    },
+    {
+      "id": "two-wrote",
+      "render": "dark54",
+      "reference": "الطالبان كَتَبَا الدرس معًا.",
+      "before": "الطالبان كُتَبَا الدرس معًا",
+      "after": "الطالبان كُتَبَا الدرس معًا",
+      "blocksBefore": 2,
+      "blocksAfter": 1,
+      "referenceRu": "Ученики вместе написали урок.",
+      "beforeRu": "Ученики записали урок вместе.",
+      "afterRu": "Ученики записали урок вместе."
+    },
+    {
+      "id": "two-books",
+      "render": "light34",
+      "reference": "على الطاولة كتابان جديدان.",
+      "before": "على الطاولة كتابان جديدان",
+      "after": "على الطاولة كتابان جديدان",
+      "blocksBefore": 1,
+      "blocksAfter": 1,
+      "referenceRu": "На столе лежат два новых книги.",
+      "beforeRu": "На столе лежат два новых книги.",
+      "afterRu": "На столе лежат два новых книги."
+    },
+    {
+      "id": "two-books",
+      "render": "dark54",
+      "reference": "على الطاولة كتابان جديدان.",
+      "before": "كتابان على الطاولة جديدان",
+      "after": "على الطاولة كتابان جديدان",
+      "blocksBefore": 4,
+      "blocksAfter": 1,
+      "referenceRu": "На столе лежат два новых книги.",
+      "beforeRu": "Два новых книги на столе.",
+      "afterRu": "На столе лежат два новых книги."
+    },
+    {
+      "id": "two-pens",
+      "render": "light34",
+      "reference": "اشتريت قَلَمَيْنِ من المتجر.",
+      "before": "شتريت قلَين من المتجر",
+      "after": "شتريت قلَين من المتجر",
+      "blocksBefore": 1,
+      "blocksAfter": 1,
+      "referenceRu": "Я купила два помады в магазине.",
+      "beforeRu": "Купил клеин в магазине.",
+      "afterRu": "Купил клеенцы в магазине."
+    },
+    {
+      "id": "two-pens",
+      "render": "dark54",
+      "reference": "اشتريت قَلَمَيْنِ من المتجر.",
+      "before": "قَلمَيْن اشتريت المتجر من",
+      "after": "اشتريت قَلمَيْن من المتجر",
+      "blocksBefore": 4,
+      "blocksAfter": 1,
+      "referenceRu": "Я купила два помады в магазине.",
+      "beforeRu": "Я купил два ручка. Магазин продал их.",
+      "afterRu": "Я купила два ручка в магазине."
+    },
+    {
+      "id": "unmarked",
+      "render": "light34",
+      "reference": "يقرأ الطفل كل مساء.",
+      "before": "قرأ الطفل كل مساء",
+      "after": "قرأ الطفل كل مساء",
+      "blocksBefore": 1,
+      "blocksAfter": 1,
+      "referenceRu": "Ребенок читает каждый вечер.",
+      "beforeRu": "Ребенок читает каждый вечер.",
+      "afterRu": "Ребенок читает каждый вечер."
+    },
+    {
+      "id": "unmarked",
+      "render": "dark54",
+      "reference": "يقرأ الطفل كل مساء.",
+      "before": "قرا الطفل كل مساء",
+      "after": "قرا الطفل كل مساء",
+      "blocksBefore": 1,
+      "blocksAfter": 1,
+      "referenceRu": "Ребенок читает каждый вечер.",
+      "beforeRu": "Ребенок читает каждый вечер.",
+      "afterRu": "Ребенок читает каждый вечер."
+    },
+    {
+      "id": "mixed",
+      "render": "light34",
+      "reference": "نستخدم OCR 25 اليوم.",
+      "before": "ستخدم OCR 25 اليوم",
+      "after": "ستخدم OCR 25 اليوم",
+      "blocksBefore": 1,
+      "blocksAfter": 1,
+      "referenceRu": "Сегодня мы используем OCR 25.",
+      "beforeRu": "Сегодня будет использоваться OCR 25.",
+      "afterRu": "Сегодня будет использоваться OCR 25."
+    },
+    {
+      "id": "mixed",
+      "render": "dark54",
+      "reference": "نستخدم OCR 25 اليوم.",
+      "before": "l OCR 25ليوج ستخدم",
+      "after": "l OCR 25ليوج ستخدم",
+      "blocksBefore": 2,
+      "blocksAfter": 2,
+      "referenceRu": "Сегодня мы используем OCR 25.",
+      "beforeRu": "L OCR 25Лиудж будет использоваться",
+      "afterRu": "L OCR 25 будет использоваться"
+    },
+    {
+      "id": "house",
+      "render": "light34",
+      "reference": "رأيت بيتًا قرب البحر.",
+      "before": "أيت بيتًا قرب البحر",
+      "after": "أيت بيتًا قرب البحر",
+      "blocksBefore": 1,
+      "blocksAfter": 1,
+      "referenceRu": "Я видел дом рядом с морем.",
+      "beforeRu": "Есть домик рядом с морем",
+      "afterRu": "Есть домик рядом с морем"
+    },
+    {
+      "id": "house",
+      "render": "dark54",
+      "reference": "رأيت بيتًا قرب البحر.",
+      "before": "رأيت بيثتًا البحر قرب",
+      "after": "رأيت بيثتًا قرب البحر",
+      "blocksBefore": 4,
+      "blocksAfter": 1,
+      "referenceRu": "Я видел дом рядом с морем.",
+      "beforeRu": "Я видел Бетту на море неподалеке.",
+      "afterRu": "Я видел Бетту у моря."
+    },
+    {
+      "id": "two-played",
+      "render": "light34",
+      "reference": "الطفلان لَعِبَا في الحديقة.",
+      "before": "لطفلان لعِبَا في الحديقة",
+      "after": "لطفلان لعِبَا في الحديقة",
+      "blocksBefore": 1,
+      "blocksAfter": 1,
+      "referenceRu": "Двое детей играли в саду.",
+      "beforeRu": "Двое детей играют в саду.",
+      "afterRu": "Двое детей играют в саду."
+    },
+    {
+      "id": "two-played",
+      "render": "dark54",
+      "reference": "الطفلان لَعِبَا في الحديقة.",
+      "before": "لَعِبَا فى الطفلان الحديقة",
+      "after": "الطفلان لَعِبَا فى الحديقة",
+      "blocksBefore": 3,
+      "blocksAfter": 1,
+      "referenceRu": "Двое детей играли в саду.",
+      "beforeRu": "Играли в саду двух детей",
+      "afterRu": "Дети играли в саду."
+    },
+    {
+      "id": "bird",
+      "render": "light34",
+      "reference": "رأيت طائرًا قرب النافذة.",
+      "before": "أيت طائرًا قرب النافذة",
+      "after": "أيت طائرًا قرب النافذة",
+      "blocksBefore": 1,
+      "blocksAfter": 1,
+      "referenceRu": "Я видел птицу у окна.",
+      "beforeRu": "Какое птичье существо у окна?",
+      "afterRu": "Какое птичку у окна?"
+    },
+    {
+      "id": "bird",
+      "render": "dark54",
+      "reference": "رأيت طائرًا قرب النافذة.",
+      "before": "رأيت طائرًا قرب النافذة",
+      "after": "رأيت طائرًا قرب النافذة",
+      "blocksBefore": 1,
+      "blocksAfter": 1,
+      "referenceRu": "Я видел птицу у окна.",
+      "beforeRu": "Я видел птицу у окна.",
+      "afterRu": "Я видел птицу у окна."
+    },
+    {
+      "id": "sound",
+      "render": "light34",
+      "reference": "سمعت صوتًا من المطبخ.",
+      "before": "سمعت صوتا من ألمطبخ",
+      "after": "سمعت صوتا من ألمطبخ",
+      "blocksBefore": 1,
+      "blocksAfter": 1,
+      "referenceRu": "Я услышал звук из кухни.",
+      "beforeRu": "Я услышал звуки из кухни.",
+      "afterRu": "Я услышал звуки из кухни."
+    },
+    {
+      "id": "sound",
+      "render": "dark54",
+      "reference": "سمعت صوتًا من المطبخ.",
+      "before": "سمعت صوتًا من المطبخ",
+      "after": "سمعت صوتًا من المطبخ",
+      "blocksBefore": 1,
+      "blocksAfter": 1,
+      "referenceRu": "Я услышал звук из кухни.",
+      "beforeRu": "Я услышал звук из кухни.",
+      "afterRu": "Я услышал звук из кухни."
+    },
+    {
+      "id": "two-drew",
+      "render": "light34",
+      "reference": "الطفلان رَسَمَا شجرة جميلة.",
+      "before": "الطفلان رَسمَا شجرة جميلة",
+      "after": "الطفلان رَسمَا شجرة جميلة",
+      "blocksBefore": 1,
+      "blocksAfter": 1,
+      "referenceRu": "Двое детей нарисовали красивую дерево.",
+      "beforeRu": "Двое детей создали красивую радугу.",
+      "afterRu": "Двое детей создали красивую радугу."
+    },
+    {
+      "id": "two-drew",
+      "render": "dark54",
+      "reference": "الطفلان رَسَمَا شجرة جميلة.",
+      "before": "شجرة جميلة الطفلان رَسَمًَا",
+      "after": "الطفلان رَسَمًَا شجرة جميلة",
+      "blocksBefore": 2,
+      "blocksAfter": 1,
+      "referenceRu": "Двое детей нарисовали красивую дерево.",
+      "beforeRu": "Красивое дерево для двух детей, нарисованное.",
+      "afterRu": "Двое детей нарисовали красивое дерево."
+    },
+    {
+      "id": "two-went",
+      "render": "light34",
+      "reference": "الصديقان ذَهَبَا إلى البيت.",
+      "before": "لصديقان ذهيَا إلى ألبيت",
+      "after": "لصديقان ذهيَا إلى ألبيت",
+      "blocksBefore": 1,
+      "blocksAfter": 1,
+      "referenceRu": "Друзья пошли домой.",
+      "beforeRu": "Два друга отправились в Албанию",
+      "afterRu": "Два друга отправились в Албанию"
+    },
+    {
+      "id": "two-went",
+      "render": "dark54",
+      "reference": "الصديقان ذَهَبَا إلى البيت.",
+      "before": "ذَْهَبَا إلى الصديقان البيت",
+      "after": "الصديقان ذَْهَبَا إلى البيت",
+      "blocksBefore": 3,
+      "blocksAfter": 1,
+      "referenceRu": "Друзья пошли домой.",
+      "beforeRu": "Они пошли к двум друзьям домой.",
+      "afterRu": "Два друга ушли домой."
+    },
+    {
+      "id": "another-flag",
+      "render": "light34",
+      "reference": "رفعت عَلَم بلادي.",
+      "before": "رفعت عَلم بلادي",
+      "after": "رفعت عَلم بلادي",
+      "blocksBefore": 1,
+      "blocksAfter": 1,
+      "referenceRu": "Я поднял флаг моей страны.",
+      "beforeRu": "Я поднял флаг моей страны",
+      "afterRu": "Я поднял флаг моей страны"
+    },
+    {
+      "id": "another-flag",
+      "render": "dark54",
+      "reference": "رفعت عَلَم بلادي.",
+      "before": "بلادي رفعت عَلم",
+      "after": "رفعت عَلَم بلادي",
+      "blocksBefore": 2,
+      "blocksAfter": 1,
+      "referenceRu": "Я поднял флаг моей страны.",
+      "beforeRu": "Моя страна подняла свой флаг",
+      "afterRu": "Я поднял флаг моей страны"
+    },
+    {
+      "id": "another-knowledge",
+      "render": "light34",
+      "reference": "هذا عِلْم نافع.",
+      "before": "هذا علّم نافع",
+      "after": "هذا علّم نافع",
+      "blocksBefore": 1,
+      "blocksAfter": 1,
+      "referenceRu": "Это полезная знание.",
+      "beforeRu": "Это был полезный урок.",
+      "afterRu": "Это было полезно."
+    },
+    {
+      "id": "another-knowledge",
+      "render": "dark54",
+      "reference": "هذا عِلْم نافع.",
+      "before": "علم نافع هذا",
+      "after": "هذا علم نافع",
+      "blocksBefore": 2,
+      "blocksAfter": 1,
+      "referenceRu": "Это полезная знание.",
+      "beforeRu": "Полезная наука",
+      "afterRu": "Это полезная наука."
+    },
+    {
+      "id": "another-king",
+      "render": "light34",
+      "reference": "في الحكاية مَلِك عادل.",
+      "before": "فى الحكاية مَلِك عادل",
+      "after": "فى الحكاية مَلِك عادل",
+      "blocksBefore": 1,
+      "blocksAfter": 1,
+      "referenceRu": "В этой истории есть справедливый король.",
+      "beforeRu": "В этой истории есть справедливый король.",
+      "afterRu": "В этой истории есть справедливый король."
+    },
+    {
+      "id": "another-king",
+      "render": "dark54",
+      "reference": "في الحكاية مَلِك عادل.",
+      "before": "ي الحكاية مَلِك عادل",
+      "after": "ي الحكاية مَلِك عادل",
+      "blocksBefore": 2,
+      "blocksAfter": 1,
+      "referenceRu": "В этой истории есть справедливый король.",
+      "beforeRu": "В этой истории есть справедливый король.",
+      "afterRu": "В истории есть справедливый король."
+    },
+    {
+      "id": "another-angel",
+      "render": "light34",
+      "reference": "في الحكاية مَلَك جميل.",
+      "before": "فى الحكاية مَلك جميل",
+      "after": "فى الحكاية مَلك جميل",
+      "blocksBefore": 1,
+      "blocksAfter": 1,
+      "referenceRu": "В этой истории есть красивый ангел.",
+      "beforeRu": "В этой истории есть прекрасный король",
+      "afterRu": "В этой истории есть прекрасный король"
+    },
+    {
+      "id": "another-angel",
+      "render": "dark54",
+      "reference": "في الحكاية مَلَك جميل.",
+      "before": "الحكاية مَلك جميل ي",
+      "after": "ي الحكاية مَلَك جميل",
+      "blocksBefore": 2,
+      "blocksAfter": 1,
+      "referenceRu": "В этой истории есть красивый ангел.",
+      "beforeRu": "История о красивом короле",
+      "afterRu": "В истории есть красивый ангел."
+    }
+  ]
+}
