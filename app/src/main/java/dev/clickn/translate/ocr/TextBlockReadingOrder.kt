@@ -48,6 +48,7 @@ internal fun sortTextBlocksForMergedPage(
 }
 
 private fun sortHorizontalPage(blocks: List<TextBlock>, leftToRight: Boolean): List<TextBlock> {
+    if (!blocks.hasWrappedParagraph()) return sortHorizontal(blocks, leftToRight)
     val gutter = 4 * mangaHorizontalBandGapThresholdPx(blocks)
     fun readColumns(section: List<TextBlock>): List<TextBlock>? {
         val columns = splitByWhitespace(section, gutter, { it.boundingBox.left },
@@ -66,8 +67,10 @@ private fun sortHorizontalPage(blocks: List<TextBlock>, leftToRight: Boolean): L
     readColumns(blocks)?.let { return it }
     val sections = splitByWhitespace(blocks, gutter, { it.boundingBox.top },
         { it.boundingBox.bottom }, { it.boundingBox.left })
-    return if (sections.size == 1) sortHorizontal(blocks, leftToRight)
-    else sections.flatMap { section -> readColumns(section) ?: sortHorizontal(section, leftToRight) }
+    if (sections.size == 1) return sortHorizontal(blocks, leftToRight)
+    val ordered = sections.map(::readColumns)
+    if (ordered.all { it == null }) return sortHorizontal(blocks, leftToRight)
+    return sections.flatMapIndexed { index, section -> ordered[index] ?: sortHorizontal(section, leftToRight) }
 }
 
 private fun List<TextBlock>.hasWrappedParagraph(): Boolean {

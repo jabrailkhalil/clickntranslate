@@ -31,9 +31,15 @@ import org.junit.runner.RunWith
 class AutomaticOcrParagraphIntegrationTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
 
-    @Test fun twoColumnPixelsReachTheExtractionCardInReadingOrder() = runBlocking {
+    @Test fun twoColumnPixelsReachTheExtractionCardInReadingOrder() =
+        checkColumnExtraction(OcrEngineKind.ML_KIT_LATIN)
+
+    @Test fun automaticOcrKeepsColumnOrderAfterCombiningRecognizerPasses() =
+        checkColumnExtraction(OcrEngineKind.ML_KIT_AUTO)
+
+    private fun checkColumnExtraction(kind: OcrEngineKind) = runBlocking {
         val image = Bitmap.createBitmap(1400, 420, Bitmap.Config.ARGB_8888)
-        val settings = Settings(ocrEngine = OcrEngineKind.ML_KIT_LATIN,
+        val settings = Settings(ocrEngine = kind,
             sourceLang = "en", targetLang = "ru", renderMode = RenderMode.FLOATING_WINDOW,
             mergeAdjacentBlocks = true, mergeStrength = MergeStrength.ALL)
         try {
