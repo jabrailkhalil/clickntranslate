@@ -76,6 +76,13 @@ def themed_html(value, dark, factor):
     return re.sub(r'(\d+(?:\.\d+)?)pt\b', lambda m: f'{float(m[1]) * factor:g}pt', value)
 
 
+def set_scalable_browser_html(browser, markup):
+    """Retain the author's CSS and paragraph direction across dialog restyling."""
+    browser.setHtml(markup)
+    document = browser.document()
+    document.setProperty('_cntAuthoredHtml', (document.revision(), markup))
+
+
 class DialogAppearance(QtCore.QObject):
     def __init__(self, app, percent=DEFAULT_SCALE, theme='Темная'):
         super().__init__(app)
@@ -273,9 +280,19 @@ class DialogAppearance(QtCore.QObject):
                     if pixmap is not None and not pixmap.isNull() and pixmap.cacheKey() != record.get('last_pixmap_key'):
                         record['pixmap'] = QtGui.QPixmap(pixmap)
                 if isinstance(widget, QtWidgets.QTextBrowser):
-                    html = widget.toHtml()
-                    if html != record.get('last_html'):
-                        record['html'] = html
+                    document = widget.document()
+                    revision = document.revision()
+                    # A font or QSS change affects toHtml() without editing the document.
+                    if document is not record.get('document') or revision != record.get('revision'):
+                        source = document.property('_cntAuthoredHtml')
+                        if source and source[0] == revision:
+                            record['html'] = source[1]
+                        else:
+                            snapshot = document.clone()
+                            snapshot.setDefaultFont(record['font'])
+                            record['html'] = snapshot.toHtml()
+                        record['document'] = document
+                        record.pop('rendered_html', None)
                 elif isinstance(widget, QtWidgets.QLabel) and '<' in widget.text():
                     if widget.text() != record.get('last_html'):
                         record['html'] = widget.text()
@@ -311,7 +328,7 @@ class DialogAppearance(QtCore.QObject):
                             position = widget.verticalScrollBar().value()
                             widget.setHtml(html)
                             widget.verticalScrollBar().setValue(position)
-                        record['last_html'] = widget.toHtml()
+                        record['revision'] = widget.document().revision()
                     else:
                         widget.setText(html)
                         record['last_html'] = html

@@ -6240,7 +6240,7 @@ HELP_ACTION_TEXT = {
      'report_failed': 'Impossibile creare il report diagnostico.\n\n{error}',
      'close': 'Capito'},
 
-    'ar': {'title': 'FAQ',
+    'ar': {'title': 'الأسئلة الشائعة',
      'guide': 'بدء الجولة التفاعلية',
      'github': 'المشروع على GitHub',
      'telegram': 'Telegram',
@@ -6328,10 +6328,13 @@ def help_text(lang, theme="Темная"):
         a {{ color:{accent}; }}
         .item-title, .kbd {{ font-weight:600; }}
     </style>"""
-    blocks = [style, f'<p>{intro}</p>']
+    rtl = QtCore.QLocale(lang).textDirection() == Qt.RightToLeft
+    direction, alignment = ('rtl', 'right') if rtl else ('ltr', 'left')
+    blocks = [f'<html><head>{style}</head><body dir="{direction}" align="{alignment}">', f'<p>{intro}</p>']
     for title, items in sections:
         blocks.append(f'<h3>{title}</h3>')
         blocks.extend(f'<p>{item}</p>' for item in items)
+    blocks.append('</body></html>')
     return "\n".join(blocks)
 
 THEMES = {
@@ -14269,6 +14272,7 @@ class DarkThemeApp(QMainWindow):
         from button_styles import button_palette
         from ui_details import social_icon
         from rounded_windows import clip_rounded_window
+        from window_appearance import set_scalable_browser_html
         colors = button_palette(dark)
         dialog = CenteredFramelessDialog(self, drag_height=54)
         dialog.setObjectName('helpDialogRoot')
@@ -14312,7 +14316,7 @@ class DarkThemeApp(QMainWindow):
 
         browser = QTextBrowser()
         browser.setOpenExternalLinks(True)
-        browser.setHtml(help_text(lang, theme))
+        set_scalable_browser_html(browser, help_text(lang, theme))
         browser.setStyleSheet(f"""
             QTextBrowser {{ background:{'#18171c' if dark else '#faf8fc'};
                 color:{colors['text']}; border:1px solid {colors['border']}; border-radius:6px;
