@@ -28,13 +28,17 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
+import androidx.test.runner.lifecycle.Stage
 import dev.clickn.translate.ClickTranslateApp
 import dev.clickn.translate.data.OcrEngineKind
 import dev.clickn.translate.data.RenderMode
 import dev.clickn.translate.data.TranslatorEngine
 import dev.clickn.translate.service.CaptureService
 import dev.clickn.translate.service.CaptureServiceState
+import dev.clickn.translate.trigger.AccessibilityServiceStatus
 import dev.clickn.translate.ui.MainActivity
+import java.io.File
 import java.net.InetAddress
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
@@ -94,6 +98,8 @@ class MediaProjectionConsentIntegrationTest {
         val firstResponseIssued = CountDownLatch(1)
         val settings = (context.applicationContext as ClickTranslateApp).settingsRepository
         val previous = runBlocking { settings.get() }
+        runBlocking { CaptureStartPreference.initialize(context) }
+        val previousBackend = requireNotNull(CaptureStartPreference.mode.value)
         val translator = MockWebServer()
         translator.dispatcher = object : Dispatcher() {
             override fun dispatch(request: RecordedRequest): MockResponse {
@@ -117,6 +123,10 @@ class MediaProjectionConsentIntegrationTest {
             ui.serviceInfo = ui.serviceInfo.apply { flags = flags or AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS }
             if (restoreOverlay) shell("cmd appops set ${context.packageName} SYSTEM_ALERT_WINDOW allow")
             waitFor("overlay app-op") { Settings.canDrawOverlays(context) }
+            CaptureStartPreference.select(CaptureStartMode.SYSTEM)
+            assertTrue("The fixture must persist the system backend", runBlocking { CaptureStartPreference.awaitPersistence() })
+            assertFalse("The disposable AVD must not have the app's Accessibility capture enabled",
+                AccessibilityServiceStatus.isEnabled(context))
             runBlocking {
                 settings.update { it.copy(
                     ocrEngine = OcrEngineKind.ML_KIT_LATIN, sourceLang = "en", targetLang = "ru",
@@ -130,11 +140,11 @@ class MediaProjectionConsentIntegrationTest {
                 home.onActivity { activity ->
                     activity.startActivity(CaptureStartRequestActivity.newIntent(activity))
                 }
-                chooseConsent(grant = false)
+                chooseConsent(grant = false, stage = "deny first capture")
                 waitFor("denial returns to the app") { appInFront() && appCaptureReleased() }
                 assertFalse("Denial registered a system projection", ownsProjection())
 
-                val firstDisplay = grantCapture(home)
+                val firstDisplay = grantCapture(home, "immediate retry after denial")
                 // Obtain independent consent now, but do not activate it. Returning to MainActivity
                 // to ask for permission during translation would cancel work before Android revoked it.
                 home.onActivity { activity ->
@@ -151,7 +161,7 @@ class MediaProjectionConsentIntegrationTest {
                     }
                     peerLauncher!!.launch(manager.createScreenCaptureIntent(MediaProjectionConfig.createConfigForDefaultDisplay()))
                 }
-                chooseConsent(grant = true)
+                chooseConsent(grant = true, stage = "approve independent system token")
                 val secondGrant = peerConsent.get(25, TimeUnit.SECONDS)
                 triggerTranslation(home, "Blue door", expectResult = false)
                 assertEquals("The pending request must belong to the first display", listOf(firstDisplay), captureDisplays())
@@ -175,7 +185,7 @@ class MediaProjectionConsentIntegrationTest {
 
                 shell("am start -W --activity-reorder-to-front -n ${context.packageName}/${MainActivity::class.java.name}")
                 waitFor("return from the launcher after the system stop") { appInFront() }
-                val restartedDisplay = grantCapture(home)
+                val restartedDisplay = grantCapture(home, "restart after system revocation")
                 assertNotEquals("Restart reused the old display", firstDisplay, restartedDisplay)
                 triggerTranslation(home, "Green door", expectResult = true)
                 context.startService(CaptureService.stopIntent(context))
@@ -183,6 +193,10 @@ class MediaProjectionConsentIntegrationTest {
                     appCaptureReleased() && !ownsProjection()
                 }
             }
+        } catch (failure: Throwable) {
+            // The AVD is disposable. Preserve evidence before teardown dismisses its activities.
+            runCatching { saveFailureDiagnostics(failure) }.onFailure { failure.addSuppressed(it) }
+            throw failure
         } finally {
             allowFirstResponse.countDown()
             instrumentation.runOnMainSync { peerLauncher?.unregister() }
@@ -190,6 +204,8 @@ class MediaProjectionConsentIntegrationTest {
             context.stopService(Intent(context, CaptureService::class.java))
             Timber.uproot(frameObserver)
             translator.shutdown()
+            CaptureStartPreference.select(previousBackend)
+            runBlocking { CaptureStartPreference.awaitPersistence() }
             runBlocking {
                 settings.update { it.copy(
                     ocrEngine = previous.ocrEngine, sourceLang = previous.sourceLang, targetLang = previous.targetLang,
@@ -203,9 +219,9 @@ class MediaProjectionConsentIntegrationTest {
         }
     }
 
-    private fun grantCapture(home: ActivityScenario<MainActivity>): Int {
+    private fun grantCapture(home: ActivityScenario<MainActivity>, stage: String): Int {
         home.onActivity { it.startActivity(CaptureStartRequestActivity.newIntent(it)) }
-        chooseConsent(grant = true)
+        chooseConsent(grant = true, stage = stage)
         waitFor("running capture, virtual display and Android projection grant") {
             CaptureServiceState.running.value && serviceRunning() && captureDisplays().size == 1 && ownsProjection()
         }
@@ -280,8 +296,9 @@ class MediaProjectionConsentIntegrationTest {
         return view is ViewGroup && (0 until view.childCount).any { hasVisibleText(view.getChildAt(it), text) }
     }
 
-    private fun chooseConsent(grant: Boolean) {
-        waitFor("system projection consent") {
+    private fun chooseConsent(grant: Boolean, stage: String) {
+        Log.i("ProjectionConsentTest", "awaiting SystemUI for $stage")
+        waitFor("SystemUI consent ($stage)") {
             val root = ui.rootInActiveWindow ?: return@waitFor false
             if (root.packageName?.toString() != "com.android.systemui") return@waitFor false
             val positive = root.findAccessibilityNodeInfosByViewId("android:id/button1").firstOrNull()
@@ -292,7 +309,32 @@ class MediaProjectionConsentIntegrationTest {
         }
     }
 
-    private fun appInFront() = ui.rootInActiveWindow?.packageName?.toString() == context.packageName
+    private fun appInFront(): Boolean {
+        if (ui.rootInActiveWindow?.packageName?.toString() != context.packageName) return false
+        var mainResumed = false
+        instrumentation.runOnMainSync {
+            mainResumed = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED)
+                .any { it is MainActivity && !it.isFinishing }
+        }
+        return mainResumed
+    }
+
+    private fun saveFailureDiagnostics(failure: Throwable) {
+        val dir = File(context.filesDir, "qa-projection-failure").also { it.mkdirs() }
+        val activities = shell("dumpsys activity activities")
+        val windows = shell("dumpsys window windows")
+        val recentLog = shell("logcat -d -t 1800 -v threadtime")
+        File(dir, "activities.txt").writeText(activities)
+        File(dir, "windows.txt").writeText(windows)
+        File(dir, "logcat.txt").writeText(recentLog)
+        val state = "backend=${CaptureStartPreference.mode.value}, overlay=${Settings.canDrawOverlays(context)}, " +
+            "accessibility=${AccessibilityServiceStatus.isEnabled(context)}, " +
+            activities.lineSequence().filter { it.contains("ResumedActivity") || it.contains("topResumedActivity") }
+                .take(3).joinToString(" ").trim()
+        File(dir, "failure.txt").writeText("${failure.stackTraceToString()}\n$state")
+        Log.e("ProjectionConsentTest", state)
+        failure.addSuppressed(AssertionError("$state; full Activity/Window stacks and logcat: files/qa-projection-failure/"))
+    }
 
     private fun ownsProjection() = shell("dumpsys media_projection").contains("(${context.packageName}, uid=")
 

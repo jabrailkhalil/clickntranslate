@@ -11,6 +11,8 @@ report=build/device-acceptance
 mkdir -p "$report"
 adb -s "$serial" shell getprop ro.build.fingerprint > "$report/system.txt"
 adb -s "$serial" shell getprop ro.product.cpu.abilist >> "$report/system.txt"
+adb -s "$serial" shell wm size >> "$report/system.txt"
+adb -s "$serial" shell wm density >> "$report/system.txt"
 cat "$report/system.txt"
 adb -s "$serial" install -r app/build/outputs/apk/debug/app-debug.apk
 adb -s "$serial" install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
@@ -49,8 +51,26 @@ PY
 # Retain independent results even if one scenario fails.
 failure=0
 python3 tools/mobile_onboarding_smoke.py --serial "$serial" --output "$report/onboarding" || failure=1
+# These tests exercise the enabled features, including Android's contextual action toolbar.
+# The fresh-install journey above runs with the normal initial permissions.
+adb -s "$serial" shell cmd appops set dev.clickn.translate.debug SYSTEM_ALERT_WINDOW allow
+adb -s "$serial" shell cmd appops set dev.clickn.translate.debug GET_USAGE_STATS allow
 run_tests device-suite || failure=1
-run_tests screen-consent -e class dev.clickn.translate.capture.MediaProjectionConsentIntegrationTest -e projectionConsent true || failure=1
+adb -s "$serial" shell cmd appops set dev.clickn.translate.debug SYSTEM_ALERT_WINDOW default
+adb -s "$serial" shell cmd appops set dev.clickn.translate.debug GET_USAGE_STATS default
+if ! run_tests screen-consent -e class dev.clickn.translate.capture.MediaProjectionConsentIntegrationTest -e projectionConsent true; then
+  failure=1
+  for file in activities windows logcat failure; do
+    adb -s "$serial" exec-out run-as dev.clickn.translate.debug cat "files/qa-projection-failure/$file.txt" > "$report/consent-$file.txt" || true
+  done
+fi
 adb -s "$serial" logcat -d -s ProjectionConsentTest:I > "$report/consent-timing.log"
 run_tests arabic-ocr -e class dev.clickn.translate.ocr.TesseractArabicOcrIntegrationTest -e downloadModels true || failure=1
+run_tests paddle-arabic -e class dev.clickn.translate.ocr.PaddleArabicParagraphIntegrationTest -e paddleArabic true -e downloadModels true || failure=1
+device_files=/sdcard/Android/data/dev.clickn.translate.debug/files
+for file in qa/arabic-english-ocr-result-api35.json paddle-arabic-qa/result.json; do
+  if adb -s "$serial" shell run-as dev.clickn.translate.debug test -f "$device_files/$file"; then
+    adb -s "$serial" exec-out run-as dev.clickn.translate.debug cat "$device_files/$file" > "$report/${file%/*}-blocks.json"
+  fi
+done
 exit "$failure"

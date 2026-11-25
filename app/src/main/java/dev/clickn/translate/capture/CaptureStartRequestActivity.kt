@@ -50,7 +50,6 @@ class CaptureStartRequestActivity : ComponentActivity() {
             Timber.w("MediaProjection denied")
             viewModel.projectionDenied()
         }
-        finishRequest()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -126,8 +125,8 @@ class CaptureStartRequestActivity : ComponentActivity() {
     }
 
     private fun finishRequest() {
-        // Remove only this temporary task; never clear a caller's existing activity stack.
-        if (isTaskRoot) finishAndRemoveTask() else finish()
+        // Finishing the whole task could also remove a newer request launched during teardown.
+        if (!isFinishing) finish()
     }
 
     companion object {
@@ -146,7 +145,6 @@ class CaptureStartViewModel @Inject constructor(
     private val savedState: SavedStateHandle,
     private val settingsRepository: SettingsRepository,
 ) : ViewModel() {
-    private val ownsGate = coordinator.gate.acquire()
     private val admission = CapturePermissionAdmission(CapturePermissionSnapshot(
         pending = savedState.get<String>("capturePendingPermission")?.let { name ->
             CapturePendingPermission.entries.firstOrNull { it.name == name } ?: CapturePendingPermission.FINISHED
@@ -155,6 +153,7 @@ class CaptureStartViewModel @Inject constructor(
         overlayAttempted = savedState.get<Boolean>("captureOverlayAttempted") == true,
         overlayDeniedNotice = savedState.get<Boolean>("captureOverlayDeniedNotice") == true,
     ))
+    private val ownsGate = coordinator.gate.acquire(admission)
     private val currentStage = MutableStateFlow(when (admission.snapshot.pending) {
         CapturePendingPermission.NONE -> CaptureStartStage.WAITING
         CapturePendingPermission.OVERLAY -> CaptureStartStage.OVERLAY_PERMISSION
@@ -240,6 +239,8 @@ class CaptureStartViewModel @Inject constructor(
 
     fun projectionDenied() {
         if (!ownsGate || !admission.consumeProjectionResult()) return
+        // The underlying Activity can be interactive before this permission host is destroyed.
+        coordinator.gate.release(admission)
         saveAdmission()
         currentStage.value = CaptureStartStage.FINISHED
     }
@@ -277,7 +278,8 @@ class CaptureStartViewModel @Inject constructor(
 
     override fun onCleared() {
         admission.finish()
-        if (ownsGate) coordinator.gate.release()
+        // An outgoing host can finish after another host has already claimed the gate.
+        coordinator.gate.release(admission)
     }
 }
 

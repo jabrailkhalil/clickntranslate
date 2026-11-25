@@ -1,21 +1,36 @@
 package dev.clickn.translate.ocr
 
+import android.content.ContextWrapper
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dagger.hilt.EntryPoints
 import dagger.hilt.android.internal.managers.ServiceComponentManager
+import dev.clickn.translate.data.LogRepository
 import dev.clickn.translate.data.OcrEngineKind
 import dev.clickn.translate.data.PaddleModelVersion
 import dev.clickn.translate.data.Settings
+import dev.clickn.translate.data.SettingsRepository
+import dev.clickn.translate.data.SettingsSecretCipher
+import dev.clickn.translate.download.ModelFileDownloader
 import dev.clickn.translate.service.CaptureService
 import dev.clickn.translate.service.CaptureService_GeneratedInjector
 import java.io.File
+import java.nio.file.Files
 import java.text.Normalizer
 import java.util.Locale
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import okhttp3.OkHttpClient
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -26,7 +41,7 @@ import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** Explicit real detector+Arabic recognizer+paragraph regression; installed models, no downloads. */
+/** An installed pack is used unless the runner explicitly opts into an isolated download. */
 @RunWith(AndroidJUnit4::class)
 class PaddleArabicParagraphIntegrationTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
@@ -43,8 +58,12 @@ class PaddleArabicParagraphIntegrationTest {
             }))
         }
         try {
-            val blocks = withTimeout(90_000) { applicationBoundEngine().recognize(image, settings.ocrEngine, settings) }
+            val download = InstrumentationRegistry.getArguments().getString("downloadModels") == "true"
+            val blocks = if (download) recognizeWithFreshPack(image, settings) else withTimeout(90_000) {
+                applicationBoundEngine().recognize(image, settings.ocrEngine, settings)
+            }
             val report = JSONObject().put("fixtureOnly", true).put("model", settings.paddleModelVersion.name)
+                .put("freshVerifiedDownload", download)
                 .put("width", image.width).put("height", image.height).put("mergeAdjacentBlocks", false)
                 .put("blocks", JSONArray(blocks.map { block -> JSONObject().put("text", block.text)
                     .put("language", block.recognizedLanguage).put("orientation", block.layoutOrientation?.name)
@@ -75,6 +94,43 @@ class PaddleArabicParagraphIntegrationTest {
             assertEquals(diagnostic, TextOrientation.HORIZONTAL_LTR, english.layoutOrientation)
             assertTrue(diagnostic, arabic[1].boundingBox.bottom < english.boundingBox.top)
         } finally { if (!image.isRecycled) image.recycle() }
+    }
+
+    private suspend fun recognizeWithFreshPack(image: Bitmap, settings: Settings): List<TextBlock> {
+        val app = instrumentation.targetContext
+        val owned = Files.createTempDirectory(app.cacheDir.toPath(), "qa-paddle-ar-").toFile()
+        val context = object : ContextWrapper(app) {
+            override fun getFilesDir() = owned
+        }
+        val job = SupervisorJob()
+        val preferences = PreferenceDataStoreFactory.create(scope = CoroutineScope(job + Dispatchers.IO)) {
+            File(owned, "settings.preferences_pb")
+        }
+        val cipher = object : SettingsSecretCipher {
+            override fun encrypt(plainText: String): String = error("This model pack uses no credentials")
+            override fun decrypt(cipherText: String): String = error("This model pack uses no credentials")
+        }
+        val repository = SettingsRepository(context, cipher, preferences)
+        val http = OkHttpClient()
+        val installer = PaddleModelInstaller(context, ModelFileDownloader(http), repository)
+        val engine = PaddleOcrEngine(context, installer, repository, LogRepository(), ShapeAwareBubbleSessionStore())
+        try {
+            val published = mutableSetOf<String>()
+            withTimeout(180_000) {
+                installer.downloadAll(settings.paddleModelVersion).collect { if (it.done) published += it.file }
+            }
+            assertEquals(PaddleArabicModelSpec.files.map { it.fileName }.toSet(), published)
+            return withTimeout(90_000) { engine.recognize(image, settings.ocrEngine, settings) }
+        } finally {
+            withContext(NonCancellable + Dispatchers.IO) {
+                engine.close()
+                job.cancelAndJoin()
+                http.dispatcher.cancelAll()
+                http.connectionPool.evictAll()
+                http.dispatcher.executorService.shutdown()
+                check(owned.deleteRecursively()) { "Could not remove the isolated Paddle test directory" }
+            }
+        }
     }
 
     /** Fields only: no real Service lifecycle, capture session or shared-engine close. */

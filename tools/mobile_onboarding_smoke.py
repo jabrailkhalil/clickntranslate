@@ -60,7 +60,15 @@ class Journey:
         self.last_xml = b""
 
     def run(self, *args):
-        return subprocess.run(self.adb + list(args), check=True, capture_output=True, timeout=20).stdout
+        cmd = self.adb + list(args)
+        result = subprocess.run(cmd, capture_output=True, timeout=30)
+        if result.returncode:
+            with (self.output / "adb-errors.log").open("a", encoding="utf-8") as log:
+                print(f"{self.stage}: {cmd!r} exited {result.returncode}", file=log)
+                print("stdout:", result.stdout.decode(errors="replace"), file=log)
+                print("stderr:", result.stderr.decode(errors="replace"), file=log)
+            result.check_returncode()
+        return result.stdout
 
     def read_tree(self):
         result = self.run("shell", "uiautomator", "dump", self.remote)
@@ -114,11 +122,19 @@ class Journey:
         raise RuntimeError(f"Timed out waiting for {expected!r}, action {action!r}; {detail}")
 
     def launch(self):
-        result = self.run("shell", "am", "start", "-W", "-a", "android.intent.action.MAIN",
-                          "-c", "android.intent.category.LAUNCHER", "-p", self.package)
+        intent = ("-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER")
+        # A launcher starts the enabled component. This app exposes a different alias for each icon.
+        resolved = self.run("shell", "cmd", "package", "resolve-activity", "--components",
+                            "--user", "current", *intent, "-p", self.package).decode(errors="replace").strip()
+        (self.output / f"{self.stage}-component.txt").write_text(resolved + "\n", encoding="utf-8")
+        if not re.fullmatch(re.escape(self.package) + r"/[A-Za-z_.$][\w.$]*", resolved):
+            raise RuntimeError(f"No active launcher component for {self.package}: {resolved!r}")
+        result = self.run("shell", "am", "start", "-W", "--user", "current", *intent,
+                          "-f", "0x10200000", "-n", resolved)
+        (self.output / f"{self.stage}-activity.txt").write_bytes(result)
         if b"Error:" in result or b"Status: ok" not in result:
-            raise RuntimeError("Failed to open the package's launcher activity")
-        metrics = {"stage": self.stage}
+            raise RuntimeError(f"Failed to open {resolved}: {result.decode(errors='replace').strip()}")
+        metrics = {"stage": self.stage, "component": resolved}
         for key, value in re.findall(r"^(LaunchState|TotalTime|WaitTime):\s*([^\r\n]+)", result.decode(), re.MULTILINE):
             metrics[key] = int(value) if value.isdecimal() else value.strip()
         self.launches.append(metrics)
@@ -129,6 +145,7 @@ class Journey:
         if self.run("shell", "getprop", "ro.build.version.sdk").strip() != b"35":
             raise ValueError("This journey targets the English API 35 AVD")
         self.verified = True
+        self.stage = "first-launch"
         self.launch()
         for index, title in enumerate(STEPS, start=1):
             self.screen(f"step-{index}", (f"Step {index} of 4", title),
@@ -176,7 +193,10 @@ def main():
         journey.execute()
         report["passed"] = True
     except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
-        report.update(passed=False, failedStage=journey.stage, error=str(error))
+        detail = ""
+        if isinstance(error, subprocess.CalledProcessError):
+            detail = (error.stderr or error.stdout or b"").decode(errors="replace").strip()
+        report.update(passed=False, failedStage=journey.stage, error=f"{error}\n{detail}".strip())
         journey.failure_evidence()
     finally:
         if journey.verified:

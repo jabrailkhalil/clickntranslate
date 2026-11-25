@@ -62,10 +62,28 @@ class SystemCapturePolicyTest {
     @Test fun startGateRejectsDuplicateAndReleasesForRetry() {
         val gate = CaptureStartGate()
         repeat(5) {
-            assertTrue(gate.acquire())
-            repeat(10) { assertFalse(gate.acquire()) }
-            gate.release()
+            val owner = Any()
+            assertTrue(gate.acquire(owner))
+            repeat(10) { assertFalse(gate.acquire(Any())) }
+            gate.release(owner)
         }
+    }
+
+    @Test fun lateDestructionOfDeniedRequestKeepsTheNextLiveDialogExclusive() {
+        val gate = CaptureStartGate()
+        val denied = CapturePermissionAdmission()
+        val retry = CapturePermissionAdmission()
+        assertTrue(gate.acquire(denied))
+        assertTrue(denied.beginProjection())
+        assertFalse(gate.acquire(retry)) // The original dialog is still live across rotation.
+        assertTrue(denied.consumeProjectionResult())
+        gate.release(denied)
+        assertTrue(gate.acquire(retry))
+        assertTrue(retry.beginProjection())
+        gate.release(denied) // Delayed onCleared of the previous host.
+        assertFalse(gate.acquire(Any()))
+        gate.release(retry)
+        assertTrue(gate.acquire(Any()))
     }
 
     @Test fun pacingIncludesCancelledOrFailedRequestsAndHandlesClockReset() {
@@ -90,8 +108,11 @@ class SystemCapturePolicyTest {
         val entry = manifest.substringAfter("android:name=\".capture.CaptureStartRequestActivity\"")
             .substringBefore("/>")
         assertFalse("must survive the system permission activity", entry.contains("noHistory"))
-        assertTrue(activity.contains("coordinator.gate.acquire()"))
-        assertTrue(activity.contains("if (ownsGate) coordinator.gate.release()"))
+        assertTrue(activity.contains("coordinator.gate.acquire(admission)"))
+        assertTrue(activity.substringAfter("fun projectionDenied()").substringBefore("suspend fun shouldShareEntireScreen")
+            .contains("coordinator.gate.release(admission)"))
+        assertTrue(activity.substringAfter("override fun onCleared()").substringBefore("internal enum class")
+            .contains("coordinator.gate.release(admission)"))
         assertTrue(activity.contains("savedState[\"projectionRequested\"] = true"))
         assertTrue(activity.contains("Activity.RESULT_OK"))
         assertTrue(activity.contains("coordinator.start(CaptureBackend.MEDIA_PROJECTION"))

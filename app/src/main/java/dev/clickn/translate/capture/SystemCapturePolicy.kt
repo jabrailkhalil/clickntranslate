@@ -2,7 +2,7 @@
 package dev.clickn.translate.capture
 
 import dev.clickn.translate.shizuku.ShizukuCapabilities
-import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 enum class CaptureStartMode { SYSTEM, SHIZUKU }
 enum class CaptureBackend { ACCESSIBILITY, MEDIA_PROJECTION, SHIZUKU }
@@ -24,9 +24,9 @@ internal fun systemCaptureBackend(sdk: Int, connected: Boolean, capable: Boolean
     else CaptureBackend.MEDIA_PROJECTION
 
 internal class CaptureStartGate {
-    private val busy = AtomicBoolean(false)
-    fun acquire(): Boolean = busy.compareAndSet(false, true)
-    fun release() { busy.set(false) }
+    private val current = AtomicReference<Any?>(null)
+    fun acquire(owner: Any): Boolean = current.compareAndSet(null, owner)
+    fun release(owner: Any) { current.compareAndSet(owner, null) }
 }
 
 /** AOSP rejects requests <=333 ms apart. Shared by every screenshotter instance. */
