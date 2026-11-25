@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="update_notification_channel">App-Updates</string>
+    <string name="update_download_progress">Update wird geladen (%1$d%%)</string>
+    <string name="update_download_failed">Der Download wurde unterbrochen. Prüfe die Verbindung und den freien Speicherplatz und versuche es erneut.</string>
+    <string name="update_invalid_apk">Dieses APK konnte für die installierte App nicht überprüft werden. Lade es erneut aus der offiziellen Veröffentlichung herunter.</string>
+    <string name="update_install_failed">Android konnte das Installationsprogramm nicht öffnen. Versuche es in den Einstellungen erneut.</string>
+    <string name="update_no_compatible">Für dieses Gerät ist kein neueres Android-Paket verfügbar.</string>
+    <string name="update_ready">Version %1$s ist bereit. Android bittet um Bestätigung des Updates.</string>
+    <string name="update_install">Update installieren</string>
+    <string name="update_error_title">Update nicht verfügbar</string>
+    <string name="update_compare_build">Für Version %1$s gibt es ein anderes APK. Lade es herunter, um die Buildnummer zu prüfen. Nur ein neuerer Build kann installiert werden.</string>
+</resources>

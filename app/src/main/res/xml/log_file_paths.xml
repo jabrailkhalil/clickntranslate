@@ -3,4 +3,5 @@
     <cache-path
         name="log_exports"
         path="log_exports/" />
+    <cache-path name="verified_update" path="app-updates/ready/" />
 </paths>

@@ -70,7 +70,7 @@ class CatalystAlertDialogTest {
             Case(
                 name = "main",
                 path = "src/main/java/dev/clickn/translate/ui/MainScreen.kt",
-                expectedSharedDialogCalls = 5,
+                expectedSharedDialogCalls = 7,
             ),
             Case(
                 name = "logs",
@@ -103,6 +103,20 @@ class CatalystAlertDialogTest {
                 Regex("""\bAlertDialog\s*\(""").containsMatchIn(source),
             )
         }
+    }
+
+    @Test
+    fun updateDownloadKeepsBackgroundAndCancellationDistinctFromInstallation() {
+        val source = sourceFile("src/main/java/dev/clickn/translate/ui/MainScreen.kt").readText()
+        val download = source.substringAfter("is dev.clickn.translate.update.UpdateViewModel.State.Downloading -> CatalystAlertDialog(")
+            .substringBefore("is dev.clickn.translate.update.UpdateViewModel.State.Ready")
+        assertTrue(download.contains("LinearProgressIndicator("))
+        assertTrue(download.contains("onClick = onDismiss"))
+        assertTrue(download.contains("onClick = onCancel"))
+        val ready = source.substringAfter("is dev.clickn.translate.update.UpdateViewModel.State.Ready -> CatalystAlertDialog(")
+            .substringBefore("is dev.clickn.translate.update.UpdateViewModel.State.Failed")
+        assertTrue(ready.contains("onInstall(state.apk)"))
+        assertTrue(ready.contains("onClick = onDismiss"))
     }
 
     @Test

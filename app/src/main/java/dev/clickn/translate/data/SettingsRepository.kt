@@ -595,7 +595,7 @@ class SettingsRepository internal constructor(
         source: Settings? = null,
     ): TranslationPreset {
         require(!TranslationPresetCatalog.isBuiltIn(preset.id))
-        updateWithPreferences { current, prefs ->
+        updateWithPreferences(explicitTranslationChoice = true) { current, prefs ->
             prefs.rememberCredentials(preset.id, source ?: current)
             val next = preset.applyTo(current).copy(
                 translationPresets = TranslationPresetCatalog.upsertCustom(current.translationPresets, preset),
@@ -626,9 +626,9 @@ class SettingsRepository internal constructor(
 
     suspend fun applyTranslationPreset(id: String, presetToSave: TranslationPreset? = null): Settings? {
         var found = false
-        val committed = updateWithPreferences(readBack = true) { current, prefs ->
+        val committed = updateWithPreferences(readBack = true, explicitTranslationChoice = true) { current, prefs ->
             if (TranslationPresetCatalog.find(current.translationPresets, id) == null) {
-                return@updateWithPreferences current
+                return@updateWithPreferences null
             }
             val prepared = if (presetToSave != null && !TranslationPresetCatalog.isBuiltIn(presetToSave.id)) {
                 prefs.rememberCredentials(presetToSave.id, current)
@@ -705,7 +705,7 @@ class SettingsRepository internal constructor(
                         decoded != null && decoded == secretCodec.decodeStored(expected)
                     } else false
                 }
-                TranslationSelectionRevision.advanceIfChanged(prefs, before, prefs.toSettings())
+                TranslationSelectionRevision.record(prefs, before, prefs.toSettings())
             }
             Unit
         }
@@ -741,6 +741,11 @@ class SettingsRepository internal constructor(
         updateWithPreferences { current, _ -> transform(current) }
     }
 
+    /** A confirmed choice supersedes pending model activation even when the value is already selected. */
+    internal suspend fun selectTranslation(transform: (Settings) -> Settings) {
+        updateWithPreferences(explicitTranslationChoice = true) { current, _ -> transform(current) }
+    }
+
     internal suspend fun updateTranslationSelectionIfUnchanged(
         expected: TranslationSelectionSnapshot,
         requested: Settings,
@@ -752,20 +757,25 @@ class SettingsRepository internal constructor(
                     sourceLang = requested.sourceLang,
                     targetLang = requested.targetLang,
                 )
-            } else current
+            } else null
         }
     }
 
     private suspend fun updateWithPreferences(
         readBack: Boolean = false,
         rollback: SettingsImportRollback? = null,
-        transform: (Settings, MutablePreferences) -> Settings,
+        explicitTranslationChoice: Boolean = false,
+        transform: (Settings, MutablePreferences) -> Settings?,
     ): Settings = withContext(Dispatchers.IO) {
         var committed: Settings? = null
         settingsStore.edit { prefs ->
             val beforeImport = if (rollback != null) prefs.asMap().toMap() else null
             val current = prefs.toSettings()
             val requested = transform(current, prefs)
+            if (requested == null) {
+                committed = current
+                return@edit
+            }
             val languageSafe = if (
                 translationLanguageCodesConflict(requested.sourceLang, requested.targetLang)
             ) {
@@ -1011,7 +1021,7 @@ class SettingsRepository internal constructor(
             committed = if (readBack) prefs.toSettings() else next
             if (beforeImport != null) rollback?.record(beforeImport, prefs.asMap().toMap())
             // Checkpoints compensate setting values; they must never rewind selection ownership.
-            TranslationSelectionRevision.advanceIfChanged(prefs, current, next)
+            TranslationSelectionRevision.record(prefs, current, next, explicitTranslationChoice)
         }
         requireNotNull(committed)
     }

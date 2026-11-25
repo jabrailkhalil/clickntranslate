@@ -276,11 +276,13 @@ class MobileViewModel @Inject constructor(
 
     fun update(transform: (Settings) -> Settings) = viewModelScope.launch { repo.update(transform) }
 
+    fun selectTranslation(transform: (Settings) -> Settings) = viewModelScope.launch { repo.selectTranslation(transform) }
+
     private val providerSaves = ProviderSaveCoordinator(viewModelScope)
     internal val providerSaveState = providerSaves.status
 
     internal fun saveProvider(transform: (Settings) -> Settings) = providerSaves.save {
-        repo.update(transform)
+        repo.selectTranslation(transform)
         resetTranslation()
     }
 

@@ -21,7 +21,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -54,7 +53,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -311,26 +309,7 @@ fun MainScreen(
     }
     // dialog 必须挂在 MainScreen 顶层，否则用户没滚到"关于"卡看不到自动检测的弹窗。
     // 0.3.0 及之前 dialog 只在 AboutContent 内挂载，导致"自动检测确实跑了但用户感觉没反应"。
-    UpdateResultDialog(
-        state = topUpdateState,
-        onDismiss = { updateVm.reset() },
-        onOpenRelease = { url ->
-            runCatching {
-                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
-                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                context.startActivity(intent)
-            }
-            updateVm.reset()
-        },
-        onSkipVersion = { v -> updateVm.skipVersion(v) }
-    )
-
-    // 自动检查中的全屏 Loading 遮罩。VM 内有 600ms 最小展示，保证用户来得及看见。
-    // 半透明 scrim + clickable 拦截点击防止用户瞎点；fillMaxSize 覆盖整屏（Dialog 例外，
-    // Dialog 在另一窗口层之上，不会被这个遮罩盖住）。
-    if (autoChecking) {
-        AutoUpdateCheckOverlay()
-    }
+    ReleaseUpdateHost(updateVm)
 
     // Shizuku 就绪时默认选 Shizuku（用户未手动切换过的前提下）。
     // 进入页面时 shizukuAvail 还在初始 NOT_INSTALLED，等 ON_RESUME 探测完才真实；
@@ -1010,7 +989,7 @@ private fun AboutContent(
         onClick = {
             if (AppBrand.updatesEnabled) updateVm.check()
             else runCatching {
-                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(AppBrand.WEBSITE_URL)))
+                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(UpdateChecker.RELEASE_PAGE_URL)))
             }
         },
         modifier = Modifier.fillMaxWidth()
@@ -1219,11 +1198,44 @@ private fun SharePromptDialog(
 }
 
 @Composable
+internal fun ReleaseUpdateHost(updateVm: dev.clickn.translate.update.UpdateViewModel = hiltViewModel()) {
+    val context = LocalContext.current
+    val state by updateVm.state.collectAsState()
+    val installer = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {}
+    val permission = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        val ready = updateVm.state.value as? dev.clickn.translate.update.UpdateViewModel.State.Ready
+        if (ready != null && context.packageManager.canRequestPackageInstalls()) {
+            updateVm.install(ready.apk) { installer.launch(it) }
+        }
+    }
+    LaunchedEffect(updateVm) { updateVm.autoCheckIfDue() }
+    UpdateResultDialog(
+        state = state, onDismiss = updateVm::reset, onSkipVersion = updateVm::skipVersion,
+        onDownload = updateVm::download, onCancel = updateVm::cancelDownload, onRetry = updateVm::retry,
+        onInstall = { apk ->
+            if (context.packageManager.canRequestPackageInstalls()) updateVm.install(apk) { installer.launch(it) }
+            else runCatching {
+                permission.launch(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}")))
+            }.onFailure { Toast.makeText(context, R.string.update_install_failed, Toast.LENGTH_LONG).show() }
+        },
+        onOpenRelease = { address ->
+            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(address)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                .onFailure { Toast.makeText(context, R.string.setup_settings_unavailable, Toast.LENGTH_SHORT).show() }
+            updateVm.reset()
+        },
+    )
+}
+
+@Composable
 private fun UpdateResultDialog(
     state: dev.clickn.translate.update.UpdateViewModel.State,
     onDismiss: () -> Unit,
     onOpenRelease: (String) -> Unit,
-    onSkipVersion: (String) -> Unit = {}
+    onSkipVersion: (String) -> Unit,
+    onDownload: (dev.clickn.translate.update.ReleaseApk) -> Unit,
+    onInstall: (dev.clickn.translate.update.ReleaseApk) -> Unit,
+    onCancel: () -> Unit,
+    onRetry: () -> Unit,
 ) {
     when (state) {
         is dev.clickn.translate.update.UpdateViewModel.State.Loaded -> {
@@ -1235,7 +1247,8 @@ private fun UpdateResultDialog(
                 title = {
                     Text(
                         text = stringResource(
-                            if (info.hasUpdate) R.string.update_dialog_title_new
+                            if (info.compareBuild || info.noCompatiblePackage) R.string.update_btn_check
+                            else if (info.hasUpdate) R.string.update_dialog_title_new
                             else R.string.update_dialog_title_uptodate
                         ),
                         style = MaterialTheme.typography.titleLarge,
@@ -1245,7 +1258,8 @@ private fun UpdateResultDialog(
                 text = {
                     Column {
                         Text(
-                            text = stringResource(
+                            text = if (info.compareBuild) stringResource(R.string.update_compare_build, info.currentVersion)
+                            else if (info.noCompatiblePackage) stringResource(R.string.update_no_compatible) else stringResource(
                                 R.string.update_dialog_versions_format,
                                 info.currentVersion,
                                 info.latestVersion,
@@ -1253,6 +1267,8 @@ private fun UpdateResultDialog(
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        info.apk?.let { Text(android.text.format.Formatter.formatFileSize(LocalContext.current, it.bytes),
+                            style = MaterialTheme.typography.bodySmall) }
                         if (info.hasUpdate && !info.changelog.isNullOrBlank()) {
                             Text(
                                 text = info.changelog,
@@ -1270,8 +1286,7 @@ private fun UpdateResultDialog(
                 confirmButton = {
                     if (info.hasUpdate) {
                         Button(onClick = {
-                            // 有 APK 直链就走直链让浏览器 / 系统下载器直接下；否则跳 release 页
-                            onOpenRelease(info.apkUrl ?: info.releaseUrl)
+                            info.apk?.let(onDownload)
                         }) { Text(stringResource(R.string.update_dialog_btn_download)) }
                     } else {
                         Button(onClick = onDismiss) {
@@ -1294,21 +1309,37 @@ private fun UpdateResultDialog(
                 } else null
             )
         }
+        is dev.clickn.translate.update.UpdateViewModel.State.Downloading -> CatalystAlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text("ClicknTranslate ${state.apk.version}") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(R.string.update_download_progress, state.percent))
+                    LinearProgressIndicator(progress = { state.percent / 100f }, modifier = Modifier.fillMaxWidth())
+                }
+            },
+            confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.update_dialog_btn_close)) } },
+            dismissButton = { TextButton(onClick = onCancel) { Text(stringResource(R.string.model_download_cancel)) } },
+        )
+        is dev.clickn.translate.update.UpdateViewModel.State.Ready -> CatalystAlertDialog(
+            onDismissRequest = onDismiss, title = { Text(stringResource(R.string.update_dialog_title_new)) },
+            text = { Text(stringResource(R.string.update_ready, state.apk.version)) },
+            confirmButton = { Button(onClick = { onInstall(state.apk) }) { Text(stringResource(R.string.update_install)) } },
+            dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.update_dialog_btn_later)) } },
+        )
         is dev.clickn.translate.update.UpdateViewModel.State.Failed -> {
             CatalystAlertDialog(
                 onDismissRequest = onDismiss,
-                title = { Text(stringResource(R.string.update_dialog_title_failed)) },
+                title = { Text(stringResource(R.string.update_error_title)) },
                 text = {
-                    Text(stringResource(R.string.update_dialog_failed_format, state.errorMessage))
+                    Text(state.errorMessage)
                 },
                 confirmButton = {
-                    TextButton(onClick = {
-                        onOpenRelease(dev.clickn.translate.update.UpdateChecker.RELEASE_PAGE_URL)
-                    }) { Text(stringResource(R.string.update_dialog_btn_open_release)) }
+                    Button(onClick = onRetry) { Text(stringResource(R.string.model_download_retry)) }
                 },
                 dismissButton = {
-                    TextButton(onClick = onDismiss) {
-                        Text(stringResource(R.string.update_dialog_btn_close))
+                    TextButton(onClick = { onOpenRelease(UpdateChecker.RELEASE_PAGE_URL) }) {
+                        Text(stringResource(R.string.update_dialog_btn_open_release))
                     }
                 }
             )
@@ -2516,34 +2547,6 @@ private fun ActionCard(
                 fontWeight = FontWeight.SemiBold
             )
             content()
-        }
-    }
-}
-
-/**
- * 自动检查更新时的全屏 Loading 遮罩：半透明 scrim + 中央 spinner + 「检查更新…」文案。
- * - `clickable` 但 indication=null + 空 onClick 用来吞掉点击事件，防止用户在遮罩期间瞎点底下控件。
- * - 不挡 [AlertDialog]：Dialog 是独立 Window 层，会盖在这个遮罩之上。
- */
-@Composable
-private fun AutoUpdateCheckOverlay() {
-    val source = remember { MutableInteractionSource() }
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.45f))
-            .clickable(interactionSource = source, indication = null) { /* 吞点击 */ },
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            CircularProgressIndicator(color = Color.White)
-            Text(
-                text = stringResource(R.string.update_auto_checking),
-                color = Color.White
-            )
         }
     }
 }

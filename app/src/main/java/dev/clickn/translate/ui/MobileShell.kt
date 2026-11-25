@@ -83,6 +83,8 @@ fun MobileShell(
     viewModel: MobileViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
+    val updater: dev.clickn.translate.update.UpdateViewModel = hiltViewModel()
+    ReleaseUpdateHost(updater)
     val settings by viewModel.settings.collectAsState()
     val translation by viewModel.translation.collectAsState()
     val history by viewModel.history.collectAsState()
@@ -218,7 +220,7 @@ fun MobileShell(
                         onSource = { sheet = "source" }, onTarget = { sheet = "target" },
                         onSwap = { if (current.sourceLang != "auto") {
                             viewModel.resetTranslation()
-                            viewModel.update { it.copy(sourceLang = current.targetLang, targetLang = current.sourceLang) }
+                            viewModel.selectTranslation { it.copy(sourceLang = current.targetLang, targetLang = current.sourceLang) }
                         } },
                         onProvider = ::openService,
                         onStart = {
@@ -238,7 +240,7 @@ fun MobileShell(
                         onInput = ::editInput, onSource = { sheet = "source" }, onTarget = { sheet = "target" },
                         onSwap = { if (current.sourceLang != "auto") {
                             viewModel.resetTranslation()
-                            viewModel.update { it.copy(sourceLang = current.targetLang, targetLang = current.sourceLang) }
+                            viewModel.selectTranslation { it.copy(sourceLang = current.targetLang, targetLang = current.sourceLang) }
                         } },
                         onProvider = ::openService,
                         onTranslate = { if (translation.busy) viewModel.resetTranslation() else if (preflight(current, false)) viewModel.translate(input) },
@@ -251,7 +253,7 @@ fun MobileShell(
                     MobileTab.SETTINGS -> SettingsHub(current, onProvider = ::openService,
                         onAppearance = { sheet = "appearance" }, onLanguage = { sheet = "language" },
                         onAdvanced, onGlossary, onDictionaries, onLogs, onCapture = { sheet = "capture" }, onIcon = { sheet = "icon" }, onOffline = { sheet = "offline" },
-                        onFloating = { sheet = "floating" },
+                        onFloating = { sheet = "floating" }, updater = updater,
                         readiness = { MobileReadinessPanel(readinessItems) { sheet = "readiness" } })
                 }
             }
@@ -268,7 +270,7 @@ fun MobileShell(
                     onSelect = { code ->
                         val source = sheet == "source"
                         viewModel.resetTranslation()
-                        viewModel.update { mobileLanguagePair(it, source, code) }
+                        viewModel.selectTranslation { mobileLanguagePair(it, source, code) }
                         sheet = ""
                     })
                 "services" -> ServicesSheet(current.translatorEngine, current.targetLang) {
@@ -309,7 +311,7 @@ fun MobileShell(
     history.entries.firstOrNull { it.id == historyEntryId }?.let { entry ->
         HistoryEntryDialog(entry, onDismiss = { historyEntryId = null }, onUseSource = {
             editInput(entry.source)
-            viewModel.update { it.copy(sourceLang = entry.from, targetLang = entry.to) }
+            viewModel.selectTranslation { it.copy(sourceLang = entry.from, targetLang = entry.to) }
             tabName = MobileTab.TEXT.name
             historyEntryId = null
         })
@@ -500,7 +502,7 @@ internal fun HistoryWorkspace(state: TextHistoryState, onImages: () -> Unit, onC
 @Composable
 internal fun SettingsHub(settings: Settings, onProvider: () -> Unit, onAppearance: () -> Unit, onLanguage: () -> Unit,
     onAdvanced: () -> Unit, onGlossary: () -> Unit, onDictionaries: () -> Unit, onLogs: () -> Unit, onCapture: () -> Unit = {}, onIcon: () -> Unit = {}, onOffline: () -> Unit = {}, onFloating: () -> Unit = {},
-    readiness: @Composable () -> Unit = {}) {
+    updater: dev.clickn.translate.update.UpdateViewModel? = null, readiness: @Composable () -> Unit = {}) {
     val context = LocalContext.current
     val capture by CaptureStartPreference.mode.collectAsState()
     fun browse(url: String) { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
@@ -522,10 +524,25 @@ internal fun SettingsHub(settings: Settings, onProvider: () -> Unit, onAppearanc
         item { SettingsRow(Icons.AutoMirrored.Outlined.LibraryBooks, stringResource(R.string.mobile_dictionaries), "", onDictionaries) }
         item { SettingsRow(Icons.Outlined.BugReport, stringResource(R.string.mobile_logs), "", onLogs) }
         item { Spacer(Modifier.height(8.dp)); SectionLabel(R.string.mobile_about) }
+        item {
+            val task = updater?.transfer?.collectAsState()?.value
+            val status = updater?.state?.collectAsState()?.value
+            val subtitle = when (val current = task) {
+                is dev.clickn.translate.update.UpdateViewModel.State.Downloading -> stringResource(R.string.update_download_progress, current.percent)
+                is dev.clickn.translate.update.UpdateViewModel.State.Ready -> stringResource(R.string.update_ready, current.apk.version)
+                else -> if (status is dev.clickn.translate.update.UpdateViewModel.State.Checking) stringResource(R.string.update_btn_checking)
+                    else "${stringResource(R.string.mobile_version)} ${BuildConfig.VERSION_NAME}"
+            }
+            SettingsRow(Icons.Outlined.SystemUpdate, stringResource(if (AppBrand.updatesEnabled) R.string.update_btn_check else R.string.brand_downloads_label),
+                subtitle, {
+                    if (AppBrand.updatesEnabled && updater != null) updater.check()
+                    else runCatching { browse(dev.clickn.translate.update.UpdateChecker.RELEASE_PAGE_URL) }.onFailure {
+                        android.widget.Toast.makeText(context, R.string.setup_settings_unavailable, android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                })
+        }
         item { SettingsRow(Icons.Outlined.Public, stringResource(R.string.mobile_website), "clickn.dev", { browse(AppBrand.WEBSITE_URL) }) }
         item { SettingsRow(Icons.AutoMirrored.Outlined.Chat, stringResource(R.string.mobile_community), "Telegram", { browse(AppBrand.COMMUNITY_URL) }) }
-        item { Text("${stringResource(R.string.mobile_version)} ${BuildConfig.VERSION_NAME}",
-            Modifier.fillMaxWidth().padding(vertical = 16.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
 }
 

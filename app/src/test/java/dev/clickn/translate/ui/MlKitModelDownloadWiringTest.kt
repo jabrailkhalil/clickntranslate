@@ -7,6 +7,25 @@ import org.junit.Test
 
 class MlKitModelDownloadWiringTest {
     @Test
+    fun confirmingAPairOrProviderUsesTheRevisionCheckedByTheDownload() {
+        for (path in listOf("ui/MobileShell.kt", "ui/MobileSetupScreen.kt")) {
+            assertTrue(path, source(path).contains("viewModel.selectTranslation { mobileLanguagePair("))
+        }
+        val viewModel = source("ui/MobileViewModel.kt")
+        assertTrue(viewModel.substringAfter("fun saveProvider(").substringBefore("fun translate(")
+            .contains("repo.selectTranslation(transform)"))
+        assertTrue(viewModel.contains("activate = repo::updateTranslationSelectionIfUnchanged"))
+    }
+
+    @Test
+    fun offlineLibraryRetainsBothDraftLanguagesDuringActivityRecreation() {
+        val sheet = source("ui/OfflineLibrarySheet.kt")
+        for (language in listOf("source", "target")) {
+            assertTrue(language, sheet.contains("var $language by rememberSaveable"))
+        }
+    }
+
+    @Test
     fun pipeline_tableDriven_settingsQuickDownloadAndWelcomeShareSessionAndFeedback() {
         val screen = source("ui/SettingsScreen.kt")
         val onboarding = source("onboarding/OnboardingScreen.kt")

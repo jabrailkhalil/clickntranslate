@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="update_notification_channel">Application updates</string>
+    <string name="update_download_progress">Downloading update (%1$d%%)</string>
+    <string name="update_download_failed">The download stopped. Check your connection and free space, then try again.</string>
+    <string name="update_invalid_apk">This APK could not be verified for the installed application. Download it again from the official release.</string>
+    <string name="update_install_failed">Android could not open the installer. You can try again from Settings.</string>
+    <string name="update_no_compatible">No newer Android package is available for this device.</string>
+    <string name="update_ready">Version %1$s is ready. Android will ask you to confirm the update.</string>
+    <string name="update_install">Install update</string>
+    <string name="update_error_title">Update unavailable</string>
+    <string name="update_compare_build">A different APK is available for version %1$s. You can download it to check its build number. Android will only install a newer build.</string>
+</resources>

@@ -13,6 +13,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotSame
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -84,7 +85,7 @@ class SettingsSelectionRevisionIntegrationTest {
                 targetLang = "fr",
             )
             repository.update { it.copy(overlayAlpha = 0.42f, apiTimeoutSeconds = 43) }
-            // Effective value changes own the revision; repeated same-value intent is a separate contract.
+            // A generic save can write unchanged fields along with unrelated settings.
             repository.update { it.copy(sourceLang = baseline.settings.sourceLang) }
             assertEquals(baseline.revision, repository.selectionSnapshots.first().revision)
 
@@ -92,6 +93,67 @@ class SettingsSelectionRevisionIntegrationTest {
 
             assertEquals(requested.copy(overlayAlpha = 0.42f, apiTimeoutSeconds = 43), repository.get())
             assertEquals(baseline.revision + 1, repository.selectionSnapshots.first().revision)
+        }
+    }
+
+    @Test fun confirmingCurrentProviderOrLanguageDuringDownloadKeepsTheConfirmedSelection() = runBlocking {
+        val confirmations: List<(Settings) -> Settings> = listOf(
+            { it.copy(translatorEngine = initial.translatorEngine) },
+            { it.copy(sourceLang = initial.sourceLang) },
+            { it.copy(targetLang = initial.targetLang) },
+        )
+        for (confirm in confirmations) withRepository { repository ->
+            val original = repository.selectionSnapshots.first()
+            val requested = original.settings.copy(translatorEngine = TranslatorEngine.GOOGLE_ML_KIT)
+            val downloaded = CompletableDeferred<Unit>()
+            coroutineScope {
+                val activation = launch {
+                    downloaded.await()
+                    repository.updateTranslationSelectionIfUnchanged(original, requested)
+                }
+                repository.selectTranslation(confirm)
+                downloaded.complete(Unit)
+                activation.join()
+            }
+
+            val confirmed = repository.selectionSnapshots.first()
+            assertEquals(original.settings, confirmed.settings)
+            assertEquals(original.revision + 1, confirmed.revision)
+            repository.updateTranslationSelectionIfUnchanged(confirmed, requested)
+            assertEquals(requested, repository.get())
+            assertEquals(confirmed.revision + 1, repository.selectionSnapshots.first().revision)
+        }
+    }
+
+    @Test fun selectingADifferentValueAdvancesTheRevisionOnce() = runBlocking {
+        withRepository { repository ->
+            val original = repository.selectionSnapshots.first()
+            repository.selectTranslation { it.copy(targetLang = "fr") }
+            val chosen = repository.selectionSnapshots.first()
+            assertEquals(original.settings.copy(targetLang = "fr"), chosen.settings)
+            assertEquals(original.revision + 1, chosen.revision)
+        }
+    }
+
+    @Test fun reapplyingCurrentPresetOwnsSelectionButMissingPresetDoesNot() = runBlocking {
+        withRepository { repository ->
+            val original = repository.selectionSnapshots.first()
+            val preset = TranslationPresetCatalog.fromSettings("custom_online", "Online", "Web", original.settings)
+            repository.saveTranslationPreset(preset)
+            val saved = repository.selectionSnapshots.first()
+            assertEquals(original.revision + 1, saved.revision)
+
+            assertNull(repository.applyTranslationPreset("missing"))
+            assertEquals(saved, repository.selectionSnapshots.first())
+            repository.applyTranslationPreset(preset.id)
+            repository.updateTranslationSelectionIfUnchanged(saved, saved.settings.copy(
+                translatorEngine = TranslatorEngine.GOOGLE_ML_KIT,
+            ))
+
+            val confirmed = repository.selectionSnapshots.first()
+            assertEquals(saved.revision + 1, confirmed.revision)
+            assertEquals(initial.translatorEngine, confirmed.settings.translatorEngine)
+            assertEquals(preset.id, confirmed.settings.activeTranslationPresetId)
         }
     }
 

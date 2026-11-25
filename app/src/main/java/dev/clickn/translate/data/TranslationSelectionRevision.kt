@@ -20,8 +20,9 @@ internal object TranslationSelectionRevision {
         before.translatorEngine == after.translatorEngine &&
             before.sourceLang == after.sourceLang && before.targetLang == after.targetLang
 
-    fun advanceIfChanged(preferences: MutablePreferences, before: Settings, after: Settings) {
-        // This records effective value changes, not repeated same-value UI intent.
-        if (!sameSelection(before, after)) preferences[key] = Math.incrementExact(read(preferences))
+    fun record(preferences: MutablePreferences, before: Settings, after: Settings, explicitChoice: Boolean = false) {
+        if (explicitChoice || !sameSelection(before, after)) {
+            preferences[key] = Math.incrementExact(read(preferences))
+        }
     }
 }

@@ -25,8 +25,8 @@ class MainScreenShareTest {
             Case(
                 "latest release",
                 UpdateChecker.RELEASE_PAGE_URL,
-                "clickn.dev",
-                "",
+                "github.com",
+                "/jabrailkhalil/clickntranslate/releases/latest",
             ),
         ).forEach { case ->
             val uri = URI(case.url)

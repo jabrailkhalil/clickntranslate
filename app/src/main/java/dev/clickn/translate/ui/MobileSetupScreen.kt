@@ -141,7 +141,7 @@ fun MobileSetupScreen(onFinished: () -> Unit, onAdvanced: (String) -> Unit, firs
                         item { LanguagePair(current, { sheet = "source" }, { sheet = "target" }, {
                             if (current.sourceLang != "auto") {
                                 pairEdited = true
-                                viewModel.update { it.copy(sourceLang = current.targetLang, targetLang = current.sourceLang) }
+                                viewModel.selectTranslation { it.copy(sourceLang = current.targetLang, targetLang = current.sourceLang) }
                             }
                         }) }
                         if (!setupLanguagePairReady(current)) item {
@@ -169,7 +169,8 @@ fun MobileSetupScreen(onFinished: () -> Unit, onAdvanced: (String) -> Unit, firs
                     allowAuto = current.translatorEngine !in setOf(TranslatorEngine.MYMEMORY, TranslatorEngine.GOOGLE_ML_KIT),
                     allowedCodes = if (current.translatorEngine == TranslatorEngine.GOOGLE_ML_KIT) dev.clickn.translate.translate.MlKitLanguagePolicy.supportedLanguageTags else null) { code ->
                     pairEdited = true
-                    viewModel.update { mobileLanguagePair(it, source, code) }; sheet = ""
+                    viewModel.selectTranslation { mobileLanguagePair(it, source, code) }
+                    sheet = ""
                 }
             }
         }

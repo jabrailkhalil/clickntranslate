@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="update_notification_channel">应用更新</string>
+    <string name="update_download_progress">正在下载更新 (%1$d%%)</string>
+    <string name="update_download_failed">下载中断。请检查网络连接和可用空间，然后重试。</string>
+    <string name="update_invalid_apk">无法验证此 APK 是否适用于已安装的应用。请从官方发布页面重新下载。</string>
+    <string name="update_install_failed">Android 无法打开安装程序。请在设置中重试。</string>
+    <string name="update_no_compatible">此设备暂无更新的 Android 安装包。</string>
+    <string name="update_ready">版本 %1$s 已准备就绪。Android 将请你确认更新。</string>
+    <string name="update_install">安装更新</string>
+    <string name="update_error_title">更新不可用</string>
+    <string name="update_compare_build">版本 %1$s 有一个不同的 APK。可以下载以检查构建编号，只有更新的构建才能安装。</string>
+</resources>

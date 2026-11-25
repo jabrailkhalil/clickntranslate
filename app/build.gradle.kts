@@ -42,7 +42,8 @@ require(mangaOcrBatchSize in setOf(1, 2, 4)) {
     "mangaOcrBatchSize must be one of 1, 2, or 4"
 }
 
-val mobileReleaseApiUrl = providers.gradleProperty("mobileReleaseApiUrl").orElse("").get()
+val mobileReleaseApiUrl = providers.gradleProperty("mobileReleaseApiUrl")
+    .orElse("https://api.github.com/repos/jabrailkhalil/clickntranslate/releases/latest").get()
     .replace("\\", "\\\\").replace("\"", "\\\"")
 
 android {
@@ -56,7 +57,7 @@ android {
         manifestPlaceholders["launcherLabel"] = "Clickn"
         minSdk = 26
         targetSdk = 35
-        versionCode = 45
+        versionCode = 46
         versionName = "1.8.3"
         buildConfigField("String", "MOBILE_RELEASE_API_URL", "\"$mobileReleaseApiUrl\"")
 

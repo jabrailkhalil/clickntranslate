@@ -1,115 +1,128 @@
-// Modified for Click'n'Translate on October 3, 2026.
 package dev.clickn.translate.update
 
-import dev.clickn.translate.BuildConfig
+import android.os.Build
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.clickn.translate.AppBrand
-import javax.inject.Inject
-import javax.inject.Singleton
+import dev.clickn.translate.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import timber.log.Timber
+import java.io.IOException
+import java.io.File
+import java.security.MessageDigest
+import javax.inject.Inject
+import javax.inject.Singleton
 
-/**
- * 升级检测：调用 GitHub Releases API 拿最新 release 信息，与当前 [BuildConfig.VERSION_NAME] 比较。
- *
- * 不需要后端：完全依赖 GitHub 提供的 `api.github.com/repos/{owner}/{repo}/releases/latest`，
- * 公开 repo 不需要 token；匿名调用对每个 IP 每小时 60 次额度，对升级检测远超需求。
- *
- * 失败时（国内访问 api.github.com 不稳定 / 网络异常）由调用方 fallback 让用户手动打开
- * [RELEASE_PAGE_URL]，不报错阻塞。
- */
 @Singleton
 class UpdateChecker @Inject constructor(
-    private val httpClient: OkHttpClient,
-    private val json: Json
+    private val http: OkHttpClient, private val json: Json, @ApplicationContext private val context: Context,
 ) {
-
-    /**
-     * 调一次 API。返回 [Result] —— 成功时 [UpdateInfo]（含是否有新版本），失败时附 Throwable。
-     */
-    suspend fun checkLatest(): Result<UpdateInfo> = withContext(Dispatchers.IO) {
-        runCatching {
-            check(AppBrand.updatesEnabled) { "Mobile release feed is not configured." }
-            val req = Request.Builder()
-                .url(AppBrand.mobileReleaseApiUrl)
-                .header("Accept", "application/vnd.github+json")
-                .header("User-Agent", "ClicknTranslate/${BuildConfig.VERSION_NAME}")
-                .build()
-            httpClient.newCall(req).execute().use { resp ->
-                if (!resp.isSuccessful) error("HTTP ${resp.code}")
-                val body = resp.body?.string() ?: error("empty body")
-                val parsed = json.decodeFromString(GithubRelease.serializer(), body)
-                val latestVersion = stripV(parsed.tagName)
-                val currentVersion = BuildConfig.VERSION_NAME
-                val hasUpdate = compareSemver(latestVersion, currentVersion) > 0
-                val apkUrl = parsed.assets
-                    .firstOrNull { it.name.endsWith(".apk", ignoreCase = true) }
-                    ?.browserDownloadUrl
-                UpdateInfo(
-                    currentVersion = currentVersion,
-                    latestVersion = latestVersion,
-                    hasUpdate = hasUpdate,
-                    releaseUrl = parsed.htmlUrl,
-                    apkUrl = apkUrl,
-                    changelog = parsed.body?.takeIf { it.isNotBlank() }
-                )
-            }
-        }.onFailure { Timber.w(it, "Update check failed") }
-    }
-
-    private fun stripV(tag: String): String =
-        if (tag.startsWith("v", ignoreCase = true)) tag.substring(1) else tag
-
-    /**
-     * 简化 semver 比较：把 "0.2.0" / "1.10.3" 等按 . 分段比整数。
-     * 不支持 -alpha / -rc 等后缀（项目目前没用），有后缀时降级到字符串比较。
-     */
-    private fun compareSemver(a: String, b: String): Int {
-        val partsA = a.split('.').mapNotNull { it.toIntOrNull() }
-        val partsB = b.split('.').mapNotNull { it.toIntOrNull() }
-        if (partsA.isEmpty() || partsB.isEmpty()) return a.compareTo(b)
-        val len = maxOf(partsA.size, partsB.size)
-        for (i in 0 until len) {
-            val ai = partsA.getOrElse(i) { 0 }
-            val bi = partsB.getOrElse(i) { 0 }
-            if (ai != bi) return ai - bi
+    suspend fun checkLatest(): UpdateInfo = withContext(Dispatchers.IO) {
+        val url = AppBrand.mobileReleaseApiUrl
+        val latest = json.decodeFromString<GitHubRelease>(metadata(url))
+        resolveAndroidUpdate(latest, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE.toLong(),
+            Build.SUPPORTED_ABIS.toList()) { page ->
+            if (!url.endsWith("/releases/latest")) emptyList() else
+                json.decodeFromString<List<GitHubRelease>>(metadata(url.removeSuffix("/latest") + "?per_page=$PAGE_SIZE&page=$page"))
         }
-        return 0
     }
 
-    companion object {
-        const val RELEASE_PAGE_URL = AppBrand.WEBSITE_URL
+    /** Called only during an explicit check of an unlabelled release with the same versionName. */
+    suspend fun sameInstalledBuild(apk: ReleaseApk): Boolean = withContext(Dispatchers.IO) {
+        val prefs = context.getSharedPreferences("update_checker", Context.MODE_PRIVATE)
+        if (prefs.getString("checked_archive", null) == "${BuildConfig.VERSION_CODE}:${apk.sha256}") return@withContext true
+        val base = File(context.applicationInfo.sourceDir)
+        if (!base.isFile || base.length() != apk.bytes) return@withContext false
+        val cacheKey = "${BuildConfig.VERSION_CODE}:${base.absolutePath}:${base.length()}:${base.lastModified()}"
+        val installed = if (prefs.getString("digest_key", null) == cacheKey) prefs.getString("base_digest", null) else null
+        val hash = installed ?: runCatching {
+            val digest = MessageDigest.getInstance("SHA-256")
+            base.inputStream().buffered().use { input ->
+                val bytes = ByteArray(64 * 1024)
+                while (true) {
+                    val size = input.read(bytes)
+                    if (size < 0) break
+                    digest.update(bytes, 0, size)
+                }
+            }
+            digest.digest().hex().also { prefs.edit().putString("digest_key", cacheKey).putString("base_digest", it).apply() }
+        }.getOrNull()
+        hash == apk.sha256
     }
+
+    private fun metadata(url: String): String {
+        val request = Request.Builder().url(url).header("Accept", "application/vnd.github+json")
+            .header("User-Agent", "ClicknTranslate/" + BuildConfig.VERSION_NAME).build()
+        return http.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) throw IOException("GitHub HTTP ${response.code}")
+            val source = response.body?.source() ?: throw IOException("GitHub returned an empty response")
+            if (source.request(4L * 1024 * 1024 + 1)) throw IOException("GitHub response exceeds 4 MiB")
+            source.readUtf8()
+        }
+    }
+
+    companion object { const val RELEASE_PAGE_URL = "$RELEASES_PAGE/latest" }
 }
 
-/** API 调用结果 —— 给 UI 层用。 */
-data class UpdateInfo(
-    val currentVersion: String,
-    val latestVersion: String,
-    val hasUpdate: Boolean,
-    val releaseUrl: String,
-    /** 直链下载 APK，没有 .apk 资产时为 null（应当跳转 [releaseUrl] 让用户手动下）。 */
-    val apkUrl: String?,
-    val changelog: String?
-)
+internal const val PAGE_SIZE = 20
+private const val DOWNLOADS_START = "<!-- clickntranslate-downloads:start -->"
+private const val DOWNLOADS_END = "<!-- clickntranslate-downloads:end -->"
 
-/** GitHub Releases API 返回的 JSON 子集。kotlinx.serialization 反序列化。 */
-@Serializable
-private data class GithubRelease(
-    @SerialName("tag_name") val tagName: String,
-    @SerialName("name") val name: String? = null,
-    @SerialName("html_url") val htmlUrl: String,
-    @SerialName("body") val body: String? = null,
-    @SerialName("assets") val assets: List<GithubAsset> = emptyList()
-)
+internal fun mobileReleaseNotes(body: String?): String? {
+    if (body.isNullOrBlank()) return null
+    var offset = 0
+    val notes = buildString {
+        while (offset < body.length) {
+            val start = body.indexOf(DOWNLOADS_START, offset)
+            if (start < 0) {
+                append(body.substring(offset))
+                break
+            }
+            append(body, offset, start)
+            val end = body.indexOf(DOWNLOADS_END, start + DOWNLOADS_START.length)
+            if (end < 0) break
+            offset = end + DOWNLOADS_END.length
+        }
+    }
+    return notes.replace(DOWNLOADS_END, "").trim().take(16_000).ifBlank { null }
+}
 
-@Serializable
-private data class GithubAsset(
-    @SerialName("name") val name: String,
-    @SerialName("browser_download_url") val browserDownloadUrl: String
-)
+/** The latest desktop release can precede the most recent release that actually contains an Android APK. */
+internal fun resolveAndroidUpdate(
+    latest: GitHubRelease, current: String, code: Long, abis: List<String>, page: (Int) -> List<GitHubRelease>,
+): UpdateInfo {
+    val installed = requireNotNull(ReleasePolicy.version(current))
+    val upperBound = ReleasePolicy.version(latest.tag)?.takeUnless { latest.draft || latest.prerelease }
+    fun result(release: GitHubRelease): UpdateInfo? {
+        val version = ReleasePolicy.version(release.tag) ?: return null
+        if (upperBound != null && ReleasePolicy.compare(version, upperBound) > 0) return null
+        val apk = ReleasePolicy.select(release, abis, current, code) ?: return null
+        return UpdateInfo(current, apk.version, apk, mobileReleaseNotes(release.body))
+    }
+    result(latest)?.let { return it }
+    fun order(release: GitHubRelease) = ReleasePolicy.version(release.tag)
+        ?.takeUnless { release.draft || release.prerelease }?.let { ReleasePolicy.compare(it, installed) }
+    val latestOrder = order(latest)
+    if (latestOrder != null && latestOrder <= 0) return UpdateInfo(current, current, null)
+    var index = 1
+    var best: UpdateInfo? = null
+    var newerRelease = (latestOrder ?: 0) > 0
+    // Stop before issuing an unbounded series of GitHub requests on malformed/repeating pages.
+    val seen = mutableSetOf<String>()
+    while (true) {
+        val releases = page(index++)
+        val unseen = releases.filter { seen.add(it.tag) }
+        // Release pages use publication order, so a recently published backport may precede a later Android version.
+        for (candidate in unseen.mapNotNull(::result)) {
+            val previous = best
+            if (previous == null || ReleasePolicy.compare(ReleasePolicy.version(candidate.latestVersion)!!,
+                    ReleasePolicy.version(previous.latestVersion)!!) > 0) best = candidate
+        }
+        newerRelease = newerRelease || unseen.any { (order(it) ?: 0) > 0 }
+        if (releases.size < PAGE_SIZE || unseen.isEmpty()) break
+    }
+    return best ?: UpdateInfo(current, current, null, noCompatiblePackage = newerRelease)
+}

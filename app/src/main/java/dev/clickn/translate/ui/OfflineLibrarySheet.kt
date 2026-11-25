@@ -44,8 +44,8 @@ internal fun OfflineLibrarySheet(settings: Settings, viewModel: MobileViewModel,
     val arabicFailure = queued.any { it.state == androidx.work.WorkInfo.State.FAILED &&
         dev.clickn.translate.download.ModelDownloadWorkPolicy.specTag(arabicSpec) in it.tags }
     val initial = mobileMlKitPair(settings)
-    var source by remember { mutableStateOf(initial.sourceLang) }
-    var target by remember { mutableStateOf(initial.targetLang) }
+    var source by rememberSaveable { mutableStateOf(initial.sourceLang) }
+    var target by rememberSaveable { mutableStateOf(initial.targetLang) }
     val pair = initial.copy(sourceLang = source, targetLang = target)
     val languages = remember(locale) { MlKitLanguagePolicy.supportedLanguageTags.map { MlKitLanguagePolicy.resolveTarget(it) }.distinct().sortedBy { Locale.forLanguageTag(it).getDisplayLanguage(locale) } }
     val downloaded = models.downloadedLanguages + "en"
@@ -119,7 +119,11 @@ internal fun OfflineLibrarySheet(settings: Settings, viewModel: MobileViewModel,
                     scope.launch {
                         try {
                             // Advanced settings reads once on entry; commit the selected engine first.
-                            viewModel.update { if (engine == TranslatorEngine.LOCAL_SAKURA) it.copy(translatorEngine = engine, sourceLang = "ja", targetLang = "zh-CN") else it.copy(translatorEngine = engine) }.join()
+                            viewModel.selectTranslation {
+                                if (engine == TranslatorEngine.LOCAL_SAKURA) {
+                                    it.copy(translatorEngine = engine, sourceLang = "ja", targetLang = "zh-CN")
+                                } else it.copy(translatorEngine = engine)
+                            }.join()
                             onAdvanced("translate")
                         } finally { openingLocalModel = false }
                     }

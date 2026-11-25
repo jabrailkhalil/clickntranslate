@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="update_notification_channel">Обновления приложения</string>
+    <string name="update_download_progress">Загрузка обновления (%1$d%%)</string>
+    <string name="update_download_failed">Загрузка прервалась. Проверьте соединение и свободное место, затем повторите попытку.</string>
+    <string name="update_invalid_apk">Не удалось подтвердить подлинность или совместимость APK. Скачайте его заново из официального релиза.</string>
+    <string name="update_install_failed">Android не удалось открыть установщик. Попробуйте ещё раз в настройках приложения.</string>
+    <string name="update_no_compatible">Для этого устройства пока нет нового Android-пакета.</string>
+    <string name="update_ready">Версия %1$s готова. Android попросит подтвердить обновление.</string>
+    <string name="update_install">Установить обновление</string>
+    <string name="update_error_title">Не удалось обновить</string>
+    <string name="update_compare_build">Для версии %1$s доступен другой APK. Его можно скачать и проверить номер сборки. Установка будет доступна только для более новой сборки.</string>
+</resources>

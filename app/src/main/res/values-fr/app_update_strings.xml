@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="update_notification_channel">Mises à jour de l’application</string>
+    <string name="update_download_progress">Téléchargement de la mise à jour (%1$d%%)</string>
+    <string name="update_download_failed">Le téléchargement s’est arrêté. Vérifiez la connexion et l’espace disponible, puis réessayez.</string>
+    <string name="update_invalid_apk">Ce fichier APK n’a pas pu être vérifié pour l’application installée. Téléchargez-le à nouveau depuis la version officielle.</string>
+    <string name="update_install_failed">Android n’a pas pu ouvrir le programme d’installation. Réessayez depuis les réglages.</string>
+    <string name="update_no_compatible">Aucun nouveau paquet Android n’est disponible pour cet appareil.</string>
+    <string name="update_ready">La version %1$s est prête. Android vous demandera de confirmer la mise à jour.</string>
+    <string name="update_install">Installer la mise à jour</string>
+    <string name="update_error_title">Mise à jour indisponible</string>
+    <string name="update_compare_build">Un autre APK est disponible pour la version %1$s. Téléchargez-le pour vérifier son numéro de build. Seul un build plus récent pourra être installé.</string>
+</resources>

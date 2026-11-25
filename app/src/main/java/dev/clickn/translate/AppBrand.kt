@@ -9,5 +9,6 @@ object AppBrand {
     const val COMMUNITY_URL = "https://t.me/jabrail_digital"
 
     val mobileReleaseApiUrl: String get() = BuildConfig.MOBILE_RELEASE_API_URL
-    val updatesEnabled: Boolean get() = mobileReleaseApiUrl.isNotBlank()
+    // Preview and validation installations have different package identities.
+    val updatesEnabled: Boolean get() = BuildConfig.APPLICATION_ID == "dev.clickn.translate" && mobileReleaseApiUrl.isNotBlank()
 }
