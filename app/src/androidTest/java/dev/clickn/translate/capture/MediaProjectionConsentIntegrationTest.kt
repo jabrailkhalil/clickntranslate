@@ -4,6 +4,7 @@ import android.accessibilityservice.AccessibilityServiceInfo
 import android.app.Activity
 import android.app.ActivityManager
 import android.content.Intent
+import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.hardware.display.DisplayManager
@@ -25,6 +26,7 @@ import android.view.inspector.WindowInspector
 import android.widget.TextView
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -183,8 +185,13 @@ class MediaProjectionConsentIntegrationTest {
                     SystemClock.sleep(100)
                 } while (SystemClock.elapsedRealtime() < quietUntil)
 
-                shell("am start -W --activity-reorder-to-front -n ${context.packageName}/${MainActivity::class.java.name}")
-                waitFor("return from the launcher after the system stop") { appInFront() }
+                // MainActivity keeps its most recent Intent. ActivityScenario tracks this host by
+                // the original launcher action/category and otherwise loses its STOPPED/DESTROYED events.
+                shell("am start -W -a ${Intent.ACTION_MAIN} -c ${Intent.CATEGORY_LAUNCHER} " +
+                    "--activity-reorder-to-front -n ${context.packageName}/${MainActivity::class.java.name}")
+                waitFor("the original test activity resumes after the system stop") {
+                    appInFront() && home.state == Lifecycle.State.RESUMED
+                }
                 val restartedDisplay = grantCapture(home, "restart after system revocation")
                 assertNotEquals("Restart reused the old display", firstDisplay, restartedDisplay)
                 triggerTranslation(home, "Green door", expectResult = true)
@@ -255,6 +262,7 @@ class MediaProjectionConsentIntegrationTest {
             }
             Log.i("ProjectionConsentTest", "restart: trigger_to_bitmap_ms=${lastFrameMs.get() - startedMs} " +
                 "trigger_to_rendered_loopback_translation_ms=${SystemClock.elapsedRealtime() - startedMs}")
+            saveRestartScreenshot(translated)
         }
     }
 
@@ -294,6 +302,24 @@ class MediaProjectionConsentIntegrationTest {
         if (!view.isShown) return false
         if (view is TextView && view.text?.contains(text) == true) return true
         return view is ViewGroup && (0 until view.childCount).any { hasVisibleText(view.getChildAt(it), text) }
+    }
+
+    private fun saveRestartScreenshot(translated: String) {
+        val drawn = CountDownLatch(1)
+        instrumentation.runOnMainSync {
+            val result = WindowInspector.getGlobalWindowViews().first { hasVisibleText(it, translated) }
+            // Let the confirmed label reach the compositor before taking the fixture screenshot.
+            result.postOnAnimation { result.postOnAnimation { drawn.countDown() } }
+        }
+        assertTrue("Result window did not draw", drawn.await(5, TimeUnit.SECONDS))
+        val bitmap = requireNotNull(ui.takeScreenshot()) { "Could not capture the synthetic translation result" }
+        try {
+            File(context.filesDir, "qa-projection-restart.png").outputStream().use {
+                assertTrue("Could not encode the result PNG", bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
+            }
+        } finally {
+            bitmap.recycle()
+        }
     }
 
     private fun chooseConsent(grant: Boolean, stage: String) {

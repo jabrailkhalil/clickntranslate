@@ -51,6 +51,15 @@ class TesseractArabicOcrIntegrationTest {
             try {
                 models.download()
                 assertTrue(models.state.value.ready)
+                if (InstrumentationRegistry.getArguments().getString("stageOwnedProbe") == "true") {
+                    val input = requireNotNull(context.getExternalFilesDir("tess-probe-input"))
+                    models.withOcrModels { directory ->
+                        TesseractModelFiles.models.forEach { spec ->
+                            val name = "${spec.language}.traineddata"
+                            File(directory, "tessdata/$name").copyTo(File(input, name), overwrite = true)
+                        }
+                    }
+                }
                 val before = requests.get()
                 val blocks = engine.recognize(image, OcrEngineKind.TESSERACT_ARABIC)
                 writeFixture(image, blocks)

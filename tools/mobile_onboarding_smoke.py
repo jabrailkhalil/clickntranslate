@@ -12,6 +12,7 @@ import xml.etree.ElementTree as ET
 
 
 STEPS = ("Interface language", "Choose a theme", "Choose your companion", "Languages and translation")
+HOME_TITLE = "Understand anything."
 PERMISSION_PACKAGES = {"com.android.permissioncontroller", "com.google.android.permissioncontroller"}
 
 
@@ -91,7 +92,7 @@ class Journey:
                     return True
         return False
 
-    def screen(self, stage, expected, action=None, completed=False):
+    def screen(self, stage, expected, action=None, completed=False, skip_action_when_visible=None):
         self.stage = stage
         deadline = time.monotonic() + 60
         detail = ""
@@ -108,8 +109,9 @@ class Journey:
                        and center(node) for text in labels(node)}
             if completed and "Set up your translator" in visible:
                 raise RuntimeError("The setup wizard returned after a cold start")
-            point = action_point(tree, self.package, action) if action else None
-            if set(expected) <= visible and (action is None or point):
+            needs_tap = action is not None and skip_action_when_visible not in visible
+            point = action_point(tree, self.package, action) if needs_tap else None
+            if set(expected) <= visible and (not needs_tap or point):
                 (self.output / f"{stage}.xml").write_bytes(self.last_xml)
                 if stage in {"step-1", "step-3", "settings"}:
                     (self.output / f"{stage}.png").write_bytes(self.run("exec-out", "screencap", "-p"))
@@ -150,13 +152,14 @@ class Journey:
         for index, title in enumerate(STEPS, start=1):
             self.screen(f"step-{index}", (f"Step {index} of 4", title),
                         "Continue" if index < 4 else "Finish setup")
-        home = ("Understand anything.", "Text", "History", "Settings")
+        home = (HOME_TITLE, "Text", "History", "Settings")
         self.screen("home", home, "Settings")
         self.screen("settings", ("Offline engines and packages", "Settings"))
         self.stage = "cold-launch"
         self.run("shell", "am", "force-stop", self.package)
         self.launch()
-        self.screen("shell-after-restart", ("Screen", "Text", "History", "Settings"), "Screen", completed=True)
+        self.screen("shell-after-restart", ("Screen", "Text", "History", "Settings"), "Screen",
+                    completed=True, skip_action_when_visible=HOME_TITLE)
         self.screen("home-after-restart", home, completed=True)
         (self.output / "home-after-restart.png").write_bytes(self.run("exec-out", "screencap", "-p"))
 
