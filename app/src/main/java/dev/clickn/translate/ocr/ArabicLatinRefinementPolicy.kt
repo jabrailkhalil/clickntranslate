@@ -4,7 +4,10 @@ import kotlin.math.ceil
 import kotlin.math.floor
 
 /** CTC positions are in the visual, left-to-right crop, before Arabic logical reordering. */
-internal data class PaddleCtcToken(val text: String, val step: Int, val confidence: Float, val fathatanScore: Float = 0f)
+internal data class PaddleCtcToken(
+    val text: String, val step: Int, val confidence: Float, val fathatanScore: Float = 0f,
+    val peakConfidence: Float = confidence,
+)
 
 internal object ArabicLatinRefinementPolicy {
     data class Crop(val rawStart: Int, val rawEnd: Int, val left: Int, val right: Int,

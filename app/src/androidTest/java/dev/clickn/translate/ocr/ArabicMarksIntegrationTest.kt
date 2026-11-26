@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Rect
 import android.system.Os
 import android.text.Layout
 import android.text.StaticLayout
@@ -42,6 +43,7 @@ import okhttp3.OkHttpClient
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Test
@@ -54,6 +56,23 @@ class ArabicMarksIntegrationTest {
     private val args = InstrumentationRegistry.getArguments()
     private val root get() = File(runner.targetContext.cacheDir, "arabic-marks")
     private val version = PaddleModelVersion.V5_ARABIC
+
+    @Test fun aSecondDetachedMarkBelowAFathaPreventsShaddaRemoval() {
+        val width = 40
+        val pixels = IntArray(width * 40) { Color.WHITE }
+        for (x in 12..23) {
+            val y = 8 - (x - 12) / 2
+            pixels[y * width + x] = Color.BLACK
+            pixels[(y + 1) * width + x] = Color.BLACK
+        }
+        for (y in 18..36) pixels[y * width + 20] = Color.BLACK
+        fun clipped() = ArabicWordMarks.singleClippedStroke(pixels, width, Rect(9, 3, 30, 37),
+            x = 17f, cutY = 8f, lineHeight = 40f)
+        assertTrue(clipped())
+        for (x in 15..21) pixels[13 * width + x] = Color.BLACK
+        for (x in listOf(15, 18, 21)) pixels[12 * width + x] = Color.BLACK
+        assertFalse(clipped())
+    }
 
     private suspend fun withRepository(block: suspend (ContextWrapper, SettingsRepository, ModelFileDownloader) -> Unit) {
         assertEquals("dev.clickn.translate.debug", runner.targetContext.packageName)
@@ -80,9 +99,20 @@ class ArabicMarksIntegrationTest {
     @Test fun recognizeOwnedCards() = runBlocking {
         assumeTrue(args.getString("arabicMarks") == "true")
         val rows = JSONArray()
+        val timingPages = args.getString("arabicTimingPages") == "true"
         val inputs = runner.context.assets.open("tesseract-probe/arabic-marks.tsv").bufferedReader().useLines { lines ->
             lines.map { it.split('\t', limit = 2) }.toList()
         }
+        val darkControls = if (args.getString("arabicDarkControls") == "true") listOf(
+            "story-angel" to "ظهر مَلَك في القصة.",
+            "story-king" to "ظهر مَلِك في القصة.",
+            "story-partial" to "ظهر مَلك في القصة.",
+            "story-unmarked" to "ظهر ملك في القصة.",
+            "new-angel" to "هذا مَلَك في الحكاية.",
+            "new-king" to "هذا مَلِك في الحكاية.",
+            "true-shadda" to "مَلَّكَ الأب ابنه البيت.",
+            "true-shadda-medial" to "عَلَّمَ خالد الطالب.",
+        ) else emptyList()
         val settings = Settings(ocrEngine = OcrEngineKind.PADDLE_ONNX, paddleModelVersion = version,
             sourceLang = "ar", targetLang = "ru", mergeAdjacentBlocks = false)
         withRepository { context, repo, downloader ->
@@ -106,27 +136,53 @@ class ArabicMarksIntegrationTest {
                     }
                 } finally { image.recycle() }
             }
-            try {
+            suspend fun recordPage(id: String, style: String) {
                 val page = runner.context.assets.open("tesseract-probe/owned-arabic-screen.png").use {
                     requireNotNull(BitmapFactory.decodeStream(it))
                 }
-                record("fox", "page", "يقرأ الثعلب الصغير كتابًا عن السفر كل مساء، ويستخدم كلمة OCR لوصف التعرف على النص.", page, 1)
+                record(id, style, "يقرأ الثعلب الصغير كتابًا عن السفر كل مساء، ويستخدم كلمة OCR لوصف التعرف على النص.", page, 1)
+            }
+            try {
+                recordPage("fox", "page")
                 for ((id, source) in inputs) for (dark in listOf(false, true)) {
                     record(id, if (dark) "dark54" else "light34", source, card(source, dark))
+                }
+                for ((id, source) in darkControls) for (size in listOf(38, 54, 68)) {
+                    record(id, "navy$size", source, card(source, dark = true, size = size.toFloat(),
+                        background = Color.rgb(27, 36, 51), foreground = Color.rgb(221, 228, 238)))
+                }
+                if (timingPages) repeat(3) { index ->
+                    recordPage("page-$index", "warm")
+                    val line = "تجري الأنهار الهادئة بين الجبال وتصل إلى قرية صغيرة يسكنها أناس طيبون"
+                    record("long-$index", "warm", line, card(line, dark = true))
                 }
             } finally {
                 engine.close()
                 File(root, "ocr.json").writeText(rows.toString(2))
             }
         }
-        assertEquals(1 + inputs.size * 2, rows.length())
+        assertEquals(1 + inputs.size * 2 + darkControls.size * 3 + (if (timingPages) 6 else 0), rows.length())
         for (i in 0 until rows.length()) assertTrue(rows.getJSONObject(i).toString(), rows.getJSONObject(i).getString("observed").isNotBlank())
+        for (i in 0 until rows.length()) {
+            val row = rows.getJSONObject(i)
+            val words = row.getString("observed").split(' ')
+            val matches = when (row.getString("id")) {
+                "angel", "story-angel", "new-angel" -> "مَلَك" in words
+                "king", "story-king", "new-king" -> words.any { it.trimEnd('َ', 'ُ', 'ِ') == "مَلِك" }
+                "story-partial" -> words.any { it.trimEnd('َ', 'ُ', 'ِ') == "مَلك" }
+                "story-unmarked" -> "ملك" in words
+                else -> continue
+            }
+            assertTrue(row.toString(), matches)
+        }
     }
 
-    private fun card(source: String, dark: Boolean): Bitmap {
+    private fun card(source: String, dark: Boolean, size: Float = if (dark) 54f else 34f,
+        background: Int = if (dark) Color.rgb(23, 23, 23) else Color.WHITE,
+        foreground: Int = if (dark) Color.WHITE else Color.BLACK): Bitmap {
         val paint = TextPaint(Paint.ANTI_ALIAS_FLAG or Paint.SUBPIXEL_TEXT_FLAG).apply {
-            textSize = if (dark) 54f else 34f
-            color = if (dark) Color.WHITE else Color.BLACK
+            textSize = size
+            color = foreground
         }
         val width = kotlin.math.ceil(Layout.getDesiredWidth(source, paint).toDouble()).toInt() + 8
         val layout = StaticLayout.Builder.obtain(source, 0, source.length, paint, width)
@@ -135,7 +191,7 @@ class ArabicMarksIntegrationTest {
         check(layout.lineCount == 1)
         return Bitmap.createBitmap(width + 64, layout.height + 64, Bitmap.Config.ARGB_8888).also {
             val canvas = Canvas(it)
-            canvas.drawColor(if (dark) Color.rgb(23, 23, 23) else Color.WHITE)
+            canvas.drawColor(background)
             canvas.translate(32f, 32f)
             layout.draw(canvas)
         }

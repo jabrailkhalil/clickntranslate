@@ -110,6 +110,15 @@ class PaddleRecognitionSizingTest {
     }
 
     @Test
+    fun provisionalArabicWordsKeepTheirResolutionAndContext() {
+        assertEquals(128, PaddleRecognitionSizing.arabicWordProbeWidth(71))
+        assertEquals(192, PaddleRecognitionSizing.arabicWordProbeWidth(144))
+        assertEquals(320, PaddleRecognitionSizing.arabicWordProbeWidth(307))
+        assertEquals(512, PaddleRecognitionSizing.arabicWordProbeWidth(512))
+        assertEquals(320, PaddleRecognitionSizing.tensorWidth(PaddleModelVersion.V5_ARABIC, 71))
+    }
+
+    @Test
     fun tensorWidth_rejectsInvalidWidths_tableDriven() {
         listOf(
             "below minimum" to PaddleRecognitionSizing.MIN_WIDTH - 1,

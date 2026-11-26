@@ -18,4 +18,24 @@ class ArabicWordMarksTest {
         assertNull(ArabicWordMarks.addition("قلمًا", reading("قلمًَا")))
         assertNull(ArabicWordMarks.addition("مَلك", reading("مَلَكٌ")))
     }
+
+    @Test fun usesThePeakOfTheSameCollapsedVowelWithoutChangingItsAlignment() {
+        val word = "مَلَك"
+        val original = reading(word)
+        val vowelIndex = 1 // second fatha in visual (left-to-right) order
+        val uncertain = original.ctcTokens.toMutableList()
+        uncertain[vowelIndex] = uncertain[vowelIndex].copy(confidence = .51f, peakConfidence = .53f)
+        assertNull(ArabicWordMarks.addition("مَلك", original.copy(ctcTokens = uncertain)))
+        uncertain[vowelIndex] = uncertain[vowelIndex].copy(peakConfidence = .86f)
+        assertEquals(word, ArabicWordMarks.addition("مَلك", original.copy(ctcTokens = uncertain)))
+        assertNull(ArabicWordMarks.addition("مَلِك", original.copy(ctcTokens = uncertain)))
+    }
+
+    @Test fun anOrphanVowelCanRegainItsLetterButCannotChangeTheRestOfTheWord() {
+        assertEquals("مَلَك", ArabicWordMarks.addition("َلك", reading("مَلَك")))
+        assertEquals("مَلك", ArabicWordMarks.addition("َلك", reading("مَلك")))
+        assertNull(ArabicWordMarks.addition("َلك", reading("مَلَك", .73f)))
+        assertNull(ArabicWordMarks.addition("لَك", reading("مَلَك")))
+        assertNull(ArabicWordMarks.addition("َلق", reading("مَلَك")))
+    }
 }

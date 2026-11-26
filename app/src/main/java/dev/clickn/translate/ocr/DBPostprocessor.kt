@@ -40,6 +40,39 @@ object DBPostprocessor {
 
     private data class IntPoint(val x: Int, val y: Int)
 
+    private data class PixelRun(val y: Int, val left: Int, val right: Int)
+
+    /** Consume whole horizontal runs. The one-pixel overlap on adjacent rows preserves 8-connectivity. */
+    private fun takeComponent(ink: Array<BooleanArray>, x: Int, y: Int): List<PixelRun> {
+        val runs = ArrayList<PixelRun>()
+        fun takeRun(rowIndex: Int, seed: Int): Int {
+            val row = ink[rowIndex]
+            var left = seed
+            var right = seed
+            while (left > 0 && row[left - 1]) left--
+            while (right < row.lastIndex && row[right + 1]) right++
+            row.fill(false, left, right + 1)
+            runs.add(PixelRun(rowIndex, left, right))
+            return right
+        }
+        takeRun(y, x)
+        var index = 0
+        while (index < runs.size) {
+            val run = runs[index++]
+            val start = maxOf(0, run.left - 1)
+            val end = minOf(ink[run.y].lastIndex, run.right + 1)
+            for (neighbor in maxOf(0, run.y - 1)..minOf(ink.lastIndex, run.y + 1)) {
+                if (neighbor == run.y) continue
+                var next = start
+                while (next <= end) {
+                    if (ink[neighbor][next]) next = takeRun(neighbor, next)
+                    next++
+                }
+            }
+        }
+        return runs
+    }
+
     /**
      * 主入口：从 prob_map 提取所有候选 Quad（已映射到原图坐标系）。
      *
@@ -65,37 +98,24 @@ object DBPostprocessor {
     ): List<Quad> {
         val h = probMap.size
         val w = probMap[0].size
-        val visited = Array(h) { BooleanArray(w) }
+        val ink = Array(h) { y -> BooleanArray(w) { x -> !(probMap[y][x] < binThresh) } }
         val result = mutableListOf<Quad>()
         val splitIndices = mutableSetOf<Int>()
         val maxUnclip = (minOf(w, h) * 0.05f).coerceAtLeast(4f)
 
         for (y0 in 0 until h) {
             for (x0 in 0 until w) {
-                if (visited[y0][x0] || probMap[y0][x0] < binThresh) continue
-                val component = mutableListOf<IntPoint>()
-                val boundary = mutableListOf<IntPoint>()
-                val stack = ArrayDeque<IntArray>()
-                stack.addLast(intArrayOf(x0, y0))
-                visited[y0][x0] = true
-                while (stack.isNotEmpty()) {
-                    val (cx, cy) = stack.removeLast()
-                    component.add(IntPoint(cx, cy))
-                    // 该点 8-邻接里有任何超出 binThresh 的"边界（与背景接触）"点，则记入 boundary
-                    var isBoundary = false
-                    for ((dx, dy) in NEIGHBORS_8) {
-                        val nx = cx + dx; val ny = cy + dy
-                        if (nx !in 0 until w || ny !in 0 until h) { isBoundary = true; continue }
-                        if (probMap[ny][nx] < binThresh) { isBoundary = true; continue }
-                        if (!visited[ny][nx]) {
-                            visited[ny][nx] = true
-                            stack.addLast(intArrayOf(nx, ny))
-                        }
-                    }
-                    if (isBoundary) boundary.add(IntPoint(cx, cy))
+                if (!ink[y0][x0]) continue
+                val runs = takeComponent(ink, x0, y0)
+                val area = runs.sumOf { it.right - it.left + 1 }
+                if (area < 16) continue
+                // Interior pixels lie on the segment joining the two ends of their run.
+                val ends = ArrayList<IntPoint>(runs.size * 2)
+                for (run in runs) {
+                    ends.add(IntPoint(run.left, run.y))
+                    if (run.right > run.left) ends.add(IntPoint(run.right, run.y))
                 }
-                if (component.size < 16) continue
-                val hull = convexHull(if (boundary.isNotEmpty()) boundary else component)
+                val hull = convexHull(ends)
                 if (hull.size < 3) continue
                 val quad = minAreaRect(hull) ?: continue
                 val side = minOf(quad.width, quad.height)
@@ -104,9 +124,12 @@ object DBPostprocessor {
                 if (score < scoreThresh) continue
                 val partition = if (columnCutValidator != null &&
                     kotlin.math.abs(quad.p1.y - quad.p0.y) < quad.width * 0.1f
-                ) PaddleTextColumnSplitPolicy.split(
-                    probMap, component.map { it.y * w + it.x }.toIntArray(), binThresh, columnCutValidator,
-                ) else null
+                ) {
+                    val members = IntArray(area)
+                    var at = 0
+                    for (run in runs) for (x in run.left..run.right) members[at++] = run.y * w + x
+                    PaddleTextColumnSplitPolicy.split(probMap, members, binThresh, columnCutValidator)
+                } else null
                 val childSupports = partition?.members?.map { pixels ->
                     minAreaRect(convexHull(pixels.map { IntPoint(it % w, it / w) }))
                 }?.takeIf { children -> children.all { it != null && minOf(it.width, it.height) >= minSide && boxScore(probMap, it) >= scoreThresh } }
@@ -268,28 +291,28 @@ object DBPostprocessor {
         var sum = 0.0
         var count = 0
         val poly = listOf(quad.p0, quad.p1, quad.p2, quad.p3)
-        for (y in y0..y1) for (x in x0..x1) {
-            if (pointInQuad(x.toFloat() + 0.5f, y.toFloat() + 0.5f, poly)) {
-                sum += probMap[y][x]
-                count++
+        for (y in y0..y1) {
+            val sampleY = y + 0.5f
+            var left = Float.POSITIVE_INFINITY
+            var right = Float.NEGATIVE_INFINITY
+            var previous = poly.last()
+            for (current in poly) {
+                if ((current.y > sampleY) != (previous.y > sampleY)) {
+                    val x = (previous.x - current.x) * (sampleY - current.y) /
+                        (previous.y - current.y + 1e-9f) + current.x
+                    left = minOf(left, x)
+                    right = maxOf(right, x)
+                }
+                previous = current
             }
+            if (left >= right) continue
+            // Pixel centers inside the convex quad occupy [left, right), as in the ray-crossing test.
+            val start = maxOf(x0, kotlin.math.ceil(left.toDouble() - 0.5).toInt())
+            val end = minOf(x1 + 1, kotlin.math.ceil(right.toDouble() - 0.5).toInt())
+            for (x in start until end) sum += probMap[y][x]
+            count += (end - start).coerceAtLeast(0)
         }
         return if (count == 0) 0f else (sum / count).toFloat()
-    }
-
-    /** 射线法判断点是否在 4 点多边形内。 */
-    private fun pointInQuad(x: Float, y: Float, poly: List<PointF>): Boolean {
-        var inside = false
-        var j = poly.size - 1
-        for (i in poly.indices) {
-            val xi = poly[i].x; val yi = poly[i].y
-            val xj = poly[j].x; val yj = poly[j].y
-            if (((yi > y) != (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi + 1e-9f) + xi)) {
-                inside = !inside
-            }
-            j = i
-        }
-        return inside
     }
 
     /**
@@ -322,9 +345,4 @@ object DBPostprocessor {
         )
     }
 
-    private val NEIGHBORS_8 = arrayOf(
-        intArrayOf(-1, -1), intArrayOf(0, -1), intArrayOf(1, -1),
-        intArrayOf(-1, 0),                       intArrayOf(1, 0),
-        intArrayOf(-1, 1),  intArrayOf(0, 1),  intArrayOf(1, 1)
-    )
 }

@@ -9,7 +9,7 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.CancellationException
 import timber.log.Timber
 
-/** Read a partly vocalised word at two scales. Preserve every base letter and every existing mark. */
+/** Compare two crops when a detector edge can hide a vowel or truncate a detached mark. */
 internal object ArabicWordMarks {
     private const val SHORT_VOWELS = "َُِ"
     private const val MARKS = "ًٌٍَُِّْ"
@@ -17,15 +17,22 @@ internal object ArabicWordMarks {
     private fun arabicLetter(c: Char) = c.isLetter() && Character.UnicodeScript.of(c.code) == Character.UnicodeScript.ARABIC
     private fun wordToken(t: PaddleCtcToken) = t.text.singleOrNull()?.let { it in MARKS || arabicLetter(it) } == true
 
-    /** A result is eligible only when removing one short vowel recovers the original word verbatim. */
+    /** An orphan initial mark may regain its missing letter. Otherwise only one internal vowel may be added. */
     fun addition(original: String, reading: PaddleRecognitionCandidate): String? {
         val chars = reading.ctcTokens.asReversed()
         val word = reading.text
-        if (word.length != original.length + 1 || chars.size != word.length ||
+        if (word.isEmpty() || original.isEmpty() || chars.size != word.length ||
             chars.indices.any { chars[it].text.singleOrNull() != word[it] }) return null
+        val orphan = original[0] in SHORT_VOWELS
+        val anchored = if (orphan) {
+            if (!arabicLetter(word[0]) || word.getOrNull(1) != original[0] || chars[0].peakConfidence !in .8f..1f) return null
+            word[0] + original
+        } else original
+        if (orphan && word == anchored) return word
+        if (word.length != anchored.length + 1) return null
         for (i in 1 until word.lastIndex) {
             if (word[i] !in SHORT_VOWELS || !arabicLetter(word[i - 1]) || !arabicLetter(word[i + 1]) ||
-                chars[i].confidence !in .6f..1f || word.removeRange(i, i + 1) != original) continue
+                chars[i].peakConfidence !in .6f..1f || word.removeRange(i, i + 1) != anchored) continue
             return word
         }
         return null
@@ -42,11 +49,13 @@ internal object ArabicWordMarks {
     }
 
     fun refine(source: Bitmap, quad: DBPostprocessor.Quad, line: PaddleRecognitionCandidate,
-        budget: Budget, checkActive: () -> Unit, read: (Bitmap) -> PaddleRecognitionCandidate): PaddleRecognitionCandidate {
+        budget: Budget, checkActive: () -> Unit, read: (Bitmap, Boolean) -> PaddleRecognitionCandidate): PaddleRecognitionCandidate {
         if (budget.exhausted || line.orientation != PaddleCropOrientation.ORIGINAL || line.widthCapped ||
             line.ctcSteps <= 0 || line.targetWidth <= 0 || line.text.none { it in SHORT_VOWELS } ||
-            quad.height !in 22f..240f || abs(quad.p0.y - quad.p1.y) > quad.height * .16f ||
-            abs(quad.p3.y - quad.p2.y) > quad.height * .16f) return line
+            quad.height !in 22f..240f) return line
+        // Long, nearly horizontal lines can rise several pixels over their entire width.
+        val allowedRise = maxOf(quad.height * .16f, quad.width * .10f)
+        if (abs(quad.p0.y - quad.p1.y) > allowedRise || abs(quad.p3.y - quad.p2.y) > allowedRise) return line
         val tokens = line.ctcTokens
         val raw = StringBuilder(tokens.joinToString("") { it.text })
         if (arabicCtcLogicalText(raw.toString()) != line.text) return line
@@ -71,15 +80,24 @@ internal object ArabicWordMarks {
             val after = tokens.getOrNull(end)
             if (before != null && before.text != " " || after != null && after.text != " ") continue
             val word = tokens.subList(i, end).asReversed().joinToString("") { it.text }
-            if (word.length !in 3..18 || word.none { it in SHORT_VOWELS } ||
-                (0 until word.lastIndex).none { arabicLetter(word[it]) && arabicLetter(word[it + 1]) }) continue
-            val x0 = floor(before?.let { left + (it.step + .5f) * stepWidth } ?: left).toInt().coerceAtLeast(0)
-            val x1 = ceil(after?.let { left + (it.step + .5f) * stepWidth } ?: right).toInt().coerceAtMost(source.width)
+            if (word.length !in 3..18 || word.none { it in SHORT_VOWELS }) continue
+            val vowelGap = (0 until word.lastIndex).any { arabicLetter(word[it]) && arabicLetter(word[it + 1]) }
+            val shadda = word.indexOf('ّ')
+            val suspect = if (shadda >= 1 && shadda == word.lastIndexOf('ّ') &&
+                (word[shadda - 1] == 'َ' || word.getOrNull(shadda + 1) == 'َ')) {
+                tokens[end - 1 - shadda].takeIf { it.peakConfidence < .65f }
+            } else null
+            if (!vowelGap && suspect == null) continue
+            val margin = if (suspect != null) quad.height * .16f else 0f
+            val x0 = floor(before?.let { left + (it.step + .5f) * stepWidth } ?: (left - margin)).toInt().coerceAtLeast(0)
+            val x1 = ceil(after?.let { left + (it.step + .5f) * stepWidth } ?: (right + margin)).toInt().coerceAtMost(source.width)
             val width = x1 - x0
             val height = y1 - y0
-            if (width < 8 || width.toLong() * height > 130_000L || !budget.reserve()) continue
+            if (width < 8 || width.toLong() * height > 130_000L) continue
+            if (vowelGap && !budget.reserve()) continue
             try {
-                val corrected = reread(source, Rect(x0, y0, x1, y1), quad, word, checkActive, read) ?: continue
+                val shaddaX = suspect?.let { left + (it.step + .5f) * stepWidth }
+                val corrected = reread(source, Rect(x0, y0, x1, y1), quad, word, vowelGap, shaddaX, budget, checkActive, read) ?: continue
                 val offset = tokens.subList(0, i).sumOf { it.text.length }
                 raw.replace(offset, offset + word.length, corrected.reversed())
                 changed = true
@@ -93,13 +111,20 @@ internal object ArabicWordMarks {
     }
 
     private fun reread(source: Bitmap, region: Rect, quad: DBPostprocessor.Quad, word: String,
-        checkActive: () -> Unit, read: (Bitmap) -> PaddleRecognitionCandidate): String? {
+        vowelGap: Boolean, shaddaX: Float?, budget: Budget,
+        checkActive: () -> Unit, read: (Bitmap, Boolean) -> PaddleRecognitionCandidate): String? {
         checkActive()
         val width = region.width()
         val height = region.height()
         val pixels = IntArray(width * height)
         source.getPixels(pixels, 0, width, region.left, region.top, width, height)
         val bounds = inkBounds(pixels, width, height) ?: return null
+        val clippedFatha = shaddaX != null && run {
+            val t = ((shaddaX - quad.p0.x) / (quad.p1.x - quad.p0.x)).coerceIn(0f, 1f)
+            val cut = quad.p0.y + t * (quad.p1.y - quad.p0.y) - region.top
+            singleClippedStroke(pixels, width, bounds, shaddaX - region.left, cut, quad.height)
+        }
+        if (!vowelGap && (!clippedFatha || !budget.reserve())) return null
         // A second view can recover a detached mark when the detector grazes the ink.
         val edge = maxOf(1f, quad.height * .035f)
         if (region.top + bounds.top > minOf(quad.p0.y, quad.p1.y) + edge &&
@@ -111,25 +136,73 @@ internal object ArabicWordMarks {
         val first = cropBounds(tight)
         val second = cropBounds(loose)
         if (first == second) return null
-        fun observe(box: Rect): String? {
+        fun observe(box: Rect, provisional: Boolean): String? {
             checkActive()
             val image = Bitmap.createBitmap(pixels, box.top * width + box.left, width, box.width(), box.height(),
                 Bitmap.Config.ARGB_8888)
             return try {
-                val prediction = read(image)
+                val prediction = read(image, provisional)
                 checkActive()
-                addition(word, prediction)
+                if (clippedFatha && prediction.score >= .8f && prediction.text == word.replace("ّ", "")) prediction.text
+                else addition(word, prediction)
             } finally {
                 image.recycle()
             }
         }
-        val proposal = observe(first) ?: return null
-        return proposal.takeIf { observe(second) == it }
+        val proposal = observe(first, provisional = true) ?: return null
+        return proposal.takeIf { observe(second, provisional = false) == it }
     }
+
+    /** A single rising stroke cut off above a tall letter. A second detached mark below it rules this out. */
+    internal fun singleClippedStroke(pixels: IntArray, width: Int, bounds: Rect, x: Float, cutY: Float, lineHeight: Float): Boolean {
+        val top = bounds.top
+        if (top > cutY - maxOf(1f, .04f * lineHeight)) return false
+        var left = bounds.right
+        var right = bounds.left - 1
+        var y = top
+        while (y < bounds.bottom) {
+            var ink = false
+            for (col in bounds.left until bounds.right) if (luma(pixels[y * width + col]) < 128) {
+                ink = true
+                left = minOf(left, col)
+                right = maxOf(right, col)
+            }
+            if (!ink) break
+            if (++y - top > lineHeight * .2f) return false
+        }
+        val w = right - left + 1
+        val h = y - top
+        if (h < 2 || w < maxOf(5f, 1.5f * h) || w > .35f * lineHeight ||
+            abs((right + left) * .5f - x) > .25f * lineHeight || abs(cutY - y) > .18f * lineHeight) return false
+        var firstMiddle = 0f
+        var previous = 0f
+        for (col in left..right) {
+            var first = top
+            while (first < y && luma(pixels[first * width + col]) >= 128) first++
+            if (first == y) return false
+            var last = y - 1
+            while (luma(pixels[last * width + col]) >= 128) last--
+            for (row in first + 1 until last) if (luma(pixels[row * width + col]) >= 128) return false
+            val middle = (first + last) * .5f
+            if (col == left) firstMiddle = middle
+            else if (middle > previous + .5f) return false
+            previous = middle
+        }
+        if ((firstMiddle - previous) / (w - 1) !in .15f.. .85f) return false
+        val nextInk = (y until bounds.bottom).firstOrNull { row ->
+            (left..right).any { col -> luma(pixels[row * width + col]) < 128 }
+        } ?: return false
+        val stemEnd = nextInk + ceil(.32f * lineHeight).toInt()
+        if (stemEnd >= bounds.bottom) return false
+        return (left..right).any { col ->
+            (nextInk + 2..stemEnd).all { row -> luma(pixels[row * width + col]) < 128 }
+        }
+    }
+
+    private fun luma(c: Int) = ((c ushr 16 and 255) * 77 + (c ushr 8 and 255) * 150 + (c and 255) * 29) ushr 8
 
     /** Uniform screenshot backgrounds only. Keep the complete ink bounds, including detached marks. */
     private fun inkBounds(pixels: IntArray, width: Int, height: Int): Rect? {
-        fun luma(c: Int) = ((c ushr 16 and 255) * 77 + (c ushr 8 and 255) * 150 + (c and 255) * 29) ushr 8
         val bands = IntArray(16)
         for (x in 0 until width) {
             bands[luma(pixels[x]) / 16]++

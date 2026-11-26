@@ -59,11 +59,12 @@ class PaddleArabicParagraphIntegrationTest {
         }
         try {
             val download = InstrumentationRegistry.getArguments().getString("downloadModels") == "true"
-            val blocks = if (download) recognizeWithFreshPack(image, settings) else withTimeout(90_000) {
-                applicationBoundEngine().recognize(image, settings.ocrEngine, settings)
+            val (blocks, darkPair) = if (download) recognizeWithFreshPack(image, settings) else withTimeout(90_000) {
+                recognizeFixtures(applicationBoundEngine(), image, settings)
             }
             val report = JSONObject().put("fixtureOnly", true).put("model", settings.paddleModelVersion.name)
                 .put("freshVerifiedDownload", download)
+                .put("darkMinimalPair", JSONObject(darkPair))
                 .put("width", image.width).put("height", image.height).put("mergeAdjacentBlocks", false)
                 .put("blocks", JSONArray(blocks.map { block -> JSONObject().put("text", block.text)
                     .put("language", block.recognizedLanguage).put("orientation", block.layoutOrientation?.name)
@@ -73,6 +74,8 @@ class PaddleArabicParagraphIntegrationTest {
             val directory = instrumentation.targetContext.ocrFixtureOutput("paddle-arabic-qa")
             File(directory, "result.json").writeText(diagnostic)
             println(diagnostic)
+            assertTrue(diagnostic, "مَلَك" in darkPair.getValue("angel").split(' '))
+            assertTrue(diagnostic, "مَلِك" in darkPair.getValue("king").split(' '))
             assertFalse("Caller-owned fixture was recycled.\n$diagnostic", image.isRecycled)
             val arabic = blocks.filter { it.recognizedLanguage == "ar" }.sortedBy { it.boundingBox.top }
             assertEquals("Both independent Arabic paragraphs must remain whole.\n$diagnostic", 2, arabic.size)
@@ -96,7 +99,24 @@ class PaddleArabicParagraphIntegrationTest {
         } finally { if (!image.isRecycled) image.recycle() }
     }
 
-    private suspend fun recognizeWithFreshPack(image: Bitmap, settings: Settings): List<TextBlock> {
+    private suspend fun recognizeFixtures(engine: OcrEngine, page: Bitmap, settings: Settings):
+        Pair<List<TextBlock>, Map<String, String>> {
+        val blocks = engine.recognize(page, settings.ocrEngine, settings)
+        val pair = linkedMapOf<String, String>()
+        for (name in listOf("angel", "king")) {
+            val bitmap = instrumentation.context.assets.open("tesseract-probe/$name-dark54.png").use {
+                requireNotNull(BitmapFactory.decodeStream(it))
+            }
+            try {
+                pair[name] = engine.recognize(bitmap, settings.ocrEngine, settings).joinToString(" ") { it.text }
+            } finally {
+                bitmap.recycle()
+            }
+        }
+        return blocks to pair
+    }
+
+    private suspend fun recognizeWithFreshPack(image: Bitmap, settings: Settings): Pair<List<TextBlock>, Map<String, String>> {
         val app = instrumentation.targetContext
         val owned = Files.createTempDirectory(app.cacheDir.toPath(), "qa-paddle-ar-").toFile()
         val context = object : ContextWrapper(app) {
@@ -120,7 +140,7 @@ class PaddleArabicParagraphIntegrationTest {
                 installer.downloadAll(settings.paddleModelVersion).collect { if (it.done) published += it.file }
             }
             assertEquals(PaddleArabicModelSpec.files.map { it.fileName }.toSet(), published)
-            return withTimeout(90_000) { engine.recognize(image, settings.ocrEngine, settings) }
+            return withTimeout(90_000) { recognizeFixtures(engine, image, settings) }
         } finally {
             withContext(NonCancellable + Dispatchers.IO) {
                 engine.close()

@@ -106,6 +106,13 @@ internal object PaddleRecognitionSizing {
             contentWidth
         }
     }
+
+    /** Keep the full 48px-high word plus right context. Only the first, provisional word read uses this. */
+    fun arabicWordProbeWidth(contentWidth: Int): Int {
+        val standard = tensorWidth(PaddleModelVersion.V5_ARABIC, contentWidth)
+        val withContext = ((contentWidth + 31) / 32 + 1) * 32
+        return withContext.coerceIn(128, standard)
+    }
 }
 
 internal fun paddleVerticalCropRotationDegrees(width: Int, height: Int): Float? =
@@ -470,11 +477,11 @@ class PaddleOcrEngine @Inject constructor(
             System.currentTimeMillis() - fingerprintStartedAt,
         )
         val e = env ?: OrtEnvironment.getEnvironment().also { env = it }
-        val sessionOptions = OrtSession.SessionOptions().apply {
-            setIntraOpNumThreads(ortThreads)
+        OrtSession.SessionOptions().use { options ->
+            options.setIntraOpNumThreads(ortThreads)
+            detSession = e.createSession(files.det.absolutePath, options)
+            recSession = e.createSession(files.rec.absolutePath, options)
         }
-        detSession = e.createSession(files.det.absolutePath, sessionOptions)
-        recSession = e.createSession(files.rec.absolutePath, sessionOptions)
         // PaddlePaddle 官方字典内嵌在 inference.yml 的 character_dict 字段。
         keys = if (files.keys.name.endsWith(".yml") || files.keys.name.endsWith(".yaml")) {
             parseYamlDict(files.keys)
@@ -985,7 +992,7 @@ class PaddleOcrEngine @Inject constructor(
 
         try {
             val nchwStartedAtNs = SystemClock.elapsedRealtimeNanos()
-            val inputData = bitmapToNCHW(resized, DET_MEAN, DET_STD)
+            val inputData = bitmapToNCHW(resized)
             val nchwUs = InferenceTiming.elapsedUs(nchwStartedAtNs, SystemClock.elapsedRealtimeNanos())
             val nchwMs = nchwUs / 1_000L
 
@@ -1226,8 +1233,8 @@ class PaddleOcrEngine @Inject constructor(
                     val latin = ArabicLatinCropRefiner.refine(item.crop, marked, budget, checkActive) { word ->
                         recognizeCrop(word, item.orientation, session, e, runId, item.boxIndex)
                     }
-                    results[item.boxIndex] = ArabicWordMarks.refine(src, quadsByIndex.getValue(item.boxIndex), latin, wordBudget, checkActive) { word ->
-                        recognizeCrop(word, item.orientation, session, e, runId, item.boxIndex)
+                    results[item.boxIndex] = ArabicWordMarks.refine(src, quadsByIndex.getValue(item.boxIndex), latin, wordBudget, checkActive) { word, provisional ->
+                        recognizeCrop(word, item.orientation, session, e, runId, item.boxIndex, compactWordProbe = provisional)
                     }
                 }
             }
@@ -1388,7 +1395,7 @@ class PaddleOcrEngine @Inject constructor(
         val contentWidth = resized.maxOf { it.width }
         val tensorWidth = PaddleRecognitionSizing.tensorWidth(loadedVersion, contentWidth)
         return try {
-            val input = bitmapBatchToNCHW(resized, tensorWidth, REC_MEAN, REC_STD)
+            val input = bitmapBatchToNCHW(resized, tensorWidth)
             val tensor = OnnxTensor.createTensor(
                 e,
                 FloatBuffer.wrap(input),
@@ -1455,12 +1462,14 @@ class PaddleOcrEngine @Inject constructor(
         e: OrtEnvironment,
         runId: Long,
         boxIndex: Int,
+        compactWordProbe: Boolean = false,
     ): PaddleRecognitionCandidate {
         val startMs = System.currentTimeMillis()
         val resizePlan = PaddleRecognitionSizing.plan(crop.width, crop.height)
         val targetW = resizePlan.targetWidth
         val targetHeight = PaddleRecognitionSizing.TARGET_HEIGHT
-        val tensorWidth = PaddleRecognitionSizing.tensorWidth(loadedVersion, targetW)
+        val tensorWidth = if (compactWordProbe) PaddleRecognitionSizing.arabicWordProbeWidth(targetW)
+            else PaddleRecognitionSizing.tensorWidth(loadedVersion, targetW)
         val resized = if (crop.width == targetW && crop.height == targetHeight) {
             crop
         } else {
@@ -1471,7 +1480,7 @@ class PaddleOcrEngine @Inject constructor(
             val tensor = OnnxTensor.createTensor(
                 e,
                 FloatBuffer.wrap(
-                    bitmapBatchToNCHW(listOf(resized), tensorWidth, REC_MEAN, REC_STD)
+                    bitmapBatchToNCHW(listOf(resized), tensorWidth)
                 ),
                 longArrayOf(1, 3, targetHeight.toLong(), tensorWidth.toLong())
             )
@@ -1612,6 +1621,14 @@ class PaddleOcrEngine @Inject constructor(
                     else -> outOfRangeIdx++
                 }
             }
+            // A vowel can first overtake blank at modest probability and peak on the next step.
+            // Keep the original alignment and first-step score used by other refinements.
+            if (best == prev && best in 1..keys.size && loadedVersion == PaddleModelVersion.V5_ARABIC) {
+                val token = tokens.last()
+                if (bestVal > token.peakConfidence && token.text.length == 1 && token.text[0] in '\u064e'..'\u0651') {
+                    tokens[tokens.lastIndex] = token.copy(peakConfidence = bestVal)
+                }
+            }
             prev = best
         }
         if (sb.isEmpty()) {
@@ -1648,7 +1665,7 @@ class PaddleOcrEngine @Inject constructor(
      * channel 错位导致识别全错（输出 blank 或乱码英文）。Android Bitmap 默认 ARGB
      * 即 RGB 顺序，必须在这里 swap。
      */
-    private fun bitmapToNCHW(bitmap: Bitmap, mean: FloatArray, std: FloatArray): FloatArray {
+    private fun bitmapToNCHW(bitmap: Bitmap): FloatArray {
         val w = bitmap.width
         val h = bitmap.height
         val pixels = IntArray(w * h)
@@ -1657,12 +1674,9 @@ class PaddleOcrEngine @Inject constructor(
         val planeSize = w * h
         for (i in 0 until planeSize) {
             val p = pixels[i]
-            val r = ((p shr 16) and 0xFF) / 255f
-            val g = ((p shr 8) and 0xFF) / 255f
-            val b = (p and 0xFF) / 255f
-            arr[i] = (b - mean[0]) / std[0]
-            arr[planeSize + i] = (g - mean[1]) / std[1]
-            arr[2 * planeSize + i] = (r - mean[2]) / std[2]
+            arr[i] = DET_BLUE[p and 255]
+            arr[planeSize + i] = DET_GREEN[(p ushr 8) and 255]
+            arr[2 * planeSize + i] = DET_RED[(p ushr 16) and 255]
         }
         return arr
     }
@@ -1670,8 +1684,6 @@ class PaddleOcrEngine @Inject constructor(
     private fun bitmapBatchToNCHW(
         bitmaps: List<Bitmap>,
         paddedWidth: Int,
-        mean: FloatArray,
-        std: FloatArray,
     ): FloatArray {
         require(bitmaps.isNotEmpty()) { "bitmaps must not be empty" }
         val height = bitmaps.first().height
@@ -1688,13 +1700,10 @@ class PaddleOcrEngine @Inject constructor(
             for (y in 0 until height) {
                 for (x in 0 until width) {
                     val pixel = pixels[y * width + x]
-                    val r = ((pixel shr 16) and 0xFF) / 255f
-                    val g = ((pixel shr 8) and 0xFF) / 255f
-                    val b = (pixel and 0xFF) / 255f
                     val position = y * paddedWidth + x
-                    output[batchOffset + position] = (b - mean[0]) / std[0]
-                    output[batchOffset + planeSize + position] = (g - mean[1]) / std[1]
-                    output[batchOffset + 2 * planeSize + position] = (r - mean[2]) / std[2]
+                    output[batchOffset + position] = REC_CHANNEL[pixel and 255]
+                    output[batchOffset + planeSize + position] = REC_CHANNEL[(pixel ushr 8) and 255]
+                    output[batchOffset + 2 * planeSize + position] = REC_CHANNEL[(pixel ushr 16) and 255]
                 }
             }
         }
@@ -1717,10 +1726,11 @@ class PaddleOcrEngine @Inject constructor(
         private const val MIN_BOX_AREA = 16
         private const val DET_BOX_SCORE_THRESH = 0.6f
         private const val DET_UNCLIP_RATIO = 1.6f
-        private val DET_MEAN = floatArrayOf(0.485f, 0.456f, 0.406f)
-        private val DET_STD = floatArrayOf(0.229f, 0.224f, 0.225f)
-        private val REC_MEAN = floatArrayOf(0.5f, 0.5f, 0.5f)
-        private val REC_STD = floatArrayOf(0.5f, 0.5f, 0.5f)
+        private fun normalizedChannel(mean: Float, std: Float) = FloatArray(256) { (it / 255f - mean) / std }
+        private val DET_BLUE = normalizedChannel(.485f, .229f)
+        private val DET_GREEN = normalizedChannel(.456f, .224f)
+        private val DET_RED = normalizedChannel(.406f, .225f)
+        private val REC_CHANNEL = normalizedChannel(.5f, .5f)
         private val WARP_PAINT = Paint().apply {
             isAntiAlias = true
             isFilterBitmap = true

@@ -70,7 +70,10 @@ if [[ -f "$report/screen-consent.json" ]]; then
 fi
 run_tests arabic-ocr -e class dev.clickn.translate.ocr.TesseractArabicOcrIntegrationTest -e downloadModels true -e stageOwnedProbe true || failure=1
 run_tests native-page -e class dev.clickn.translate.ocr.TesseractOwnedScreenProbeTest -e tessProbe true || failure=1
-run_tests paddle-arabic -e class dev.clickn.translate.ocr.PaddleArabicParagraphIntegrationTest -e paddleArabic true -e downloadModels true || failure=1
+ocr=dev.clickn.translate.ocr
+paddle_checks="$ocr.PaddleArabicParagraphIntegrationTest,$ocr.DBPostprocessorIntegrationTest"
+paddle_checks+=",$ocr.ArabicMarksIntegrationTest#aSecondDetachedMarkBelowAFathaPreventsShaddaRemoval"
+run_tests paddle-arabic -e class "$paddle_checks" -e paddleArabic true -e downloadModels true || failure=1
 device_files=/sdcard/Android/data/dev.clickn.translate.debug/files
 for file in qa/arabic-english-ocr-result-api35.json tess-probe-result/result.json paddle-arabic-qa/result.json; do
   adb -s "$serial" pull "$device_files/$file" "$report/${file%/*}-blocks.json" || echo "OCR diagnostic unavailable: $file" >&2
