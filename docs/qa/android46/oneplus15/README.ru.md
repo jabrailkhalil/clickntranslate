@@ -27,7 +27,7 @@ GitHub Actions проверил те же исходники на Android 15. В
 
 [Страница с арабским текстом](../../../../app/src/androidTest/assets/tesseract-probe/owned-arabic-screen.png) · [Проверка повторяющихся страниц](../../../../app/src/androidTest/java/dev/clickn/translate/capture/OwnedSurfaceCaptureSoakIntegrationTest.kt) · [Проверка озвучивания](../../../../app/src/androidTest/java/dev/clickn/translate/tts/OfflineVoiceSynthesisTest.kt)
 
-Исправление огласовки в слове `كتابًا` и результаты сравнения на 57 изображениях опубликованы в отдельном отчёте. [Арабские огласовки на OnePlus 15](arabic-marks.ru.md)
+На 81 изображении проверили огласовки, в том числе различие между ангелом `مَلَك` и королём `مَلِك` на тёмном фоне. В отчёте приведены переводы Hy-MT2 и замеры времени OCR. [Арабские огласовки на OnePlus 15](arabic-marks.ru.md)
 
 ## Захват экрана и действия с выделенным текстом
 

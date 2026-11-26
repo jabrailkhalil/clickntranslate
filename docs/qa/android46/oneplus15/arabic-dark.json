@@ -1,0 +1,376 @@
+{
+  "device": "OnePlus 15, Android API 37, ARM64",
+  "hardware": "Physical phone, background test user",
+  "model": "PP-OCRv5 Arabic / ONNX Runtime CPU",
+  "baseline": "28291fa",
+  "selectedVariant": "normal",
+  "weightsSha256": {
+    "det": "a431985659dc921974177a95adcfbb90fd9e51989a5e04d70d0b75f597b6e61d",
+    "rec": "799113ebf267fbe742deb99eb36e8d42c9ddc5291ceacf92add41b4d52a59110",
+    "dictionary": "21368419e6c016c31db55d316d59e11c128e1913e6e6fe10287084710043d3a6"
+  },
+  "variants": {
+    "no-word-check": "28291fa with the auxiliary word checks disabled",
+    "baseline": "unmodified 28291fa",
+    "quiet": "corrected recognition, worker spinning disabled",
+    "normal": "corrected recognition, runtime default spinning",
+    "grouped": "same as normal, combining adjacent small recognizer batches with identical padding"
+  },
+  "localTranslator": "Hy-MT2-1.8B-Q4_K_M, Arabic to Russian, production decoding, translation cache disabled; input order changed across four independent runs",
+  "controls": "No-word-check is the baseline with just the two-word verification budget disabled. It is a speed reference only. Normalized metrics align NFC letters and count each mark on the matching letter. Detector bounding boxes/reading order match the baseline on all 81.",
+  "codeRevision": "9fa5c5ce77fdc30840ce0209c095d8484cdd138d",
+  "tests": {
+    "sameOrderedBoxesOnCards": 81,
+    "detectorMasksCompared": 1200,
+    "identicalBoxesIncludingSupport": 908,
+    "phoneNativePassed": 4,
+    "phoneNativeCases": [
+      "ownedArabicPageKeepsBothCompleteParagraphsMixedOcrWordAndEnglishButton",
+      "hollowBoxScoreIncludesOnlyPixelCentersInsideItsHull",
+      "diagonalTouchAtTheFrameEdgeJoinsOnlyTheTwoTouchingComponents",
+      "aSecondDetachedMarkBelowAFathaPreventsShaddaRemoval"
+    ],
+    "unit": {
+      "tests": 1937,
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0
+    },
+    "android15Acceptance": "https://github.com/jabrailkhalil/clickntranslate/actions/runs/45895963946"
+  },
+  "before": {
+    "cards": 81,
+    "lettersDigits": 1306,
+    "baseEditDistance": 74,
+    "exactLettersAndMarks": 13,
+    "exactLetters": 32,
+    "referenceMarks": 170,
+    "outputMarks": 122,
+    "sameMarkOnSameLetter": 104
+  },
+  "after": {
+    "cards": 81,
+    "lettersDigits": 1306,
+    "baseEditDistance": 73,
+    "exactLettersAndMarks": 17,
+    "exactLetters": 32,
+    "referenceMarks": 170,
+    "outputMarks": 127,
+    "sameMarkOnSameLetter": 111
+  },
+  "original57Before": {
+    "cards": 57,
+    "lettersDigits": 973,
+    "baseEditDistance": 52,
+    "exactLettersAndMarks": 10,
+    "exactLetters": 25,
+    "referenceMarks": 119,
+    "outputMarks": 78,
+    "sameMarkOnSameLetter": 65
+  },
+  "original57After": {
+    "cards": 57,
+    "lettersDigits": 973,
+    "baseEditDistance": 52,
+    "exactLettersAndMarks": 13,
+    "exactLetters": 25,
+    "referenceMarks": 119,
+    "outputMarks": 82,
+    "sameMarkOnSameLetter": 69
+  },
+  "darkMinimalPairTranslations": {
+    "beforeAngel": {
+      "ocr": "ظهر مَلك في القصة",
+      "russian": [
+        "В истории появился король.",
+        "В истории появился король.",
+        "В истории появился король.",
+        "В истории появился король."
+      ]
+    },
+    "afterAngel": {
+      "ocr": "ظهر مَلَك في القصة",
+      "russian": [
+        "В истории появился ангел.",
+        "В истории появился ангел.",
+        "В истории появился ангел.",
+        "В истории появился ангел."
+      ]
+    },
+    "trueKing": {
+      "ocr": "ظهر مَلِك في القصة",
+      "russian": [
+        "В истории появился король.",
+        "В истории появился король.",
+        "В истории появился король.",
+        "В истории появился король."
+      ]
+    }
+  },
+  "timings": [
+    {
+      "run": "matched-0-no-word-check",
+      "variant": "no-word-check",
+      "warmShortCards": 56,
+      "medianMs": 60.0,
+      "p95Ms": 288,
+      "warmPageMs": [911, 467, 482],
+      "longLineMs": [384, 205, 129],
+      "firstPageIncludesLoadMs": 1783,
+      "batteryTemperatureC": [33.3, 33.3],
+      "shortMs": [56, 122, 71, 163, 79, 110, 34, 44, 33, 66, 43, 95, 45, 71, 44, 52, 101, 53, 38, 103, 52, 60, 43, 53, 42, 52, 63, 71, 49, 131, 759, 288, 54, 46, 71, 89, 38, 121, 44, 106, 45, 59, 44, 71, 50, 69, 55, 102, 34, 60, 33, 77, 3147, 277, 165, 140]
+    },
+    {
+      "run": "matched-1-normal",
+      "variant": "normal",
+      "warmShortCards": 56,
+      "medianMs": 91.0,
+      "p95Ms": 192,
+      "warmPageMs": [1030, 637, 576],
+      "longLineMs": [177, 151, 159],
+      "firstPageIncludesLoadMs": 960,
+      "batteryTemperatureC": [33.3, 33.3],
+      "shortMs": [92, 138, 85, 230, 71, 159, 96, 150, 62, 57, 55, 110, 98, 161, 74, 77, 77, 91, 58, 151, 109, 125, 81, 74, 61, 80, 68, 128, 74, 192, 79, 215, 60, 65, 102, 148, 52, 176, 72, 149, 63, 74, 62, 75, 91, 114, 84, 149, 97, 154, 45, 103, 84, 132, 113, 146]
+    },
+    {
+      "run": "matched-2-baseline",
+      "variant": "baseline",
+      "warmShortCards": 56,
+      "medianMs": 66.5,
+      "p95Ms": 128,
+      "warmPageMs": [381, 368, 369],
+      "longLineMs": [117, 111, 116],
+      "firstPageIncludesLoadMs": 787,
+      "batteryTemperatureC": [33.3, 33.3],
+      "shortMs": [65, 91, 54, 169, 62, 113, 88, 42, 56, 49, 40, 67, 80, 91, 64, 55, 65, 73, 52, 133, 87, 98, 66, 54, 41, 52, 44, 88, 51, 127, 45, 109, 38, 46, 67, 90, 50, 115, 72, 115, 50, 66, 44, 74, 79, 72, 71, 103, 34, 128, 36, 97, 40, 83, 63, 110]
+    },
+    {
+      "run": "matched-3-baseline",
+      "variant": "baseline",
+      "warmShortCards": 56,
+      "medianMs": 65.0,
+      "p95Ms": 127,
+      "warmPageMs": [384, 369, 364],
+      "longLineMs": [104, 110, 103],
+      "firstPageIncludesLoadMs": 780,
+      "batteryTemperatureC": [33.6, 33.6],
+      "shortMs": [71, 124, 57, 163, 62, 102, 76, 41, 64, 41, 55, 87, 81, 86, 82, 52, 63, 81, 39, 122, 91, 93, 64, 51, 41, 55, 57, 64, 49, 139, 46, 109, 39, 46, 68, 94, 39, 127, 66, 103, 47, 61, 42, 51, 95, 66, 71, 102, 33, 122, 36, 77, 41, 78, 62, 121]
+    },
+    {
+      "run": "matched-4-normal",
+      "variant": "normal",
+      "warmShortCards": 56,
+      "medianMs": 64.0,
+      "p95Ms": 142,
+      "warmPageMs": [427, 370, 362],
+      "longLineMs": [107, 110, 99],
+      "firstPageIncludesLoadMs": 655,
+      "batteryTemperatureC": [33.6, 33.9],
+      "shortMs": [50, 87, 47, 158, 53, 126, 73, 72, 68, 55, 40, 76, 69, 142, 52, 47, 58, 63, 43, 116, 74, 111, 54, 51, 41, 48, 44, 85, 48, 125, 55, 169, 37, 47, 65, 96, 37, 115, 59, 127, 43, 51, 47, 51, 69, 73, 59, 104, 70, 110, 47, 78, 45, 69, 73, 118]
+    },
+    {
+      "run": "matched-5-no-word-check",
+      "variant": "no-word-check",
+      "warmShortCards": 56,
+      "medianMs": 53.5,
+      "p95Ms": 130,
+      "warmPageMs": [404, 371, 369],
+      "longLineMs": [103, 113, 117],
+      "firstPageIncludesLoadMs": 762,
+      "batteryTemperatureC": [34.4, 34.4],
+      "shortMs": [55, 86, 56, 163, 52, 101, 34, 42, 35, 41, 55, 88, 38, 75, 43, 56, 42, 50, 43, 102, 41, 49, 45, 69, 74, 77, 64, 67, 52, 140, 45, 130, 49, 49, 73, 98, 44, 114, 46, 104, 45, 59, 43, 52, 51, 84, 50, 103, 32, 80, 37, 86, 40, 70, 41, 66]
+    },
+    {
+      "run": "counterbalanced-0-baseline",
+      "variant": "baseline",
+      "warmShortCards": 56,
+      "medianMs": 64.5,
+      "p95Ms": 143,
+      "warmPageMs": [381, 373, 376],
+      "longLineMs": [105, 104, 104],
+      "firstPageIncludesLoadMs": 753,
+      "batteryTemperatureC": [34.6, 34.6],
+      "shortMs": [55, 109, 53, 165, 56, 107, 76, 57, 56, 41, 39, 67, 81, 88, 84, 62, 63, 77, 45, 125, 84, 100, 65, 58, 43, 51, 46, 64, 49, 143, 46, 148, 46, 48, 84, 109, 42, 114, 66, 106, 51, 53, 43, 59, 74, 86, 72, 104, 32, 109, 38, 76, 61, 70, 64, 110]
+    },
+    {
+      "run": "counterbalanced-1-normal",
+      "variant": "normal",
+      "warmShortCards": 56,
+      "medianMs": 63.0,
+      "p95Ms": 132,
+      "warmPageMs": [372, 359, 355],
+      "longLineMs": [104, 114, 110],
+      "firstPageIncludesLoadMs": 690,
+      "batteryTemperatureC": [34.6, 35.0],
+      "shortMs": [72, 98, 53, 148, 47, 91, 69, 70, 66, 45, 38, 82, 69, 113, 53, 52, 59, 63, 43, 117, 75, 86, 55, 51, 41, 56, 48, 83, 49, 132, 55, 139, 39, 45, 71, 109, 37, 115, 55, 103, 45, 52, 49, 61, 63, 65, 59, 102, 64, 100, 46, 59, 46, 69, 75, 118]
+    },
+    {
+      "run": "counterbalanced-2-no-word-check",
+      "variant": "no-word-check",
+      "warmShortCards": 56,
+      "medianMs": 51.0,
+      "p95Ms": 130,
+      "warmPageMs": [404, 378, 375],
+      "longLineMs": [116, 114, 114],
+      "firstPageIncludesLoadMs": 749,
+      "batteryTemperatureC": [35.0, 35.0],
+      "shortMs": [62, 88, 66, 161, 51, 102, 33, 49, 35, 40, 40, 89, 38, 67, 42, 53, 47, 60, 38, 105, 42, 51, 41, 51, 43, 52, 50, 87, 49, 129, 51, 130, 39, 47, 66, 131, 38, 115, 51, 109, 51, 51, 43, 53, 50, 93, 48, 105, 46, 59, 49, 70, 41, 71, 40, 68]
+    },
+    {
+      "run": "counterbalanced-3-grouped",
+      "variant": "grouped",
+      "warmShortCards": 56,
+      "medianMs": 65.0,
+      "p95Ms": 128,
+      "warmPageMs": [401, 360, 359],
+      "longLineMs": [113, 120, 103],
+      "firstPageIncludesLoadMs": 806,
+      "batteryTemperatureC": [35.3, 35.3],
+      "shortMs": [50, 94, 74, 191, 49, 113, 75, 75, 49, 47, 46, 80, 68, 96, 54, 64, 54, 67, 43, 120, 73, 127, 77, 51, 40, 55, 52, 83, 62, 128, 59, 137, 38, 46, 66, 101, 46, 114, 54, 103, 45, 53, 44, 51, 63, 91, 59, 101, 64, 112, 47, 102, 40, 68, 79, 100]
+    },
+    {
+      "run": "counterbalanced-4-grouped",
+      "variant": "grouped",
+      "warmShortCards": 56,
+      "medianMs": 64.5,
+      "p95Ms": 124,
+      "warmPageMs": [376, 364, 362],
+      "longLineMs": [121, 105, 126],
+      "firstPageIncludesLoadMs": 673,
+      "batteryTemperatureC": [35.3, 35.3],
+      "shortMs": [63, 66, 47, 149, 45, 115, 76, 73, 53, 41, 43, 81, 75, 115, 55, 66, 55, 69, 38, 111, 73, 83, 55, 50, 42, 58, 45, 86, 54, 117, 55, 128, 38, 46, 66, 99, 44, 115, 55, 101, 44, 52, 48, 51, 63, 65, 67, 124, 64, 113, 31, 76, 41, 71, 95, 100]
+    },
+    {
+      "run": "counterbalanced-5-no-word-check",
+      "variant": "no-word-check",
+      "warmShortCards": 56,
+      "medianMs": 50.0,
+      "p95Ms": 129,
+      "warmPageMs": [377, 374, 373],
+      "longLineMs": [103, 104, 105],
+      "firstPageIncludesLoadMs": 701,
+      "batteryTemperatureC": [35.3, 35.3],
+      "shortMs": [54, 83, 58, 163, 62, 104, 34, 40, 48, 42, 40, 67, 39, 67, 42, 53, 40, 48, 44, 102, 42, 49, 47, 50, 42, 51, 50, 86, 49, 132, 44, 129, 38, 47, 70, 91, 48, 120, 44, 104, 44, 51, 47, 53, 56, 67, 46, 107, 37, 78, 36, 65, 40, 72, 41, 67]
+    },
+    {
+      "run": "counterbalanced-6-normal",
+      "variant": "normal",
+      "warmShortCards": 56,
+      "medianMs": 65.0,
+      "p95Ms": 127,
+      "warmPageMs": [392, 362, 358],
+      "longLineMs": [108, 116, 106],
+      "firstPageIncludesLoadMs": 670,
+      "batteryTemperatureC": [35.3, 35.3],
+      "shortMs": [57, 87, 48, 148, 67, 99, 83, 76, 44, 45, 39, 81, 68, 95, 53, 53, 66, 62, 43, 111, 78, 82, 55, 50, 46, 50, 51, 84, 49, 127, 56, 138, 38, 45, 73, 116, 42, 118, 57, 116, 45, 51, 44, 54, 80, 87, 59, 102, 65, 110, 31, 65, 47, 69, 72, 97]
+    },
+    {
+      "run": "counterbalanced-7-baseline",
+      "variant": "baseline",
+      "warmShortCards": 56,
+      "medianMs": 66.0,
+      "p95Ms": 128,
+      "warmPageMs": [372, 371, 398],
+      "longLineMs": [116, 113, 130],
+      "firstPageIncludesLoadMs": 776,
+      "batteryTemperatureC": [35.3, 35.3],
+      "shortMs": [64, 82, 62, 168, 55, 104, 76, 41, 71, 40, 45, 67, 89, 89, 82, 54, 64, 79, 53, 122, 94, 103, 65, 52, 48, 51, 45, 84, 49, 137, 45, 128, 39, 47, 73, 89, 54, 118, 74, 103, 45, 52, 43, 54, 81, 85, 70, 111, 32, 102, 36, 65, 41, 70, 64, 108]
+    }
+  ],
+  "extraBatchExperiment": {
+    "samplesPerRun": "6 repetitions of door/dark54, two-books/dark54, two-pens/dark54, story-angel/navy68; all OCR strings and boxes identical. Run order normal, grouped, grouped, normal.",
+    "milliseconds": {
+      "normal": [
+        [106, 122, 143, 158, 104, 124, 128, 175, 106, 124, 137, 165, 87, 123, 136, 157, 105, 130, 121, 168, 103, 122, 146, 160],
+        [105, 130, 137, 159, 106, 122, 164, 163, 105, 127, 123, 159, 106, 129, 122, 161, 105, 122, 116, 159, 109, 123, 158, 200]
+      ],
+      "grouped": [
+        [104, 118, 133, 150, 104, 122, 127, 157, 104, 116, 140, 161, 103, 126, 128, 150, 111, 122, 124, 151, 102, 117, 131, 149],
+        [104, 117, 125, 162, 114, 129, 138, 157, 115, 126, 136, 160, 114, 126, 140, 161, 113, 123, 136, 162, 100, 127, 137, 180]
+      ]
+    }
+  },
+  "cards": [
+    {"id": "fox", "style": "page", "source": "يقرأ الثعلب الصغير كتابًا عن السفر كل مساء، ويستخدم كلمة OCR لوصف التعرف على النص.", "before": "يقرأ الثعلب الصغير كتابًا عن السفر كل مساء، ويستخدم كلمة OCR لوصف التعرف على النص", "after": "يقرأ الثعلب الصغير كتابًا عن السفر كل مساء، ويستخدم كلمة OCR لوصف التعرف على النص", "boxes": ["[108,1418][1193,1853]"]},
+    {"id": "book", "style": "light34", "source": "يقرأ الطفل كتابًا كل مساء.", "before": "قرأ الطفل كتابا كل مساء", "after": "قرأ الطفل كتابا كل مساء", "boxes": ["[42,42][337,74]"]},
+    {"id": "book", "style": "dark54", "source": "يقرأ الطفل كتابًا كل مساء.", "before": "بقرا الطفل كتابا كل مساء", "after": "بقرا الطفل كتابا كل مساء", "boxes": ["[46,49][518,99]"]},
+    {"id": "pen", "style": "light34", "source": "اشترى الطالب قلمًا جديدًا.", "before": "شترى الطالب قلمًا جديدًا", "after": "شترى الطالب قلمًا جديدًا", "boxes": ["[45,44][342,71]"]},
+    {"id": "pen", "style": "dark54", "source": "اشترى الطالب قلمًا جديدًا.", "before": "اشترى الطالب قلمًا جديدًا", "after": "اشترى الطالب قلمًا جديدًا", "boxes": ["[45,53][525,104]"]},
+    {"id": "door", "style": "light34", "source": "فتح العامل بابًا في الجدار.", "before": "فتح العامل بابا في الجدار", "after": "فتح العامل بابا في الجدار", "boxes": ["[44,47][343,75]"]},
+    {"id": "door", "style": "dark54", "source": "فتح العامل بابًا في الجدار.", "before": "فتح العامل بابَا فى الجدار", "after": "فتح العامل بابَا فى الجدار", "boxes": ["[48,49][532,106]"]},
+    {"id": "flag", "style": "light34", "source": "هذا عَلَم جديد.", "before": "هذا عَلَم جديد", "after": "هذا عَلَم جديد", "boxes": ["[43,41][209,75]"]},
+    {"id": "flag", "style": "dark54", "source": "هذا عَلَم جديد.", "before": "هذا عَلم جديد", "after": "هذا عَلَم جديد", "boxes": ["[48,45][311,107]"]},
+    {"id": "knowledge", "style": "light34", "source": "هذا عِلْم جديد.", "before": "هذا عِلم جديد", "after": "هذا عِلم جديد", "boxes": ["[44,42][209,75]"]},
+    {"id": "knowledge", "style": "dark54", "source": "هذا عِلْم جديد.", "before": "هذا علم جديد", "after": "هذا علم جديد", "boxes": ["[48,47][311,105]"]},
+    {"id": "king", "style": "light34", "source": "ظهر مَلِك في القصة.", "before": "طهر مَلِك في القصة", "after": "طهر مَلِك في القصة", "boxes": ["[43,44][268,75]"]},
+    {"id": "king", "style": "dark54", "source": "ظهر مَلِك في القصة.", "before": "ظهر مَلِك في القصة", "after": "ظهر مَلِك في القصة", "boxes": ["[45,54][408,102]"]},
+    {"id": "angel", "style": "light34", "source": "ظهر مَلَك في القصة.", "before": "ظهر مَلَك في القصة", "after": "ظهر مَلَك في القصة", "boxes": ["[44,43][268,74]"]},
+    {"id": "angel", "style": "dark54", "source": "ظهر مَلَك في القصة.", "before": "ظهر مَلك في القصة", "after": "ظهر مَلَك في القصة", "boxes": ["[45,51][408,102]"]},
+    {"id": "oman", "style": "light34", "source": "سافرت إلى عُمان أمس.", "before": "سافرت إلى غُمان أمس", "after": "سافرت إلى غُمان أمس", "boxes": ["[46,43][307,74]"]},
+    {"id": "oman", "style": "dark54", "source": "سافرت إلى عُمان أمس.", "before": "سافرت إلى غمان أمس", "after": "سافرت إلى غمان أمس", "boxes": ["[50,47][468,102]"]},
+    {"id": "amman", "style": "light34", "source": "سافرت إلى عَمّان أمس.", "before": "سافرت إلى عَقَان أمس", "after": "سافرت إلى عَقَان أمس", "boxes": ["[46,43][307,74]"]},
+    {"id": "amman", "style": "dark54", "source": "سافرت إلى عَمّان أمس.", "before": "سافرت إلى عَقّان أمس", "after": "سافرت إلى عَقّان أمس", "boxes": ["[50,47][468,102]"]},
+    {"id": "wrote", "style": "light34", "source": "كَتَبَ الطالب الدرس.", "before": "كشبَ الطالب الدرس", "after": "كشبَ الطالب الدرس", "boxes": ["[43,41][271,79]"]},
+    {"id": "wrote", "style": "dark54", "source": "كَتَبَ الطالب الدرس.", "before": "كتبَ الطالب الدرس", "after": "كتبَ الطالب الدرس", "boxes": ["[45,51][410,106]"]},
+    {"id": "was-written", "style": "light34", "source": "كُتِبَ الدرس في الدفتر.", "before": "كتِبَ الدرس في الدفتر", "after": "كتِبَ الدرس في الدفتر", "boxes": ["[44,44][306,77]"]},
+    {"id": "was-written", "style": "dark54", "source": "كُتِبَ الدرس في الدفتر.", "before": "كُتِبَ الدرس فى الدفتر", "after": "كُتِبَ الدرس فى الدفتر", "boxes": ["[47,50][466,105]"]},
+    {"id": "teaches", "style": "light34", "source": "هو يُدَرِّسُ في الجامعة.", "before": "هو يدَرّش فى ألجامعة", "after": "هو يدَرّش فى ألجامعة", "boxes": ["[42,44][303,77]"]},
+    {"id": "teaches", "style": "dark54", "source": "هو يُدَرِّسُ في الجامعة.", "before": "هو يدَرّْش في الجامعة", "after": "هو يدَرّْش في الجامعة", "boxes": ["[47,54][462,106]"]},
+    {"id": "studies", "style": "light34", "source": "هو يَدْرُسُ في الجامعة.", "before": "هو يذّرْش في الجامعة", "after": "هو يذّرْش في الجامعة", "boxes": ["[42,44][303,78]"]},
+    {"id": "studies", "style": "dark54", "source": "هو يَدْرُسُ في الجامعة.", "before": "هو يذرُش في الجامعة", "after": "هو يذرُش في الجامعة", "boxes": ["[46,54][462,107]"]},
+    {"id": "two-wrote", "style": "light34", "source": "الطالبان كَتَبَا الدرس معًا.", "before": "الطالبان كتبًا الدرس مقا", "after": "الطالبان كتبًا الدرس مقا", "boxes": ["[43,44][318,74]"]},
+    {"id": "two-wrote", "style": "dark54", "source": "الطالبان كَتَبَا الدرس معًا.", "before": "الطالبان كُتَبَا الدرس معًا", "after": "الطالبان كُتَبَا الدرس معًا", "boxes": ["[46,52][485,101]"]},
+    {"id": "two-books", "style": "light34", "source": "على الطاولة كتابان جديدان.", "before": "على الطاولة كتابان جديدان", "after": "على الطاولة كتابان جديدان", "boxes": ["[45,44][363,76]"]},
+    {"id": "two-books", "style": "dark54", "source": "على الطاولة كتابان جديدان.", "before": "على الطاولة كتابان جديدان", "after": "على الطاولة كتابان جديدان", "boxes": ["[48,53][561,107]"]},
+    {"id": "two-pens", "style": "light34", "source": "اشتريت قَلَمَيْنِ من المتجر.", "before": "شتريت قلَين من المتجر", "after": "شتريت قلَين من المتجر", "boxes": ["[45,41][340,78]"]},
+    {"id": "two-pens", "style": "dark54", "source": "اشتريت قَلَمَيْنِ من المتجر.", "before": "اشتريت قَلمَيْن من المتجر", "after": "اشتريت قَلمَيْن من المتجر", "boxes": ["[48,48][523,106]"]},
+    {"id": "unmarked", "style": "light34", "source": "يقرأ الطفل كل مساء.", "before": "قرأ الطفل كل مساء", "after": "قرأ الطفل كل مساء", "boxes": ["[42,42][277,73]"]},
+    {"id": "unmarked", "style": "dark54", "source": "يقرأ الطفل كل مساء.", "before": "قرا الطفل كل مساء", "after": "قرا الطفل كل مساء", "boxes": ["[45,52][420,96]"]},
+    {"id": "mixed", "style": "light34", "source": "نستخدم OCR 25 اليوم.", "before": "ستخدم OCR 25 اليوم", "after": "ستخدم OCR 25 اليوم", "boxes": ["[43,42][336,79]"]},
+    {"id": "mixed", "style": "dark54", "source": "نستخدم OCR 25 اليوم.", "before": "l OCR 25ليوج ستخدم", "after": "l OCR 25ليوج ستخدم", "boxes": ["[46,50][342,102]", "[357,60][509,98]"]},
+    {"id": "house", "style": "light34", "source": "رأيت بيتًا قرب البحر.", "before": "أيت بيتًا قرب البحر", "after": "أيت بيتًا قرب البحر", "boxes": ["[44,41][283,76]"]},
+    {"id": "house", "style": "dark54", "source": "رأيت بيتًا قرب البحر.", "before": "رأيت بيثتًا قرب البحر", "after": "رأيت بيثتًا قرب البحر", "boxes": ["[46,46][431,108]"]},
+    {"id": "two-played", "style": "light34", "source": "الطفلان لَعِبَا في الحديقة.", "before": "لطفلان لعِبَا في الحديقة", "after": "لطفلان لعِبَا في الحديقة", "boxes": ["[44,42][327,74]"]},
+    {"id": "two-played", "style": "dark54", "source": "الطفلان لَعِبَا في الحديقة.", "before": "الطفلان لَعِبَا فى الحديقة", "after": "الطفلان لَعِبَا فى الحديقة", "boxes": ["[47,49][503,106]"]},
+    {"id": "bird", "style": "light34", "source": "رأيت طائرًا قرب النافذة.", "before": "أيت طائرًا قرب النافذة", "after": "أيت طائرًا قرب النافذة", "boxes": ["[42,43][319,71]"]},
+    {"id": "bird", "style": "dark54", "source": "رأيت طائرًا قرب النافذة.", "before": "رأيت طائرًا قرب النافذة", "after": "رأيت طائرًا قرب النافذة", "boxes": ["[46,48][490,108]"]},
+    {"id": "sound", "style": "light34", "source": "سمعت صوتًا من المطبخ.", "before": "سمعت صوتا من ألمطبخ", "after": "سمعت صوتا من ألمطبخ", "boxes": ["[45,44][324,75]"]},
+    {"id": "sound", "style": "dark54", "source": "سمعت صوتًا من المطبخ.", "before": "سمعت صوتًا من المطبخ", "after": "سمعت صوتًا من المطبخ", "boxes": ["[53,53][493,99]"]},
+    {"id": "two-drew", "style": "light34", "source": "الطفلان رَسَمَا شجرة جميلة.", "before": "الطفلان رَسمَا شجرة جميلة", "after": "الطفلان رَسمَا شجرة جميلة", "boxes": ["[44,44][358,72]"]},
+    {"id": "two-drew", "style": "dark54", "source": "الطفلان رَسَمَا شجرة جميلة.", "before": "الطفلان رَسَمًَا شجرة جميلة", "after": "الطفلان رَسَمًَا شجرة جميلة", "boxes": ["[51,53][548,100]"]},
+    {"id": "two-went", "style": "light34", "source": "الصديقان ذَهَبَا إلى البيت.", "before": "لصديقان ذهيَا إلى ألبيت", "after": "لصديقان ذهيَا إلى ألبيت", "boxes": ["[43,45][331,74]"]},
+    {"id": "two-went", "style": "dark54", "source": "الصديقان ذَهَبَا إلى البيت.", "before": "الصديقان ذَْهَبَا إلى البيت", "after": "الصديقان ذَْهَبَا إلى البيت", "boxes": ["[46,53][506,105]"]},
+    {"id": "another-flag", "style": "light34", "source": "رفعت عَلَم بلادي.", "before": "رفعت عَلم بلادي", "after": "رفعت عَلَم بلادي", "boxes": ["[45,42][236,80]"]},
+    {"id": "another-flag", "style": "dark54", "source": "رفعت عَلَم بلادي.", "before": "رفعت عَلَم بلادي", "after": "رفعت عَلَم بلادي", "boxes": ["[50,54][350,110]"]},
+    {"id": "another-knowledge", "style": "light34", "source": "هذا عِلْم نافع.", "before": "هذا علّم نافع", "after": "هذا علّم نافع", "boxes": ["[43,40][191,76]"]},
+    {"id": "another-knowledge", "style": "dark54", "source": "هذا عِلْم نافع.", "before": "هذا علم نافع", "after": "هذا علم نافع", "boxes": ["[47,51][285,103]"]},
+    {"id": "another-king", "style": "light34", "source": "في الحكاية مَلِك عادل.", "before": "فى الحكاية مَلِك عادل", "after": "فى الحكاية مَلِك عادل", "boxes": ["[45,43][301,78]"]},
+    {"id": "another-king", "style": "dark54", "source": "في الحكاية مَلِك عادل.", "before": "ي الحكاية مَلِك عادل", "after": "ي الحكاية مَلِك عادل", "boxes": ["[49,55][470,115]"]},
+    {"id": "another-angel", "style": "light34", "source": "في الحكاية مَلَك جميل.", "before": "فى الحكاية مَلك جميل", "after": "فى الحكاية مَلَك جميل", "boxes": ["[46,43][309,77]"]},
+    {"id": "another-angel", "style": "dark54", "source": "في الحكاية مَلَك جميل.", "before": "ي الحكاية مَلَك جميل", "after": "ي الحكاية مَلَك جميل", "boxes": ["[48,53][482,112]"]},
+    {"id": "story-angel", "style": "navy38", "source": "ظهر مَلَك في القصة.", "before": "طهر َلك في القصة", "after": "طهر مَلَك في القصة", "boxes": ["[43,45][298,80]"]},
+    {"id": "story-angel", "style": "navy54", "source": "ظهر مَلَك في القصة.", "before": "ظهر مَلَك فر القصة", "after": "ظهر مَلَك فر القصة", "boxes": ["[45,52][409,107]"]},
+    {"id": "story-angel", "style": "navy68", "source": "ظهر مَلَك في القصة.", "before": "ظهر مَلَّك في القصة", "after": "ظهر مَلَك في القصة", "boxes": ["[48,54][507,126]"]},
+    {"id": "story-king", "style": "navy38", "source": "ظهر مَلِك في القصة.", "before": "طهر مَلِك في القصة", "after": "طهر مَلِك في القصة", "boxes": ["[43,46][298,81]"]},
+    {"id": "story-king", "style": "navy54", "source": "ظهر مَلِك في القصة.", "before": "ظهر مَلِك القصة", "after": "ظهر مَلِك القصة", "boxes": ["[247,54][409,102]", "[45,55][161,95]"]},
+    {"id": "story-king", "style": "navy68", "source": "ظهر مَلِك في القصة.", "before": "ظهر مَلِكَ في القصة", "after": "ظهر مَلِكَ في القصة", "boxes": ["[47,60][508,127]"]},
+    {"id": "story-partial", "style": "navy38", "source": "ظهر مَلك في القصة.", "before": "ظهر مَلك في القصة", "after": "ظهر مَلك في القصة", "boxes": ["[43,46][299,82]"]},
+    {"id": "story-partial", "style": "navy54", "source": "ظهر مَلك في القصة.", "before": "ظهر مَلك ف القصة", "after": "ظهر مَلك ف القصة", "boxes": ["[45,49][409,109]"]},
+    {"id": "story-partial", "style": "navy68", "source": "ظهر مَلك في القصة.", "before": "ظهر مَلكَ في القصة", "after": "ظهر مَلكَ في القصة", "boxes": ["[48,59][507,127]"]},
+    {"id": "story-unmarked", "style": "navy38", "source": "ظهر ملك في القصة.", "before": "طهر ملك في القصة", "after": "طهر ملك في القصة", "boxes": ["[43,46][298,82]"]},
+    {"id": "story-unmarked", "style": "navy54", "source": "ظهر ملك في القصة.", "before": "ظهر ملك فف القصة", "after": "ظهر ملك فف القصة", "boxes": ["[44,53][410,109]"]},
+    {"id": "story-unmarked", "style": "navy68", "source": "ظهر ملك في القصة.", "before": "ظهر ملك في القصة", "after": "ظهر ملك في القصة", "boxes": ["[47,58][507,126]"]},
+    {"id": "new-angel", "style": "navy38", "source": "هذا مَلَك في الحكاية.", "before": "هذا مَلَك في ألحكاية", "after": "هذا مَلَك في ألحكاية", "boxes": ["[46,46][311,80]"]},
+    {"id": "new-angel", "style": "navy54", "source": "هذا مَلَك في الحكاية.", "before": "هذا مَلك فى الحكاية", "after": "هذا مَلَك فى الحكاية", "boxes": ["[46,48][431,101]"]},
+    {"id": "new-angel", "style": "navy68", "source": "هذا مَلَك في الحكاية.", "before": "هiا مَلَك ف الحكابة", "after": "هiا مَلَك ف الحكابة", "boxes": ["[50,56][532,122]"]},
+    {"id": "new-king", "style": "navy38", "source": "هذا مَلِك في الحكاية.", "before": "هذا مَلِك في الحكاية", "after": "هذا مَلِك في الحكاية", "boxes": ["[46,49][312,79]"]},
+    {"id": "new-king", "style": "navy54", "source": "هذا مَلِك في الحكاية.", "before": "هذا مَلِك فى الحكاية", "after": "هذا مَلِك فى الحكاية", "boxes": ["[47,54][432,101]"]},
+    {"id": "new-king", "style": "navy68", "source": "هذا مَلِك في الحكاية.", "before": "هذا مَلِك في الحكابة", "after": "هذا مَلِك في الحكابة", "boxes": ["[255,58][532,126]", "[50,60][225,111]"]},
+    {"id": "true-shadda", "style": "navy38", "source": "مَلَّكَ الأب ابنه البيت.", "before": "مَلّكَ الأب أبنه ألبيت", "after": "مَلّكَ الأب أبنه ألبيت", "boxes": ["[45,43][302,79]"]},
+    {"id": "true-shadda", "style": "navy54", "source": "مَلَّكَ الأب ابنه البيت.", "before": "مَلّكَ الأب أبنه البيت", "after": "مَلّكَ الأب أبنه البيت", "boxes": ["[44,49][416,105]"]},
+    {"id": "true-shadda", "style": "navy68", "source": "مَلَّكَ الأب ابنه البيت.", "before": "مَلَكَ الأب أبنه البيت", "after": "مَلَكَ الأب أبنه البيت", "boxes": ["[46,54][516,130]"]},
+    {"id": "true-shadda-medial", "style": "navy38", "source": "عَلَّمَ خالد الطالب.", "before": "قَلمَ خالد الطالب", "after": "قَلمَ خالد الطالب", "boxes": ["[45,46][258,80]"]},
+    {"id": "true-shadda-medial", "style": "navy54", "source": "عَلَّمَ خالد الطالب.", "before": "عَلمَ خالد الطالب", "after": "عَلمَ خالد الطالب", "boxes": ["[47,51][354,103]"]},
+    {"id": "true-shadda-medial", "style": "navy68", "source": "عَلَّمَ خالد الطالب.", "before": "E عَلَمَ خالد الطالب", "after": "E عَلَمَ خالد الطالب", "boxes": ["[385,40][400,54]", "[48,60][435,118]"]}
+  ]
+}
