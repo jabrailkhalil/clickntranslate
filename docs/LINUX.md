@@ -12,8 +12,15 @@ chmod +x Click-n-Translate-1.8.2-linux-x86_64.AppImage
 ./Click-n-Translate-1.8.2-linux-x86_64.AppImage
 ```
 
-For the portable archive, extract the whole directory and run `clickntranslate`.
-Keep the accompanying program files. Version 1.8.2 supports in-app updates for
+If FUSE is unavailable, use the portable `.tar.gz` download. Extract the entire
+`clickntranslate` directory to a permanent, writable location and run the
+`clickntranslate` executable inside it. Point desktop launchers and keyboard
+shortcuts at that executable. This keeps the program and its `_internal` files
+available across repeated launches. The AppImage runtime's
+`--appimage-extract-and-run` mode shares a temporary directory between launches
+and can remove it while the first window is still open.
+
+Version 1.8.2 supports in-app updates for
 writable AppImage and supported portable installations. To upgrade **1.8.1 or
 earlier** for the first time, replace the application manually and keep user data.
 See [1.8.2 package checks and limitations](RELEASE_QA_1.8.2.md) and
