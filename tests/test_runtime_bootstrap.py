@@ -14,7 +14,8 @@ def fresh_state(monkeypatch):
 
 def test_normal_source_interpreter_does_not_load_or_change_dll_search_paths(monkeypatch, tmp_path):
     monkeypatch.setattr(sys, 'executable', str(tmp_path / 'python.exe'))
-    monkeypatch.setattr(bootstrap.os, 'add_dll_directory', lambda *_: pytest.fail('Source GUI changed DLL paths'))
+    monkeypatch.setattr(bootstrap.os, 'add_dll_directory',
+                        lambda *_: pytest.fail('Source GUI changed DLL paths'), raising=False)
     assert bootstrap.activate() == {}
 
 

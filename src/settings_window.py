@@ -1456,10 +1456,10 @@ class SettingsPageTabButton(OpticallyCenteredPushButton):
         self.set_dark(dark)
 
     def sizeHint(self):
-        font = QtGui.QFont(self.font())
-        font.setPixelSize(13)
-        font.setWeight(QtGui.QFont.Medium)
-        metrics = QtGui.QFontMetrics(font)
+        # The active Qt style can resolve a different font for Arabic. Use the
+        # polished button font that label_layout() also gives to the painter.
+        self.ensurePolished()
+        metrics = self.fontMetrics()
         ink_width = max(metrics.horizontalAdvance(self.text()), metrics.boundingRect(self.text()).width())
         return QtCore.QSize(ink_width + 18, 26)
 

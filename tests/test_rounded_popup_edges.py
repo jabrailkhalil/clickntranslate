@@ -9,7 +9,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtTest import QTest
 
 from classic_style import classic_palette
-from rounded_windows import rounded_clip_region
+from rounded_windows import rounded_clip_region, uses_alpha_surface
 from settings_window import DropDownCombo, modern_combo_style
 from styled_dialogs import (_apply_rounded_popup_mask, _ensure_control_tooltip,
     _paint_hover_tooltip, tooltip_has_text, tooltip_text, install_tooltip_style)
@@ -34,9 +34,11 @@ def painted_surface(size, radius, *, density=1., dark=True):
 def assert_mask_keeps_paint(mask, image):
     density = image.devicePixelRatio()
     mask=QtGui.QTransform.fromScale(density,density).map(mask)
-    clipped = [(x,y) for y in range(image.height()) for x in range(image.width())
-               if image.pixelColor(x,y).alpha()>8
-               and not mask.contains(QtCore.QPoint(x,y))]
+    outside = QtGui.QRegion(image.rect()).subtracted(mask)
+    clipped = [(x, y) for rect in outside.rects()
+               for y in range(rect.top(), rect.bottom() + 1)
+               for x in range(rect.left(), rect.right() + 1)
+               if image.pixelColor(x, y).alpha() > 8]
     assert not clipped, clipped[:10]
 
 
@@ -244,8 +246,17 @@ def test_actual_frameless_dialogs_keep_transparent_corners_and_full_frames(windo
         for dialog in dialogs:
             dialog.show()
             for _ in range(6): app.processEvents()
-            assert dialog.mask().isEmpty()
+            mask = dialog.mask()
+            if uses_alpha_surface(dialog):
+                assert mask.isEmpty()
+            elif not mask.isEmpty():
+                # Compare the original painted outline with its Linux fallback
+                # mask before the platform has clipped the pixels under test.
+                dialog.clearMask()
             image=dialog.grab().toImage()
+            if not mask.isEmpty():
+                dialog.setMask(mask)
+                assert_mask_keeps_paint(mask, image)
             corners=[image.pixelColor(x,y).alpha() for x,y in
                      ((0,0),(image.width()-1,0),(0,image.height()-1),(image.width()-1,image.height()-1))]
             assert max(corners)<10,(type(dialog).__name__,locale,dark,corners)

@@ -15,7 +15,9 @@ from test_desktop_ux import app, window
 
 
 @pytest.fixture
-def page(window, app):
+def page(window, app, monkeypatch):
+    monkeypatch.setattr(settings_window.SettingsWindow, '_find_available_tesseract_exe',
+                        lambda _settings: 'qa-tesseract')
     window.config.update(translator_engine='Google', ocr_engine=platform_support.default_ocr_engine(), api_providers={})
     window.show_settings()
     with (mock.patch.object(provider_secrets, 'get_key', return_value='qa-only-key'),
