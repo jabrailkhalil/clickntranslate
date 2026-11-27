@@ -1,25 +1,202 @@
-name: Measure Mac desktop scenarios
+name: macOS
+
 on:
   workflow_dispatch:
+    inputs:
+      architecture:
+        description: Mac architecture to build
+        type: choice
+        options: [all, arm64, x86_64]
+        default: all
+      signing_only:
+        description: Verify the permanent signer without building or running the app
+        type: boolean
+        default: false
+      prepare_release:
+        description: Test and prepare signed files for a coordinated release, without publication
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      architecture:
+        type: string
+        default: all
+      signing_only:
+        type: boolean
+        default: false
+      prepare_release:
+        type: boolean
+        default: false
+    secrets:
+      MACOS_SIGNING_KEYCHAIN_BASE64:
+        required: false
+      MACOS_SIGNING_KEYCHAIN_PASSWORD:
+        required: false
+  pull_request:
+    paths:
+      - '**.py'
+      - 'tools/requirements/macos.txt'
+      - 'tools/packaging/ClicknTranslate-macos.spec'
+      - 'tools/packaging/macos/**'
+      - 'tools/*macos*'
+      - '.github/workflows/macos.yml'
+      - '.github/workflows/release.yml'
+
 permissions:
   contents: read
+
 jobs:
-  trace:
-    runs-on: macos-15
-    timeout-minutes: 12
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(inputs.architecture == 'arm64' && '[{"runner":"macos-15","arch":"arm64"}]' || inputs.architecture == 'x86_64' && '[{"runner":"macos-15-intel","arch":"x86_64"}]' || '[{"runner":"macos-15","arch":"arm64"},{"runner":"macos-15-intel","arch":"x86_64"}]') }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    env:
+      VENV: .venv-macos
+      PYTHONUTF8: '1'
+      CLICKNTRANSLATE_SIGN_ALL_CODE: '1'
     steps:
+      - name: Select isolated signing directory
+        run: echo "CLICKNTRANSLATE_SIGNING_DIR=$RUNNER_TEMP/clickntranslate-signing" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
+      - name: Validate preparation mode
+        if: inputs.prepare_release && inputs.signing_only
+        run: |
+          echo 'Choose either signing_only or prepare_release, not both.' >&2
+          exit 1
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-          cache: pip
+          cache: ${{ !inputs.signing_only && 'pip' || '' }}
           cache-dependency-path: tools/requirements/macos.txt
+      - name: Restore permanent release signer
+        if: github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/') || inputs.signing_only || inputs.prepare_release)
+        env:
+          MACOS_SIGNING_KEYCHAIN_BASE64: ${{ secrets.MACOS_SIGNING_KEYCHAIN_BASE64 }}
+          MACOS_SIGNING_KEYCHAIN_PASSWORD: ${{ secrets.MACOS_SIGNING_KEYCHAIN_PASSWORD }}
+        run: python tools/macos_ci_signing.py restore
+      - name: Verify signer survives a binary update
+        if: inputs.signing_only
+        run: python tools/macos_ci_signing.py probe --report build/macos/signing-probe.json
       - name: Install native dependencies
+        if: '!inputs.signing_only'
         run: bash tools/setup_macos_env.sh
-      - name: Run the native UI scenarios independently
-        run: .venv-macos/bin/python tools/trace_macos_scenarios.py
-      - uses: actions/upload-artifact@v4
-        if: always()
+      - name: Test platform behavior and selected engines
+        if: '!inputs.signing_only'
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          .venv-macos/bin/python tools/run_regression_tests.py --output build/macos/portable-tests \
+            tests/test_macos_*.py tests/test_translation_chunks.py tests/test_ocr_text_layout.py \
+            tests/test_document_services.py tests/test_single_instance.py tests/test_theme_button.py
+      - name: Keep platform test results
+        if: always() && !inputs.signing_only
+        uses: actions/upload-artifact@v4
         with:
-          name: macos-popup-native-trace
-          path: build/macos/trace/
+          name: macos-${{ matrix.arch }}-platform-tests
+          path: |
+            build/macos/portable-tests/results.xml
+            build/macos/portable-tests/run.json
+          if-no-files-found: ignore
+      - name: Build and exercise native bundle
+        if: '!inputs.signing_only'
+        env:
+          # Only tags and explicit signed preparation use the permanent key.
+          CLICKNTRANSLATE_ALLOW_ADHOC: ${{ (startsWith(github.ref, 'refs/tags/') || inputs.prepare_release) && '0' || '1' }}
+          CLICKNTRANSLATE_SKIP_SMOKE: '0'
+          CLICKNTRANSLATE_SMOKE_TIMEOUT: '600'
+        run: bash tools/build_macos_release.sh
+      - name: Verify final release certificate
+        if: (startsWith(github.ref, 'refs/tags/') || inputs.prepare_release) && !inputs.signing_only
+        run: python tools/macos_ci_signing.py verify --app dist/ClicknTranslate.app --report build/macos/release-signature.json
+      - name: Stage signed files and source manifest
+        if: inputs.prepare_release && !inputs.signing_only
+        run: python tools/stage_macos_artifacts.py
+      - name: Keep files for a later coordinated release
+        id: prepared
+        if: inputs.prepare_release && !inputs.signing_only
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.arch }}-prepared
+          path: build/macos/prepared/*
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 90
+      - name: Link prepared files
+        if: inputs.prepare_release && !inputs.signing_only
+        env:
+          ARTIFACT_URL: ${{ steps.prepared.outputs.artifact-url }}
+          BUILD_ARCH: ${{ matrix.arch }}
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          with Path(os.environ['GITHUB_STEP_SUMMARY']).open('a') as output:
+              output.write(f"Prepared {os.environ['BUILD_ARCH']} files from `{os.environ['GITHUB_SHA']}`.\n\n")
+              output.write(f"[Download artifact]({os.environ['ARTIFACT_URL']}) (retained for 90 days).\n\n")
+              output.write('Permanent self-signed certificate; not notarized. Native GUI, OCR and worker checks passed. No GitHub Release or tag was created.\n')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: '!inputs.signing_only && !inputs.prepare_release'
+        with:
+          name: macos-${{ matrix.arch }}-release
+          path: |
+            releases/*-macos-${{ matrix.arch }}.*
+            build/macos/smoke.json
+            build/macos/smoke*.png
+          if-no-files-found: error
+      - name: Keep public signing verification
+        if: inputs.signing_only || startsWith(github.ref, 'refs/tags/')
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.arch }}-signing
+          path: |
+            build/macos/signing-probe.json
+            build/macos/release-signature.json
+          if-no-files-found: error
+      - name: Remove private signer from runner
+        if: always() && github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/') || inputs.signing_only || inputs.prepare_release)
+        run: python tools/macos_ci_signing.py cleanup
+      - name: Keep build diagnostics on failure
+        if: failure()
+        run: |
+          "$VENV/bin/python" - <<'PY'
+          from pathlib import Path
+          import subprocess
+          import psutil
+          app = Path('dist/ClicknTranslate.app').resolve()
+          executable = app / 'Contents/MacOS/ClicknTranslate'
+          output = Path('build/macos/diagnostics')
+          output.mkdir(parents=True, exist_ok=True)
+          for process in psutil.process_iter(['exe']):
+              if process.info['exe'] != str(executable):
+                  continue
+              try:
+                  subprocess.run(['/usr/bin/sample', str(process.pid), '2', '1', '-file',
+                                  str(output / f'process-{process.pid}.txt')], timeout=15)
+              except subprocess.TimeoutExpired:
+                  pass
+              try:
+                  process.terminate()
+                  process.wait(5)
+              except psutil.TimeoutExpired:
+                  process.kill()
+              except psutil.NoSuchProcess:
+                  pass
+          if app.is_dir():
+              subprocess.run(['/usr/bin/ditto', '-c', '-k', '--keepParent', str(app),
+                              str(output / 'unpublished-app.zip')], check=True)
+          PY
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.arch }}-diagnostics
+          path: |
+            build/macos/pyinstaller/**/warn-*.txt
+            build/macos/smoke*
+            build/macos/compatibility.json
+            build/macos/diagnostics/*
+          compression-level: 0
