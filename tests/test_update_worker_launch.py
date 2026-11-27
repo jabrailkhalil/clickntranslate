@@ -1,5 +1,6 @@
 """A rejected worker launch must release update controls and permit retry."""
 import threading
+import time
 from types import MethodType, SimpleNamespace
 from unittest import mock
 
@@ -10,6 +11,62 @@ import settings_window as settings
 from settings_window import OcrLanguageManagerDialog
 from test_desktop_ux import app
 from test_language_package_manager import _AppParent, _ManagerOwner
+
+
+def test_check_updates_reuses_a_catalog_being_loaded_when_the_center_opens(app, tmp_path, monkeypatch):
+    from PyQt5.QtTest import QTest
+    from component_texts import error_text
+    from component_catalog import ComponentError
+
+    started, release, waiting = threading.Event(), threading.Event(), threading.Event()
+    catalog = {'schema': 1, 'revision': 1, 'artifacts': {}, 'bundles': []}
+
+    def load_catalog(root):
+        started.set()
+        assert release.wait(5)
+        return catalog
+
+    parent = _AppParent()
+    owner = _ManagerOwner(parent)
+    with mock.patch.object(OcrLanguageManagerDialog, '_start_runtime_probe'):
+        dialog = OcrLanguageManagerDialog(owner)
+    dialog._initial_probe_timer.stop()
+    dialog._initial_catalog_timer.stop()
+    lock = dialog._catalog_read_lock
+
+    class ObserveWait:
+        def __enter__(self):
+            if lock.locked():
+                waiting.set()
+            lock.acquire()
+
+        def __exit__(self, *_args):
+            lock.release()
+
+    monkeypatch.setenv('CLICKNTRANSLATE_COMPONENTS_DIR', str(tmp_path))
+    dialog._catalog_read_lock = ObserveWait()
+    table = dialog.tesseract_table
+    button = next(action for action in table._package_engine_actions if action.property('packageAction') == 'update')
+    try:
+        with mock.patch('component_catalog.trusted_catalog', side_effect=load_catalog) as load, \
+             mock.patch.object(settings, 'managed_install_supported', return_value=True), \
+             mock.patch('translater.argos_package_catalog', return_value=[]):
+            dialog._start_argos_catalog_refresh(True)
+            assert started.wait(3)
+            button.trigger()
+            assert waiting.wait(3) and not button.isEnabled()
+            release.set()
+            deadline = time.monotonic() + 5
+            while (button.property('packageUpdateChecking') or dialog._argos_catalog_request_active) and time.monotonic() < deadline:
+                QTest.qWait(10)
+            load.assert_called_once()
+            assert button.isEnabled() and not button.property('packageUpdateChecking')
+            assert error_text(dialog.lang, ComponentError('no_compatible_update')) in table._package_size_label.text()
+    finally:
+        release.set()
+        dialog.close()
+        owner.close()
+        parent.close()
 
 
 def unavailable_thread(point):

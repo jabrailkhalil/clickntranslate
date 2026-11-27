@@ -6576,6 +6576,8 @@ class OcrLanguageManagerDialog(QDialog):
         self._runtime_probe_active = False
         self._package_sizes = None
         self._package_sizes_error = ''
+        self._catalog_read_lock = threading.Lock()
+        self._verified_catalog = None
         self._engine_states = {}
         self._download_access_page = None
         self._title_drag_offset = None
@@ -8019,20 +8021,31 @@ class OcrLanguageManagerDialog(QDialog):
             from component_texts import error_text
             self._on_update_plan_ready(table._package_engine, {'error': error_text(self.lang, error)})
 
+    def _refresh_catalog(self, store, previous):
+        # Both locks are held. A concurrent request can reuse the catalog
+        # refreshed since it started; a later independent check fetches again.
+        from component_catalog import trusted_catalog
+        if self._verified_catalog is previous:
+            self._verified_catalog = trusted_catalog(store.root)
+        return self._verified_catalog
+
     def _check_update_worker(self, engine):
-        from component_catalog import trusted_catalog, component_store_path
+        from component_catalog import component_store_path
         from component_store import ComponentStore
         from engine_center import compare_update
         try:
             store = ComponentStore(component_store_path())
-            with store.lock():
-                catalog = trusted_catalog(store.root)
+            previous = self._verified_catalog
+            with self._catalog_read_lock, store.lock():
+                catalog = self._refresh_catalog(store, previous)
                 result = compare_update(catalog, engine, store=store,
                     channel=os.environ.get('CLICKNTRANSLATE_COMPONENT_CHANNEL', 'stable'))
             self._package_sizes_ready.emit(catalog)
         except Exception as error:
             from component_texts import error_text
-            result = {'error': error_text(self.lang, error)}
+            message = (language_manager_text(self.lang, 'task_busy_help')
+                       if getattr(error, 'code', '') == 'operation_busy' else error_text(self.lang, error))
+            result = {'error': message}
         try:
             self._update_plan_ready.emit(engine, result)
         except RuntimeError:
@@ -8567,16 +8580,17 @@ class OcrLanguageManagerDialog(QDialog):
         try:
             import translater
             if refresh and managed_install_supported():
-                from component_catalog import trusted_catalog, component_store_path
+                from component_catalog import component_store_path
                 from component_store import ComponentStore
                 from component_argos import catalog_rows
                 store = ComponentStore(component_store_path())
-                with store.lock():
-                    catalog = trusted_catalog(store.root)
-                self._package_sizes_ready.emit(catalog)
-                # Reuse the authenticated bytes for Argos: opening one dialog
-                # must not make two separate metadata-refresh requests.
-                packages = catalog_rows(refresh=True, catalog_loader=lambda _root: catalog)
+                previous = self._verified_catalog
+                with self._catalog_read_lock:
+                    with store.lock():
+                        catalog = self._refresh_catalog(store, previous)
+                    self._package_sizes_ready.emit(catalog)
+                    # catalog_rows acquires its own store lock for installed models.
+                    packages = catalog_rows(refresh=True, catalog_loader=lambda _root: catalog)
             else:
                 packages = translater.argos_package_catalog(refresh=refresh)
         except Exception as exc:
