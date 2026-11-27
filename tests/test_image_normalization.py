@@ -307,11 +307,16 @@ def test_optional_corrupt_png_exif_never_rejects_readable_pixels(tmp_path, metad
 
 
 @pytest.mark.parametrize('metadata', [b'broken', b'Exif\x00\x00bad'], ids=['not-tiff', 'bad-prefixed-tiff'])
-def test_qt_rejected_corrupt_png_remains_invalid(tmp_path, metadata):
+def test_optional_bad_exif_preserves_the_native_png_decoder_result(tmp_path, metadata):
     path = tmp_path / 'qt-rejected-exif.png'
-    png_with_late_exif(path, metadata)
-    with pytest.raises(ValueError, match='invalid'):
-        images.load_image(path)
+    expected = png_with_late_exif(path, metadata)
+    # Versions of libpng differ on whether bad ancillary metadata is fatal.
+    # A readable image must keep its original pixels in either decoder.
+    if QtGui.QImageReader(str(path)).read().isNull():
+        with pytest.raises(ValueError, match='invalid'):
+            images.load_image(path)
+    else:
+        assert_corners(images.load_image(path), expected)
 
 
 @pytest.mark.parametrize('error', [OSError, ValueError, OverflowError, RuntimeError])
