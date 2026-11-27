@@ -1,4 +1,4 @@
-"""Hindi remains readable without an OS language/font package or internet."""
+"""Bundled interface fallbacks work without an OS language/font package or internet."""
 from pathlib import Path
 
 from PyQt5 import QtGui
@@ -29,3 +29,17 @@ def test_bundled_devanagari_font_shapes_hindi_without_missing_glyphs(app, weight
 def test_bundled_script_font_has_redistribution_license():
     text = Path(main.resource_path('icons/fonts/NOTO-DEVANAGARI-LICENSE.txt')).read_text(encoding='utf-8')
     assert 'SIL OPEN FONT LICENSE' in text
+
+
+def test_chinese_fallback_covers_the_interface_in_both_weights(app):
+    from tools.build_chinese_ui_font import FAMILY, interface_codepoints
+
+    codepoints = interface_codepoints()
+    assert {ord(char) for char in "中文翻译设置"} <= codepoints
+    for weight in ("Regular", "Bold"):
+        path = main.resource_path(f"icons/fonts/ClicknTranslateHan-{weight}.otf")
+        face = QtGui.QRawFont(str(path), 16, QtGui.QFont.PreferDefaultHinting)
+        assert face.isValid() and face.familyName() == FAMILY
+        assert face.styleName() == weight
+        missing = {f"U+{code:04X}" for code in codepoints if not face.supportsCharacter(code)}
+        assert not missing, missing
