@@ -7,6 +7,7 @@ from PyQt5 import QtCore, QtWidgets
 
 import api_providers
 import main
+import platform_support
 import provider_secrets
 import settings_window
 from provider_settings import show_provider_settings, routing_text
@@ -15,7 +16,7 @@ from test_desktop_ux import app, window
 
 @pytest.fixture
 def page(window, app):
-    window.config.update(translator_engine='Google', ocr_engine='Windows', api_providers={})
+    window.config.update(translator_engine='Google', ocr_engine=platform_support.default_ocr_engine(), api_providers={})
     window.show_settings()
     with (mock.patch.object(provider_secrets, 'get_key', return_value='qa-only-key'),
           mock.patch.object(provider_secrets, 'set_key', return_value=True) as store,
@@ -28,7 +29,7 @@ def page(window, app):
         app.processEvents()
 
 
-@pytest.mark.parametrize('usage,translator,ocr', [('text', 'gemini', 'Windows'),
+@pytest.mark.parametrize('usage,translator,ocr', [('text', 'gemini', platform_support.default_ocr_engine()),
                                                ('ocr', 'Google', 'Gemini API'),
                                                ('direct', 'gemini', 'Gemini API')])
 def test_save_and_select_changes_only_the_requested_engines(page, usage, translator, ocr):
@@ -81,7 +82,7 @@ def test_invalid_connection_does_not_change_the_active_engines(page):
     with mock.patch.object(api_providers, 'validate', side_effect=api_providers.ProviderError('Add an API key')):
         editor.use.click()
     assert owner.config['translator_engine'] == 'Google'
-    assert owner.config['ocr_engine'] == 'Windows'
+    assert owner.config['ocr_engine'] == platform_support.default_ocr_engine()
 
 
 def test_preview_updates_from_model_and_usage_without_saving_or_using_the_key(page):

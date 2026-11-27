@@ -997,7 +997,8 @@ class MainWindowGeometryTest(unittest.TestCase):
 
     def test_next_button_cannot_skip_multiple_cards_during_transition(self):
         self.window._guide_active = True
-        self.window._guide_step_index = main.ONBOARDING_ORDER.index("shortcut_ocr")
+        actions = [step[0] for step in self.window._guide_steps()]
+        self.window._guide_step_index = actions.index("shortcut_ocr")
         self.window._show_guide_step()
         start = self.window._guide_step_index
 
@@ -1013,7 +1014,8 @@ class MainWindowGeometryTest(unittest.TestCase):
 
     def test_clicking_a_highlighted_control_also_locks_next_until_new_card(self):
         self.window._guide_active = True
-        self.window._guide_step_index = main.ONBOARDING_ORDER.index("shortcut_ocr")
+        actions = [step[0] for step in self.window._guide_steps()]
+        self.window._guide_step_index = actions.index("shortcut_ocr")
         self.window._show_guide_step()
         start = self.window._guide_step_index
         action = self.window._guide_current_action()

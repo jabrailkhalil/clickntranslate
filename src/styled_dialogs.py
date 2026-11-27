@@ -491,8 +491,15 @@ class CopyNotificationPopup(StatusPopup):
         bounds = screen.availableGeometry().adjusted(18, 18, -18, -18)
         from ui_scaling import desktop_control_scale
         factor = desktop_control_scale(screen)
-        self.setMaximumWidth(min(round(360 * factor), bounds.width()))
-        self.adjustSize()
+        self.setWordWrap(False)
+        self.ensurePolished()
+        natural = self.sizeHint()
+        max_width = max(1, min(round(360 * factor), bounds.width()))
+        if natural.width() > max_width:
+            self.setWordWrap(True)
+            self.resize(max_width, self.heightForWidth(max_width))
+        else:
+            self.resize(natural)
         destination = bounds
         if anchor_rect:
             inset = round(12 * factor)

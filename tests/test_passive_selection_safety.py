@@ -267,11 +267,11 @@ def test_foreground_process_uses_full_width_hwnd_without_touching_an_application
         return 8
     api = SimpleNamespace(GetForegroundWindow=NativeCall(lambda: hwnd),
                           GetWindowThreadProcessId=NativeCall(process_id))
-    monkeypatch.setattr(ctypes, 'WinDLL', lambda *_args, **_kwargs: api)
+    monkeypatch.setattr(ctypes, 'WinDLL', lambda *_args, **_kwargs: api, raising=False)
     assert selection._foreground_process(hwnd) == 77
     assert selection._foreground_process(hwnd + 1) == 0
     monkeypatch.setattr(platform_support, 'IS_WINDOWS', True)
-    monkeypatch.setattr(main.ctypes, 'windll', SimpleNamespace(user32=api))
+    monkeypatch.setattr(main.ctypes, 'windll', SimpleNamespace(user32=api), raising=False)
     assert main._windows_foreground_window() == hwnd
 
 

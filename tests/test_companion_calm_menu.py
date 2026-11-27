@@ -10,7 +10,7 @@ from assistant_motion import PetMotion, paint_pet
 from assistant_settings import ASSISTANT_ACTIONS, LEGACY_DEFAULT_ACTIONS, normalized_assistant_actions
 from assistant_text import ASSISTANT_TEXT, assistant_action_text
 from desktop_assistant import AssistantMenu, FOREGROUND_ACTIONS
-from test_desktop_assistant import app, companion
+from test_desktop_assistant import app, companion, windows_selection_platform
 
 
 def render(mascot, action='idle', time=0., state_time=0., gaze=None):
@@ -112,7 +112,8 @@ def test_activity_changes_remeasure_the_menu_without_clipping_its_footer(app):
 
 
 @pytest.mark.parametrize('action,method', [('selection', 'launch_translate_selection'), ('replace', 'launch_translate_replace_selection')])
-def test_selection_modes_restore_external_focus_before_dispatch(companion, app, action, method):
+def test_selection_modes_restore_external_focus_before_dispatch(companion, app, action, method,
+                                                               windows_selection_platform):
     assert action in FOREGROUND_ACTIONS
     companion._selection_target = 123
     order = []
@@ -130,7 +131,7 @@ def test_selection_modes_restore_external_focus_before_dispatch(companion, app, 
 
 
 def test_unsupported_linux_replacement_is_clear_and_never_dispatched(companion):
-    with mock.patch('desktop_assistant.sys.platform', 'linux'):
+    with mock.patch('platform_support.IS_LINUX', True):
         companion.toggle_menu()
         assert not companion.menu.buttons['replace'].isEnabled()
         assert companion.menu.buttons['replace'].toolTip()

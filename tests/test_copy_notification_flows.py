@@ -167,6 +167,28 @@ def test_notification_fits_cursor_monitor_and_localized_text(monkeypatch, langua
         app.setProperty("ui_theme", previous_theme)
 
 
+def test_narrow_cursor_monitor_wraps_the_notice_and_a_later_short_copy_shrinks(monkeypatch):
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    monitor = QtCore.QRect(-440, 0, 440, 400)
+    screen = SimpleNamespace(availableGeometry=lambda: monitor, logicalDotsPerInch=lambda: 192)
+    monkeypatch.setattr(QtWidgets.QApplication, "screenAt", staticmethod(lambda _pos: screen))
+    popup = CopyNotificationPopup()
+    try:
+        popup.show_message(main.TRANSLATION_RESULT_DIALOG_TEXT["pt"]["copied"])
+        app.processEvents()
+        wrapped = popup.size()
+        assert popup.wordWrap()
+        assert monitor.adjusted(18, 18, -18, -18).contains(popup.geometry())
+        assert wrapped.height() >= popup.heightForWidth(wrapped.width())
+        popup.show_message("OK")
+        app.processEvents()
+        assert not popup.wordWrap()
+        assert popup.width() < wrapped.width() and popup.height() < wrapped.height()
+    finally:
+        popup.close()
+        popup.deleteLater()
+
+
 def test_no_monitor_safely_skips_feedback(monkeypatch):
     QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     popup = CopyNotificationPopup()

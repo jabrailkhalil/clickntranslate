@@ -232,6 +232,10 @@ def test_source_adapter_uses_private_python_only_for_known_sdk(monkeypatch):
     monkeypatch.delattr(sys,'frozen',raising=False)
     runtime=dict(command=['private runtime/python.exe','private runtime/adapter/ocr_worker.py'],
                  receipt=dict(component='ocr.rapidocr',upstream='3.10.0'))
+    for platform in ('linux', 'darwin'):
+        monkeypatch.setattr(sys, 'platform', platform)
+        assert source_ocr_adapter_command(runtime) is None
+    monkeypatch.setattr(sys, 'platform', 'win32')
     command=source_ocr_adapter_command(runtime)
     assert command[0]==runtime['command'][0]
     assert Path(command[1])==ROOT/'src/ocr_runtime_entry.py'

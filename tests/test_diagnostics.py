@@ -63,6 +63,7 @@ def test_frozen_metadata_missing_does_not_claim_the_worker_engine_is_uninstalled
 
 def test_report_identifies_separate_workers_and_cpu_without_running_engines(tmp_path, monkeypatch):
     import subprocess
+    from platform_support import executable_name
     root = tmp_path / 'ClicknTranslate'
     workers = root / 'app' / '_internal'
     workers.mkdir(parents=True)
@@ -70,8 +71,9 @@ def test_report_identifies_separate_workers_and_cpu_without_running_engines(tmp_
     data.mkdir()
     (data / 'config.json').write_text('{}', encoding='utf-8')
     argos = b'Argos worker fixture'
-    (workers / 'ArgosWorker.exe').write_bytes(argos)
-    (workers / 'OcrWorker.exe').write_bytes(b'OCR worker fixture')
+    (workers / executable_name('ArgosWorker')).write_bytes(argos)
+    (workers / executable_name('OcrWorker')).write_bytes(b'OCR worker fixture')
+    monkeypatch.setattr(diagnostics.platform, 'platform', lambda: 'QA system')
     monkeypatch.setattr(diagnostics, '_portable_root', lambda: root)
     monkeypatch.setattr(diagnostics.platform, 'processor', lambda: 'QA CPU model')
     monkeypatch.setattr(diagnostics.os, 'cpu_count', lambda: 8)

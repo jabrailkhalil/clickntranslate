@@ -12942,7 +12942,10 @@ class DarkThemeApp(QMainWindow):
     def eventFilter(self, watched, event):
         picker = getattr(self, '_interface_language_picker', None)
         if picker is not None:
-            if event.type() == QtCore.QEvent.WindowDeactivate and watched is self:
+            if (watched is getattr(self, 'main_text_section', None)
+                    and event.type() in (QtCore.QEvent.Move, QtCore.QEvent.Resize)):
+                QTimer.singleShot(0, self._position_interface_language_picker)
+            elif event.type() == QtCore.QEvent.WindowDeactivate and watched is self:
                 self._close_interface_language_picker(restore_focus=False)
             elif event.type() == QtCore.QEvent.MouseButtonPress and isinstance(watched, QWidget):
                 if watched.window() is self.ui_root:
@@ -14261,7 +14264,7 @@ class DarkThemeApp(QMainWindow):
         picker = getattr(self, '_interface_language_picker', None)
         if picker is not None:
             picker.set_language(language_code)
-            self._position_interface_language_picker()
+            QTimer.singleShot(0, self._position_interface_language_picker)
         if self.document_dialog is not None and self.document_dialog.isVisible():
             self.document_dialog.refresh_language(language_code)
         for dialog in _live_translation_result_dialogs():

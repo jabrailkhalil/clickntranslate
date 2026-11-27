@@ -13,6 +13,7 @@ from assistant_settings import ASSISTANT_ACTIONS
 from desktop_assistant import (DesktopAssistant, AssistantMenu, ACTION_METHODS,
                                CAPTURE_ACTIONS, clamp_position, normalized_position)
 import mode_coordinator
+import platform_support
 from qt_layout_test_support import ensure_layout_fonts
 
 
@@ -77,17 +78,21 @@ def test_macos_companion_opts_out_of_native_shadow_and_deactivation_hiding(compa
     assert companion.anchor.testAttribute(QtCore.Qt.WA_ShowWithoutActivating)
 
 
+@pytest.fixture
+def windows_selection_platform(monkeypatch):
+    monkeypatch.setattr(platform_support, 'IS_WINDOWS', True)
+    monkeypatch.setattr(platform_support, 'IS_MAC', False)
+    monkeypatch.setattr(platform_support, 'IS_LINUX', False)
+
+
 @pytest.mark.parametrize('action', tuple(ACTION_METHODS) + ('text', 'settings'))
-def test_actions_reuse_existing_workflows_and_preserve_provider(companion, action, monkeypatch):
+def test_actions_reuse_existing_workflows_and_preserve_provider(
+        companion, action, monkeypatch, windows_selection_platform):
     if action in ('selection', 'replace'):
         monkeypatch.setattr(companion, '_remember_foreground', lambda: None)
         monkeypatch.setattr(companion, '_restore_foreground', lambda: True)
         companion._selection_target = 42
     companion.request_action(action)
-    if action == 'replace' and sys.platform.startswith('linux'):
-        companion.owner.launch_translate_replace_selection.assert_not_called()
-        assert not companion._dispatch_timer.isActive()
-        return
     assert companion.anchor.isVisible() == (action not in CAPTURE_ACTIONS)
     companion.request_action(action)  # Ignore a duplicate click during dispatch.
     QTest.qWait(220)

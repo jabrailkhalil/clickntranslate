@@ -19,6 +19,7 @@ from assistant_motion import PetMotion, paint_pet, play_reaction
 from assistant_sprites import look_index
 from ui_scaling import desktop_control_scale
 import mode_coordinator
+import platform_support
 
 
 CAPTURE_ACTIONS = frozenset(('screen', 'area', 'dynamic', 'copy'))
@@ -401,7 +402,7 @@ class AssistantMenu(QtWidgets.QFrame):
         for action in selected:
             button = ActionButton(*assistant_action_text(language, action), dark)
             button.setMinimumHeight(34)
-            if action == 'replace' and sys.platform.startswith('linux'):
+            if action == 'replace' and platform_support.IS_LINUX:
                 from settings_window import settings_text
                 button.setEnabled(False)
                 button.setToolTip(settings_text(language, 'replace_selection_unavailable'))
@@ -478,7 +479,7 @@ class AssistantMenu(QtWidgets.QFrame):
     def set_actions_enabled(self, enabled):
         for action, button in self.buttons.items():
             if action != 'hide':
-                button.setEnabled(bool(enabled) and not (action == 'replace' and sys.platform.startswith('linux')))
+                button.setEnabled(bool(enabled) and not (action == 'replace' and platform_support.IS_LINUX))
 
     def set_status(self, text, *, error=False):
         if self.activity_label.property('statusError') != error:
@@ -782,7 +783,6 @@ class DesktopAssistant(QtCore.QObject):
     def _remember_foreground(self):
         if self._closed:
             return
-        import platform_support
         from game_mode import _foreground_window, _window_belongs_to_this_process
         current = _foreground_window()
         if current and not _window_belongs_to_this_process(current):
@@ -815,7 +815,7 @@ class DesktopAssistant(QtCore.QObject):
             return
         if action not in (*ACTION_METHODS, *BEHAVIORS, 'home', 'open', 'text', 'settings', 'hide'):
             return
-        if action == 'replace' and sys.platform.startswith('linux'):
+        if action == 'replace' and platform_support.IS_LINUX:
             return
         if action in BEHAVIORS and self.anchor.appearance not in ('animated', 'walking'):
             return
@@ -833,7 +833,6 @@ class DesktopAssistant(QtCore.QObject):
             return
         self._remember_foreground()
         if action in ('selection', 'replace'):
-            import platform_support
             if platform_support.IS_MAC and not self._selection_target:
                 from macos_desktop import ensure_permission
                 if not ensure_permission('accessibility', self.owner, self._context[0]):
@@ -870,7 +869,6 @@ class DesktopAssistant(QtCore.QObject):
 
     def _restore_foreground(self):
         try:
-            import platform_support
             from game_mode import _foreground_window, _window_belongs_to_this_process
             if not (platform_support.IS_WINDOWS or platform_support.IS_MAC):
                 return True
