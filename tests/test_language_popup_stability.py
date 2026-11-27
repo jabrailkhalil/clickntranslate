@@ -23,6 +23,35 @@ def settle(app):
     app.processEvents()
 
 
+def test_first_open_uses_the_final_field_width_when_layout_settles(app):
+    owner = QtWidgets.QWidget()
+    layout = QtWidgets.QVBoxLayout(owner)
+    combo = DropDownCombo(owner)
+    layout.addWidget(combo)
+    for language in LANGUAGES:
+        combo.addItem(language.english_name, language.code)
+    owner.resize(640, 100)
+    owner.show()
+    settle(app)
+    try:
+        combo.showPopup()
+        initial_field_width = combo.width()
+        # A scaled Cocoa page can finish laying out its field after Show.
+        owner.resize(330, 100)
+        settle(app)
+        first = popup_rect(combo).width()
+        combo.hidePopup()
+        combo.showPopup()
+        settle(app)
+        assert combo.width() < initial_field_width
+        assert first == popup_rect(combo).width() < initial_field_width
+    finally:
+        combo.hidePopup()
+        owner.close()
+        owner.deleteLater()
+        app.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)
+
+
 @pytest.mark.parametrize('percent', (80, 100, 137))
 def test_main_and_hotkey_language_search_shrinks_without_moving_input(window, app, percent, tmp_path):
     window.set_ui_scale_percent(percent)
