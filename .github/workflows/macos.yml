@@ -1,72 +1,62 @@
-name: Verify the installed macOS test packages
+name: Upgrade an old Mac install with the signed test ZIP
 on:
   workflow_dispatch:
-    inputs:
-      run_id:
-        required: true
-        type: string
-        description: Source run containing the staged packages
-      source_sha:
-        required: true
-        type: string
-        description: Exact expected source commit
 permissions:
   contents: read
   actions: read
 jobs:
-  verify:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - {runner: macos-15, arch: arm64}
-          - {runner: macos-15-intel, arch: x86_64}
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 28
-    env:
-      TARGET_RUN: ${{ inputs.run_id }}
-      EXPECTED_SHA: ${{ inputs.source_sha }}
-      ARCH: ${{ matrix.arch }}
+  upgrade:
+    runs-on: macos-15
+    timeout-minutes: 14
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: eec0ed7951b1dafbe6479701162b6ca0d57ee324
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Locate the exact candidate and architecture in Actions
+          cache: pip
+          cache-dependency-path: tools/requirements/macos.txt
+      - run: bash tools/setup_macos_env.sh
+      - uses: actions/download-artifact@v4
+        with:
+          run-id: 45970538250
+          github-token: ${{ github.token }}
+          name: macos-arm64-prepared
+          path: ${{ runner.temp }}/new
+      - name: Verify the public 1.8.2 ZIP and signed 1.8.3 candidate
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -eu
-          [[ "$TARGET_RUN" =~ ^[0-9]+$ && "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
-          test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$TARGET_RUN" --jq '.head_sha')" = "$EXPECTED_SHA"
-          for attempt in $(seq 1 55); do
-            if gh api "repos/$GITHUB_REPOSITORY/actions/runs/$TARGET_RUN/artifacts" --jq '.artifacts[].name' | grep -Fxq "macos-$ARCH-prepared"; then exit 0; fi
-            if [ "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$TARGET_RUN" --jq '.status')" = completed ]; then exit 1; fi
-            sleep 15
-          done
-          exit 1
-      - uses: actions/download-artifact@v4
-        with:
-          run-id: ${{ inputs.run_id }}
-          github-token: ${{ github.token }}
-          name: macos-${{ matrix.arch }}-prepared
-          path: ${{ runner.temp }}/candidate
-      - name: Validate both hashes and install the unchanged signed DMG
+          mkdir "$RUNNER_TEMP/old"
+          gh release download v1.8.2 -R "$GITHUB_REPOSITORY" -D "$RUNNER_TEMP/old" -p 'Click-n-Translate-1.8.2-macos-arm64.zip' -p 'Click-n-Translate-1.8.2-macos-arm64.sha256'
+          cd "$RUNNER_TEMP/old"
+          grep '\.zip$' *arm64.sha256 | shasum -a 256 -c -
+          ditto -x -k Click-n-Translate-1.8.2-macos-arm64.zip "$RUNNER_TEMP/old"
+          test "$(defaults read "$RUNNER_TEMP/old/ClicknTranslate.app/Contents/Info" CFBundleShortVersionString)" = '1.8.2'
+          codesign --verify --deep --strict -R '=identifier "io.github.jabrailkhalil.clickntranslate" and certificate root = H"fc6752f0026d34e5b63433544af788b8fc1899ef"' "$RUNNER_TEMP/old/ClicknTranslate.app"
+          cd "$RUNNER_TEMP/new"
+          shasum -a 256 -c *arm64.sha256
+          test "$(jq -r .source_commit BUILD.json)" = 'eec0ed7951b1dafbe6479701162b6ca0d57ee324'
+      - name: Update a release 1.8.2 bundle and verify GUI readiness and saved profile
         run: |
-          set -eu
-          export CANDIDATE="$RUNNER_TEMP/candidate"
-          mkdir -p "$RUNNER_TEMP/cnt-dmg"
-          (cd "$CANDIDATE" && shasum -a 256 -c *"$ARCH".sha256)
-          dmg="$CANDIDATE/Click-n-Translate-1.8.3-macos-$ARCH.dmg"
-          hdiutil verify "$dmg"
-          hdiutil attach -readonly -nobrowse -mountpoint "$RUNNER_TEMP/cnt-dmg" "$dmg"
-          test ! -e /Applications/ClicknTranslate.app
-          sudo ditto "$RUNNER_TEMP/cnt-dmg/ClicknTranslate.app" /Applications/ClicknTranslate.app
-          hdiutil detach "$RUNNER_TEMP/cnt-dmg"
-          codesign --verify --deep --strict -R '=identifier "io.github.jabrailkhalil.clickntranslate" and certificate root = H"fc6752f0026d34e5b63433544af788b8fc1899ef"' /Applications/ClicknTranslate.app
-          python tools/qa_installed_macos_package.py
+          .venv-macos/bin/python tools/qa_posix_update.py --kind macos --installed "$RUNNER_TEMP/old/ClicknTranslate.app" --package "$RUNNER_TEMP/new/Click-n-Translate-1.8.3-macos-arm64.zip" --version 1.8.3 --output "$RUNNER_TEMP/upgrade-success"
+      - name: Verify that a killed replacement restores the actual 1.8.2 app
+        run: |
+          .venv-macos/bin/python tools/qa_posix_update.py --kind macos --installed "$RUNNER_TEMP/old/ClicknTranslate.app" --package "$RUNNER_TEMP/new/Click-n-Translate-1.8.3-macos-arm64.zip" --version 1.8.3 --output "$RUNNER_TEMP/upgrade-rollback" --scenario rollback
+      - name: Collect only compact upgrade results
+        if: always()
+        run: |
+          mkdir -p build/macos/trace
+          for result in success rollback; do
+            for file in report controller ui; do
+              f="$RUNNER_TEMP/upgrade-$result/$file.json"
+              if [ -f "$f" ]; then cp "$f" "build/macos/trace/$result-$file.json"; fi
+            done
+          done
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: macos-${{ matrix.arch }}-installed
+          name: macos-native-upgrade
           path: build/macos/trace/
