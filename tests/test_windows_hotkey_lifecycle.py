@@ -119,13 +119,22 @@ BINDINGS = (
 )
 
 
-@pytest.mark.parametrize('binding', BINDINGS, ids=lambda item: item[0])
-def test_preview_and_layout_modes_save_preferences_without_registering_keys(window, binding):
-    key, method, _callback, _identifier = binding
-    assert window._hotkey_services_enabled is False  # Fixture uses layout mode.
+@pytest.fixture
+def windows_hotkey_settings(window, monkeypatch):
+    monkeypatch.setattr(main.platform_support, 'IS_WINDOWS', True)
+    monkeypatch.setattr(main.platform_support, 'IS_MAC', False)
+    monkeypatch.setattr(main.platform_support, 'IS_LINUX', False)
     window.show_settings()
     settings = window.settings_window
     settings.show_hotkeys_screen()
+    return settings
+
+
+@pytest.mark.parametrize('binding', BINDINGS, ids=lambda item: item[0])
+def test_preview_and_layout_modes_save_preferences_without_registering_keys(window, windows_hotkey_settings, binding):
+    key, method, _callback, _identifier = binding
+    assert window._hotkey_services_enabled is False  # Fixture uses layout mode.
+    settings = windows_hotkey_settings
     window.HotkeyListenerThread = mock.Mock()
     getattr(settings, key+'_input').setHotkeyText('Ctrl+Alt+F23')
     getattr(settings, method)()
@@ -134,11 +143,9 @@ def test_preview_and_layout_modes_save_preferences_without_registering_keys(wind
 
 
 @pytest.mark.parametrize('binding', BINDINGS, ids=lambda item: item[0])
-def test_focus_out_without_editing_does_not_restart_a_working_shortcut(window, binding):
+def test_focus_out_without_editing_does_not_restart_a_working_shortcut(window, windows_hotkey_settings, binding):
     key, method, _callback, _identifier = binding
-    window.show_settings()
-    settings = window.settings_window
-    settings.show_hotkeys_screen()
+    settings = windows_hotkey_settings
     old = mock.Mock()
     old.is_alive.return_value = True
     setattr(window, key+'_thread', old)
@@ -155,11 +162,9 @@ def test_focus_out_without_editing_does_not_restart_a_working_shortcut(window, b
 
 
 @pytest.mark.parametrize('binding', BINDINGS, ids=lambda item: item[0])
-def test_changed_shortcut_replaces_only_its_listener_and_clear_keeps_it_disabled(window, binding):
+def test_changed_shortcut_replaces_only_its_listener_and_clear_keeps_it_disabled(window, windows_hotkey_settings, binding):
     key, method, callback, identifier = binding
-    window.show_settings()
-    settings = window.settings_window
-    settings.show_hotkeys_screen()
+    settings = windows_hotkey_settings
     old, new = mock.Mock(), mock.Mock()
     setattr(window, key+'_thread', old)
     window.HotkeyListenerThread = mock.Mock(return_value=new)
@@ -185,11 +190,9 @@ def test_changed_shortcut_replaces_only_its_listener_and_clear_keeps_it_disabled
         window._hotkey_services_enabled = False
 
 
-def test_external_registration_conflict_preserves_saved_shortcut_and_editor(window, app, fake_api, monkeypatch):
+def test_external_registration_conflict_preserves_saved_shortcut_and_editor(window, windows_hotkey_settings, app, fake_api, monkeypatch):
     fake_api.success = False
-    window.show_settings()
-    settings = window.settings_window
-    settings.show_hotkeys_screen()
+    settings = windows_hotkey_settings
     window._hotkey_services_enabled = True
     field = settings.copy_hotkey_input
     field.setHotkeyText('Ctrl+Alt+F23')
@@ -210,10 +213,8 @@ def test_external_registration_conflict_preserves_saved_shortcut_and_editor(wind
         window._hotkey_services_enabled = False
 
 
-def test_unchanged_shortcut_can_retry_a_failed_registration(window):
-    window.show_settings()
-    settings = window.settings_window
-    settings.show_hotkeys_screen()
+def test_unchanged_shortcut_can_retry_a_failed_registration(window, windows_hotkey_settings):
+    settings = windows_hotkey_settings
     old, new = mock.Mock(), mock.Mock()
     old.is_alive.return_value = False
     window.copy_hotkey_thread = old
@@ -226,6 +227,22 @@ def test_unchanged_shortcut_can_retry_a_failed_registration(window):
         assert window.config['copy_hotkey'] == settings.copy_hotkey_input.hotkeyText()
     finally:
         window._hotkey_services_enabled = False
+
+
+def test_linux_saves_changed_shortcut_without_registering_a_windows_listener(window, monkeypatch):
+    monkeypatch.setattr(main.platform_support, 'IS_WINDOWS', False)
+    monkeypatch.setattr(main.platform_support, 'IS_MAC', False)
+    monkeypatch.setattr(main.platform_support, 'IS_LINUX', True)
+    window.show_settings()
+    settings = window.settings_window
+    settings.show_hotkeys_screen()
+    window.HotkeyListenerThread = mock.Mock()
+    monkeypatch.setattr(window, '_hotkey_services_enabled', True)
+    settings.copy_hotkey_input.setHotkeyText('Ctrl+Alt+F23')
+    settings.save_copy_hotkey()
+    assert window.config['copy_hotkey'] == 'Ctrl+Alt+F23'
+    assert getattr(window, 'copy_hotkey_thread', None) is None
+    window.HotkeyListenerThread.assert_not_called()
 
 
 def test_import_does_not_enable_hotkeys_in_a_preview(window):

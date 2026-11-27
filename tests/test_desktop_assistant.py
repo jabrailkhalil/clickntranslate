@@ -6,7 +6,7 @@ from unittest import mock
 
 import pytest
 from PyQt5 import QtCore, QtGui, QtWidgets, sip
-from PyQt5.QtTest import QTest
+from PyQt5.QtTest import QSignalSpy, QTest
 
 from assistant_text import ASSISTANT_TEXT, assistant_text
 from assistant_settings import ASSISTANT_ACTIONS
@@ -92,15 +92,20 @@ def test_actions_reuse_existing_workflows_and_preserve_provider(
         monkeypatch.setattr(companion, '_remember_foreground', lambda: None)
         monkeypatch.setattr(companion, '_restore_foreground', lambda: True)
         companion._selection_target = 42
+    dispatched = QSignalSpy(companion._dispatch_timer.timeout)
     companion.request_action(action)
     assert companion.anchor.isVisible() == (action not in CAPTURE_ACTIONS)
     companion.request_action(action)  # Ignore a duplicate click during dispatch.
-    QTest.qWait(220)
+    assert dispatched or dispatched.wait(2000)
     method = {'text': 'open_text_translation', 'settings': 'show_settings'}.get(action, ACTION_METHODS.get(action))
     expected = {'expected_target': 42} if action in ('selection', 'replace') else {}
     getattr(companion.owner, method).assert_called_once_with(**expected)
     assert companion.owner.config['translator_engine'] == 'DeepL'
-    QTest.qWait(370)
+    for _ in range(100):
+        if not companion._dispatching:
+            break
+        QTest.qWait(20)
+    assert not companion._dispatching
     assert companion.anchor.isVisible()
 
 

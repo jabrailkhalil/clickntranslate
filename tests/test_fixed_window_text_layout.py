@@ -287,15 +287,18 @@ class FixedWindowTextLayoutTest(unittest.TestCase):
                             self.assertTrue(current.rect().contains(self.rect_in(current, button)))
 
     def test_dynamic_tab_explains_the_mode_and_launches_the_real_action(self):
-        self.window.show_settings()
-        settings = self.window.settings_window
-        settings.settings_page_tabs[2].click()
-        self.settle()
+        with (mock.patch("ocr.installed_ocr_language_codes", return_value={"en"}),
+              mock.patch("ocr._translation_targets_for_source", return_value={"ru"})):
+            self.window.show_settings()
+            settings = self.window.settings_window
+            settings.settings_page_tabs[2].click()
+            self.settle()
         self.assertEqual(settings._settings_page_index, 2)
         self.assertTrue(settings.game_help_button.isVisible())
         self.assertTrue(settings.game_manual_output_checkbox.isVisible())
         self.assertTrue(settings.game_toolbar_checkbox.isVisible())
         self.assertTrue(settings.game_launch_button.isVisible())
+        self.assertTrue(settings.game_launch_button.isEnabled())
         with mock.patch.object(self.window, 'show_dynamic_translation_help') as help_dialog:
             settings.game_help_button.click()
         help_dialog.assert_called_once_with()

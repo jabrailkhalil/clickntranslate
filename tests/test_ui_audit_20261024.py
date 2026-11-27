@@ -10,6 +10,7 @@ from pathlib import Path
 import threading
 import builtins
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import keyboard_navigation as keyboard
 import main
@@ -410,11 +411,17 @@ def test_history_ui_reports_corruption_and_preserves_the_file_on_clear(window, t
     assert path.read_text(encoding='utf-8') == payload
 
 
+@pytest.fixture
+def windows_shortcut_keys(monkeypatch):
+    monkeypatch.setattr(keyboard, 'sys', SimpleNamespace(platform='win32'))
+
+
 @pytest.mark.parametrize('target_name', ['view', 'text_input', 'flag_button'])
 @pytest.mark.parametrize('command,key,native_vk,scan,text', [
     ('settings', 0x0411, 0xBC, 0x33, 'б'),  # Ctrl+, on the Russian layout.
     ('open', 0x0429, 0x4F, 0x18, 'щ'),      # Ctrl+O on the Russian layout.
 ])
+@pytest.mark.usefixtures('windows_shortcut_keys')
 def test_windows_internal_shortcuts_use_native_keys_on_a_non_latin_layout(window, app, monkeypatch, target_name, command, key, native_vk, scan, text):
     calls = []
     monkeypatch.setattr(window, '_choose_document_from_main', lambda: calls.append('open'))
@@ -439,6 +446,7 @@ def test_windows_internal_shortcuts_use_native_keys_on_a_non_latin_layout(window
     QtCore.Qt.ControlModifier | QtCore.Qt.MetaModifier],
     ids=['typing', 'shift-typing', 'altgr', 'ctrl-shift', 'ctrl-meta'])
 @pytest.mark.parametrize('key,native_vk,text', [(0x0411, 0xBC, 'б'), (0x0429, 0x4F, 'щ')])
+@pytest.mark.usefixtures('windows_shortcut_keys')
 def test_native_app_shortcuts_do_not_hijack_typing_or_altgr(window, app, monkeypatch, modifiers, key, native_vk, text):
     calls = []
     monkeypatch.setattr(window, '_choose_document_from_main', lambda: calls.append('open'))
@@ -463,6 +471,7 @@ def test_windows_native_shortcut_codes_are_not_reinterpreted_on_other_platforms(
 
 
 @pytest.mark.parametrize('key,native_vk,text', [(0x0411, 0xBC, 'б'), (0x0429, 0x4F, 'щ')])
+@pytest.mark.usefixtures('windows_shortcut_keys')
 def test_native_shortcut_recording_keeps_control_of_non_latin_keys(window, app, monkeypatch, key, native_vk, text):
     from settings_window import ClearableKeySequenceEdit
     calls = []
@@ -513,7 +522,17 @@ def test_embedded_language_popup_keeps_its_native_arrow_and_end_navigation(windo
         combo.hidePopup()
 
 
+@pytest.fixture
+def windows_atomic_os(monkeypatch):
+    import atomic_storage
+    # Keep pathlib, tempfile, and file locking on the real host filesystem.
+    windows_os = Mock(wraps=atomic_storage.os)
+    windows_os.name = 'nt'
+    monkeypatch.setattr(atomic_storage, 'os', windows_os)
+
+
 @pytest.mark.parametrize('winerror', [5, 32, 33])
+@pytest.mark.usefixtures('windows_atomic_os')
 def test_history_publication_retries_only_transient_windows_busy_errors(tmp_path, monkeypatch, winerror):
     import atomic_storage
     path = tmp_path/'history.json'
@@ -536,6 +555,7 @@ def test_history_publication_retries_only_transient_windows_busy_errors(tmp_path
     assert not list(tmp_path.glob('.cnt-save-*.tmp'))
 
 
+@pytest.mark.usefixtures('windows_atomic_os')
 def test_history_publication_stops_retrying_and_preserves_the_original(tmp_path, monkeypatch):
     import atomic_storage
     path = tmp_path/'history.json'
@@ -557,7 +577,7 @@ def test_history_publication_stops_retrying_and_preserves_the_original(tmp_path,
     assert not list(tmp_path.glob('.cnt-save-*.tmp'))
 
 
-@pytest.mark.parametrize('platform_name,winerror', [('posix', 5), ('nt', 87), ('nt', None)])
+@pytest.mark.parametrize('platform_name,winerror', [('posix', 5), ('posix', 32), ('posix', 33), ('nt', 87), ('nt', None)])
 def test_atomic_publication_does_not_retry_unrelated_errors(monkeypatch, platform_name, winerror):
     import atomic_storage
     attempts, delays = [], []
