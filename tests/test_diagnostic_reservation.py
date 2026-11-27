@@ -1,6 +1,7 @@
 """Independent report jobs share a Desktop destination and second-resolution stamp."""
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+import sys
 import threading
 import zipfile
 
@@ -89,6 +90,33 @@ def test_existing_report_and_same_name_file_are_never_replaced(reports):
     assert first.read_bytes() == first_bytes
     assert first.parent.name.endswith('-2')
     assert second.parent.name.endswith('-3')
+
+
+@pytest.mark.skipif(sys.platform != 'win32', reason='Windows legacy path limit')
+@pytest.mark.parametrize('destination_units,short_zip', [(180, False), (214, True)])
+def test_deep_redirected_desktop_keeps_two_readable_reports(reports, tmp_path_factory, monkeypatch,
+                                                           destination_units, short_zip):
+    _, data, stamp = reports
+    root = tmp_path_factory.mktemp('drive')
+    base = root / 'Desktop' / 'ClicknTranslate Bug Reports'
+    padding = destination_units - len(str(base).encode('utf-16-le')) // 2 - 1
+    if padding < 2:
+        pytest.skip('Temporary directory already exceeds this test destination length')
+    onedrive = root / ('r' * (padding - 2) + '🏠')
+    (onedrive / 'Desktop').mkdir(parents=True)
+    monkeypatch.setenv('OneDrive', str(onedrive))
+    first, second = [diagnostics.create_bug_report(app_version=version, data_dir=data)
+                     for version in ('deep-A', 'deep-B')]
+    assert [first.parent.name, second.parent.name] == [stamp, stamp + '-2']
+    expected_name = 'report.zip' if short_zip else f'ClicknTranslate-bug-report-{stamp}.zip'
+    for path, version in [(first, 'deep-A'), (second, 'deep-B')]:
+        assert path.name == expected_name
+        instructions = (path.parent / 'HOW_TO_SEND.txt').read_text(encoding='utf-8')
+        assert path.name in instructions
+        with zipfile.ZipFile(path) as archive:
+            assert archive.testzip() is None
+            assert f'app_version: {version}' in archive.read('report.txt').decode('utf-8')
+            assert archive.read('HOW_TO_SEND.txt').decode('utf-8') == instructions
 
 
 def test_report_permission_failure_is_not_hidden_or_retried_as_a_collision(reports, monkeypatch):

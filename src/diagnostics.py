@@ -357,6 +357,14 @@ def application_snapshot(owner):
                 timings=snapshot(), process=process, api_connections=connections)
 
 
+def _exceeds_windows_path_limit(path: Path) -> bool:
+    if os.name != "nt":
+        return False
+    absolute = os.path.abspath(path)
+    # MAX_PATH includes the terminating UTF-16 NUL. Extended paths opt out.
+    return not absolute.startswith("\\\\?\\") and len(absolute.encode("utf-16-le", "surrogatepass")) >= 260 * 2
+
+
 def create_bug_report(output_dir: str | os.PathLike[str] | None = None, *, app_version: str = "unknown", data_dir=None, runtime=None) -> Path:
     """Create and return a local ZIP that is safe to share with maintainers."""
 
@@ -365,10 +373,17 @@ def create_bug_report(output_dir: str | os.PathLike[str] | None = None, *, app_v
     destination = Path(output_dir) if output_dir is not None else _default_output_dir()
     destination.mkdir(parents=True, exist_ok=True)
     stamp = time.strftime("%Y%m%d-%H%M%S")
+    report_name = f"ClicknTranslate-bug-report-{stamp}"
     counter = 1
     while True:
         suffix = "" if counter == 1 else f"-{counter}"
-        report_dir = destination / f"ClicknTranslate-bug-report-{stamp}{suffix}"
+        report_dir = destination / (report_name + suffix)
+        report_path = report_dir / (report_name + ".zip")
+        if _exceeds_windows_path_limit(report_path):
+            report_dir = destination / (stamp + suffix)
+            report_path = report_dir / (report_name + ".zip")
+            if _exceeds_windows_path_limit(report_path):
+                report_path = report_dir / "report.zip"
         try:
             # Reserve the name atomically across independent report jobs.
             report_dir.mkdir(parents=True)
@@ -376,7 +391,6 @@ def create_bug_report(output_dir: str | os.PathLike[str] | None = None, *, app_v
             counter += 1
         else:
             break
-    report_path = report_dir / f"ClicknTranslate-bug-report-{stamp}.zip"
     instructions = _send_instructions(report_path.name)
     (report_dir / "HOW_TO_SEND.txt").write_text(instructions, encoding="utf-8")
 
