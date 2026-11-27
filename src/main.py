@@ -1017,6 +1017,9 @@ def _show_instance_replacement_error():
 def _replace_existing_instance():
     global _show_after_instance_replacement
     instances = _running_clickntranslate_instances()
+    if not platform_support.IS_WINDOWS and any(item.get('same_path') for item in instances):
+        # The POSIX launch already sent "show" to the owner of the command socket.
+        return False
     if not _confirm_close_other_install(instances):
         return False
     if not instances:

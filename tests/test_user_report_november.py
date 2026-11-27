@@ -15,6 +15,19 @@ from test_desktop_ux import app, window
 SAVE_CONFIG = main.DarkThemeApp.save_config
 
 
+@pytest.mark.parametrize('same_install', [True, False])
+def test_posix_relaunch_only_offers_to_close_a_different_install(same_install):
+    owner = [{'same_path': same_install}]
+    with mock.patch.object(main.platform_support, 'IS_WINDOWS', False), \
+         mock.patch.object(main, '_running_clickntranslate_instances', return_value=owner), \
+         mock.patch.object(main, '_confirm_close_other_install', return_value=False) as confirm:
+        assert not main._replace_existing_instance()
+    if same_install:
+        confirm.assert_not_called()
+    else:
+        confirm.assert_called_once_with(owner)
+
+
 @pytest.mark.parametrize('autostart', [False, True])
 @pytest.mark.parametrize('minimized', [False, True])
 @pytest.mark.parametrize('updated', [False, True])

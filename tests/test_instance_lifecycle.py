@@ -55,6 +55,27 @@ def test_launchers_own_ancestors_and_ocr_helpers_are_not_duplicate_guis(tmp_path
     assert found[0]['same_path']
 
 
+@pytest.mark.parametrize(('other_image', 'other_mount', 'same'), [
+    ('current.AppImage', 'second-mount', True),
+    ('other.AppImage', 'first-mount', False),
+])
+def test_appimage_identity_uses_the_file_instead_of_the_mount(tmp_path, monkeypatch, other_image, other_mount, same):
+    binary = str(tmp_path / 'first-mount' / 'clickntranslate')
+    other = str(tmp_path / other_mount / 'clickntranslate')
+    peer = mock.Mock(info=dict(pid=10, name='clickntranslate', exe=other, cmdline=[other], ppid=1, create_time=123))
+    peer.environ.return_value = {'APPIMAGE': str(tmp_path / other_image)}
+    current = mock.Mock(pid=99)
+    current.parents.return_value = []
+    monkeypatch.setattr(lifecycle.sys, 'platform', 'linux')
+    monkeypatch.setattr(lifecycle.sys, 'frozen', True, raising=False)
+    monkeypatch.setenv('APPIMAGE', str(tmp_path / 'current.AppImage'))
+    with mock.patch.object(lifecycle.psutil, 'Process', side_effect=lambda pid=None: current if pid is None else peer), \
+            mock.patch.object(lifecycle.psutil, 'process_iter', return_value=[peer]), \
+            mock.patch.object(lifecycle, '_active_gui_pids', return_value={10}):
+        found = lifecycle.running_instances(binary)
+    assert len(found) == 1 and found[0]['same_path'] is same
+
+
 def test_close_rechecks_pid_identity_and_does_not_touch_a_newer_launch():
     chosen = [{'pid': 10, 'create_time': 12}]
     current = [{'pid': 10, 'create_time': 13}, {'pid': 20, 'create_time': 12}]

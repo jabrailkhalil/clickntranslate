@@ -131,7 +131,18 @@ def running_instances(current_path):
     # Closing that child lets the wrapper exit normally; don't list it twice.
     parents = {item['ppid'] for item in instances}
     active = _active_gui_pids({item['pid'] for item in instances})
-    return [item for item in instances if item['pid'] not in parents and item['pid'] in active]
+    owners = [item for item in instances if item['pid'] not in parents and item['pid'] in active]
+    if sys.platform == 'linux' and getattr(sys, 'frozen', False) and os.environ.get('APPIMAGE'):
+        # Two launches can mount the same AppImage at different paths, and two
+        # identical files can share an extraction path. Compare the actual images.
+        image = normalized_path(os.environ['APPIMAGE'])
+        for owner in owners:
+            try:
+                other = psutil.Process(owner['pid']).environ().get('APPIMAGE')
+                owner['same_path'] = normalized_path(other) == image
+            except (psutil.Error, OSError):
+                owner['same_path'] = False
+    return owners
 
 
 def show_instances(instances):
