@@ -233,3 +233,18 @@ def test_window_toggle_preserves_tray_or_taskbar_destination():
     )
     main.DarkThemeApp.toggle_window_visibility(hidden_window)
     hidden_window.show_window_from_tray.assert_called_once_with(force_show=True)
+
+
+def test_unknown_theme_is_repaired_without_resetting_other_preferences(monkeypatch):
+    monkeypatch.setitem(main.THEMES, "Custom palette", dict(main.THEMES[main.DEFAULT_CONFIG["theme"]]))
+    base = dict(main.fresh_config("de"), ui_scale_percent=125, custom_setting="keep")
+    for theme in (None, 42, [], {}, "Damaged theme", *main.THEMES):
+        settings, migrated = main.merge_config_defaults(dict(base, theme=theme))
+        known = isinstance(theme, str) and theme in main.THEMES
+        assert settings["theme"] == (theme if known else main.DEFAULT_CONFIG["theme"])
+        assert ("theme" in migrated) == (not known)
+        assert settings["custom_setting"] == "keep"
+        assert settings["ui_scale_percent"] == 125
+        assert settings["interface_language"] == "de"
+        again, next_migration = main.merge_config_defaults(settings)
+        assert again["theme"] == settings["theme"] and "theme" not in next_migration

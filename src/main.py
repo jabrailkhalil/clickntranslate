@@ -403,6 +403,10 @@ def merge_config_defaults(config):
     if source and 'translation_defaults_language' not in source:
         merged['translation_defaults_language'] = ''
     merged.update(source)
+    theme = merged["theme"]
+    if not isinstance(theme, str) or theme not in THEMES:
+        merged["theme"] = DEFAULT_CONFIG["theme"]
+        missing_keys += ("theme",)
     if platform_support.IS_MAC and str(merged.get("ocr_engine", "")).lower() not in platform_support.available_ocr_engines():
         # Importing Windows settings cannot retain a WinRT selection on a Mac.
         # Persist the visible native default before constructing any UI/workers.
