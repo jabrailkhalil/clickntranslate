@@ -101,3 +101,9 @@ try:
     macos_smoke.run(main, DEST / "screen.json")
 except Finished:
     pass
+except BaseException:
+    import traceback
+    detail=traceback.format_exc()
+    (DEST / "error.txt").write_text(detail,encoding="utf-8")
+    print(detail,file=sys.__stderr__,flush=True)
+    raise
