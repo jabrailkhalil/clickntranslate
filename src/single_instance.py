@@ -45,20 +45,42 @@ class CommandStatus(Enum):
     FAILED = "failed"
 
 
-def runtime_dir():
+def _private_directory(path):
+    try:
+        os.mkdir(path, 0o700)
+    except FileExistsError:
+        pass
+    info = os.lstat(path)
+    if (not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid()
+            or (stat.S_IMODE(info.st_mode) & 0o777) != 0o700 or not os.access(path, os.W_OK | os.X_OK)):
+        raise PermissionError(errno.EACCES, "Command directory must be private and owned by this user", path)
+    return path
+
+
+def runtime_dir(runtime=None):
     """Per-user runtime directory for the command socket."""
-    runtime = str(os.environ.get("XDG_RUNTIME_DIR", "") or "").strip()
+    runtime = os.fspath(runtime) if runtime is not None else os.environ.get("XDG_RUNTIME_DIR", "")
+    session = None
     if runtime and os.path.isdir(runtime):
-        return runtime
-    # Fall back to a per-user directory in /tmp when the session has no
-    # XDG_RUNTIME_DIR (bare X sessions, some containers, WSL).
-    fallback = os.path.join("/tmp", f"clickntranslate-{os.getuid()}")
-    os.makedirs(fallback, mode=0o700, exist_ok=True)
-    return fallback
+        # sockaddr_un.sun_path must include the terminating NUL. Count encoded
+        # bytes, including the filename, before deciding where to bind.
+        limit = 103 if platform_support.IS_MAC else 107
+        real = os.path.realpath(runtime)
+        if len(os.fsencode(os.path.join(real, SOCKET_NAME))) <= limit:
+            if len(os.fsencode(os.path.join(runtime, SOCKET_NAME))) <= limit:
+                return runtime
+            return real
+        session = os.stat(real)
+    fallback = _private_directory(os.path.join("/tmp", f"clickntranslate-{os.getuid()}"))
+    if session is None:
+        return fallback
+    # Alternate spellings of one runtime directory share a socket. Different
+    # sessions, including a directory recreated after logout, stay separate.
+    return _private_directory(os.path.join(fallback, f"session-{session.st_dev:x}-{session.st_ino:x}"))
 
 
-def socket_path():
-    return os.path.join(runtime_dir(), SOCKET_NAME)
+def socket_path(runtime=None):
+    return os.path.join(runtime_dir(runtime), SOCKET_NAME)
 
 
 def send_command(command, path=None):

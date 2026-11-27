@@ -163,6 +163,54 @@ class RuntimeDirTest(unittest.TestCase):
             self.assertTrue(path.startswith("/tmp/clickntranslate-"))
             self.assertTrue(os.path.isdir(path))
 
+    @unittest.skipUnless(os.name == 'posix', 'Unix runtime directories')
+    def test_long_unicode_runtime_paths_keep_owners_and_clients_in_their_session(self):
+        with tempfile.TemporaryDirectory(dir='/tmp') as temporary:
+            root = Path(temporary)
+            directories = [root / ('界' * 35 + suffix) for suffix in ('a', 'b')]
+            for directory in directories:
+                directory.mkdir()
+            paths = [single_instance.socket_path(directory) for directory in directories]
+            self.assertNotEqual(*paths)
+            alias = root / 'alias'
+            alias.symlink_to(directories[0], target_is_directory=True)
+            self.assertEqual(single_instance.socket_path(alias), paths[0])
+            self.assertEqual(single_instance.socket_path(root), str(root / single_instance.SOCKET_NAME))
+            events = [threading.Event(), threading.Event()]
+            for path, event in zip(paths, events):
+                self.assertLessEqual(len(os.fsencode(path)), 103)
+                self.assertEqual(os.stat(os.path.dirname(path)).st_mode & 0o777, 0o700)
+                server = single_instance.CommandServer(lambda command, e=event: e.set(), path)
+                self.assertTrue(server.bind())
+                self.addCleanup(Path(path).parent.rmdir)
+                self.addCleanup(Path(path + '.lock').unlink, missing_ok=True)
+                server.start()
+                self.addCleanup(server.join, 2)
+                self.addCleanup(server.stop)
+            child = ("import single_instance as ipc; "
+                     "assert not ipc.CommandServer(lambda command: None).bind(); "
+                     "assert ipc.send_command('show')")
+            for index, directory in enumerate(directories):
+                env = dict(os.environ, XDG_RUNTIME_DIR=str(directory), PYTHONPATH=str(ROOT / 'src'))
+                subprocess.run([sys.executable, '-c', child], env=env, cwd=ROOT, check=True, timeout=8)
+                self.assertTrue(events[index].wait(2))
+                if index == 0:
+                    self.assertFalse(events[1].is_set())
+
+    @unittest.skipUnless(os.name == 'posix', 'Unix directory ownership and permissions')
+    def test_private_socket_directory_rejects_a_shared_directory_and_a_symlink(self):
+        with tempfile.TemporaryDirectory(dir='/tmp') as temporary:
+            base = Path(temporary)
+            private = base / 'private'
+            self.assertEqual(single_instance._private_directory(private), private)
+            link = base / 'link'
+            link.symlink_to(private, target_is_directory=True)
+            with self.assertRaises(PermissionError):
+                single_instance._private_directory(link)
+            private.chmod(0o755)
+            with self.assertRaises(PermissionError):
+                single_instance._private_directory(private)
+
 
 class CommandStatusTest(unittest.TestCase):
     def setUp(self):

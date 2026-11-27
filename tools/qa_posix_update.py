@@ -141,6 +141,9 @@ def supervise(options):
     home.mkdir()
     runtime = Path(tempfile.mkdtemp(prefix='cnt-upd-'))
     runtime.chmod(0o700)
+    sys.path[:0] = [str(ROOT), str(ROOT / 'src')]
+    import single_instance
+    channel_path = single_instance.socket_path(runtime)
     env = dict(os.environ, HOME=str(home), XDG_RUNTIME_DIR=str(runtime),
                APPIMAGE_EXTRACT_AND_RUN='1', PYTHONUTF8='1')
     for key in ('XDG_DATA_HOME', 'XDG_CONFIG_HOME', 'XDG_CACHE_HOME'):
@@ -269,7 +272,7 @@ def supervise(options):
                                 # An AppImage's GUI runs from an extracted
                                 # mount; its outer runtime is a different PID.
                                 with socket.socket(socket.AF_UNIX) as channel:
-                                    channel.connect(str(runtime / 'clickntranslate.sock'))
+                                    channel.connect(channel_path)
                                     crashed_pid, _, _ = struct.unpack('3i', channel.getsockopt(
                                         socket.SOL_SOCKET, socket.SO_PEERCRED, 12))
                                 import signal
@@ -295,13 +298,10 @@ def supervise(options):
                 raise RuntimeError('Native update transaction did not complete')
             report['real_gui_acknowledged'] = ack_seen
             assert ack_seen
-            sys.path[:0] = [str(ROOT), str(ROOT / 'src')]
-            import single_instance
-            channel = str(runtime / single_instance.SOCKET_NAME)
             # An AppImage rollback may need to extract the restored runtime
             # before the old GUI can answer. Do not confuse that with failure.
             deadline = time.monotonic() + 90
-            while not single_instance.send_command('show', channel):
+            while not single_instance.send_command('show', channel_path):
                 if time.monotonic() > deadline:
                     raise RuntimeError('Native GUI command channel is not ready')
                 time.sleep(.1)
@@ -310,7 +310,7 @@ def supervise(options):
             report['atomic_replacement_verified'] = True
             if sys.platform == 'linux' and crashed_pid:
                 with socket.socket(socket.AF_UNIX) as client:
-                    client.connect(channel)
+                    client.connect(channel_path)
                     recovered_pid, _, _ = struct.unpack('3i', client.getsockopt(
                         socket.SOL_SOCKET, socket.SO_PEERCRED, 12))
                 assert recovered_pid != crashed_pid
