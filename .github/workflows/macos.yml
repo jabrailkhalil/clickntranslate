@@ -1,26 +1,43 @@
-name: Public translation providers on the GitHub network
+name: First opening of a quarantined Mac download
 on:
   workflow_dispatch:
+    inputs:
+      run_id:
+        required: true
+        type: string
+        description: Signed candidate workflow run
+      source_sha:
+        required: true
+        type: string
+        description: Exact source revision
 permissions:
   contents: read
+  actions: read
 jobs:
-  provider:
+  quarantine:
     runs-on: macos-15
-    timeout-minutes: 5
+    timeout-minutes: 7
+    env:
+      TARGET_RUN: ${{ inputs.run_id }}
+      EXPECTED_SHA: ${{ inputs.source_sha }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
-        with:
-          ref: eec0ed7951b1dafbe6479701162b6ca0d57ee324
-          path: release-candidate
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python -m pip install requests
-      - name: Translate the single QA phrase with the four default public engines
-        working-directory: release-candidate
-        run: python ../tools/qa_public_translation.py
-      - uses: actions/upload-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
-          name: macos-public-translations
-          path: release-candidate/online-providers.json
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ github.token }}
+          name: macos-arm64-prepared
+          path: ${{ runner.temp }}/candidate
+      - name: Open the quarantined copy once in an isolated Mac session
+        run: |
+          export CANDIDATE="$RUNNER_TEMP/candidate"
+          (cd "$CANDIDATE" && shasum -a 256 -c *arm64.sha256)
+          python tools/qa_macos_quarantine.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: macos-quarantined-first-open
+          path: build/macos/trace/
