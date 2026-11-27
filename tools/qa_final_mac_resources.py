@@ -63,10 +63,12 @@ with tempfile.TemporaryDirectory() as directory:
         evidence['tiff'][compression] = 12
 out = trace / 'final-resources.json'
 out.write_text(json.dumps(evidence, indent=2))
-with tempfile.TemporaryDirectory(prefix='cnt-invalid-theme-') as directory:
+with tempfile.TemporaryDirectory(prefix='cnt-theme-', dir='/tmp') as directory:
     profile = Path(directory)
     runtime = profile / 'runtime'
     runtime.mkdir(mode=0o700)
+    socket_bytes = len(os.fsencode(runtime / 'clickntranslate.sock'))
+    assert socket_bytes < 100
     data = profile / 'Library/Application Support/ClicknTranslate/data'
     data.mkdir(parents=True)
     preferences = {'theme': 'invalid-theme-macos-qa', 'interface_language': 'en', 'qa_marker': 'preserve',
@@ -93,6 +95,10 @@ with tempfile.TemporaryDirectory(prefix='cnt-invalid-theme-') as directory:
             assert repaired['interface_language'] == 'en' and repaired['qa_marker'] == 'preserve'
             evidence['invalid_theme_gui'] = {'version': ack.read_text(), 'input': preferences['theme'],
                                              'recovered_theme': repaired['theme'],
+                                             'test_socket_path_bytes': socket_bytes,
+                                             'previous_fixture_socket_path_bytes': len(os.fsencode(
+                                                 Path(tempfile.gettempdir()) / 'cnt-invalid-theme-00000000'
+                                                 / 'runtime/clickntranslate.sock')),
                                              'seconds_to_gui': round(time.monotonic() - started, 2)}
             import Quartz
             windows = Quartz.CGWindowListCopyWindowInfo(Quartz.kCGWindowListOptionOnScreenOnly, 0)
