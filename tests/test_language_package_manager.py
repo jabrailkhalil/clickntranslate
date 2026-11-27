@@ -187,7 +187,7 @@ class LanguagePackageDialogTest(unittest.TestCase):
         self.owner.close()
         self.parent.close()
 
-    def test_manager_contains_argos_and_complete_rapidocr_bundle(self):
+    def test_manager_contains_argos_and_legacy_rapidocr_bundle(self):
         section_titles = [
             self.dialog.tabs.tabText(index)
             for index in range(self.dialog.tabs.count())
@@ -210,7 +210,8 @@ class LanguagePackageDialogTest(unittest.TestCase):
         # Hy-MT is a translator you install and remove, so it has a tab of its
         # own here; that used to be possible only from the × in the picker.
         self.assertEqual(translation_titles, ["Google", "MyMemory", "Lingva", "LibreTranslate", "Hy-MT", "Argos"])
-        self.dialog.ocr_tabs.setCurrentWidget(self.dialog.rapidocr_table.parentWidget())
+        with mock.patch("rapidocr_models.installed_languages", return_value=[]):
+            self.dialog.ocr_tabs.setCurrentWidget(self.dialog.rapidocr_table.parentWidget())
         self.assertEqual(self.dialog.rapidocr_table.rowCount(), 4)
         packages = {
             self.dialog.rapidocr_table.item(row, 2).text()

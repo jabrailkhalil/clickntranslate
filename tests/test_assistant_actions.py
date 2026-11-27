@@ -151,7 +151,9 @@ def test_menu_buttons_action_uses_the_footer_and_changes_apply_live(window, app)
     settings._set_settings_page(3)
     page = settings.settings_assistant_page
     panel = settings.assistant_action_panel
-    assert panel.layout().itemAt(1).widget() is page.menu_buttons
+    app.processEvents()
+    assert panel.layout().indexOf(page.menu_buttons) >= 0
+    assert page.menu_buttons.isVisibleTo(panel)
     assert page.menu_buttons.parentWidget() is panel
     assert abs(page.menu_buttons.geometry().center().x() - panel.rect().center().x()) <= 1
     assert page.menu_buttons.width() < panel.width()

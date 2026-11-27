@@ -111,11 +111,16 @@ $manifest = $manifest.Replace("__VERSION__", $Version)
     [System.Text.UTF8Encoding]::new($false)
 )
 
-$makeAppx = Get-ChildItem -Path "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\makeappx.exe" |
+$sdkTools = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\bin\*\x64\makeappx.exe'
+$makeAppx = Get-ChildItem -Path $sdkTools -File -ErrorAction SilentlyContinue |
     Sort-Object -Property FullName -Descending |
     Select-Object -First 1
 if (-not $makeAppx) {
-    throw "MakeAppx.exe was not found. Install the Windows SDK."
+    $sdkCommand = Get-Command makeappx.exe -CommandType Application -ErrorAction SilentlyContinue
+    if ($sdkCommand) { $makeAppx = Get-Item -LiteralPath $sdkCommand.Source }
+}
+if (-not $makeAppx) {
+    throw "MakeAppx.exe was not found. Install the Windows SDK or add its tools directory to PATH."
 }
 
 if (-not $OutputPath) {

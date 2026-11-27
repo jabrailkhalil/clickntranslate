@@ -28,7 +28,7 @@ PROJECT_EXES = (
 def run_script(script, *args):
     return subprocess.run(
         [POWERSHELL, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", str(script), *map(str, args)],
-        capture_output=True, text=True, timeout=90,
+        capture_output=True, encoding="oem", timeout=90,
     )
 
 

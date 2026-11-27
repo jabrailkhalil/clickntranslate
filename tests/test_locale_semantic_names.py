@@ -59,7 +59,8 @@ def test_current_guides_name_the_real_tabs_and_show_the_flag_as_language_entry(l
 
 
 @pytest.mark.parametrize('locale', tuple(ASSISTANT_TEXT))
-def test_rapidocr_model_description_uses_local_language_names_without_changing_package_ids(locale):
+def test_legacy_rapidocr_model_description_uses_local_language_names_without_changing_package_ids(locale, monkeypatch):
+    monkeypatch.setattr("rapidocr_models.installed_languages", lambda _root: [])
     collected = []
     owner = SimpleNamespace(lang=locale, _rapidocr_status_cache=(True, ''),
         _set_engine_missing_state=lambda *_: None,

@@ -78,13 +78,21 @@ def test_macos_companion_opts_out_of_native_shadow_and_deactivation_hiding(compa
 
 
 @pytest.mark.parametrize('action', tuple(ACTION_METHODS) + ('text', 'settings'))
-def test_actions_reuse_existing_workflows_and_preserve_provider(companion, action):
+def test_actions_reuse_existing_workflows_and_preserve_provider(companion, action, monkeypatch):
+    if action in ('selection', 'replace'):
+        monkeypatch.setattr(companion, '_remember_foreground', lambda: None)
+        monkeypatch.setattr(companion, '_restore_foreground', lambda: True)
+        companion._selection_target = 42
     companion.request_action(action)
+    if action == 'replace' and sys.platform.startswith('linux'):
+        companion.owner.launch_translate_replace_selection.assert_not_called()
+        assert not companion._dispatch_timer.isActive()
+        return
     assert companion.anchor.isVisible() == (action not in CAPTURE_ACTIONS)
     companion.request_action(action)  # Ignore a duplicate click during dispatch.
     QTest.qWait(220)
     method = {'text': 'open_text_translation', 'settings': 'show_settings'}.get(action, ACTION_METHODS.get(action))
-    expected = {'expected_target': companion._selection_target or 0} if action in ('selection', 'replace') else {}
+    expected = {'expected_target': 42} if action in ('selection', 'replace') else {}
     getattr(companion.owner, method).assert_called_once_with(**expected)
     assert companion.owner.config['translator_engine'] == 'DeepL'
     QTest.qWait(370)

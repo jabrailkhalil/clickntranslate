@@ -68,13 +68,13 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
         ocr._QT_ICON_CACHE.clear()
         self.addCleanup(ocr._QT_ICON_CACHE.clear)
         decoded_icon = object()
-        with mock.patch.object(ocr.QtGui, "QIcon", return_value=decoded_icon) as qicon:
+        with mock.patch("icon_rendering.load_icon", return_value=decoded_icon) as load_icon:
             first = ocr._cached_qt_icon(r"icons\American_flag.png")
             second = ocr._cached_qt_icon("icons/American_flag.png")
 
         self.assertIs(first, decoded_icon)
         self.assertIs(second, decoded_icon)
-        qicon.assert_called_once()
+        load_icon.assert_called_once_with(ocr.resource_path("icons/American_flag.png"))
 
     def test_overlay_is_tool_topmost_and_frameless(self):
         overlay = ocr.ScreenCaptureOverlay("copy", defer_show=True)
@@ -1167,6 +1167,7 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
             # whether the developer's interpreter also has modern RapidOCR.
             source_root = Path(__file__).resolve().parents[1]
             with mock.patch.object(ocr, "_rapidocr_local_root", return_value=str(rapid_root)), \
+                 mock.patch("rapidocr_models.model_roots", return_value=[rapid_root / "models" / "ppocrv5"]), \
                  mock.patch.object(ocr.sys, 'path', [str(source_root), str(source_root / 'src')]):
                 self.assertEqual(
                     ocr.installed_ocr_language_codes("RapidOCR", {}),
@@ -1188,7 +1189,7 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
                 self.assertTrue({'en','ru','ar','zh','de'} <= available)
                 self.assertNotIn('hi', available)
 
-    def test_frozen_build_exposes_rapidocr_bundled_in_worker(self):
+    def test_legacy_frozen_build_exposes_rapidocr_bundled_in_worker(self):
         with tempfile.TemporaryDirectory() as root:
             app_exe = Path(root, platform_support.executable_name("ClicknTranslate"))
             app_exe.write_bytes(b"app")
@@ -1198,6 +1199,7 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
             with mock.patch.object(ocr.sys, "frozen", True, create=True):
                 source_root = Path(__file__).resolve().parents[1]
                 with mock.patch.object(ocr.sys, "executable", str(app_exe)), \
+                     mock.patch("rapidocr_models.model_roots", return_value=[internal / "rapidocr_models"]), \
                      mock.patch.object(ocr.sys, 'path', [str(source_root), str(source_root / 'src')]):
                     self.assertEqual(
                         ocr.installed_ocr_language_codes("RapidOCR", {}),
