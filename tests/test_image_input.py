@@ -275,7 +275,15 @@ def test_local_ocr_uses_selected_engine_language_and_paragraph_option(app, join,
     assert text == expected and translated is None
 
 
-def test_windows_photo_with_auto_source_uses_installed_ocr_languages(app):
+@pytest.fixture
+def windows_photo_platform(monkeypatch):
+    import platform_support
+    monkeypatch.setattr(platform_support, 'IS_WINDOWS', True)
+    monkeypatch.setattr(platform_support, 'IS_MAC', False)
+    monkeypatch.setattr(platform_support, 'IS_LINUX', False)
+
+
+def test_windows_photo_with_auto_source_uses_installed_ocr_languages(app, windows_photo_platform):
     worker=SimpleNamespace(engine='windows',bitmap=object())
     with (mock.patch('ocr.create_position_ocr_worker',return_value=worker),
           mock.patch('ocr._recognize_with_windows_auto',return_value='detected text') as recognize):
@@ -284,7 +292,7 @@ def test_windows_photo_with_auto_source_uses_installed_ocr_languages(app):
     assert recognize.call_args.kwargs['join_paragraphs'] is True
 
 
-def test_windows_auto_photo_converts_the_actual_position_workers_qimage(app, monkeypatch):
+def test_windows_auto_photo_converts_the_actual_position_workers_qimage(app, monkeypatch, windows_photo_platform):
     import ocr
     bitmap = object()
     converted, recognized = [], []

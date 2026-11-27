@@ -14,8 +14,7 @@ from guide_scenarios import ORDER, COPY, INTRO, chat_shortcut_body
 from qt_layout_test_support import ensure_layout_fonts
 
 
-@pytest.fixture
-def window():
+def guide_window():
     app = QApplication.instance() or QApplication([])
     app.setQuitOnLastWindowClosed(False)
     ensure_layout_fonts(app)
@@ -34,6 +33,18 @@ def window():
         w.close()
         w.deleteLater()
         settle()
+
+
+@pytest.fixture
+def window():
+    yield from guide_window()
+
+
+@pytest.fixture
+def chat_window(monkeypatch):
+    # This part of onboarding is offered on desktops that support replacement.
+    monkeypatch.setattr(main.platform_support, 'IS_LINUX', False)
+    yield from guide_window()
 
 
 def settle():
@@ -87,21 +98,23 @@ def test_language_picker_changes_the_guide_then_advances_on_close(window):
 
 def test_theme_can_be_kept_or_changed_without_automatic_toggling(window):
     before = window.current_theme
+    next_step = 'shortcut_ocr' if main.platform_support.IS_LINUX else 'replace_selection_select_all'
     show_step(window, 'theme')
     assert window.current_theme == before
     window._guide_primary_btn.click()
     assert window.current_theme == before
-    assert window._guide_current_action() == 'replace_selection_select_all'
+    assert window._guide_current_action() == next_step
     show_step(window, 'theme')
     window.theme_button.click()
     from test_ui_operations import wait_until
     wait_until(QApplication.instance(), lambda: not window._ui_operation.active)
     assert window.current_theme != before
-    assert window._guide_current_action() == 'replace_selection_select_all'
+    assert window._guide_current_action() == next_step
 
 
 @pytest.mark.parametrize('previous', (False, True))
-def test_skipping_chat_preserves_settings_and_skips_its_children(window, previous):
+def test_skipping_chat_preserves_settings_and_skips_its_children(chat_window, previous):
+    window = chat_window
     window.config['replace_selection_select_all'] = previous
     before = dict(window.config)
     show_step(window, 'replace_selection_select_all')
@@ -113,7 +126,8 @@ def test_skipping_chat_preserves_settings_and_skips_its_children(window, previou
 
 
 @pytest.mark.parametrize('manual', (False, True))
-def test_chat_opt_in_uses_real_checkbox_and_advances_only_once(window, manual):
+def test_chat_opt_in_uses_real_checkbox_and_advances_only_once(chat_window, manual):
+    window = chat_window
     window.config['replace_selection_select_all'] = False
     target = show_step(window, 'replace_selection_select_all')
     assert target is window.settings_window.replace_select_all_checkbox
@@ -126,7 +140,8 @@ def test_chat_opt_in_uses_real_checkbox_and_advances_only_once(window, manual):
     assert window._guide_current_action() == 'chat_languages'
 
 
-def test_chat_pair_edits_only_replacement_and_uses_real_saved_shortcut(window):
+def test_chat_pair_edits_only_replacement_and_uses_real_saved_shortcut(chat_window):
+    window = chat_window
     before = {k: window.config.get(k) for mode, keys in main.HOTKEY_LANGUAGE_CONFIG_KEYS.items()
               if mode != 'replace' for k in keys}
     show_step(window, 'chat_languages')
@@ -144,7 +159,8 @@ def test_chat_pair_edits_only_replacement_and_uses_real_saved_shortcut(window):
     assert 'Ctrl+Shift+Q' not in window._guide_body.text()
 
 
-def test_shortcut_editor_is_not_closed_and_resumes_the_chat_card(window):
+def test_shortcut_editor_is_not_closed_and_resumes_the_chat_card(chat_window):
+    window = chat_window
     show_step(window, 'shortcut_replace')
     with mock.patch.object(window, '_confirm_open_hotkey_settings', return_value=True):
         window.main_hotkey_references['replace'].clicked.emit()
@@ -183,13 +199,17 @@ def test_linux_tour_does_not_offer_unsupported_automatic_replacement(window):
 def test_whole_tour_uses_choices_without_altering_unrelated_defaults(window):
     before = dict(window.config)
     show_step(window, 'language')
+    supports_chat = not main.platform_support.IS_LINUX
     for action in ORDER:
+        if not supports_chat and action in main.CHAT_STEPS:
+            continue
         show_step(window, action)
         window._guide_primary_btn.click()
     window._guide_step_timer.stop()
     window._show_guide_step()
     assert not window._guide_active
-    assert window.config['replace_selection_select_all'] is True
+    expected = True if supports_chat else before['replace_selection_select_all']
+    assert window.config['replace_selection_select_all'] is expected
     allowed = {'replace_selection_select_all', 'hotkey_language_editor_mode',
                'first_run_guide_completed', 'first_run_guide_pending'}
     assert {key for key in before if before[key] != window.config.get(key)} <= allowed
