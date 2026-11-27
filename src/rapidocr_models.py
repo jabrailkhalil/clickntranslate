@@ -4,6 +4,7 @@ Downloads happen only in the explicit installer/build preparation step. A newer
 RapidOCR package must not silently select its new default model or fetch files
 while the user is translating.
 """
+from copy import copy
 from functools import lru_cache
 import hashlib
 import os
@@ -117,7 +118,22 @@ def create_engine(rapid_cls, language_code='en', root_dir=''):
                        f'{component}.ocr_version': OCRVersion(version),
                        f'{component}.lang_type': language,
                        f'{component}.model_path': paths[key]})
-    return rapid_cls(params=params)
+    if group not in ('en', 'cyrillic'):
+        return rapid_cls(params=params)
+
+    class ScreenSelectionOCR(rapid_cls):
+        def detect_and_crop(self, image, op_record):
+            height, width = image.shape[:2]
+            if height > 192 or width < 2 * height:
+                return super().detect_and_crop(image, op_record)
+            # Upscaling a shallow selection to 736 px can split or clip letters.
+            # Share the loaded ONNX session but keep this call's scale private.
+            selection = copy(self)
+            selection.text_det = copy(self._load_det_model())
+            selection.text_det.limit_side_len = 448
+            return rapid_cls.detect_and_crop(selection, image, op_record)
+
+    return ScreenSelectionOCR(params=params)
 
 
 def download_models(destination, download, check_cancel=lambda: None, progress=lambda *_: None):

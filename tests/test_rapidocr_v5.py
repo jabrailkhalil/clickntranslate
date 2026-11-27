@@ -134,8 +134,12 @@ def test_legacy_backend_does_not_claim_to_recognize_arabic():
         models.create_engine(Legacy, 'ar')
 
 
-@pytest.mark.parametrize('code,group,use_cls', [('ru', 'cyrillic', True), ('ar', 'arabic', False)])
-def test_modern_profile_pins_v5_and_local_paths_instead_of_upstream_defaults(tmp_path, code, group, use_cls):
+@pytest.mark.parametrize('code,group,use_cls,detector_min_side', [
+    ('en', 'en', True, 448), ('ru', 'cyrillic', True, 448),
+    ('ar', 'arabic', False, 736), ('zh', 'ch', True, 736), ('de', 'latin', True, 736),
+])
+def test_modern_profile_pins_v5_and_local_paths_instead_of_upstream_defaults(
+        tmp_path, code, group, use_cls, detector_min_side):
     from enum import Enum
     class EngineType(Enum):
         ONNXRUNTIME = 'onnxruntime'
@@ -149,13 +153,22 @@ def test_modern_profile_pins_v5_and_local_paths_instead_of_upstream_defaults(tmp
         __module__ = 'rapidocr.main'
         def __init__(self, params):
             seen.update(params)
+            self.text_det = SimpleNamespace(limit_side_len=736)
+        def _load_det_model(self):
+            return self.text_det
+        def detect_and_crop(self, image, op_record):
+            return self._load_det_model().limit_side_len
     fake_module = SimpleNamespace(EngineType=EngineType, ModelType=ModelType, OCRVersion=OCRVersion)
     with mock.patch.dict('sys.modules', rapidocr=fake_module), \
          mock.patch.object(models, 'asset_path', side_effect=lambda key, _roots: tmp_path / key), \
          mock.patch.object(models, 'verify_model', side_effect=lambda path, _key: str(path)):
-        models.create_engine(Modern, code)
+        engine = models.create_engine(Modern, code)
     assert seen['Rec.lang_type'] == group
     assert seen['Global.use_cls'] is use_cls
+    assert engine.detect_and_crop(np.empty((130, 900)), {}) == detector_min_side
+    assert engine.detect_and_crop(np.empty((256, 448)), {}) == 736
+    assert engine.detect_and_crop(np.empty((140, 110)), {}) == 736
+    assert engine.text_det.limit_side_len == 736
     assert seen['Rec.ocr_version'].value == 'PP-OCRv5'
     assert seen['Det.ocr_version'].value == 'PP-OCRv5'
     assert seen['Cls.ocr_version'].value == 'PP-OCRv4'
