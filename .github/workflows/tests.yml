@@ -20,12 +20,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
+        part: [1, 2, 3, 4, 5, 6]
+        platform:
           - os: windows-latest
             requirements: tools/requirements/windows.txt
           - os: ubuntu-latest
             requirements: tools/requirements/linux.txt
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.platform.os }}
+    name: ${{ matrix.platform.os }} (part ${{ matrix.part }}/6)
     timeout-minutes: 40
     env:
       QT_QPA_PLATFORM: offscreen
@@ -36,7 +38,7 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-          cache-dependency-path: ${{ matrix.requirements }}
+          cache-dependency-path: ${{ matrix.platform.requirements }}
       - name: Install Linux desktop test dependencies
         if: runner.os == 'Linux'
         run: |
@@ -46,17 +48,17 @@ jobs:
         shell: bash
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -r "${{ matrix.requirements }}" pytest pyinstaller
+          python -m pip install -r "${{ matrix.platform.requirements }}" pytest pyinstaller
           if [ "${{ runner.os }}" = "Linux" ]; then
             python -m pip install --no-deps "argostranslate~=1.11.0"
           fi
       - name: Run tests
-        run: python tools/run_ci_tests.py
+        run: python tools/run_ci_tests.py --parts 6 --part ${{ matrix.part }} --timeout 1500
       - name: Keep test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: tests-${{ runner.os }}
+          name: tests-${{ runner.os }}-part-${{ matrix.part }}
           path: |
             build/ci-tests/plan.json
             build/ci-tests/part-*/results.xml

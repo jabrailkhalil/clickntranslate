@@ -9,7 +9,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import pytest
 from PyQt5 import QtCore, QtWidgets
-from PyQt5.QtTest import QTest
+from PyQt5.QtTest import QSignalSpy
 
 import main
 import ocr
@@ -184,13 +184,15 @@ def test_manual_close_then_new_copy_reopens_notice():
     QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     popup = CopyNotificationPopup()
     try:
-        popup.show_message("First", duration_ms=60)
+        popup.show_message("First", duration_ms=3000)
         popup.close()
         assert not popup.isVisible()
-        popup.show_message("Second", duration_ms=160)
-        QTest.qWait(80)
+        timeout = QSignalSpy(popup._dismiss.timeout)
+        popup.show_message("Second", duration_ms=80)
         assert popup.isVisible() and "Second" in popup.text()
-        QTest.qWait(100)
+        assert popup._dismiss.isActive() and popup._dismiss.interval() == 80
+        assert timeout.wait(3000)
+        assert len(timeout) == 1
         assert not popup.isVisible()
     finally:
         popup.close()
