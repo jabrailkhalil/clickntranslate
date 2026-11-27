@@ -57,6 +57,8 @@ def test_picker_preserves_home_draft_size_and_language_pair(window, app):
 
 @pytest.mark.parametrize('page', [0, 1, 2, 3, 4])
 def test_live_choice_preserves_settings_page_and_panel_geometry(window, app, page):
+    settle(app)
+    home_panel_height = window.main_text_section.height()
     window.show_settings()
     settings = window.settings_window
     settings._set_settings_page(page)
@@ -64,11 +66,13 @@ def test_live_choice_preserves_settings_page_and_panel_geometry(window, app, pag
     window.show_interface_language_menu()
     picker = window._interface_language_picker
     before = QtCore.QRect(picker.geometry())
+    top_left = settings.mapTo(picker.parentWidget(), QtCore.QPoint())
+    assert before == QtCore.QRect(top_left, QtCore.QSize(settings.width(), min(home_panel_height, settings.height())))
     for locale in ('es', 'ar', 'pt', 'hi', 'en'):
         picker.buttons[locale].click()
         assert picker.geometry() == before
         settle(app)
-        assert picker.geometry() == before and picker.height() == picker.PANEL_HEIGHT
+        assert picker.geometry() == before
         assert window.settings_window is settings and settings.settings_pages.currentIndex() == page
     QTest.keyClick(picker.buttons['en'], QtCore.Qt.Key_Escape)
     settle(app)

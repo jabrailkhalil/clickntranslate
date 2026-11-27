@@ -29,7 +29,12 @@ def test_constructor_leaves_hidden_tables_unpopulated(manager):
     active = manager._active_engine_table()
     assert active is not None
     assert not active._package_rows_dirty
-    assert active.rowCount() > 0
+    if getattr(active, "_package_is_missing", False):
+        assert active.rowCount() == 0
+        assert active._package_missing_frame.isVisible()
+        assert not active.isVisible()
+    else:
+        assert active.rowCount() > 0 and active.isVisible()
     for name in ('tesseract_table', 'easyocr_table', 'rapidocr_table', 'hymt_table', 'argos_table'):
         table = getattr(manager, name)
         if table is not active:
