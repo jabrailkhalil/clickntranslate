@@ -290,6 +290,7 @@ def load_image(payload):
         device = QtCore.QFile(str(payload))
         if not device.open(QtCore.QIODevice.ReadOnly):
             raise ValueError('invalid')
+        reader = None
         try:
             if device.size() > MAX_BYTES:
                 raise ValueError('large')
@@ -310,6 +311,9 @@ def load_image(payload):
                 if orientation in transforms:
                     image = image.transformed(QtGui.QTransform(*transforms[orientation]))
         finally:
+            # The TIFF handler calls back into its QIODevice during destruction.
+            # Release the reader while the file is still open and alive.
+            del reader
             device.close()
     if image.isNull():
         raise ValueError('invalid')
