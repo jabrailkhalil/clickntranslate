@@ -1,0 +1,179 @@
+{
+  "private_station": {
+    "station": "QA-station",
+    "desktop": "QA",
+    "wsf_visible": false
+  },
+  "sha": "eec0ed7951b1dafbe6479701162b6ca0d57ee324",
+  "no_synthetic_keys": true,
+  "desktop_switched": false,
+  "native_controls": [
+    {
+      "host_observation": {
+        "focus": 4262776,
+        "foreground": 0,
+        "selection": [
+          7,
+          23
+        ],
+        "text": "выбранная строка",
+        "full_text": "Before выбранная строка after",
+        "seq": 0
+      },
+      "provider": {
+        "hwnd": 4262776,
+        "pid": 21880,
+        "control_type": 50004,
+        "runtime_id": [
+          42,
+          4262776
+        ],
+        "focus": false,
+        "password": false,
+        "enabled": true,
+        "value_readonly": false,
+        "text_pattern": false,
+        "provider": "[pid:26576,providerId:0x410B78 Main:Nested [pid:21880,providerId:0x410B78 Annotation(parent link):Microsoft: Annotation Proxy (unmanaged:uiautomationcore.dll); Main:Microsoft: MSAA Proxy (unmanaged:uiautomationcore.dll)]; Hwnd(parent link):Microsoft: HWND Proxy (unmanaged:uiautomationcore.dll)]",
+        "ranges": []
+      },
+      "product_text_with_known_native_handle": "",
+      "win32_class": "Edit"
+    },
+    {
+      "host_observation": {
+        "focus": 3149350,
+        "foreground": 0,
+        "selection": [
+          6,
+          19
+        ],
+        "text": "поле проверки",
+        "full_text": "Other поле проверки after",
+        "seq": 5
+      },
+      "provider": {
+        "hwnd": 3149350,
+        "pid": 21880,
+        "control_type": 50004,
+        "runtime_id": [
+          42,
+          3149350
+        ],
+        "focus": false,
+        "password": false,
+        "enabled": true,
+        "value_readonly": false,
+        "text_pattern": false,
+        "provider": "[pid:26576,providerId:0x300E26 Main:Nested [pid:21880,providerId:0x300E26 Annotation(parent link):Microsoft: Annotation Proxy (unmanaged:uiautomationcore.dll); Main:Microsoft: MSAA Proxy (unmanaged:uiautomationcore.dll)]; Hwnd(parent link):Microsoft: HWND Proxy (unmanaged:uiautomationcore.dll)]",
+        "ranges": []
+      },
+      "product_text_with_known_native_handle": "",
+      "win32_class": "Edit"
+    },
+    {
+      "host_observation": {
+        "focus": 3870196,
+        "foreground": 0,
+        "selection": [
+          5,
+          20
+        ],
+        "text": "выделена строка",
+        "full_text": "Rich выделена строка after",
+        "seq": 10
+      },
+      "provider": {
+        "hwnd": 3870196,
+        "pid": 21880,
+        "control_type": 50030,
+        "runtime_id": [
+          42,
+          3870196
+        ],
+        "focus": true,
+        "password": false,
+        "enabled": true,
+        "value_readonly": false,
+        "text_pattern": true,
+        "provider": "[pid:26576,providerId:0x3B0DF4 Main:Nested [pid:21880,providerId:0x3B0DF4 Annotation(parent link):Microsoft: Annotation Proxy (unmanaged:uiautomationcore.dll); Main:Unidentified Provider (unmanaged:Msftedit.dll)]; Hwnd(parent link):Microsoft: HWND Proxy (unmanaged:uiautomationcore.dll)]",
+        "ranges": [
+          "выделена строка"
+        ]
+      },
+      "product_text_with_known_native_handle": "выделена строка",
+      "win32_class": "RichEdit50W"
+    },
+    {
+      "host_observation": {
+        "focus": 198984,
+        "foreground": 0,
+        "selection": [
+          7,
+          22
+        ],
+        "text": "другой фрагмент",
+        "full_text": "Fourth другой фрагмент after",
+        "seq": 24
+      },
+      "provider": {
+        "hwnd": 198984,
+        "pid": 21880,
+        "control_type": 50030,
+        "runtime_id": [
+          42,
+          198984
+        ],
+        "focus": true,
+        "password": false,
+        "enabled": true,
+        "value_readonly": false,
+        "text_pattern": true,
+        "provider": "[pid:26576,providerId:0x30948 Main:Nested [pid:21880,providerId:0x30948 Annotation(parent link):Microsoft: Annotation Proxy (unmanaged:uiautomationcore.dll); Main:Unidentified Provider (unmanaged:Msftedit.dll)]; Hwnd(parent link):Microsoft: HWND Proxy (unmanaged:uiautomationcore.dll)]",
+        "ranges": [
+          "другой фрагмент"
+        ]
+      },
+      "product_text_with_known_native_handle": "другой фрагмент",
+      "win32_class": "RichEdit50W"
+    }
+  ],
+  "production_focused_reads": [],
+  "host": {
+    "station": "QA-station",
+    "desktop": "QA",
+    "wsf_visible": false,
+    "top": 1445396,
+    "controls": [
+      4262776,
+      3149350,
+      3870196,
+      198984
+    ],
+    "process": 21880,
+    "thread": 3448,
+    "initial_foreground": 0,
+    "visible": false
+  },
+  "native_clipboard": "WM_COPY operations on private controls returned their exact spans",
+  "guard_actual_foreground": [
+    false,
+    "focus_changed"
+  ],
+  "guard_with_injected_focus_lookup_and_real_uia_ids": [
+    false,
+    "editor_changed"
+  ],
+  "data_after_guard": [
+    "выбранная строка",
+    "поле проверки",
+    "выделена строка",
+    "другой фрагмент"
+  ],
+  "full_contents_after_guard": [
+    "Before выбранная строка after",
+    "Other поле проверки after",
+    "Rich выделена строка after",
+    "Fourth другой фрагмент after"
+  ],
+  "status": "passed"
+}

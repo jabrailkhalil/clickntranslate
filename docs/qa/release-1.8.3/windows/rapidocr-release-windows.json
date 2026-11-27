@@ -1,0 +1,242 @@
+{
+  "sha": "eec0ed7951b1dafbe6479701162b6ca0d57ee324",
+  "passed": 12,
+  "total": 12,
+  "cases": [
+    {
+      "lang": "ru",
+      "label": "Arial-40",
+      "size": [
+        980,
+        134
+      ],
+      "text": "Проверка перевода текста",
+      "expected": "Проверка перевода текста",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "Segoe-40",
+      "size": [
+        980,
+        134
+      ],
+      "text": "Проверка перевода текста",
+      "expected": "Проверка перевода текста",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "Arial-30",
+      "size": [
+        980,
+        134
+      ],
+      "text": "Проверка перевода текста",
+      "expected": "Проверка перевода текста",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "Arial-40-vopros",
+      "size": [
+        980,
+        134
+      ],
+      "text": "Сохранить перевод текста",
+      "expected": "Сохранить перевод текста",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "Segoe-32-vopros",
+      "size": [
+        980,
+        134
+      ],
+      "text": "Доброе утро",
+      "expected": "Доброе утро",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "RU24",
+      "size": [
+        720,
+        95
+      ],
+      "text": "Окно перевода",
+      "expected": "Окно перевода",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "RU36",
+      "size": [
+        790,
+        120
+      ],
+      "text": "Откройте настройки",
+      "expected": "Откройте настройки",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "RU48",
+      "size": [
+        970,
+        144
+      ],
+      "text": "Работа с текстом",
+      "expected": "Работа с текстом",
+      "exact": true
+    },
+    {
+      "lang": "en",
+      "label": "EN40",
+      "size": [
+        980,
+        134
+      ],
+      "text": "CLICK TRANSLATE",
+      "expected": "CLICK TRANSLATE",
+      "exact": true
+    },
+    {
+      "lang": "en",
+      "label": "EN25",
+      "size": [
+        734,
+        92
+      ],
+      "text": "Save the translation",
+      "expected": "Save the translation",
+      "exact": true
+    },
+    {
+      "lang": "en",
+      "label": "EN30",
+      "size": [
+        770,
+        102
+      ],
+      "text": "This is a sample line.",
+      "expected": "This is a sample line.",
+      "exact": true
+    },
+    {
+      "lang": "en",
+      "label": "EN50",
+      "size": [
+        960,
+        135
+      ],
+      "text": "LARGE LETTERS",
+      "expected": "LARGE LETTERS",
+      "exact": true
+    }
+  ],
+  "backend": "real RapidOCR 3.10.0; production create_engine and worker output, Windows x64 CPU",
+  "worker_subprocess": {
+    "command": "python src/ocr_worker.py <request.json>",
+    "passed": 12,
+    "cases": [
+      {
+        "lang": "ru",
+        "label": "Arial-40",
+        "source": "Проверка перевода текста",
+        "text": "Проверка перевода текста",
+        "exact": true,
+        "boxes": 3
+      },
+      {
+        "lang": "ru",
+        "label": "Segoe-40",
+        "source": "Проверка перевода текста",
+        "text": "Проверка перевода текста",
+        "exact": true,
+        "boxes": 3
+      },
+      {
+        "lang": "ru",
+        "label": "Arial-30",
+        "source": "Проверка перевода текста",
+        "text": "Проверка перевода текста",
+        "exact": true,
+        "boxes": 3
+      },
+      {
+        "lang": "ru",
+        "label": "Arial-40-vopros",
+        "source": "Сохранить перевод текста",
+        "text": "Сохранить перевод текста",
+        "exact": true,
+        "boxes": 3
+      },
+      {
+        "lang": "ru",
+        "label": "Segoe-32-vopros",
+        "source": "Доброе утро",
+        "text": "Доброе утро",
+        "exact": true,
+        "boxes": 1
+      },
+      {
+        "lang": "ru",
+        "label": "RU24",
+        "source": "Окно перевода",
+        "text": "Окно перевода",
+        "exact": true,
+        "boxes": 1
+      },
+      {
+        "lang": "ru",
+        "label": "RU36",
+        "source": "Откройте настройки",
+        "text": "Откройте настройки",
+        "exact": true,
+        "boxes": 2
+      },
+      {
+        "lang": "ru",
+        "label": "RU48",
+        "source": "Работа с текстом",
+        "text": "Работа с текстом",
+        "exact": true,
+        "boxes": 2
+      },
+      {
+        "lang": "en",
+        "label": "EN40",
+        "source": "CLICK TRANSLATE",
+        "text": "CLICK TRANSLATE",
+        "exact": true,
+        "boxes": 2
+      },
+      {
+        "lang": "en",
+        "label": "EN25",
+        "source": "Save the translation",
+        "text": "Save the translation",
+        "exact": true,
+        "boxes": 2
+      },
+      {
+        "lang": "en",
+        "label": "EN30",
+        "source": "This is a sample line.",
+        "text": "This is a sample line.",
+        "exact": true,
+        "boxes": 4
+      },
+      {
+        "lang": "en",
+        "label": "EN50",
+        "source": "LARGE LETTERS",
+        "text": "LARGE LETTERS",
+        "exact": true,
+        "boxes": 1
+      }
+    ]
+  }
+}

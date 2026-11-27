@@ -1,0 +1,22 @@
+{
+  "source_sha": "05c30f30bc288b7b9ce582ae5952c3315f5fdb82",
+  "system_fonts_zh": [],
+  "preferences": {
+    "theme": "Светлая",
+    "interface_language": "zh",
+    "custom_setting": "candidate-keep",
+    "ui_scale_percent": 125
+  },
+  "geometry": {
+    "WINDOW": "4194310",
+    "X": "93",
+    "Y": "137",
+    "WIDTH": "1094",
+    "HEIGHT": "625",
+    "SCREEN": "0"
+  },
+  "gui_version": "1.8.3",
+  "captured": true,
+  "exit_code": 0,
+  "passed": true
+}

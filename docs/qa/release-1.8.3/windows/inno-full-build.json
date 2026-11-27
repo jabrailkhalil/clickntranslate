@@ -1,0 +1,16 @@
+{
+  "command": [
+    "qa-reports/windows/work/inno/ISCC.exe",
+    "/Qp",
+    "/DMyAppVersion=1.8.3",
+    "/DSourceDir=qa-reports/windows/work/source/releases/local-audit/ClicknTranslate",
+    "/DReleaseDir=qa-reports/windows/work/inno-output",
+    "qa-reports/windows/work/source/tools/installer/ClicknTranslate.iss"
+  ],
+  "pid": 19896,
+  "exit_code": 0,
+  "seconds": 121.7,
+  "qt": "offscreen",
+  "private_station": "QA-station",
+  "private_desktop": "QA"
+}

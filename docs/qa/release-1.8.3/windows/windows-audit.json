@@ -1,0 +1,367 @@
+{
+  "windows": "Windows 11 x64 build 26300, CPython 3.12.10, PyQt5 5.15.11, Qt offscreen",
+  "desktop_input": "Private noninteractive window station per process tree, no switch to user's input desktop. Qt clipboard tests use in-memory data. Two native QWidget.winId() tests used hidden windows on their own station and a test-specific mutex.",
+  "git": {
+    "desktop_release_base": "fafcbb87ae12618d24884c668cb02ab80c7e6307",
+    "integrated_full_suite": "fe83670d6e4068ed1cf442bd8c10ce283db10c67",
+    "windows_diagnostics_fix": "5d8dc13c00b8c27782f0381229621b31a3a6dd59",
+    "ocr_and_native_select_checked": "eec0ed7951b1dafbe6479701162b6ca0d57ee324"
+  },
+  "full_suite": {
+    "sha": "fe83670d6e4068ed1cf442bd8c10ce283db10c67",
+    "modules": 288,
+    "passed": 8631,
+    "skipped": 92,
+    "failed": 0,
+    "shards": [
+      {
+        "name": "final-suite-1",
+        "passed": 545,
+        "skipped": 6,
+        "exit_code": 0,
+        "profile_unchanged": true
+      },
+      {
+        "name": "final-suite-2",
+        "passed": 1246,
+        "skipped": 23,
+        "exit_code": 0,
+        "profile_unchanged": true
+      },
+      {
+        "name": "final-suite-3",
+        "passed": 2221,
+        "skipped": 17,
+        "exit_code": 0,
+        "profile_unchanged": true
+      },
+      {
+        "name": "final-suite-4",
+        "passed": 1507,
+        "skipped": 7,
+        "exit_code": 0,
+        "profile_unchanged": true
+      },
+      {
+        "name": "final-suite-5",
+        "passed": 1412,
+        "skipped": 30,
+        "exit_code": 0,
+        "profile_unchanged": true
+      },
+      {
+        "name": "final-suite-6",
+        "passed": 1700,
+        "skipped": 9,
+        "exit_code": 0,
+        "profile_unchanged": true
+      }
+    ],
+    "hidden_win32_guards": [
+      {
+        "name": "test_real_windows_instance_can_be_replaced_and_releases_mutex[False]",
+        "passed": true
+      },
+      {
+        "name": "test_real_windows_instance_can_be_replaced_and_releases_mutex[True]",
+        "passed": true
+      }
+    ],
+    "skip_reasons": {
+      "Requires the explicitly selected native Windows Qt backend": 4,
+      "Requires the native Cocoa application lifecycle": 3,
+      "Native freedesktop launcher parser is Linux-only": 12,
+      "requires native Cocoa panels": 6,
+      "requires native Carbon": 2,
+      "requires the real macOS frameworks": 1,
+      "checks the non-Windows runner list": 1,
+      "Select the native Windows Qt backend explicitly": 7,
+      "Requires native QMenu placement on the connected monitors": 8,
+      "Requires native dialog and combo placement": 1,
+      "Native monitor coordinates require the Windows backend": 1,
+      "requires native Windows Qt windows": 1,
+      "Real hover delivery requires the native Qt backend": 1,
+      "requires actual Cocoa windows": 4,
+      "requires native AppKit": 1,
+      "AF_UNIX sockets are not available on this platform": 11,
+      "Linux ownership and AF_UNIX tests": 19,
+      "Physical monitor placement uses the native Qt backend": 9
+    },
+    "evidence": "final-plan.json and final/final-suite-{1..6}/results.xml + run.json"
+  },
+  "diagnostics": {
+    "sha": "5d8dc13c00b8c27782f0381229621b31a3a6dd59",
+    "pytest_passed": 352,
+    "pytest_failed": 0,
+    "before": "diagnostic-paths-before.json",
+    "after": "diagnostic-paths-after.json",
+    "evidence": "final/diagnostics/results.xml"
+  },
+  "frozen_integrated": {
+    "sha": "fe83670d6e4068ed1cf442bd8c10ce283db10c67",
+    "pyinstaller_exit": 0,
+    "stage_exit": 0,
+    "verify": "verify: 4250 program files",
+    "smoke_result": {
+      "status": "passed",
+      "platform": "win32",
+      "architecture": "AMD64",
+      "frozen": true,
+      "screenshots": [
+        "en-dark.png",
+        "en-light.png",
+        "ru-dark.png",
+        "ru-light.png",
+        "ar-dark.png",
+        "ar-light.png",
+        "hi-dark.png",
+        "hi-light.png",
+        "center-en-dark-0.png",
+        "center-en-dark-1.png",
+        "center-en-dark-2.png",
+        "center-en-light-0.png",
+        "center-en-light-1.png",
+        "center-en-light-2.png",
+        "center-ar-dark-0.png",
+        "center-ar-dark-1.png",
+        "center-ar-dark-2.png",
+        "center-ar-light-0.png",
+        "center-ar-light-1.png",
+        "center-ar-light-2.png",
+        "popup-host-en-main.png",
+        "popup-host-en-dynamic.png",
+        "popup-host-ar-main.png",
+        "popup-host-ar-dynamic.png"
+      ],
+      "checks": {
+        "gui": "four locales, two themes, five settings pages",
+        "engine_center": "stationary tabs and footer; OCR/translation/API, en/ar, both themes",
+        "popup_scroll": "full visible list repainted after scrolling without hover",
+        "popup_host_scaling": "retained proxy; main/dynamic, en/ar, 135%, two openings and search",
+        "ocr_worker": "bundled RapidOCR recognized the generated fixture",
+        "argos_worker": "bundled probe returned structured data"
+      }
+    },
+    "evidence": "final/frozen/report.json"
+  },
+  "base_gui": {
+    "sha": "fafcbb87ae12618d24884c668cb02ab80c7e6307",
+    "source": "passed",
+    "direct": "passed",
+    "public_launcher": "passed"
+  },
+  "packaging": {
+    "runtime_sha": "fafcbb87ae12618d24884c668cb02ab80c7e6307",
+    "msix_builder_patch_in": "fe83670d6e4068ed1cf442bd8c10ce283db10c67",
+    "signed_release_artifacts": false,
+    "portable_manifest": "verify: 4249 program files",
+    "inno_compiler": "Inno Setup 6.7.4, portable install confined to QA",
+    "inno_original_production_appid_installer": {
+      "sha256": "fc0e462cf7ab6cd37af8d12e01dbebd2479b8210427e336f445ec410d31bd528",
+      "bytes": 218897943
+    },
+    "upgrade_from_published_182": {
+      "old_version": "1.8.2",
+      "new_version": "1.8.3",
+      "setup": "qa-reports/windows/work/qa-inno/ClicknTranslate-Setup-v1.8.3-win64.exe",
+      "controls": "private window station; disposable AppId and shell folders; update acknowledgement in layout editor mode",
+      "private_shell_folders": [
+        "qa-work/local-inno-e2e/user/AppData/Roaming/Microsoft/Windows/Start Menu/Programs",
+        "qa-work/local-inno-e2e/user/Desktop",
+        "qa-work/local-inno-e2e/user/AppData/Roaming"
+      ],
+      "old_zip_sha256": "8ee34cf794aa85764db549f7642b47630be3698c578d3ffbaeac1adc2f16429d",
+      "old_manifest_files": 4064,
+      "setup_sha256": "20b825e15e264daab22a881f347dea3eb8a25cf1ddd4f107faf85211b81c0500",
+      "new_manifest_files": 4249,
+      "config_and_history_after_install": {
+        "config.json": true,
+        "user_history.json": true
+      },
+      "ready_version": "1.8.3",
+      "disposable_registration_removed": true,
+      "app_removed": true,
+      "history_after_uninstall": true,
+      "config_after_uninstall": true
+    },
+    "updater_signing_msix_fixture_tests": {
+      "passed": 37,
+      "subtests": 8,
+      "evidence": "work/pytest-sdk/results.xml"
+    },
+    "msix": {
+      "identity": "JabrailDigital.ClicknTranslate.Test",
+      "version": "1.8.3.0",
+      "sha256": "16737443d2846f1a4b9e8268747cb676eab41b0c58c6d7daf65ea77a47d9023b",
+      "bytes": 311636301,
+      "unpacked": true,
+      "unpacked_executable_smoke": "passed",
+      "installed_with_windows_identity": false
+    }
+  },
+  "native_engines": {
+    "base_sha": "fafcbb87ae12618d24884c668cb02ab80c7e6307",
+    "english_russian_winrt": "2/2 exact synthetic images, output boxes fit both images",
+    "argos": "4/4 real offline translation directions, models checksum verified; EN↔RU and EN↔AR",
+    "rapidocr": "5 Cyrillic single-line fixtures; baseline 1.8.3 and archived 2026-11-14 test build 1.8.2 identical, 1/5 exact. Feeding the known full line with 8 px padding directly to the recognizer returns 5/5. The detector and orientation classifier in upstream RapidOCR account for losses before app ordering.",
+    "evidence": [
+      "native-engines-report.json",
+      "rapidocr-comparison-report.json",
+      "rapidocr-stages-report.json",
+      "rapidocr-limit-windows.json",
+      "rapidocr-detector-limits.json",
+      "rapidocr-release-windows.json"
+    ],
+    "rapidocr_calibration_exact": {
+      "448": 12,
+      "480": 11,
+      "512": 11,
+      "416": 11,
+      "320": 11,
+      "384": 9,
+      "736": 8
+    },
+    "fixed_rapidocr": {
+      "sha": "eec0ed7951b1dafbe6479701162b6ca0d57ee324",
+      "direct_exact": 12,
+      "real_worker_exact": 12,
+      "images": 12,
+      "pytest_passed": 19,
+      "pytest_evidence": "final/rapidocr/results.xml",
+      "evidence": "rapidocr-release-windows.json"
+    }
+  },
+  "unverified": [
+    "Live user desktop, physical input, native global clipboard selection in an external application, real multi-monitor positioning/fractional native DPI.",
+    "Production-signed installer, Store submission or registered MSIX package.",
+    "An automatic migration into the live 1.8.2 installation that remained open during QA. Upgrade used its original published ZIP in a private directory and a distinct installer AppId."
+  ],
+  "native_selection": {
+    "sha": "eec0ed7951b1dafbe6479701162b6ca0d57ee324",
+    "real_foreground": 0,
+    "private_native_clipboard": "All four selections via WM_COPY; both real RichEdit TextPattern ranges exact; both classic EDIT MSAA providers lack TextPattern.",
+    "real_foreground_refusal": [
+      false,
+      "focus_changed"
+    ],
+    "controlled_other_editor_refusal": [
+      false,
+      "editor_changed"
+    ],
+    "evidence": "native-selection-report.json"
+  },
+  "native_csharp_update": {
+    "candidate": {
+      "candidate_sha": "05c30f30bc288b7b9ce582ae5952c3315f5fdb82",
+      "old_tag": "v1.8.2",
+      "old_release_id": 421036522,
+      "old_sha256": "8ee34cf794aa85764db549f7642b47630be3698c578d3ffbaeac1adc2f16429d",
+      "candidate_sha256": "c241951dac726874a8f10678f1916a3f09a829afc22cf2c8ee985050d0612e33",
+      "candidate_size": 282501472
+    },
+    "published_old_gui_to_candidate": {
+      "case": "zip-182-to-183",
+      "status": "passed",
+      "old_version": "1.8.2",
+      "new_version": "1.8.3",
+      "old_sha256": "8ee34cf794aa85764db549f7642b47630be3698c578d3ffbaeac1adc2f16429d",
+      "new_sha256": "c241951dac726874a8f10678f1916a3f09a829afc22cf2c8ee985050d0612e33",
+      "old_helper_sha256": "f23a8b61fe8bcf37b2ca7f4b950c25c4cd4f8be8f6e362795505c16da8dffa01",
+      "invoked_helper_sha256": "f23a8b61fe8bcf37b2ca7f4b950c25c4cd4f8be8f6e362795505c16da8dffa01",
+      "helper_override": false,
+      "install": "repo/build/update-audit/zip-182-to-183/Копия с пробелами/ClicknTranslate",
+      "temp": "qa-temp/cntqa-zwfx_27r",
+      "markers": {
+        "data/update-test-marker.bin": "aa0079648aeccb9fdaae7dbea3d8bd82a25e7d93f243489ba638bc35c4083072",
+        "ocr/update-test-model.bin": "784b2549a0c3059334d10a248199d9d58b78c370a6781892591acbb8d75add61",
+        "translators/update-test-model.bin": "d7f1bdefd3450c13147727299ddf4fbdf90dc522c80bd4606a32edec63367f22"
+      },
+      "scope": "Old released helper CLI, real released GUIs; no download/UI automation",
+      "mode": "zip",
+      "old_gui_pid": 2680,
+      "helper_exit_code": 0,
+      "helper_failure_reported": false,
+      "verified_program_files": 4206,
+      "preferences_preserved": true,
+      "restarted_gui_pid": 2104,
+      "cleanup_completed": true,
+      "finished_at": "2026-11-27T13:40:03+0000"
+    },
+    "rollback_and_real_old_gui": {
+      "case": "zip-182-rollback",
+      "status": "passed",
+      "old_version": "1.8.2",
+      "new_version": "1.8.3",
+      "old_sha256": "8ee34cf794aa85764db549f7642b47630be3698c578d3ffbaeac1adc2f16429d",
+      "new_sha256": "71d8b4558048b7ba2672c1e688b4be04b3b42e019e7de77cb099101d7eed6bdb",
+      "old_helper_sha256": "f23a8b61fe8bcf37b2ca7f4b950c25c4cd4f8be8f6e362795505c16da8dffa01",
+      "invoked_helper_sha256": "f23a8b61fe8bcf37b2ca7f4b950c25c4cd4f8be8f6e362795505c16da8dffa01",
+      "helper_override": false,
+      "install": "repo/build/update-audit/zip-182-rollback/Копия с пробелами/ClicknTranslate",
+      "temp": "qa-temp/cntqa-ws3115ho",
+      "markers": {
+        "data/update-test-marker.bin": "aa0079648aeccb9fdaae7dbea3d8bd82a25e7d93f243489ba638bc35c4083072",
+        "ocr/update-test-model.bin": "784b2549a0c3059334d10a248199d9d58b78c370a6781892591acbb8d75add61",
+        "translators/update-test-model.bin": "d7f1bdefd3450c13147727299ddf4fbdf90dc522c80bd4606a32edec63367f22"
+      },
+      "scope": "Old released helper CLI, real released GUIs; no download/UI automation",
+      "mode": "zip",
+      "old_gui_pid": 6716,
+      "helper_exit_code": null,
+      "helper_failure_reported": true,
+      "verified_program_files": 4065,
+      "preferences_preserved": true,
+      "restarted_gui_pid": 2788,
+      "cleanup_completed": true,
+      "finished_at": "2026-11-27T13:41:36+0000"
+    },
+    "run": "https://github.com/jabrailkhalil/clickntranslate/actions/runs/46007997038",
+    "scope": "The old C# helper from public ZIP 1.8.2 used its normal CLI. Native GUIs, data markers, program hashes, restart and rollback on a clean GitHub Windows Server 2022. The in-app download UI was outside this transition harness."
+  },
+  "legacy_powershell_update": {
+    "sha": "60ff416a453a57505c40dcd34d0997d4e68c6dc9",
+    "before": "final/ps127-before/results.xml",
+    "after": "final/ps127-after/results.xml",
+    "updater_repair_handshake_tests": 67,
+    "evidence": "final/windows-updater-fixed/results.xml"
+  },
+  "windows_ci_regressions": {
+    "sha": "05c30f30bc288b7b9ce582ae5952c3315f5fdb82",
+    "run_id": 46006833564,
+    "windows": {
+      "2": {
+        "tests": 1956,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 4,
+        "seconds": 1028.578
+      },
+      "6": {
+        "tests": 1312,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 36,
+        "seconds": 260.67
+      }
+    },
+    "targeted_confirmations": {
+      "2": [
+        "test_actions_reuse_existing_workflows_and_preserve_provider[screen]",
+        "test_actions_reuse_existing_workflows_and_preserve_provider[area]",
+        "test_actions_reuse_existing_workflows_and_preserve_provider[dynamic]",
+        "test_actions_reuse_existing_workflows_and_preserve_provider[copy]",
+        "test_actions_reuse_existing_workflows_and_preserve_provider[documents]",
+        "test_actions_reuse_existing_workflows_and_preserve_provider[selection]",
+        "test_actions_reuse_existing_workflows_and_preserve_provider[replace]",
+        "test_actions_reuse_existing_workflows_and_preserve_provider[text]",
+        "test_actions_reuse_existing_workflows_and_preserve_provider[settings]",
+        "test_dynamic_tab_explains_the_mode_and_launches_the_real_action"
+      ],
+      "6": [
+        "test_updater_script_applies_payload_and_preserves_data",
+        "test_updater_stops_locked_worker_before_replacing_install",
+        "test_updater_uses_external_cwd_and_preserves_installer_metadata"
+      ]
+    }
+  }
+}

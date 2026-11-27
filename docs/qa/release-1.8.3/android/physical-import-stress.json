@@ -1,0 +1,200 @@
+{
+  "api": "37",
+  "page_size": "4096",
+  "build": "CPH2745",
+  "started": "2026-11-27T08:43:11.159767+00:00",
+  "groups": {
+    "journal-sequence": {
+      "log": "qa-reports/android/journal-sequence.log",
+      "sha256": "24aeb6ab73031b073c6f722859ccbdf31f248d3e05c1fee7bbcbbeb37810486c",
+      "tests": 36,
+      "passed": 36,
+      "skipped": 0,
+      "failed": 0,
+      "seconds": 15.649,
+      "cases": [
+        {
+          "class": "dev.clickn.translate.history.TextHistoryIntegrationTest",
+          "test": "malformedLegacyRemainsRecoverableAndDoesNotBlockNewRoomHistory",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.history.TextHistoryIntegrationTest",
+          "test": "lateEraseFailureCannotOverrideAnotherSuccessfulClear",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.history.TextHistoryIntegrationTest",
+          "test": "failedLegacyEraseIsVisibleAndRetriedWithoutDeletingUnrelatedPreferences",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.history.TextHistoryIntegrationTest",
+          "test": "importsAllLegacyFieldsWithoutTruncationAndReopensWithoutReimporting",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.history.TextHistoryIntegrationTest",
+          "test": "failedInsertRollsBackEveryImportedRowAndTheReceipt",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.history.TextHistoryIntegrationTest",
+          "test": "initializationAndExplicitClearNeverReadOrWriteLegacyPreferencesOnMain",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.history.TextHistoryIntegrationTest",
+          "test": "clearWinsAgainstAnImportAlreadyReadingItsOldSnapshot",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.history.TextHistoryIntegrationTest",
+          "test": "concurrentRepositoriesImportOnceEvenWithEqualLegacyTimestamps",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.history.TextHistoryIntegrationTest",
+          "test": "interruptedClearFinishesLegacyErasureAfterReopenWithoutResurrectingRows",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.history.TextHistoryIntegrationTest",
+          "test": "clearRejectsResultsFromBeforeClearAndNewResultsKeepTheirLanguageAndProviderScope",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.glossary.SettingsGlossaryRollbackIntegrationTest",
+          "test": "cancelledImportRetainsLaterEditsAndNewTermsAndReversesRepeatedIds",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.glossary.SettingsGlossaryRollbackIntegrationTest",
+          "test": "failedRoomTransactionDiscardsItsJournalWithoutTouchingLaterRows",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.data.SettingsImportJournalConcurrencyIntegrationTest",
+          "test": "concurrentCheckpointsFromDifferentInstancesRetainBothStoreIntents",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.data.SettingsImportJournalConcurrencyIntegrationTest",
+          "test": "lateCallbackCannotOverwriteTheNextImportAfterOldIntentWasCleaned",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.data.SettingsImportJournalConcurrencyIntegrationTest",
+          "test": "directorySyncFailureAfterFinishKeepsThePublishedIntentAndItsBackups",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.data.SettingsImportJournalConcurrencyIntegrationTest",
+          "test": "terminalDecisionRejectsLateStoreIntentAndCannotBeChangedToRollback",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.data.DurableSettingsImportIntegrationTest",
+          "test": "interruptedUnpublishedFirstIntentHasNoStoreEffectsAndDoesNotBlockStartup",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.data.DurableSettingsImportIntegrationTest",
+          "test": "deathAfterCommitDecisionPreservesWholeImportAndOnlyCleansStaging",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.data.DurableSettingsImportIntegrationTest",
+          "test": "deathAfterRoomCommitRecoversBeforeFirstPublicRead",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.data.DurableSettingsImportIntegrationTest",
+          "test": "deathAfterDataStoreCommitRestoresLocalCredentialsAndAllStores",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.data.DurableSettingsImportIntegrationTest",
+          "test": "cleanupFailureAfterCommittedDecisionNeverRollsBackCommittedData",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.data.DurableSettingsImportIntegrationTest",
+          "test": "cancellationAfterRoomCommitCompensatesBeforeReturningCancellation",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.data.DurableSettingsImportIntegrationTest",
+          "test": "successfulImportPersistsInterfaceChoicesTogetherWithProfilesTermsAndFonts",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.data.DurableSettingsImportIntegrationTest",
+          "test": "committedRecoveryKeepsInterfaceChoicesMadeAfterTheImportDecision",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.data.DurableSettingsImportIntegrationTest",
+          "test": "committedRecoveryDoesNotOverwriteInterfaceChoicesChangedAndRevertedLater",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.data.DurableSettingsImportIntegrationTest",
+          "test": "encryptionFailureBeforeIntentNeverChangesAnyStore",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.data.DurableSettingsImportIntegrationTest",
+          "test": "deathAfterInterfacePublicationReplaysWithoutIncrementingChoiceRevisions",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.data.DurableSettingsImportIntegrationTest",
+          "test": "recoveryRetainsLaterSettingsAndGlossaryEditsAndDoesNotResurrectDeletion",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.data.DurableSettingsImportIntegrationTest",
+          "test": "rollbackDoesNotKeepANewFontMerelyBecauseAnOldMissingFileWasReferenced",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.data.DurableSettingsImportIntegrationTest",
+          "test": "unreadableEncryptedJournalExposesNoPartialStateAndCanRetryAfterRepair",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.data.DurableSettingsImportIntegrationTest",
+          "test": "deathAfterFontPublicationRestoresOriginalAndRemovesNewFont",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.dictionary.DictionaryPackIntegrationTest",
+          "test": "cancellingAnActualPartialPipeCopyKeepsV2CleansStagingAndAllowsNextImport",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.dictionary.DictionaryPackIntegrationTest",
+          "test": "invalidReplacementsKeepV1BytesAndV2AtomicallyReplacesItsDefinitions",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.dictionary.DictionaryPackIntegrationTest",
+          "test": "installReadsFormsNfkcAndExactArabicDefinitionsFromRealSqlite",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.update.InstalledApkVerificationTest",
+          "test": "anApkWithAnotherApplicationIdIsRejectedByTheInstalledPackageCheck",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.update.InstalledApkVerificationTest",
+          "test": "ownInstalledArchiveIsRecognizedAndReadableThroughTheInstallerUri",
+          "result": "passed"
+        }
+      ]
+    }
+  },
+  "cleanup": true
+}

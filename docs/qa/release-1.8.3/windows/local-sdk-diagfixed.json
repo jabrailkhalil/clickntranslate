@@ -1,0 +1,21 @@
+{
+  "command": [
+    "qa-reports/windows/work/venv/Scripts/python.exe",
+    "tools/run_regression_tests.py",
+    "--output",
+    "qa-reports/windows/final/diagnostics",
+    "--basetemp",
+    "qa-work/t-diag",
+    "-vv",
+    "qa-work/diag/tests/test_diagnostic_job_failures.py",
+    "qa-work/diag/tests/test_diagnostic_report_boundaries.py",
+    "qa-work/diag/tests/test_diagnostic_reservation.py",
+    "qa-work/diag/tests/test_diagnostics.py"
+  ],
+  "pid": 5132,
+  "exit_code": 0,
+  "seconds": 6.44,
+  "qt": "offscreen",
+  "private_station": "QA-station",
+  "private_desktop": "QA"
+}

@@ -1,0 +1,18 @@
+{
+  "qt_platform": "xcb",
+  "languages": [
+    "English",
+    "Russian"
+  ],
+  "copied_original": "The green train leaves at seven.",
+  "online_google_result": "Зеленый поезд отправляется в семь.",
+  "visible_windows": [
+    "",
+    "Click'n'Translate"
+  ],
+  "input_after_translation": "The green train leaves at seven.",
+  "result_state": "None",
+  "error_label": "",
+  "copied_result": "Зеленый поезд отправляется в семь.",
+  "passed": true
+}

@@ -1,0 +1,1228 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites name="pytest tests">
+  <testsuite name="pytest" errors="0" failures="3" skipped="36" tests="1312" time="473.374" timestamp="2026-11-27T13:11:54.926955+00:00">
+    <testcase classname="tests.test_single_instance.CommandSetTest" name="test_every_shortcut_action_is_accepted_plus_show" time="0.001" />
+    <testcase classname="tests.test_single_instance.CommandSetTest" name="test_unknown_command_is_rejected_before_touching_the_socket" time="0.001" />
+    <testcase classname="tests.test_single_instance.CommandServerTest" name="test_command_reaches_the_running_instance" time="0.000">
+      <skipped type="pytest.skip" message="AF_UNIX sockets are not available on this platform" />
+    </testcase>
+    <testcase classname="tests.test_single_instance.CommandServerTest" name="test_every_command_round_trips" time="0.000">
+      <skipped type="pytest.skip" message="AF_UNIX sockets are not available on this platform" />
+    </testcase>
+    <testcase classname="tests.test_single_instance.CommandServerTest" name="test_garbage_input_does_not_kill_the_server" time="0.000">
+      <skipped type="pytest.skip" message="AF_UNIX sockets are not available on this platform" />
+    </testcase>
+    <testcase classname="tests.test_single_instance.CommandServerTest" name="test_quit_only_reaches_the_explicitly_selected_process" time="0.000">
+      <skipped type="pytest.skip" message="AF_UNIX sockets are not available on this platform" />
+    </testcase>
+    <testcase classname="tests.test_single_instance.CommandServerTest" name="test_second_server_cannot_claim_a_live_socket" time="0.000">
+      <skipped type="pytest.skip" message="AF_UNIX sockets are not available on this platform" />
+    </testcase>
+    <testcase classname="tests.test_single_instance.CommandServerTest" name="test_send_reports_false_when_nothing_is_listening" time="0.001">
+      <skipped type="pytest.skip" message="AF_UNIX sockets are not available on this platform" />
+    </testcase>
+    <testcase classname="tests.test_single_instance.CommandServerTest" name="test_socket_is_private_to_the_user" time="0.000">
+      <skipped type="pytest.skip" message="AF_UNIX sockets are not available on this platform" />
+    </testcase>
+    <testcase classname="tests.test_single_instance.CommandServerTest" name="test_socket_left_by_a_crashed_instance_is_reclaimed" time="0.000">
+      <skipped type="pytest.skip" message="AF_UNIX sockets are not available on this platform" />
+    </testcase>
+    <testcase classname="tests.test_single_instance.CommandServerTest" name="test_stopping_removes_the_socket_file" time="0.000">
+      <skipped type="pytest.skip" message="AF_UNIX sockets are not available on this platform" />
+    </testcase>
+    <testcase classname="tests.test_single_instance.RuntimeDirTest" name="test_missing_runtime_dir_falls_back_to_a_private_tmp_dir" time="0.000">
+      <skipped type="pytest.skip" message="AF_UNIX sockets are not available on this platform" />
+    </testcase>
+    <testcase classname="tests.test_single_instance.RuntimeDirTest" name="test_xdg_runtime_dir_is_used_when_present" time="0.000">
+      <skipped type="pytest.skip" message="AF_UNIX sockets are not available on this platform" />
+    </testcase>
+    <testcase classname="tests.test_single_instance.CommandStatusTest" name="test_broken_write_without_reply_remains_ambiguous" time="0.002" />
+    <testcase classname="tests.test_single_instance.CommandStatusTest" name="test_busy_is_not_reported_as_success" time="0.002" />
+    <testcase classname="tests.test_single_instance.CommandStatusTest" name="test_busy_reply_survives_listener_closing_before_client_write" time="0.002" />
+    <testcase classname="tests.test_single_instance.CommandStatusTest" name="test_fragmented_ack_is_accepted" time="0.002" />
+    <testcase classname="tests.test_single_instance.CommandStatusTest" name="test_lost_ack_is_ambiguous_and_never_replayed" time="0.002" />
+    <testcase classname="tests.test_single_instance.CommandStatusTest" name="test_only_missing_or_refused_connect_means_no_listener" time="0.005" />
+    <testcase classname="tests.test_single_instance.CommandStatusTest" name="test_post_connect_refusal_does_not_mean_safe_to_replay" time="0.002" />
+    <testcase classname="tests.test_single_instance.CommandStatusTest" name="test_unknown_or_incomplete_reply_is_failure" time="0.003" />
+    <testcase classname="tests.test_single_instance.CommandReliabilityTest" name="test_aborted_accept_does_not_stop_listener" time="0.000">
+      <skipped type="pytest.skip" message="Linux ownership and AF_UNIX tests" />
+    </testcase>
+    <testcase classname="tests.test_single_instance.CommandReliabilityTest" name="test_ambiguous_probe_failures_never_unlink" time="0.000">
+      <skipped type="pytest.skip" message="Linux ownership and AF_UNIX tests" />
+    </testcase>
+    <testcase classname="tests.test_single_instance.CommandReliabilityTest" name="test_arbitrary_path_and_symlink_are_preserved" time="0.000">
+      <skipped type="pytest.skip" message="Linux ownership and AF_UNIX tests" />
+    </testcase>
+    <testcase classname="tests.test_single_instance.CommandReliabilityTest" name="test_bind_failure_releases_lock_and_owned_socket" time="0.000">
+      <skipped type="pytest.skip" message="Linux ownership and AF_UNIX tests" />
+    </testcase>
+    <testcase classname="tests.test_single_instance.CommandReliabilityTest" name="test_bound_but_not_started_owner_cannot_be_replaced" time="0.000">
+      <skipped type="pytest.skip" message="Linux ownership and AF_UNIX tests" />
+    </testcase>
+    <testcase classname="tests.test_single_instance.CommandReliabilityTest" name="test_burst_128_waits_for_ui_then_drains_in_memory" time="0.000">
+      <skipped type="pytest.skip" message="Linux ownership and AF_UNIX tests" />
+    </testcase>
+    <testcase classname="tests.test_single_instance.CommandReliabilityTest" name="test_handler_exception_does_not_kill_dispatch" time="0.000">
+      <skipped type="pytest.skip" message="Linux ownership and AF_UNIX tests" />
+    </testcase>
+    <testcase classname="tests.test_single_instance.CommandReliabilityTest" name="test_invalid_and_oversize_frames_are_not_admitted" time="0.000">
+      <skipped type="pytest.skip" message="Linux ownership and AF_UNIX tests" />
+    </testcase>
+    <testcase classname="tests.test_single_instance.CommandReliabilityTest" name="test_killed_owner_lock_is_released_and_stale_path_reclaimed" time="0.000">
+      <skipped type="pytest.skip" message="Linux ownership and AF_UNIX tests" />
+    </testcase>
+    <testcase classname="tests.test_single_instance.CommandReliabilityTest" name="test_owner_lock_symlink_is_not_followed" time="0.000">
+      <skipped type="pytest.skip" message="Linux ownership and AF_UNIX tests" />
+    </testcase>
+    <testcase classname="tests.test_single_instance.CommandReliabilityTest" name="test_partial_frame_expires" time="0.000">
+      <skipped type="pytest.skip" message="Linux ownership and AF_UNIX tests" />
+    </testcase>
+    <testcase classname="tests.test_single_instance.CommandReliabilityTest" name="test_pending_client_limit_rejects_and_recovers" time="0.000">
+      <skipped type="pytest.skip" message="Linux ownership and AF_UNIX tests" />
+    </testcase>
+    <testcase classname="tests.test_single_instance.CommandReliabilityTest" name="test_shutdown_before_ui_ready_is_bounded_and_logged" time="0.000">
+      <skipped type="pytest.skip" message="Linux ownership and AF_UNIX tests" />
+    </testcase>
+    <testcase classname="tests.test_single_instance.CommandReliabilityTest" name="test_slow_fragmented_sender_does_not_block_other_commands" time="0.000">
+      <skipped type="pytest.skip" message="Linux ownership and AF_UNIX tests" />
+    </testcase>
+    <testcase classname="tests.test_single_instance.CommandReliabilityTest" name="test_slow_handler_does_not_block_admission_and_queue_is_bounded" time="0.000">
+      <skipped type="pytest.skip" message="Linux ownership and AF_UNIX tests" />
+    </testcase>
+    <testcase classname="tests.test_single_instance.CommandReliabilityTest" name="test_stop_before_start_is_idempotent" time="0.000">
+      <skipped type="pytest.skip" message="Linux ownership and AF_UNIX tests" />
+    </testcase>
+    <testcase classname="tests.test_single_instance.CommandReliabilityTest" name="test_stop_keeps_owner_lock_until_inflight_handler_finishes" time="0.000">
+      <skipped type="pytest.skip" message="Linux ownership and AF_UNIX tests" />
+    </testcase>
+    <testcase classname="tests.test_single_instance.CommandReliabilityTest" name="test_stop_preserves_replacement_socket" time="0.001">
+      <skipped type="pytest.skip" message="Linux ownership and AF_UNIX tests" />
+    </testcase>
+    <testcase classname="tests.test_single_instance.CommandReliabilityTest" name="test_two_processes_cannot_win_startup_together" time="0.000">
+      <skipped type="pytest.skip" message="Linux ownership and AF_UNIX tests" />
+    </testcase>
+    <testcase classname="tests.test_single_instance_startup.LinuxForwardingStartupTest" name="test_acknowledged_command_exits_successfully_without_new_server" time="0.332" />
+    <testcase classname="tests.test_single_instance_startup.LinuxForwardingStartupTest" name="test_application_shutdown_stops_and_joins_channel" time="0.311" />
+    <testcase classname="tests.test_single_instance_startup.LinuxForwardingStartupTest" name="test_busy_or_ambiguous_delivery_does_not_start_or_replay" time="0.017" />
+    <testcase classname="tests.test_single_instance_startup.LinuxForwardingStartupTest" name="test_failed_race_forward_is_not_silent_success" time="0.003" />
+    <testcase classname="tests.test_single_instance_startup.LinuxForwardingStartupTest" name="test_lost_ownership_race_can_forward_previously_unsent_command" time="0.002" />
+    <testcase classname="tests.test_single_instance_startup.LinuxForwardingStartupTest" name="test_manual_cancel_and_autostart_keep_the_old_instance" time="0.003" />
+    <testcase classname="tests.test_single_instance_startup.LinuxForwardingStartupTest" name="test_manual_launch_can_replace_and_claim_the_released_channel" time="0.002" />
+    <testcase classname="tests.test_single_instance_startup.LinuxForwardingStartupTest" name="test_manual_startup_race_still_offers_the_same_choice" time="0.002" />
+    <testcase classname="tests.test_single_instance_startup.LinuxForwardingStartupTest" name="test_new_owner_buffers_commands_until_ui_ready" time="0.003" />
+    <testcase classname="tests.test_source_handoff" name="test_snapshot_includes_cross_platform_build_sources" time="0.145" />
+    <testcase classname="tests.test_source_handoff" name="test_snapshot_does_not_include_private_key_material" time="0.010" />
+    <testcase classname="tests.test_startup_dialogs" name="test_replacement_dialog_fits_every_language_theme_and_scale" time="2.265" />
+    <testcase classname="tests.test_startup_dialogs" name="test_replacement_requires_the_explicit_button_and_escape_keeps_old_copy" time="0.046" />
+    <testcase classname="tests.test_startup_dialogs" name="test_closing_wait_keeps_the_ui_responsive_and_reports_failure" time="0.060" />
+    <testcase classname="tests.test_startup_news" name="test_startup_news_is_localized_and_explains_user_benefits" time="0.003" />
+    <testcase classname="tests.test_startup_news" name="test_startup_news_escapes_the_supplied_version" time="0.001" />
+    <testcase classname="tests.test_startup_news" name="test_startup_news_is_shown_once_per_announcement_and_remembered" time="0.042" />
+    <testcase classname="tests.test_startup_news" name="test_acknowledged_announcement_never_opens_again" time="0.002" />
+    <testcase classname="tests.test_startup_news" name="test_same_version_does_not_hide_a_new_announcement_id" time="0.021" />
+    <testcase classname="tests.test_startup_news" name="test_dialog_uses_the_current_application_interface_language" time="0.152" />
+    <testcase classname="tests.test_startup_news" name="test_announcement_preserves_hidden_welcome_and_can_start_setup" time="0.023" />
+    <testcase classname="tests.test_startup_news" name="test_skipping_announcement_keeps_completed_setup" time="0.022" />
+    <testcase classname="tests.test_startup_ocr_preparation.TestStartupOcrPreparation" name="test_gui_preparation_refuses_wrong_thread_even_if_called_directly" time="0.002" />
+    <testcase classname="tests.test_startup_ocr_preparation.TestStartupOcrPreparation" name="test_startup_keeps_models_and_unused_overlays_unloaded" time="0.002" />
+    <testcase classname="tests.test_styled_dialogs" name="test_message_box_uses_custom_chrome_and_status_icon" time="0.010" />
+    <testcase classname="tests.test_styled_dialogs" name="test_external_message_style_cannot_remove_shared_chrome" time="0.010" />
+    <testcase classname="tests.test_styled_dialogs" name="test_theme_detection_accepts_settings_parent_attribute" time="0.010" />
+    <testcase classname="tests.test_styled_dialogs" name="test_message_box_centers_on_embedded_settings_in_global_coordinates" time="0.015" />
+    <testcase classname="tests.test_styled_dialogs" name="test_every_process_uses_the_shared_message_box" time="0.001" />
+    <testcase classname="tests.test_styled_dialogs" name="test_qt_exception_guard_is_idempotent" time="0.001" />
+    <testcase classname="tests.test_styled_dialogs" name="test_unchanged_stylesheet_does_not_repolish_child_widgets" time="0.002" />
+    <testcase classname="tests.test_styled_dialogs" name="test_document_window_uses_the_shared_frameless_chrome" time="0.160" />
+    <testcase classname="tests.test_styled_dialogs" name="test_document_stop_keeps_finished_text_and_does_not_report_completion" time="0.321" />
+    <testcase classname="tests.test_styled_dialogs" name="test_closing_document_requests_cancellation" time="0.119" />
+    <testcase classname="tests.test_styled_dialogs" name="test_document_pane_borders_survive_theme_and_language_switches" time="0.579" />
+    <testcase classname="tests.test_styled_dialogs" name="test_tooltips_render_in_the_current_theme_across_widgets_and_theme_switches" time="0.840" />
+    <testcase classname="tests.test_styled_dialogs" name="test_document_window_uses_saved_target_when_opened_from_settings" time="0.145" />
+    <testcase classname="tests.test_styled_dialogs" name="test_document_provider_list_groups_online_and_only_installed_offline" time="0.129" />
+    <testcase classname="tests.test_styled_dialogs" name="test_document_auto_source_is_available_only_for_google" time="0.265" />
+    <testcase classname="tests.test_styled_dialogs" name="test_document_language_arrow_swaps_source_and_target" time="0.154" />
+    <testcase classname="tests.test_styled_dialogs" name="test_faq_uses_custom_chrome_and_exposes_project_links" time="0.033" />
+    <testcase classname="tests.test_technical_audit" name="test_runtime_timings_are_bounded_and_do_not_capture_arguments" time="0.001" />
+    <testcase classname="tests.test_technical_audit" name="test_unrelated_settings_do_not_rebuild_home_or_lose_draft" time="1.487" />
+    <testcase classname="tests.test_technical_audit" name="test_theme_updates_cached_home_once_without_rebuilding" time="1.858" />
+    <testcase classname="tests.test_technical_audit" name="test_missing_credentials_are_cached_briefly_but_saving_is_immediate" time="0.001" />
+    <testcase classname="tests.test_technical_audit" name="test_export_removes_legacy_credentials_at_every_depth_and_position_round_trips" time="0.002" />
+    <testcase classname="tests.test_technical_audit" name="test_import_does_not_overwrite_new_language_pair_with_cached_controls" time="1.848" />
+    <testcase classname="tests.test_technical_audit" name="test_export_writes_real_json_and_failed_replace_preserves_existing_files" time="1.216" />
+    <testcase classname="tests.test_technical_audit" name="test_oversized_import_is_rejected_without_changing_preferences" time="1.208" />
+    <testcase classname="tests.test_technical_audit" name="test_bug_report_uses_actual_data_directory_and_adds_private_safe_runtime" time="0.186" />
+    <testcase classname="tests.test_technical_audit" name="test_diagnostic_redaction_covers_api_headers_json_and_urls[fixture-1]" time="0.001" />
+    <testcase classname="tests.test_technical_audit" name="test_diagnostic_redaction_covers_api_headers_json_and_urls[fixture-2]" time="0.001" />
+    <testcase classname="tests.test_technical_audit" name="test_diagnostic_redaction_covers_api_headers_json_and_urls[fixture-3]" time="0.001" />
+    <testcase classname="tests.test_technical_audit" name="test_diagnostic_redaction_covers_api_headers_json_and_urls[fixture-4]" time="0.001" />
+    <testcase classname="tests.test_technical_audit" name="test_diagnostic_redaction_covers_api_headers_json_and_urls[fixture-5]" time="0.001" />
+    <testcase classname="tests.test_technical_audit" name="test_diagnostic_job_does_not_block_qt_event_delivery" time="0.695" />
+    <testcase classname="tests.test_technical_audit" name="test_report_action_waits_for_delivery_then_releases_completed_job" time="1.212" />
+    <testcase classname="tests.test_technical_audit" name="test_real_local_http_transport_does_not_reuse_credentials_or_follow_redirects" time="0.529" />
+    <testcase classname="tests.test_tesseract_components" name="test_language_add_remove_and_update_preserve_running_generation" time="0.511" />
+    <testcase classname="tests.test_tesseract_components" name="test_failed_model_activation_keeps_active_and_previous_data" time="0.206" />
+    <testcase classname="tests.test_tesseract_components" name="test_removed_languages_do_not_reappear_from_legacy_environment_or_defaults" time="0.200" />
+    <testcase classname="tests.test_tesseract_components" name="test_language_removal_works_without_network_or_catalog" time="0.191" />
+    <testcase classname="tests.test_tesseract_components" name="test_copied_windows_install_is_not_used_on_another_platform" time="0.125" />
+    <testcase classname="tests.test_tesseract_components" name="test_model_source_archive_does_not_convert_alias_into_fake_traineddata" time="0.009" />
+    <testcase classname="tests.test_tesseract_components" name="test_migration_preserves_custom_legacy_models_and_blocks_incompatible_update" time="0.141" />
+    <testcase classname="tests.test_tesseract_components" name="test_cancellation_during_language_transaction_does_not_publish" time="0.190" />
+    <testcase classname="tests.test_tesseract_components" name="test_managed_command_uses_its_own_models_and_holds_lease" time="0.167" />
+    <testcase classname="tests.test_tesseract_components" name="test_managed_data_preparation_never_writes_or_downloads" time="0.114" />
+    <testcase classname="tests.test_tesseract_components" name="test_catalog_rejects_unsafe_native_descriptions[command]" time="0.006" />
+    <testcase classname="tests.test_tesseract_components" name="test_catalog_rejects_unsafe_native_descriptions[code]" time="0.006" />
+    <testcase classname="tests.test_tesseract_components" name="test_catalog_rejects_unsafe_native_descriptions[destination]" time="0.008" />
+    <testcase classname="tests.test_tesseract_components" name="test_catalog_rejects_unsafe_native_descriptions[mismatch]" time="0.007" />
+    <testcase classname="tests.test_tesseract_components" name="test_materialization_does_not_change_signed_capabilities" time="0.006" />
+    <testcase classname="tests.test_tesseract_components" name="test_native_arguments_preserve_model_directory_with_spaces" time="0.016" />
+    <testcase classname="tests.test_tesseract_components" name="test_native_arabic_line_identity_does_not_turn_word_spaces_into_paragraphs" time="0.001" />
+    <testcase classname="tests.test_tesseract_components" name="test_native_line_identity_still_preserves_page_gutter" time="0.001" />
+    <testcase classname="tests.test_theme_button" name="test_theme_clicked_signal_accepts_qt_checked_argument" time="1.183" />
+    <testcase classname="tests.test_theme_button" name="test_visible_theme_button_changes_both_palettes[main-80]" time="1.120" />
+    <testcase classname="tests.test_theme_button" name="test_visible_theme_button_changes_both_palettes[main-100]" time="1.106" />
+    <testcase classname="tests.test_theme_button" name="test_visible_theme_button_changes_both_palettes[main-137]" time="1.131" />
+    <testcase classname="tests.test_theme_button" name="test_visible_theme_button_changes_both_palettes[main-200]" time="1.126" />
+    <testcase classname="tests.test_theme_button" name="test_visible_theme_button_changes_both_palettes[settings-80]" time="1.976" />
+    <testcase classname="tests.test_theme_button" name="test_visible_theme_button_changes_both_palettes[settings-100]" time="1.973" />
+    <testcase classname="tests.test_theme_button" name="test_visible_theme_button_changes_both_palettes[settings-137]" time="1.983" />
+    <testcase classname="tests.test_theme_button" name="test_visible_theme_button_changes_both_palettes[settings-200]" time="2.006" />
+    <testcase classname="tests.test_translation_algorithm_invariants" name="test_argos_model_update_retranslates_instead_of_returning_the_old_result" time="0.015" />
+    <testcase classname="tests.test_translation_algorithm_invariants" name="test_argos_cache_is_bound_to_approved_bytes_and_the_original_operation[False]" time="0.016" />
+    <testcase classname="tests.test_translation_algorithm_invariants" name="test_argos_cache_is_bound_to_approved_bytes_and_the_original_operation[True]" time="0.016" />
+    <testcase classname="tests.test_translation_algorithm_invariants" name="test_argos_runtime_selected_for_cache_lookup_remains_leased_through_the_request" time="0.283" />
+    <testcase classname="tests.test_translation_algorithm_invariants" name="test_argos_document_model_change_between_chunks_never_mixes_or_relabels_cached_results" time="0.058" />
+    <testcase classname="tests.test_translation_algorithm_invariants" name="test_legacy_argos_retains_its_existing_cache_namespace[False]" time="0.010" />
+    <testcase classname="tests.test_translation_algorithm_invariants" name="test_legacy_argos_retains_its_existing_cache_namespace[True]" time="0.011" />
+    <testcase classname="tests.test_translation_algorithm_invariants" name="test_bound_unmanaged_argos_does_not_switch_to_newly_installed_managed_worker[False-False]" time="0.026" />
+    <testcase classname="tests.test_translation_algorithm_invariants" name="test_bound_unmanaged_argos_does_not_switch_to_newly_installed_managed_worker[False-True]" time="0.038" />
+    <testcase classname="tests.test_translation_algorithm_invariants" name="test_bound_unmanaged_argos_does_not_switch_to_newly_installed_managed_worker[True-False]" time="0.032" />
+    <testcase classname="tests.test_translation_algorithm_invariants" name="test_bound_unmanaged_argos_does_not_switch_to_newly_installed_managed_worker[True-True]" time="0.047" />
+    <testcase classname="tests.test_translation_algorithm_invariants" name="test_api_document_keeps_one_connection_snapshot_between_streamed_pieces[endpoint]" time="0.021" />
+    <testcase classname="tests.test_translation_algorithm_invariants" name="test_api_document_keeps_one_connection_snapshot_between_streamed_pieces[model]" time="0.020" />
+    <testcase classname="tests.test_translation_algorithm_invariants" name="test_api_document_keeps_one_connection_snapshot_between_streamed_pieces[key]" time="0.021" />
+    <testcase classname="tests.test_translation_algorithm_invariants" name="test_seeded_unicode_chunk_plan_is_lossless_and_stays_inside_both_budgets[63]" time="0.011" />
+    <testcase classname="tests.test_translation_algorithm_invariants" name="test_seeded_unicode_chunk_plan_is_lossless_and_stays_inside_both_budgets[811]" time="0.010" />
+    <testcase classname="tests.test_translation_algorithm_invariants" name="test_seeded_unicode_chunk_plan_is_lossless_and_stays_inside_both_budgets[20261106]" time="0.010" />
+    <testcase classname="tests.test_translation_algorithm_invariants" name="test_seeded_ocr_geometry_retains_each_text_fragment_once[67]" time="0.003" />
+    <testcase classname="tests.test_translation_algorithm_invariants" name="test_seeded_ocr_geometry_retains_each_text_fragment_once[911]" time="0.002" />
+    <testcase classname="tests.test_translation_algorithm_invariants" name="test_seeded_ocr_geometry_retains_each_text_fragment_once[20261106]" time="0.002" />
+    <testcase classname="tests.test_translation_algorithm_invariants" name="test_argos_mapping_fault_keeps_completed_and_cached_pieces_without_shifting[wrong_index]" time="0.001" />
+    <testcase classname="tests.test_translation_algorithm_invariants" name="test_argos_mapping_fault_keeps_completed_and_cached_pieces_without_shifting[duplicate_index]" time="0.001" />
+    <testcase classname="tests.test_translation_algorithm_invariants" name="test_argos_mapping_fault_keeps_completed_and_cached_pieces_without_shifting[missing_text]" time="0.001" />
+    <testcase classname="tests.test_translation_algorithm_invariants" name="test_argos_mapping_fault_keeps_completed_and_cached_pieces_without_shifting[early_eof]" time="0.001" />
+    <testcase classname="tests.test_translation_algorithm_invariants" name="test_argos_stream_close_or_cancel_stops_a_backpressured_producer[False]" time="0.001" />
+    <testcase classname="tests.test_translation_algorithm_invariants" name="test_argos_stream_close_or_cancel_stops_a_backpressured_producer[True]" time="0.001" />
+    <testcase classname="tests.test_translation_area_preference" name="test_settings_toggle_uses_existing_preference_and_clears_only_translation_area" time="1.301" />
+    <testcase classname="tests.test_translation_area_preference" name="test_settings_preference_is_used_by_next_capture_without_starting_ocr" time="1.470" />
+    <testcase classname="tests.test_translation_area_preference" name="test_contextual_toggle_updates_cached_settings_without_a_refresh_save" time="1.520" />
+    <testcase classname="tests.test_translation_area_preference" name="test_preference_survives_interface_language_and_theme_rebuilds[en]" time="2.021" />
+    <testcase classname="tests.test_translation_area_preference" name="test_preference_survives_interface_language_and_theme_rebuilds[ru]" time="2.033" />
+    <testcase classname="tests.test_translation_area_preference" name="test_preference_survives_interface_language_and_theme_rebuilds[es]" time="2.008" />
+    <testcase classname="tests.test_translation_area_preference" name="test_preference_survives_interface_language_and_theme_rebuilds[de]" time="2.013" />
+    <testcase classname="tests.test_translation_area_preference" name="test_preference_survives_interface_language_and_theme_rebuilds[fr]" time="2.079" />
+    <testcase classname="tests.test_translation_area_preference" name="test_preference_survives_interface_language_and_theme_rebuilds[zh]" time="2.049" />
+    <testcase classname="tests.test_translation_area_preference" name="test_preference_survives_interface_language_and_theme_rebuilds[pt]" time="2.048" />
+    <testcase classname="tests.test_translation_area_preference" name="test_preference_survives_interface_language_and_theme_rebuilds[it]" time="2.003" />
+    <testcase classname="tests.test_translation_area_preference" name="test_preference_survives_interface_language_and_theme_rebuilds[ar]" time="2.042" />
+    <testcase classname="tests.test_translation_area_preference" name="test_preference_survives_interface_language_and_theme_rebuilds[tr]" time="2.030" />
+    <testcase classname="tests.test_translation_area_preference" name="test_preference_survives_interface_language_and_theme_rebuilds[hi]" time="2.064" />
+    <testcase classname="tests.test_translation_area_preference" name="test_preference_survives_interface_language_and_theme_rebuilds[id]" time="2.019" />
+    <testcase classname="tests.test_translation_area_preference" name="test_disabling_memory_does_not_resolve_an_unavailable_monitor" time="1.293" />
+    <testcase classname="tests.test_translation_availability" name="test_ready_checks_use_the_requested_pair_and_never_load_native_models" time="0.001" />
+    <testcase classname="tests.test_translation_availability" name="test_real_recovery_prompt_fits_and_lists_only_ready_choices[False-en]" time="0.126" />
+    <testcase classname="tests.test_translation_availability" name="test_real_recovery_prompt_fits_and_lists_only_ready_choices[False-ru]" time="0.037" />
+    <testcase classname="tests.test_translation_availability" name="test_real_recovery_prompt_fits_and_lists_only_ready_choices[False-es]" time="0.037" />
+    <testcase classname="tests.test_translation_availability" name="test_real_recovery_prompt_fits_and_lists_only_ready_choices[False-de]" time="0.037" />
+    <testcase classname="tests.test_translation_availability" name="test_real_recovery_prompt_fits_and_lists_only_ready_choices[False-fr]" time="0.036" />
+    <testcase classname="tests.test_translation_availability" name="test_real_recovery_prompt_fits_and_lists_only_ready_choices[False-zh]" time="0.037" />
+    <testcase classname="tests.test_translation_availability" name="test_real_recovery_prompt_fits_and_lists_only_ready_choices[True-en]" time="0.039" />
+    <testcase classname="tests.test_translation_availability" name="test_real_recovery_prompt_fits_and_lists_only_ready_choices[True-ru]" time="0.038" />
+    <testcase classname="tests.test_translation_availability" name="test_real_recovery_prompt_fits_and_lists_only_ready_choices[True-es]" time="0.036" />
+    <testcase classname="tests.test_translation_availability" name="test_real_recovery_prompt_fits_and_lists_only_ready_choices[True-de]" time="0.036" />
+    <testcase classname="tests.test_translation_availability" name="test_real_recovery_prompt_fits_and_lists_only_ready_choices[True-fr]" time="0.037" />
+    <testcase classname="tests.test_translation_availability" name="test_real_recovery_prompt_fits_and_lists_only_ready_choices[True-zh]" time="0.037" />
+    <testcase classname="tests.test_translation_availability" name="test_result_setup_preserves_drafts_until_a_ready_provider_is_explicitly_chosen[None-argos]" time="0.798" />
+    <testcase classname="tests.test_translation_availability" name="test_result_setup_preserves_drafts_until_a_ready_provider_is_explicitly_chosen[None-hymt]" time="0.773" />
+    <testcase classname="tests.test_translation_availability" name="test_result_setup_preserves_drafts_until_a_ready_provider_is_explicitly_chosen[install-argos]" time="0.783" />
+    <testcase classname="tests.test_translation_availability" name="test_result_setup_preserves_drafts_until_a_ready_provider_is_explicitly_chosen[install-hymt]" time="0.871" />
+    <testcase classname="tests.test_translation_availability" name="test_result_setup_preserves_drafts_until_a_ready_provider_is_explicitly_chosen[google-argos]" time="0.772" />
+    <testcase classname="tests.test_translation_availability" name="test_result_setup_preserves_drafts_until_a_ready_provider_is_explicitly_chosen[google-hymt]" time="0.786" />
+    <testcase classname="tests.test_translation_availability" name="test_worker_missing_component_only_prompts_for_its_current_draft[False]" time="0.775" />
+    <testcase classname="tests.test_translation_availability" name="test_worker_missing_component_only_prompts_for_its_current_draft[True]" time="0.755" />
+    <testcase classname="tests.test_translation_availability" name="test_install_link_opens_the_matching_package_tab[argos]" time="1.513" />
+    <testcase classname="tests.test_translation_availability" name="test_install_link_opens_the_matching_package_tab[hymt]" time="1.502" />
+    <testcase classname="tests.test_translation_availability" name="test_settings_missing_provider_does_not_persist_an_unusable_choice[None]" time="1.219" />
+    <testcase classname="tests.test_translation_availability" name="test_settings_missing_provider_does_not_persist_an_unusable_choice[install]" time="1.194" />
+    <testcase classname="tests.test_translation_availability" name="test_settings_missing_provider_does_not_persist_an_unusable_choice[lingva]" time="1.179" />
+    <testcase classname="tests.test_translation_availability" name="test_settings_only_host_does_not_start_other_background_services" time="0.567" />
+    <testcase classname="tests.test_translation_availability" name="test_missing_selection_warns_even_before_text_is_entered" time="0.790" />
+    <testcase classname="tests.test_translation_availability" name="test_document_missing_provider_keeps_existing_text_and_provider_local" time="0.720" />
+    <testcase classname="tests.test_translation_availability" name="test_cached_hymt_paths_do_not_claim_deleted_models_are_ready" time="0.004" />
+    <testcase classname="tests.test_translation_availability" name="test_main_argos_choices_can_open_setup_or_switch_explicitly" time="0.622" />
+    <testcase classname="tests.test_translation_availability" name="test_result_setup_link_is_owned_while_installation_is_open" time="0.732" />
+    <testcase classname="tests.test_translation_availability" name="test_main_worker_missing_runtime_offers_recovery_and_keeps_the_draft" time="0.613" />
+    <testcase classname="tests.test_translation_availability" name="test_standalone_install_link_creates_a_services_free_settings_host" time="1.475" />
+    <testcase classname="tests.test_translation_chunks" name="test_chunks_are_lossless_and_obey_both_limits[4-text0]" time="0.014" />
+    <testcase classname="tests.test_translation_chunks" name="test_chunks_are_lossless_and_obey_both_limits[4-text1]" time="0.014" />
+    <testcase classname="tests.test_translation_chunks" name="test_chunks_are_lossless_and_obey_both_limits[4-text2]" time="0.009" />
+    <testcase classname="tests.test_translation_chunks" name="test_chunks_are_lossless_and_obey_both_limits[4-text3]" time="0.022" />
+    <testcase classname="tests.test_translation_chunks" name="test_chunks_are_lossless_and_obey_both_limits[4-text4]" time="0.010" />
+    <testcase classname="tests.test_translation_chunks" name="test_chunks_are_lossless_and_obey_both_limits[4-text5]" time="0.006" />
+    <testcase classname="tests.test_translation_chunks" name="test_chunks_are_lossless_and_obey_both_limits[4-text6]" time="0.010" />
+    <testcase classname="tests.test_translation_chunks" name="test_chunks_are_lossless_and_obey_both_limits[17-text0]" time="0.004" />
+    <testcase classname="tests.test_translation_chunks" name="test_chunks_are_lossless_and_obey_both_limits[17-text1]" time="0.004" />
+    <testcase classname="tests.test_translation_chunks" name="test_chunks_are_lossless_and_obey_both_limits[17-text2]" time="0.004" />
+    <testcase classname="tests.test_translation_chunks" name="test_chunks_are_lossless_and_obey_both_limits[17-text3]" time="0.006" />
+    <testcase classname="tests.test_translation_chunks" name="test_chunks_are_lossless_and_obey_both_limits[17-text4]" time="0.004" />
+    <testcase classname="tests.test_translation_chunks" name="test_chunks_are_lossless_and_obey_both_limits[17-text5]" time="0.002" />
+    <testcase classname="tests.test_translation_chunks" name="test_chunks_are_lossless_and_obey_both_limits[17-text6]" time="0.003" />
+    <testcase classname="tests.test_translation_chunks" name="test_chunks_are_lossless_and_obey_both_limits[500-text0]" time="0.001" />
+    <testcase classname="tests.test_translation_chunks" name="test_chunks_are_lossless_and_obey_both_limits[500-text1]" time="0.001" />
+    <testcase classname="tests.test_translation_chunks" name="test_chunks_are_lossless_and_obey_both_limits[500-text2]" time="0.001" />
+    <testcase classname="tests.test_translation_chunks" name="test_chunks_are_lossless_and_obey_both_limits[500-text3]" time="0.003" />
+    <testcase classname="tests.test_translation_chunks" name="test_chunks_are_lossless_and_obey_both_limits[500-text4]" time="0.002" />
+    <testcase classname="tests.test_translation_chunks" name="test_chunks_are_lossless_and_obey_both_limits[500-text5]" time="0.001" />
+    <testcase classname="tests.test_translation_chunks" name="test_chunks_are_lossless_and_obey_both_limits[500-text6]" time="0.001" />
+    <testcase classname="tests.test_translation_chunks" name="test_chunks_are_lossless_and_obey_both_limits[1500-text0]" time="0.001" />
+    <testcase classname="tests.test_translation_chunks" name="test_chunks_are_lossless_and_obey_both_limits[1500-text1]" time="0.001" />
+    <testcase classname="tests.test_translation_chunks" name="test_chunks_are_lossless_and_obey_both_limits[1500-text2]" time="0.001" />
+    <testcase classname="tests.test_translation_chunks" name="test_chunks_are_lossless_and_obey_both_limits[1500-text3]" time="0.002" />
+    <testcase classname="tests.test_translation_chunks" name="test_chunks_are_lossless_and_obey_both_limits[1500-text4]" time="0.002" />
+    <testcase classname="tests.test_translation_chunks" name="test_chunks_are_lossless_and_obey_both_limits[1500-text5]" time="0.002" />
+    <testcase classname="tests.test_translation_chunks" name="test_chunks_are_lossless_and_obey_both_limits[1500-text6]" time="0.001" />
+    <testcase classname="tests.test_translation_chunks" name="test_whole_sentences_are_kept_together_when_they_fit" time="0.001" />
+    <testcase classname="tests.test_translation_chunks" name="test_paragraphs_take_priority_and_no_separator_is_invented" time="0.001" />
+    <testcase classname="tests.test_translation_chunks" name="test_abbreviations_and_decimals_do_not_create_false_sentence_ends" time="0.001" />
+    <testcase classname="tests.test_translation_chunks" name="test_invalid_limits_fail_instead_of_looping[kwargs0]" time="0.001" />
+    <testcase classname="tests.test_translation_chunks" name="test_invalid_limits_fail_instead_of_looping[kwargs1]" time="0.001" />
+    <testcase classname="tests.test_translation_chunks" name="test_invalid_limits_fail_instead_of_looping[kwargs2]" time="0.001" />
+    <testcase classname="tests.test_translation_chunks" name="test_invalid_limits_fail_instead_of_looping[kwargs3]" time="0.001" />
+    <testcase classname="tests.test_translation_chunks" name="test_invalid_limits_fail_instead_of_looping[kwargs4]" time="0.001" />
+    <testcase classname="tests.test_translation_chunks" name="test_too_small_byte_limit_for_unicode_fails_cleanly" time="0.001" />
+    <testcase classname="tests.test_translation_chunks" name="test_document_requests_match_the_shared_plan_once[google-_google_translate_chunk]" time="0.089" />
+    <testcase classname="tests.test_translation_chunks" name="test_document_requests_match_the_shared_plan_once[mymemory-_mymemory_translate_chunk]" time="0.197" />
+    <testcase classname="tests.test_translation_chunks" name="test_retry_plain_text_only_resends_the_failed_and_untranslated_parts" time="0.082" />
+    <testcase classname="tests.test_translation_chunks" name="test_document_retry_reuses_successful_parts_and_keeps_paragraphs" time="0.031" />
+    <testcase classname="tests.test_translation_chunks" name="test_cancel_stops_requests_and_does_not_start_fallback" time="0.022" />
+    <testcase classname="tests.test_translation_chunks" name="test_cancellation_prevents_a_google_endpoint_retry" time="0.003" />
+    <testcase classname="tests.test_translation_chunks" name="test_batch_documents_use_fewer_requests_and_preserve_order" time="0.065" />
+    <testcase classname="tests.test_translation_chunks" name="test_unsupported_batch_retries_singly_on_the_same_server" time="0.034" />
+    <testcase classname="tests.test_translation_chunks" name="test_failed_batch_never_shifts_results_or_caches_partial_answers[429-answer0]" time="0.003" />
+    <testcase classname="tests.test_translation_chunks" name="test_failed_batch_never_shifts_results_or_caches_partial_answers[200-answer1]" time="0.005" />
+    <testcase classname="tests.test_translation_chunks" name="test_failed_batch_never_shifts_results_or_caches_partial_answers[200-answer2]" time="0.003" />
+    <testcase classname="tests.test_translation_chunks" name="test_cache_never_crosses_provider_or_custom_server_boundaries" time="0.016" />
+    <testcase classname="tests.test_translation_chunks" name="test_rate_limit_stops_remaining_batches_but_keeps_cached_results" time="0.016" />
+    <testcase classname="tests.test_translation_chunks" name="test_cancel_after_batch_retains_every_received_piece_for_resume" time="0.027" />
+    <testcase classname="tests.test_translation_chunks" name="test_batch_failure_preserves_cached_parts_without_switching_provider" time="0.010" />
+    <testcase classname="tests.test_translation_chunks" name="test_selected_provider_failure_never_switches_even_with_legacy_fallback_enabled[google]" time="0.003" />
+    <testcase classname="tests.test_translation_chunks" name="test_selected_provider_failure_never_switches_even_with_legacy_fallback_enabled[lingva]" time="0.077" />
+    <testcase classname="tests.test_translation_chunks" name="test_selected_provider_failure_never_switches_even_with_legacy_fallback_enabled[mymemory]" time="0.004" />
+    <testcase classname="tests.test_translation_chunks" name="test_selected_provider_failure_never_switches_even_with_legacy_fallback_enabled[libretranslate]" time="0.003" />
+    <testcase classname="tests.test_translation_chunks" name="test_unknown_engine_does_not_use_google_or_argos" time="0.003" />
+    <testcase classname="tests.test_translation_chunks" name="test_invalid_cached_translation_is_a_cache_miss[]" time="0.004" />
+    <testcase classname="tests.test_translation_chunks" name="test_invalid_cached_translation_is_a_cache_miss[  ]" time="0.003" />
+    <testcase classname="tests.test_translation_chunks" name="test_invalid_cached_translation_is_a_cache_miss[42]" time="0.002" />
+    <testcase classname="tests.test_translation_chunks" name="test_invalid_cached_translation_is_a_cache_miss[invalid3]" time="0.002" />
+    <testcase classname="tests.test_translation_chunks" name="test_invalid_cached_translation_is_a_cache_miss[invalid4]" time="0.003" />
+    <testcase classname="tests.test_translation_empty_inputs" name="test_blank_translation_never_calls_the_paid_adapter[openai]" time="0.002" />
+    <testcase classname="tests.test_translation_empty_inputs" name="test_blank_translation_never_calls_the_paid_adapter[openai-compatible]" time="0.002" />
+    <testcase classname="tests.test_translation_empty_inputs" name="test_blank_translation_never_calls_the_paid_adapter[gemini]" time="0.002" />
+    <testcase classname="tests.test_translation_empty_inputs" name="test_blank_translation_never_calls_the_paid_adapter[anthropic]" time="0.003" />
+    <testcase classname="tests.test_translation_empty_inputs" name="test_blank_translation_never_calls_the_paid_adapter[deepl]" time="0.003" />
+    <testcase classname="tests.test_translation_empty_inputs" name="test_whitespace_document_pieces_keep_source_and_skip_the_paid_adapter[openai]" time="0.029" />
+    <testcase classname="tests.test_translation_empty_inputs" name="test_whitespace_document_pieces_keep_source_and_skip_the_paid_adapter[openai-compatible]" time="0.033" />
+    <testcase classname="tests.test_translation_empty_inputs" name="test_whitespace_document_pieces_keep_source_and_skip_the_paid_adapter[gemini]" time="0.027" />
+    <testcase classname="tests.test_translation_empty_inputs" name="test_whitespace_document_pieces_keep_source_and_skip_the_paid_adapter[anthropic]" time="0.030" />
+    <testcase classname="tests.test_translation_empty_inputs" name="test_whitespace_document_pieces_keep_source_and_skip_the_paid_adapter[deepl]" time="0.030" />
+    <testcase classname="tests.test_translation_empty_inputs" name="test_already_cancelled_argos_document_does_not_construct_a_worker" time="0.003" />
+    <testcase classname="tests.test_translation_empty_inputs" name="test_blank_input_still_obeys_an_already_requested_cancellation" time="0.002" />
+    <testcase classname="tests.test_translation_result_ui.TranslationResultUiTest" name="test_absent_clipboard_restore_setting_leaves_the_captured_selection" time="0.005" />
+    <testcase classname="tests.test_translation_result_ui.TranslationResultUiTest" name="test_changed_pair_is_remembered_only_for_the_invoking_mode" time="1.057" />
+    <testcase classname="tests.test_translation_result_ui.TranslationResultUiTest" name="test_changing_the_source_keeps_a_valid_target_and_retranslates" time="0.172" />
+    <testcase classname="tests.test_translation_result_ui.TranslationResultUiTest" name="test_changing_the_target_retranslates_the_original_text" time="0.151" />
+    <testcase classname="tests.test_translation_result_ui.TranslationResultUiTest" name="test_copy_button_works_without_closing_the_result" time="0.141" />
+    <testcase classname="tests.test_translation_result_ui.TranslationResultUiTest" name="test_disabled_history_flags_never_touch_history_files" time="0.002" />
+    <testcase classname="tests.test_translation_result_ui.TranslationResultUiTest" name="test_editors_and_a_valid_pair_remain_available_without_original_metadata" time="0.585" />
+    <testcase classname="tests.test_translation_result_ui.TranslationResultUiTest" name="test_failed_retranslate_keeps_the_previous_result_and_reports_it" time="0.202" />
+    <testcase classname="tests.test_translation_result_ui.TranslationResultUiTest" name="test_hiding_the_main_window_result_copies_exactly_once" time="0.009" />
+    <testcase classname="tests.test_translation_result_ui.TranslationResultUiTest" name="test_main_window_result_stays_inline_when_the_mode_is_not_listed" time="0.002" />
+    <testcase classname="tests.test_translation_result_ui.TranslationResultUiTest" name="test_mode_list_survives_junk_from_a_hand_edited_config" time="0.001" />
+    <testcase classname="tests.test_translation_result_ui.TranslationResultUiTest" name="test_multiple_results_stay_open_and_are_cascaded_downward" time="0.398" />
+    <testcase classname="tests.test_translation_result_ui.TranslationResultUiTest" name="test_only_the_listed_modes_are_hidden" time="0.001" />
+    <testcase classname="tests.test_translation_result_ui.TranslationResultUiTest" name="test_outside_click_closes_the_result_window_when_enabled" time="0.200" />
+    <testcase classname="tests.test_translation_result_ui.TranslationResultUiTest" name="test_outside_click_does_not_close_the_result_window_by_default" time="0.157" />
+    <testcase classname="tests.test_translation_result_ui.TranslationResultUiTest" name="test_owned_popup_keeps_the_result_window_open_on_deactivate" time="0.150" />
+    <testcase classname="tests.test_translation_result_ui.TranslationResultUiTest" name="test_regular_selection_hotkey_never_attempts_replacement" time="0.052" />
+    <testcase classname="tests.test_translation_result_ui.TranslationResultUiTest" name="test_replace_fallback_copies_and_still_never_opens_dialog" time="0.005" />
+    <testcase classname="tests.test_translation_result_ui.TranslationResultUiTest" name="test_replace_hotkey_uses_one_history_entry_and_never_opens_dialog" time="0.003" />
+    <testcase classname="tests.test_translation_result_ui.TranslationResultUiTest" name="test_result_dialog_is_frameless_themed_and_localized" time="1.916" />
+    <testcase classname="tests.test_translation_result_ui.TranslationResultUiTest" name="test_result_editors_follow_the_configured_font_size" time="0.202" />
+    <testcase classname="tests.test_translation_result_ui.TranslationResultUiTest" name="test_retranslated_result_respects_auto_copy_checkbox" time="0.155" />
+    <testcase classname="tests.test_translation_result_ui.TranslationResultUiTest" name="test_returned_modes_keep_a_stable_order" time="0.001" />
+    <testcase classname="tests.test_translation_result_ui.TranslationResultUiTest" name="test_safe_selection_replacement_revalidates_then_pastes" time="0.003" />
+    <testcase classname="tests.test_translation_result_ui.TranslationResultUiTest" name="test_selection_replacement_never_pastes_after_focus_changes" time="0.001" />
+    <testcase classname="tests.test_translation_result_ui.TranslationResultUiTest" name="test_selection_replacement_never_pastes_over_changed_text" time="0.002" />
+    <testcase classname="tests.test_translation_result_ui.TranslationResultUiTest" name="test_skip_dialog_copies_without_opening_the_result_window" time="0.053" />
+    <testcase classname="tests.test_translation_result_ui.TranslationResultUiTest" name="test_successful_replacement_respects_disabled_clipboard_restore" time="0.003" />
+    <testcase classname="tests.test_translation_result_ui.TranslationResultUiTest" name="test_swap_flips_the_pair_and_retranslates" time="0.165" />
+    <testcase classname="tests.test_translation_result_ui.TranslationResultUiTest" name="test_swap_tooltip_is_localized_in_every_language" time="2.068" />
+    <testcase classname="tests.test_translation_result_ui.TranslationResultUiTest" name="test_the_default_is_shown_everywhere_and_is_immutable" time="0.002" />
+    <testcase classname="tests.test_translation_result_ui.TranslationResultUiTest" name="test_unchecked_still_opens_the_result_window" time="0.002" />
+    <testcase classname="tests.test_translation_result_ui.TranslationResultUiTest" name="test_unknown_font_size_falls_back_to_medium" time="0.001" />
+    <testcase classname="tests.test_translation_result_ui.TranslationResultUiTest" name="test_visible_selection_with_auto_copy_off_restores_previous_clipboard" time="0.003" />
+    <testcase classname="tests.test_translation_result_ui.TranslationResultUiTest" name="test_wrapper_uses_new_dialog_and_preserves_auto_copy" time="0.003" />
+    <testcase classname="tests.test_translation_workspace" name="test_translate_uses_the_current_draft_and_selected_engine" time="0.320" />
+    <testcase classname="tests.test_translation_workspace" name="test_worker_thread_delivers_result_to_the_gui" time="0.195" />
+    <testcase classname="tests.test_translation_workspace" name="test_typing_in_result_translates_that_draft_and_keeps_it_visible[\u041d\u043e\u0432\u044b\u0439 \u043f\u0435\u0440\u0435\u0432\u043e\u0434]" time="0.177" />
+    <testcase classname="tests.test_translation_workspace" name="test_typing_in_result_translates_that_draft_and_keeps_it_visible[]" time="0.191" />
+    <testcase classname="tests.test_translation_workspace" name="test_typing_in_result_translates_that_draft_and_keeps_it_visible[   \n]" time="0.188" />
+    <testcase classname="tests.test_translation_workspace" name="test_typing_in_result_translates_that_draft_and_keeps_it_visible[reply3]" time="0.183" />
+    <testcase classname="tests.test_translation_workspace" name="test_latest_source_edit_takes_priority_over_an_earlier_result_edit" time="0.173" />
+    <testcase classname="tests.test_translation_workspace" name="test_clearing_source_clears_result_and_disables_empty_requests" time="0.162" />
+    <testcase classname="tests.test_translation_workspace" name="test_swap_exchanges_the_edited_texts_as_well_as_languages" time="0.175" />
+    <testcase classname="tests.test_translation_workspace" name="test_late_answer_cannot_overwrite_edits_or_copy_to_clipboard[source_edit]" time="0.165" />
+    <testcase classname="tests.test_translation_workspace" name="test_late_answer_cannot_overwrite_edits_or_copy_to_clipboard[text_edit]" time="0.165" />
+    <testcase classname="tests.test_translation_workspace" name="test_new_language_request_wins_when_old_answer_arrives_last" time="0.166" />
+    <testcase classname="tests.test_translation_workspace" name="test_close_cancels_pending_translation_without_history_or_copy" time="0.163" />
+    <testcase classname="tests.test_translation_workspace" name="test_appearance_changes_do_not_cancel_an_active_translation" time="0.327" />
+    <testcase classname="tests.test_translation_workspace" name="test_error_preserves_both_fields_and_exposes_full_details" time="0.165" />
+    <testcase classname="tests.test_translation_workspace" name="test_plain_enter_inserts_a_line_and_control_enter_translates" time="0.167" />
+    <testcase classname="tests.test_translation_workspace" name="test_source_and_translation_have_independent_undo_histories" time="0.160" />
+    <testcase classname="tests.test_translation_workspace" name="test_both_editors_wrap_and_remain_accessible_after_reflow[ru-\u0422\u0435\u043c\u043d\u0430\u044f]" time="0.243" />
+    <testcase classname="tests.test_translation_workspace" name="test_both_editors_wrap_and_remain_accessible_after_reflow[ru-\u0421\u0432\u0435\u0442\u043b\u0430\u044f]" time="0.235" />
+    <testcase classname="tests.test_translation_workspace" name="test_both_editors_wrap_and_remain_accessible_after_reflow[en-\u0422\u0435\u043c\u043d\u0430\u044f]" time="0.254" />
+    <testcase classname="tests.test_translation_workspace" name="test_both_editors_wrap_and_remain_accessible_after_reflow[en-\u0421\u0432\u0435\u0442\u043b\u0430\u044f]" time="0.238" />
+    <testcase classname="tests.test_translation_workspace" name="test_both_editors_wrap_and_remain_accessible_after_reflow[de-\u0422\u0435\u043c\u043d\u0430\u044f]" time="0.243" />
+    <testcase classname="tests.test_translation_workspace" name="test_both_editors_wrap_and_remain_accessible_after_reflow[de-\u0421\u0432\u0435\u0442\u043b\u0430\u044f]" time="0.245" />
+    <testcase classname="tests.test_translation_workspace" name="test_both_editors_wrap_and_remain_accessible_after_reflow[fr-\u0422\u0435\u043c\u043d\u0430\u044f]" time="0.235" />
+    <testcase classname="tests.test_translation_workspace" name="test_both_editors_wrap_and_remain_accessible_after_reflow[fr-\u0421\u0432\u0435\u0442\u043b\u0430\u044f]" time="0.248" />
+    <testcase classname="tests.test_translation_workspace" name="test_both_editors_wrap_and_remain_accessible_after_reflow[es-\u0422\u0435\u043c\u043d\u0430\u044f]" time="0.235" />
+    <testcase classname="tests.test_translation_workspace" name="test_both_editors_wrap_and_remain_accessible_after_reflow[es-\u0421\u0432\u0435\u0442\u043b\u0430\u044f]" time="0.249" />
+    <testcase classname="tests.test_translation_workspace" name="test_both_editors_wrap_and_remain_accessible_after_reflow[zh-\u0422\u0435\u043c\u043d\u0430\u044f]" time="0.237" />
+    <testcase classname="tests.test_translation_workspace" name="test_both_editors_wrap_and_remain_accessible_after_reflow[zh-\u0421\u0432\u0435\u0442\u043b\u0430\u044f]" time="0.231" />
+    <testcase classname="tests.test_translation_workspace" name="test_scale_and_theme_changes_preserve_drafts_and_fit_a_small_screen" time="3.874" />
+    <testcase classname="tests.test_translation_workspace" name="test_inflight_real_worker_cannot_overwrite_newer_user_state[edit_source]" time="0.167" />
+    <testcase classname="tests.test_translation_workspace" name="test_inflight_real_worker_cannot_overwrite_newer_user_state[edit_result]" time="0.168" />
+    <testcase classname="tests.test_translation_workspace" name="test_inflight_real_worker_cannot_overwrite_newer_user_state[new_language]" time="0.169" />
+    <testcase classname="tests.test_translation_workspace" name="test_inflight_real_worker_cannot_overwrite_newer_user_state[close]" time="0.168" />
+    <testcase classname="tests.test_translation_workspace" name="test_inflight_real_worker_cannot_overwrite_newer_user_state[delete]" time="0.163" />
+    <testcase classname="tests.test_translation_workspace" name="test_hiding_source_shrinks_window_and_restores_expanded_size" time="0.298" />
+    <testcase classname="tests.test_translation_workspace" name="test_result_view_preferences_survive_reopen_and_are_isolated_by_mode" time="1.360" />
+    <testcase classname="tests.test_translation_workspace" name="test_stacked_editors_stay_inside_their_frames_at_default_scale" time="1.171" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_ctrl_tab_does_not_crash_on_embedded_update_page[False--1]" time="1.560" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_ctrl_tab_does_not_crash_on_embedded_update_page[False-1]" time="1.522" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_ctrl_tab_does_not_crash_on_embedded_update_page[True--1]" time="1.507" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_ctrl_tab_does_not_crash_on_embedded_update_page[True-1]" time="1.497" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_f1_capture_help_uses_the_capture_interface_language[en-copy]" time="0.078" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_f1_capture_help_uses_the_capture_interface_language[en-translate]" time="0.113" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_f1_capture_help_uses_the_capture_interface_language[ru-copy]" time="0.075" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_f1_capture_help_uses_the_capture_interface_language[ru-translate]" time="0.110" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_f1_capture_help_uses_the_capture_interface_language[es-copy]" time="0.082" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_f1_capture_help_uses_the_capture_interface_language[es-translate]" time="0.109" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_f1_capture_help_uses_the_capture_interface_language[de-copy]" time="0.079" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_f1_capture_help_uses_the_capture_interface_language[de-translate]" time="0.111" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_f1_capture_help_uses_the_capture_interface_language[fr-copy]" time="0.073" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_f1_capture_help_uses_the_capture_interface_language[fr-translate]" time="0.109" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_f1_capture_help_uses_the_capture_interface_language[zh-copy]" time="0.078" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_f1_capture_help_uses_the_capture_interface_language[zh-translate]" time="0.111" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_f1_capture_help_uses_the_capture_interface_language[pt-copy]" time="0.079" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_f1_capture_help_uses_the_capture_interface_language[pt-translate]" time="0.111" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_f1_capture_help_uses_the_capture_interface_language[it-copy]" time="0.073" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_f1_capture_help_uses_the_capture_interface_language[it-translate]" time="0.110" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_f1_capture_help_uses_the_capture_interface_language[ar-copy]" time="0.083" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_f1_capture_help_uses_the_capture_interface_language[ar-translate]" time="0.120" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_f1_capture_help_uses_the_capture_interface_language[tr-copy]" time="0.074" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_f1_capture_help_uses_the_capture_interface_language[tr-translate]" time="0.110" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_f1_capture_help_uses_the_capture_interface_language[hi-copy]" time="0.088" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_f1_capture_help_uses_the_capture_interface_language[hi-translate]" time="0.122" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_f1_capture_help_uses_the_capture_interface_language[id-copy]" time="0.073" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_f1_capture_help_uses_the_capture_interface_language[id-translate]" time="0.119" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_f1_output_toolbar_help_uses_its_interface_language" time="0.228" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_closing_capture_before_queued_f1_does_not_leave_a_help_window" time="0.087" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_f1_real_dialog_releases_focus_after_the_originating_control_is_deleted" time="0.030" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_deleting_displayed_history_after_retention_shift_removes_the_displayed_record[False]" time="1.650" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_deleting_displayed_history_after_retention_shift_removes_the_displayed_record[True]" time="1.610" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_history_save_preserves_an_unrelated_temporary_file" time="0.015" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_recording_new_history_does_not_replace_a_corrupt_existing_file[False]" time="0.005" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_recording_new_history_does_not_replace_a_corrupt_existing_file[True]" time="0.004" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_history_deletion_ignores_a_card_whose_record_has_already_gone[False]" time="1.321" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_history_deletion_ignores_a_card_whose_record_has_already_gone[True]" time="1.349" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_invalid_history_is_preserved_and_the_save_refusal_is_logged[{broken]" time="0.005" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_invalid_history_is_preserved_and_the_save_refusal_is_logged[{&quot;unexpected&quot;:&quot;object&quot;}]" time="0.004" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_invalid_history_is_preserved_and_the_save_refusal_is_logged[]" time="0.004" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_invalid_history_is_preserved_and_the_save_refusal_is_logged[null]" time="0.004" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_real_history_writer_retains_the_newest_500_records[False]" time="0.019" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_real_history_writer_retains_the_newest_500_records[True]" time="0.016" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_history_atomic_replace_failure_preserves_the_previous_document" time="0.016" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_concurrent_history_writers_do_not_lose_records" time="0.868" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_independent_processes_share_the_history_lock" time="2.332" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_real_settings_export_and_import_round_trip[en]" time="1.827" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_real_settings_export_and_import_round_trip[ar]" time="1.863" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_real_settings_export_and_import_round_trip[pt]" time="1.811" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_real_settings_export_and_import_round_trip[it]" time="1.849" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_real_settings_export_and_import_round_trip[tr]" time="1.819" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_real_settings_export_and_import_round_trip[hi]" time="1.855" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_real_settings_export_and_import_round_trip[id]" time="1.815" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_real_import_rejects_bad_files_without_changing_live_preferences[malformed-json]" time="1.214" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_real_import_rejects_bad_files_without_changing_live_preferences[wrong-shape]" time="1.206" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_real_import_rejects_bad_files_without_changing_live_preferences[invalid-utf8]" time="1.212" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_real_import_rejects_bad_files_without_changing_live_preferences[over-one-mb]" time="1.216" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_f6_prefers_the_source_language_and_safely_falls_back[available]" time="0.006" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_f6_prefers_the_source_language_and_safely_falls_back[hidden]" time="0.006" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_f6_prefers_the_source_language_and_safely_falls_back[disabled]" time="0.005" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_f6_prefers_the_source_language_and_safely_falls_back[deleted]" time="0.006" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_two_first_copy_results_do_not_reinitialize_each_others_history" time="0.275" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_opening_an_empty_history_does_not_initialize_a_file_outside_the_writer_lock[False]" time="1.237" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_opening_an_empty_history_does_not_initialize_a_file_outside_the_writer_lock[True]" time="1.259" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_history_ui_reports_corruption_and_preserves_the_file_on_clear[{incomplete-False]" time="1.255" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_history_ui_reports_corruption_and_preserves_the_file_on_clear[{incomplete-True]" time="1.237" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_history_ui_reports_corruption_and_preserves_the_file_on_clear[{&quot;unexpected&quot;:&quot;object&quot;}-False]" time="1.303" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_history_ui_reports_corruption_and_preserves_the_file_on_clear[{&quot;unexpected&quot;:&quot;object&quot;}-True]" time="1.234" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_windows_internal_shortcuts_use_native_keys_on_a_non_latin_layout[settings-1041-188-51-\u0431-view]" time="1.315" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_windows_internal_shortcuts_use_native_keys_on_a_non_latin_layout[settings-1041-188-51-\u0431-text_input]" time="1.303" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_windows_internal_shortcuts_use_native_keys_on_a_non_latin_layout[settings-1041-188-51-\u0431-flag_button]" time="1.271" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_windows_internal_shortcuts_use_native_keys_on_a_non_latin_layout[open-1065-79-24-\u0449-view]" time="0.649" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_windows_internal_shortcuts_use_native_keys_on_a_non_latin_layout[open-1065-79-24-\u0449-text_input]" time="0.649" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_windows_internal_shortcuts_use_native_keys_on_a_non_latin_layout[open-1065-79-24-\u0449-flag_button]" time="0.657" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_native_app_shortcuts_do_not_hijack_typing_or_altgr[1041-188-\u0431-typing]" time="0.604" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_native_app_shortcuts_do_not_hijack_typing_or_altgr[1041-188-\u0431-shift-typing]" time="0.602" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_native_app_shortcuts_do_not_hijack_typing_or_altgr[1041-188-\u0431-altgr]" time="0.609" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_native_app_shortcuts_do_not_hijack_typing_or_altgr[1041-188-\u0431-ctrl-shift]" time="0.617" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_native_app_shortcuts_do_not_hijack_typing_or_altgr[1041-188-\u0431-ctrl-meta]" time="0.619" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_native_app_shortcuts_do_not_hijack_typing_or_altgr[1065-79-\u0449-typing]" time="0.603" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_native_app_shortcuts_do_not_hijack_typing_or_altgr[1065-79-\u0449-shift-typing]" time="0.619" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_native_app_shortcuts_do_not_hijack_typing_or_altgr[1065-79-\u0449-altgr]" time="0.614" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_native_app_shortcuts_do_not_hijack_typing_or_altgr[1065-79-\u0449-ctrl-shift]" time="0.607" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_native_app_shortcuts_do_not_hijack_typing_or_altgr[1065-79-\u0449-ctrl-meta]" time="0.623" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_windows_native_shortcut_codes_are_not_reinterpreted_on_other_platforms[44-1041-188-darwin]" time="0.002" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_windows_native_shortcut_codes_are_not_reinterpreted_on_other_platforms[44-1041-188-linux]" time="0.001" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_windows_native_shortcut_codes_are_not_reinterpreted_on_other_platforms[79-1065-79-darwin]" time="0.001" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_windows_native_shortcut_codes_are_not_reinterpreted_on_other_platforms[79-1065-79-linux]" time="0.001" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_native_shortcut_recording_keeps_control_of_non_latin_keys[1041-188-\u0431]" time="1.322" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_native_shortcut_recording_keeps_control_of_non_latin_keys[1065-79-\u0449]" time="1.303" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_embedded_language_popup_keeps_its_native_arrow_and_end_navigation" time="1.182" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_history_publication_retries_only_transient_windows_busy_errors[5]" time="0.013" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_history_publication_retries_only_transient_windows_busy_errors[32]" time="0.017" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_history_publication_retries_only_transient_windows_busy_errors[33]" time="0.013" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_history_publication_stops_retrying_and_preserves_the_original" time="0.011" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_atomic_publication_does_not_retry_unrelated_errors[posix-5]" time="0.001" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_atomic_publication_does_not_retry_unrelated_errors[posix-32]" time="0.001" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_atomic_publication_does_not_retry_unrelated_errors[posix-33]" time="0.001" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_atomic_publication_does_not_retry_unrelated_errors[nt-87]" time="0.001" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_atomic_publication_does_not_retry_unrelated_errors[nt-None]" time="0.001" />
+    <testcase classname="tests.test_ui_audit_20261024" name="test_windows_history_publication_recovers_when_a_reader_releases_the_file" time="0.030" />
+    <testcase classname="tests.test_ui_operations" name="test_idle_and_fast_operations_never_start_a_spinner_or_thread" time="0.022" />
+    <testcase classname="tests.test_ui_operations" name="test_file_wait_animates_without_a_popup_and_completes_on_the_gui_thread" time="0.130" />
+    <testcase classname="tests.test_ui_operations" name="test_failures_restore_the_original_controls_cursor_and_report_once[file]" time="0.015" />
+    <testcase classname="tests.test_ui_operations" name="test_failures_restore_the_original_controls_cursor_and_report_once[stage]" time="0.015" />
+    <testcase classname="tests.test_ui_operations" name="test_failures_restore_the_original_controls_cursor_and_report_once[thread_start]" time="0.003" />
+    <testcase classname="tests.test_ui_operations" name="test_a_cancelled_worker_cannot_finish_or_hide_a_new_operation" time="0.049" />
+    <testcase classname="tests.test_ui_operations" name="test_theme_button_keeps_feedback_alive_but_freezes_content_and_open_dialog" time="1.657" />
+    <testcase classname="tests.test_ui_operations" name="test_modal_prompts_remain_dismissible_during_a_pending_operation" time="0.019" />
+    <testcase classname="tests.test_ui_operations" name="test_destroying_the_owner_cancels_its_feedback_and_ignores_the_file_reply" time="0.062" />
+    <testcase classname="tests.test_ui_operations" name="test_theme_write_failure_keeps_the_previous_visible_theme_and_releases_input" time="0.745" />
+    <testcase classname="tests.test_ui_operations" name="test_theme_gui_stages_retain_cached_content_until_complete" time="1.646" />
+    <testcase classname="tests.test_ui_operations" name="test_progress_labels_frames_and_animation_fit_both_directions[\u0422\u0435\u043c\u043d\u0430\u044f-en]" time="0.012" />
+    <testcase classname="tests.test_ui_operations" name="test_progress_labels_frames_and_animation_fit_both_directions[\u0422\u0435\u043c\u043d\u0430\u044f-ru]" time="0.006" />
+    <testcase classname="tests.test_ui_operations" name="test_progress_labels_frames_and_animation_fit_both_directions[\u0422\u0435\u043c\u043d\u0430\u044f-es]" time="0.006" />
+    <testcase classname="tests.test_ui_operations" name="test_progress_labels_frames_and_animation_fit_both_directions[\u0422\u0435\u043c\u043d\u0430\u044f-de]" time="0.006" />
+    <testcase classname="tests.test_ui_operations" name="test_progress_labels_frames_and_animation_fit_both_directions[\u0422\u0435\u043c\u043d\u0430\u044f-fr]" time="0.006" />
+    <testcase classname="tests.test_ui_operations" name="test_progress_labels_frames_and_animation_fit_both_directions[\u0422\u0435\u043c\u043d\u0430\u044f-zh]" time="0.006" />
+    <testcase classname="tests.test_ui_operations" name="test_progress_labels_frames_and_animation_fit_both_directions[\u0422\u0435\u043c\u043d\u0430\u044f-pt]" time="0.006" />
+    <testcase classname="tests.test_ui_operations" name="test_progress_labels_frames_and_animation_fit_both_directions[\u0422\u0435\u043c\u043d\u0430\u044f-it]" time="0.006" />
+    <testcase classname="tests.test_ui_operations" name="test_progress_labels_frames_and_animation_fit_both_directions[\u0422\u0435\u043c\u043d\u0430\u044f-ar]" time="0.007" />
+    <testcase classname="tests.test_ui_operations" name="test_progress_labels_frames_and_animation_fit_both_directions[\u0422\u0435\u043c\u043d\u0430\u044f-tr]" time="0.006" />
+    <testcase classname="tests.test_ui_operations" name="test_progress_labels_frames_and_animation_fit_both_directions[\u0422\u0435\u043c\u043d\u0430\u044f-hi]" time="0.008" />
+    <testcase classname="tests.test_ui_operations" name="test_progress_labels_frames_and_animation_fit_both_directions[\u0422\u0435\u043c\u043d\u0430\u044f-id]" time="0.006" />
+    <testcase classname="tests.test_ui_operations" name="test_progress_labels_frames_and_animation_fit_both_directions[\u0421\u0432\u0435\u0442\u043b\u0430\u044f-en]" time="0.006" />
+    <testcase classname="tests.test_ui_operations" name="test_progress_labels_frames_and_animation_fit_both_directions[\u0421\u0432\u0435\u0442\u043b\u0430\u044f-ru]" time="0.006" />
+    <testcase classname="tests.test_ui_operations" name="test_progress_labels_frames_and_animation_fit_both_directions[\u0421\u0432\u0435\u0442\u043b\u0430\u044f-es]" time="0.006" />
+    <testcase classname="tests.test_ui_operations" name="test_progress_labels_frames_and_animation_fit_both_directions[\u0421\u0432\u0435\u0442\u043b\u0430\u044f-de]" time="0.005" />
+    <testcase classname="tests.test_ui_operations" name="test_progress_labels_frames_and_animation_fit_both_directions[\u0421\u0432\u0435\u0442\u043b\u0430\u044f-fr]" time="0.005" />
+    <testcase classname="tests.test_ui_operations" name="test_progress_labels_frames_and_animation_fit_both_directions[\u0421\u0432\u0435\u0442\u043b\u0430\u044f-zh]" time="0.006" />
+    <testcase classname="tests.test_ui_operations" name="test_progress_labels_frames_and_animation_fit_both_directions[\u0421\u0432\u0435\u0442\u043b\u0430\u044f-pt]" time="0.005" />
+    <testcase classname="tests.test_ui_operations" name="test_progress_labels_frames_and_animation_fit_both_directions[\u0421\u0432\u0435\u0442\u043b\u0430\u044f-it]" time="0.006" />
+    <testcase classname="tests.test_ui_operations" name="test_progress_labels_frames_and_animation_fit_both_directions[\u0421\u0432\u0435\u0442\u043b\u0430\u044f-ar]" time="0.006" />
+    <testcase classname="tests.test_ui_operations" name="test_progress_labels_frames_and_animation_fit_both_directions[\u0421\u0432\u0435\u0442\u043b\u0430\u044f-tr]" time="0.005" />
+    <testcase classname="tests.test_ui_operations" name="test_progress_labels_frames_and_animation_fit_both_directions[\u0421\u0432\u0435\u0442\u043b\u0430\u044f-hi]" time="0.006" />
+    <testcase classname="tests.test_ui_operations" name="test_progress_labels_frames_and_animation_fit_both_directions[\u0421\u0432\u0435\u0442\u043b\u0430\u044f-id]" time="0.005" />
+    <testcase classname="tests.test_ui_polish" name="test_welcome_checkbox_click_has_a_tick_and_survives_every_exit[accept]" time="0.027" />
+    <testcase classname="tests.test_ui_polish" name="test_welcome_checkbox_click_has_a_tick_and_survives_every_exit[reject]" time="0.023" />
+    <testcase classname="tests.test_ui_polish" name="test_welcome_checkbox_click_has_a_tick_and_survives_every_exit[close]" time="0.023" />
+    <testcase classname="tests.test_ui_polish" name="test_welcome_checkbox_click_has_a_tick_and_survives_every_exit[skip_guide]" time="0.023" />
+    <testcase classname="tests.test_ui_polish" name="test_welcome_checkbox_click_has_a_tick_and_survives_every_exit[start_guide]" time="0.022" />
+    <testcase classname="tests.test_ui_polish" name="test_welcome_keyboard_and_language_rebuild_keep_choice" time="0.044" />
+    <testcase classname="tests.test_ui_polish" name="test_welcome_links_are_icons_and_point_to_the_project" time="0.018" />
+    <testcase classname="tests.test_ui_polish" name="test_workspace_engine_is_local_and_survives_global_changes" time="0.306" />
+    <testcase classname="tests.test_ui_polish" name="test_switch_engine_cancels_old_reply_and_main_stream" time="0.295" />
+    <testcase classname="tests.test_ui_polish" name="test_workspace_engine_header_fits_narrow_and_wide_windows[\u0421\u0432\u0435\u0442\u043b\u0430\u044f]" time="0.360" />
+    <testcase classname="tests.test_ui_polish" name="test_workspace_engine_header_fits_narrow_and_wide_windows[\u0422\u0435\u043c\u043d\u0430\u044f]" time="0.356" />
+    <testcase classname="tests.test_ui_polish" name="test_followed_or_unknown_provider_never_falls_back_to_online" time="0.280" />
+    <testcase classname="tests.test_ui_polish" name="test_preview_reference_hover_does_not_leave_mouse_focus_highlight" time="0.010" />
+    <testcase classname="tests.test_ui_polish" name="test_welcome_language_menu_is_complete_rounded_and_anchored[\u0421\u0432\u0435\u0442\u043b\u0430\u044f]" time="0.070" />
+    <testcase classname="tests.test_ui_polish" name="test_welcome_language_menu_is_complete_rounded_and_anchored[\u0422\u0435\u043c\u043d\u0430\u044f]" time="0.058" />
+    <testcase classname="tests.test_ui_polish" name="test_preview_cache_is_shared_small_and_no_per_frame_loading" time="0.010" />
+    <testcase classname="tests.test_ui_polish" name="test_static_preview_never_runs_a_repaint_timer" time="0.418" />
+    <testcase classname="tests.test_ui_polish" name="test_single_static_preview_requests_settings_without_desktop_overlay" time="0.007" />
+    <testcase classname="tests.test_ui_polish" name="test_capture_closed_label_never_changes_to_full_name_and_effect_is_restored[True]" time="0.296" />
+    <testcase classname="tests.test_ui_polish" name="test_capture_closed_label_never_changes_to_full_name_and_effect_is_restored[False]" time="0.267" />
+    <testcase classname="tests.test_ui_polish" name="test_faq_scrollbar_keeps_contrast_while_held[\u0422\u0435\u043c\u043d\u0430\u044f]" time="0.078" />
+    <testcase classname="tests.test_ui_polish" name="test_faq_scrollbar_keeps_contrast_while_held[\u0421\u0432\u0435\u0442\u043b\u0430\u044f]" time="0.072" />
+    <testcase classname="tests.test_ui_polish" name="test_translation_result_scrollbar_keeps_contrast_while_held[\u0422\u0435\u043c\u043d\u0430\u044f]" time="0.187" />
+    <testcase classname="tests.test_ui_polish" name="test_translation_result_scrollbar_keeps_contrast_while_held[\u0421\u0432\u0435\u0442\u043b\u0430\u044f]" time="0.189" />
+    <testcase classname="tests.test_ui_polish" name="test_tray_toggle_and_settings_use_one_state" time="0.004" />
+    <testcase classname="tests.test_ui_polish" name="test_capture_animation_setting_is_restored_even_on_popup_error" time="0.014" />
+    <testcase classname="tests.test_ui_polish" name="test_main_scaling_uses_local_dirty_rectangles_and_full_theme_refresh" time="0.007" />
+    <testcase classname="tests.test_ui_polish" name="test_main_screen_has_translation_heading_and_preview_in_shortcut_area" time="0.660" />
+    <testcase classname="tests.test_ui_polish" name="test_desktop_dismissal_preserves_main_preview_and_saves_disabled_preference" time="0.005" />
+    <testcase classname="tests.test_ui_polish" name="test_title_flag_is_smaller_and_left_aligned" time="0.596" />
+    <testcase classname="tests.test_ui_polish" name="test_preview_click_opens_current_assistant_settings" time="2.059" />
+    <testcase classname="tests.test_ui_qa_bootstrap" name="test_screenshot_harness_imports_main_before_any_qt_dependency" time="0.006" />
+    <testcase classname="tests.test_ui_refresh_efficiency" name="test_reapplying_the_same_theme_keeps_native_and_proxy_stylesheets" time="1.698" />
+    <testcase classname="tests.test_ui_refresh_efficiency" name="test_sorted_bulk_update_keeps_codes_and_package_columns_in_the_same_row" time="1.532" />
+    <testcase classname="tests.test_ui_refresh_efficiency" name="test_bulk_update_restores_explicit_state_even_when_population_fails[False-False]" time="2.077" />
+    <testcase classname="tests.test_ui_refresh_efficiency" name="test_bulk_update_restores_explicit_state_even_when_population_fails[False-True]" time="1.713" />
+    <testcase classname="tests.test_ui_refresh_efficiency" name="test_bulk_update_restores_explicit_state_even_when_population_fails[True-False]" time="1.819" />
+    <testcase classname="tests.test_ui_refresh_efficiency" name="test_bulk_update_restores_explicit_state_even_when_population_fails[True-True]" time="1.683" />
+    <testcase classname="tests.test_ui_refresh_efficiency" name="test_bulk_refresh_does_not_turn_inherited_paint_freeze_into_a_permanent_child_freeze" time="1.633" />
+    <testcase classname="tests.test_ui_scaling.ScaleValueTest" name="test_font_backend_is_selected_before_startup_and_preserves_explicit_options" time="0.026" />
+    <testcase classname="tests.test_ui_scaling.ScaleValueTest" name="test_invalid_and_out_of_range_values_have_safe_defaults" time="0.004" />
+    <testcase classname="tests.test_ui_scaling.ScaleValueTest" name="test_screen_limit_uses_both_dimensions_in_logical_pixels" time="0.001" />
+    <testcase classname="tests.test_ui_scaling.UiScalingTest" name="test_arrow_clicks_and_keyboard_activation_apply_exact_one_percent_steps" time="1.561" />
+    <testcase classname="tests.test_ui_scaling.UiScalingTest" name="test_buttons_follow_the_screen_limit_and_allow_returning_to_smaller_sizes" time="1.916" />
+    <testcase classname="tests.test_ui_scaling.UiScalingTest" name="test_clicks_and_multiline_typing_reach_the_scaled_controls" time="2.258" />
+    <testcase classname="tests.test_ui_scaling.UiScalingTest" name="test_content_growth_and_return_to_settings_resynchronize_the_proxy" time="1.849" />
+    <testcase classname="tests.test_ui_scaling.UiScalingTest" name="test_dynamic_language_catalog_is_ready_before_the_first_popup" time="1.689" />
+    <testcase classname="tests.test_ui_scaling.UiScalingTest" name="test_every_scale_keeps_logical_geometry_and_enlarges_icons" time="0.783" />
+    <testcase classname="tests.test_ui_scaling.UiScalingTest" name="test_first_popup_keeps_its_anchor_after_native_proxy_sync_and_zoom" time="3.019" />
+    <testcase classname="tests.test_ui_scaling.UiScalingTest" name="test_guide_uses_logical_canvas_and_other_windows_keep_native_geometry" time="0.751" />
+    <testcase classname="tests.test_ui_scaling.UiScalingTest" name="test_header_drag_and_document_shortcut_reach_the_native_window" time="0.708" />
+    <testcase classname="tests.test_ui_scaling.UiScalingTest" name="test_hiding_and_restoring_preserve_scale_and_content" time="0.708" />
+    <testcase classname="tests.test_ui_scaling.UiScalingTest" name="test_holding_an_arrow_keeps_the_ui_intact_until_release" time="1.819" />
+    <testcase classname="tests.test_ui_scaling.UiScalingTest" name="test_icon_pixels_increase_with_the_window" time="0.714" />
+    <testcase classname="tests.test_ui_scaling.UiScalingTest" name="test_leaving_the_number_field_keeps_the_clicked_control_under_the_pointer" time="1.401" />
+    <testcase classname="tests.test_ui_scaling.UiScalingTest" name="test_main_controls_fit_their_panels_and_viewport_on_full_hd_and_qhd" time="0.909" />
+    <testcase classname="tests.test_ui_scaling.UiScalingTest" name="test_manual_percentage_is_applied_only_on_commit_and_escape_cancels" time="1.387" />
+    <testcase classname="tests.test_ui_scaling.UiScalingTest" name="test_numeric_input_clamps_to_screen_and_handles_empty_input" time="1.584" />
+    <testcase classname="tests.test_ui_scaling.UiScalingTest" name="test_rapid_theme_changes_and_navigation_paint_the_final_theme" time="8.823" />
+    <testcase classname="tests.test_ui_scaling.UiScalingTest" name="test_repeated_clicks_at_one_desktop_point_keep_hitting_the_arrow" time="3.102" />
+    <testcase classname="tests.test_ui_scaling.UiScalingTest" name="test_repeated_clicks_keep_every_control_in_its_region" time="2.785" />
+    <testcase classname="tests.test_ui_scaling.UiScalingTest" name="test_saved_scale_is_loaded_by_a_new_window" time="1.276" />
+    <testcase classname="tests.test_ui_scaling.UiScalingTest" name="test_scale_labels_fit_in_both_themes_and_every_interface_language" time="9.885" />
+    <testcase classname="tests.test_ui_scaling.UiScalingTest" name="test_scaled_icons_request_source_pixels_for_the_actual_display_size" time="0.764" />
+    <testcase classname="tests.test_ui_scaling.UiScalingTest" name="test_scaled_popup_stays_inside_viewport_and_selection_works" time="1.887" />
+    <testcase classname="tests.test_ui_scaling.UiScalingTest" name="test_scaled_text_uses_smooth_gray_edges_without_color_fringes" time="1.212" />
+    <testcase classname="tests.test_ui_scaling.UiScalingTest" name="test_screen_changes_clamp_size_without_losing_the_preference" time="0.687" />
+    <testcase classname="tests.test_ui_scaling.UiScalingTest" name="test_shadow_button_repaints_on_first_theme_switch_and_after_settings" time="3.637" />
+    <testcase classname="tests.test_ui_scaling.UiScalingTest" name="test_theme_transaction_freezes_the_proxy_canvas_and_open_dialog" time="1.639" />
+    <testcase classname="tests.test_ui_scaling.UiScalingTest" name="test_title_bar_and_controls_follow_canvas_width_growth" time="0.708" />
+    <testcase classname="tests.test_ui_scaling.UiScalingTest" name="test_window_edges_and_exposed_backing_follow_the_theme_during_scaling" time="2.617" />
+    <testcase classname="tests.test_update_checksum" name="test_checksum_matches_exactly_one_file[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-True]" time="0.003" />
+    <testcase classname="tests.test_update_checksum" name="test_checksum_matches_exactly_one_file[\ufeffaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa *app.zip\n-True]" time="0.003" />
+    <testcase classname="tests.test_update_checksum" name="test_checksum_matches_exactly_one_file[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  app.zip\n-True]" time="0.003" />
+    <testcase classname="tests.test_update_checksum" name="test_checksum_matches_exactly_one_file[SHA256 (app.zip) = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-True]" time="0.003" />
+    <testcase classname="tests.test_update_checksum" name="test_checksum_matches_exactly_one_file[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  releases/app.zip\n-True]" time="0.003" />
+    <testcase classname="tests.test_update_checksum" name="test_checksum_matches_exactly_one_file[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  releases/another.zip\n-False]" time="0.003" />
+    <testcase classname="tests.test_update_checksum" name="test_checksum_matches_exactly_one_file[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa *app.zip.exe-False]" time="0.003" />
+    <testcase classname="tests.test_update_checksum" name="test_checksum_matches_exactly_one_file[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa *another.zip-False]" time="0.003" />
+    <testcase classname="tests.test_update_checksum" name="test_checksum_matches_exactly_one_file[hash: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-False]" time="0.003" />
+    <testcase classname="tests.test_update_checksum" name="test_checksum_matches_exactly_one_file[content9-False]" time="0.003" />
+    <testcase classname="tests.test_update_checksum" name="test_checksum_matches_exactly_one_file[content10-False]" time="0.003" />
+    <testcase classname="tests.test_update_checksum" name="test_checksum_matches_exactly_one_file[not a checksum-False]" time="0.003" />
+    <testcase classname="tests.test_update_checksum" name="test_checksum_matches_exactly_one_file[-False]" time="0.003" />
+    <testcase classname="tests.test_update_checksum" name="test_unverified_package_never_reaches_apply_helper[-]" time="0.004" />
+    <testcase classname="tests.test_update_checksum" name="test_unverified_package_never_reaches_apply_helper[https://example.invalid/hash-broken]" time="0.005" />
+    <testcase classname="tests.test_update_checksum" name="test_windows_never_uses_another_platform_or_service_archive[Click-n-Translate-1.8.0-macos-arm64.zip]" time="0.006" />
+    <testcase classname="tests.test_update_checksum" name="test_windows_never_uses_another_platform_or_service_archive[ClicknTranslate-1.8.0-macos-x86_64.zip]" time="0.001" />
+    <testcase classname="tests.test_update_checksum" name="test_windows_never_uses_another_platform_or_service_archive[ClicknTranslate-linux-x86_64.zip]" time="0.003" />
+    <testcase classname="tests.test_update_checksum" name="test_windows_never_uses_another_platform_or_service_archive[Click-n-Translate-1.8.0-verification.zip]" time="0.001" />
+    <testcase classname="tests.test_update_checksum" name="test_windows_never_uses_another_platform_or_service_archive[ClicknTranslate-1.8.0-source.zip]" time="0.001" />
+    <testcase classname="tests.test_update_checksum" name="test_windows_never_uses_another_platform_or_service_archive[unrelated-windows-x64.zip]" time="0.002" />
+    <testcase classname="tests.test_update_checksum" name="test_windows_never_uses_another_platform_or_service_archive[ClicknTranslate-windows-arm64.zip]" time="0.001" />
+    <testcase classname="tests.test_update_evidence" name="test_only_exact_artifacts_and_old_helpers_satisfy_release_gate" time="0.031" />
+    <testcase classname="tests.test_update_handshake" name="test_application_ack_is_atomic_and_uses_runtime_version" time="0.004" />
+    <testcase classname="tests.test_update_handshake" name="test_failed_ack_does_not_leave_an_empty_confirmation" time="0.004" />
+    <testcase classname="tests.test_update_handshake" name="test_launcher_waits_for_child_readiness_without_creating_ack[False]" time="3.545" />
+    <testcase classname="tests.test_update_handshake" name="test_launcher_waits_for_child_readiness_without_creating_ack[True]" time="0.293" />
+    <testcase classname="tests.test_update_handshake" name="test_missing_application_report_identifies_modules_and_interrupted_update" time="0.089" />
+    <testcase classname="tests.test_update_handshake" name="test_update_rejects_old_app_under_new_launcher[old]" time="0.077" />
+    <testcase classname="tests.test_update_handshake" name="test_update_rejects_old_app_under_new_launcher[current]" time="0.105" />
+    <testcase classname="tests.test_update_handshake" name="test_real_updater_replaces_all_files_or_restores_all_old_files[None-zip]" time="10.267" />
+    <testcase classname="tests.test_update_handshake" name="test_real_updater_replaces_all_files_or_restores_all_old_files[None-setup]" time="0.031">
+      <skipped type="pytest.skip" message="Inno Setup is unavailable" />
+    </testcase>
+    <testcase classname="tests.test_update_handshake" name="test_real_updater_replaces_all_files_or_restores_all_old_files[app/_internal/provider.dll-zip]" time="0.925" />
+    <testcase classname="tests.test_update_handshake" name="test_real_updater_replaces_all_files_or_restores_all_old_files[app/_internal/provider.dll-setup]" time="0.030">
+      <skipped type="pytest.skip" message="Inno Setup is unavailable" />
+    </testcase>
+    <testcase classname="tests.test_update_handshake" name="test_real_updater_replaces_all_files_or_restores_all_old_files[app/_internal/OcrWorker.exe-zip]" time="0.867" />
+    <testcase classname="tests.test_update_handshake" name="test_real_updater_replaces_all_files_or_restores_all_old_files[app/_internal/OcrWorker.exe-setup]" time="0.031">
+      <skipped type="pytest.skip" message="Inno Setup is unavailable" />
+    </testcase>
+    <testcase classname="tests.test_update_handshake" name="test_real_updater_replaces_all_files_or_restores_all_old_files[locked_backup-zip]" time="31.764" />
+    <testcase classname="tests.test_update_handshake" name="test_real_updater_replaces_all_files_or_restores_all_old_files[locked_backup-setup]" time="0.034">
+      <skipped type="pytest.skip" message="Inno Setup is unavailable" />
+    </testcase>
+    <testcase classname="tests.test_update_handshake" name="test_real_updater_replaces_all_files_or_restores_all_old_files[gui_crash-zip]" time="10.593" />
+    <testcase classname="tests.test_update_handshake" name="test_real_updater_replaces_all_files_or_restores_all_old_files[gui_crash-setup]" time="0.041">
+      <skipped type="pytest.skip" message="Inno Setup is unavailable" />
+    </testcase>
+    <testcase classname="tests.test_update_repair.TestUpdateRepair" name="test_checksum_failure_leaves_installed_version_untouched" time="0.713" />
+    <testcase classname="tests.test_update_repair.TestUpdateRepair" name="test_release_repair_keeps_installer_permissions" time="0.002" />
+    <testcase classname="tests.test_update_repair.TestUpdateRepair" name="test_release_repair_refuses_missing_digest_and_insecure_url_before_build" time="0.896" />
+    <testcase classname="tests.test_update_repair.TestUpdateRepair" name="test_repair_installs_full_package_and_keeps_user_data" time="0.929" />
+    <testcase classname="tests.test_update_restart_startup" name="test_restart_skips_welcome_without_changing_the_users_preference[--show-after-update]" time="0.693" />
+    <testcase classname="tests.test_update_restart_startup" name="test_restart_skips_welcome_without_changing_the_users_preference[--update-ack=/tmp/ready]" time="0.648" />
+    <testcase classname="tests.test_update_terminal_delivery" name="test_download_terminal_delivery_blocks_early_retry_then_allows_a_new_check[failure]" time="0.020" />
+    <testcase classname="tests.test_update_terminal_delivery" name="test_download_terminal_delivery_blocks_early_retry_then_allows_a_new_check[cancel]" time="0.019" />
+    <testcase classname="tests.test_update_version_selection" name="test_release_check_orders_release_versions_without_suffix_digits[1.8.2-1.8.2-rc.1-up_to_date]" time="0.002" />
+    <testcase classname="tests.test_update_version_selection" name="test_release_check_orders_release_versions_without_suffix_digits[1.8.2-1.8.2-beta.8-up_to_date]" time="0.002" />
+    <testcase classname="tests.test_update_version_selection" name="test_release_check_orders_release_versions_without_suffix_digits[1.8.2-1.8.2+build.100-up_to_date]" time="0.001" />
+    <testcase classname="tests.test_update_version_selection" name="test_release_check_orders_release_versions_without_suffix_digits[1.8.2-v1.8.2+artifact.20261106-up_to_date]" time="0.001" />
+    <testcase classname="tests.test_update_version_selection" name="test_release_check_orders_release_versions_without_suffix_digits[1.8.2-1.8.2.0-up_to_date]" time="0.002" />
+    <testcase classname="tests.test_update_version_selection" name="test_release_check_orders_release_versions_without_suffix_digits[1.8.2-v1.8.3-ready]" time="0.001" />
+    <testcase classname="tests.test_update_version_selection" name="test_release_check_orders_release_versions_without_suffix_digits[1.8.3-v1.8.2-up_to_date]" time="0.001" />
+    <testcase classname="tests.test_update_version_selection" name="test_release_check_orders_release_versions_without_suffix_digits[1.8.2-rc.1-1.8.2-ready]" time="0.002" />
+    <testcase classname="tests.test_update_version_selection" name="test_windows_x64_update_selection_rejects_explicit_32bit_assets[wrong-only-x86-portable]" time="0.001" />
+    <testcase classname="tests.test_update_version_selection" name="test_windows_x64_update_selection_rejects_explicit_32bit_assets[wrong-only-x86-installed]" time="0.001" />
+    <testcase classname="tests.test_update_version_selection" name="test_windows_x64_update_selection_rejects_explicit_32bit_assets[wrong-only-ia32-portable]" time="0.001" />
+    <testcase classname="tests.test_update_version_selection" name="test_windows_x64_update_selection_rejects_explicit_32bit_assets[wrong-only-ia32-installed]" time="0.001" />
+    <testcase classname="tests.test_update_version_selection" name="test_windows_x64_update_selection_rejects_explicit_32bit_assets[with-x64-portable-x86-portable]" time="0.001" />
+    <testcase classname="tests.test_update_version_selection" name="test_windows_x64_update_selection_rejects_explicit_32bit_assets[with-x64-portable-x86-installed]" time="0.001" />
+    <testcase classname="tests.test_update_version_selection" name="test_windows_x64_update_selection_rejects_explicit_32bit_assets[with-x64-portable-ia32-portable]" time="0.001" />
+    <testcase classname="tests.test_update_version_selection" name="test_windows_x64_update_selection_rejects_explicit_32bit_assets[with-x64-portable-ia32-installed]" time="0.001" />
+    <testcase classname="tests.test_update_version_selection" name="test_windows_x64_update_selection_still_accepts_explicit_x86_64_assets[x86_64-portable]" time="0.001" />
+    <testcase classname="tests.test_update_version_selection" name="test_windows_x64_update_selection_still_accepts_explicit_x86_64_assets[x86_64-installed]" time="0.001" />
+    <testcase classname="tests.test_update_version_selection" name="test_windows_x64_update_selection_still_accepts_explicit_x86_64_assets[x86-64-portable]" time="0.001" />
+    <testcase classname="tests.test_update_version_selection" name="test_windows_x64_update_selection_still_accepts_explicit_x86_64_assets[x86-64-installed]" time="0.001" />
+    <testcase classname="tests.test_update_version_selection" name="test_windows_32bit_architecture_tokens_are_rejected_with_filename_punctuation[space-portable]" time="0.001" />
+    <testcase classname="tests.test_update_version_selection" name="test_windows_32bit_architecture_tokens_are_rejected_with_filename_punctuation[space-installed]" time="0.001" />
+    <testcase classname="tests.test_update_version_selection" name="test_windows_32bit_architecture_tokens_are_rejected_with_filename_punctuation[parentheses-portable]" time="0.001" />
+    <testcase classname="tests.test_update_version_selection" name="test_windows_32bit_architecture_tokens_are_rejected_with_filename_punctuation[parentheses-installed]" time="0.001" />
+    <testcase classname="tests.test_update_version_selection" name="test_invalid_release_versions_cannot_be_accepted_as_an_upgrade[invalid.9-1.8.2]" time="0.001" />
+    <testcase classname="tests.test_update_version_selection" name="test_invalid_release_versions_cannot_be_accepted_as_an_upgrade[1.8.3+bad!build-1.8.2]" time="0.001" />
+    <testcase classname="tests.test_update_version_selection" name="test_invalid_release_versions_cannot_be_accepted_as_an_upgrade[1.8.3-None]" time="0.001" />
+    <testcase classname="tests.test_update_version_selection" name="test_invalid_release_versions_cannot_be_accepted_as_an_upgrade[1.8.3-invalid.1]" time="0.001" />
+    <testcase classname="tests.test_update_version_selection" name="test_non_app_downloads_never_offer_a_windows_update[ClicknTranslate-9.0.0-android-x86_64.zip]" time="0.001" />
+    <testcase classname="tests.test_update_version_selection" name="test_non_app_downloads_never_offer_a_windows_update[ClicknTranslate-9.0.0-windows-x64-debug-symbols.zip]" time="0.001" />
+    <testcase classname="tests.test_update_version_selection" name="test_non_app_downloads_never_offer_a_windows_update[ClicknTranslate-9.0.0-rapidocr-windows-x64-installer.exe]" time="0.001" />
+    <testcase classname="tests.test_update_version_selection" name="test_startup_and_manual_check_offer_the_same_installable_download[asset_names0-False]" time="0.001" />
+    <testcase classname="tests.test_update_version_selection" name="test_startup_and_manual_check_offer_the_same_installable_download[asset_names1-False]" time="0.002" />
+    <testcase classname="tests.test_update_version_selection" name="test_startup_and_manual_check_offer_the_same_installable_download[asset_names2-True]" time="0.002" />
+    <testcase classname="tests.test_update_version_selection" name="test_desktop_can_find_a_stable_upgrade_behind_a_mobile_only_release[False]" time="0.002" />
+    <testcase classname="tests.test_update_version_selection" name="test_desktop_can_find_a_stable_upgrade_behind_a_mobile_only_release[True]" time="0.003" />
+    <testcase classname="tests.test_update_version_selection" name="test_checksum_picker_prefers_an_exact_file_over_similarly_named_reports" time="0.001" />
+    <testcase classname="tests.test_update_version_selection" name="test_historical_windows_distributions_are_still_recognised[ClicknTranslate.zip]" time="0.001" />
+    <testcase classname="tests.test_update_version_selection" name="test_historical_windows_distributions_are_still_recognised[ClicknTranslate-Windows.zip]" time="0.001" />
+    <testcase classname="tests.test_update_version_selection" name="test_historical_windows_distributions_are_still_recognised[ClicknTranslate-v1.5.0-win64.zip]" time="0.001" />
+    <testcase classname="tests.test_update_version_selection" name="test_historical_windows_distributions_are_still_recognised[ClicknTranslate-Setup-v1.5.0-win64.exe]" time="0.001" />
+    <testcase classname="tests.test_update_version_selection" name="test_historical_windows_distributions_are_still_recognised[Click-n-Translate-1.8.2-windows-x64-installer.exe]" time="0.001" />
+    <testcase classname="tests.test_update_version_selection" name="test_installed_copy_can_fall_back_to_complete_portable_package[checksum]" time="0.001" />
+    <testcase classname="tests.test_update_version_selection" name="test_installed_copy_can_fall_back_to_complete_portable_package[partial_upload]" time="0.001" />
+    <testcase classname="tests.test_update_version_selection" name="test_installed_copy_can_fall_back_to_complete_portable_package[empty]" time="0.001" />
+    <testcase classname="tests.test_update_version_selection" name="test_an_attachment_from_an_older_version_is_not_offered[Click-n-Translate-8.0.0-windows-portable-x64.zip]" time="0.001" />
+    <testcase classname="tests.test_update_version_selection" name="test_an_attachment_from_an_older_version_is_not_offered[Click-n-Translate-8.0.0-windows-x64-installer.exe]" time="0.001" />
+    <testcase classname="tests.test_update_worker_launch" name="test_check_updates_reuses_a_catalog_being_loaded_when_the_center_opens" time="0.336" />
+    <testcase classname="tests.test_update_worker_launch" name="test_engine_update_check_launch_failure_releases_the_button_and_allows_retry[constructor]" time="0.271" />
+    <testcase classname="tests.test_update_worker_launch" name="test_engine_update_check_launch_failure_releases_the_button_and_allows_retry[start]" time="0.290" />
+    <testcase classname="tests.test_update_worker_launch" name="test_application_update_launch_failure_releases_busy_state_and_allows_retry[constructor-check]" time="0.015" />
+    <testcase classname="tests.test_update_worker_launch" name="test_application_update_launch_failure_releases_busy_state_and_allows_retry[constructor-download]" time="0.003" />
+    <testcase classname="tests.test_update_worker_launch" name="test_application_update_launch_failure_releases_busy_state_and_allows_retry[start-check]" time="0.002" />
+    <testcase classname="tests.test_update_worker_launch" name="test_application_update_launch_failure_releases_busy_state_and_allows_retry[start-download]" time="0.002" />
+    <testcase classname="tests.test_updater.TestVersionHelpers" name="test_is_newer_version" time="0.001" />
+    <testcase classname="tests.test_updater.TestVersionHelpers" name="test_normalize_version" time="0.001" />
+    <testcase classname="tests.test_updater.TestConfigCacheInvalidation" name="test_uses_already_loaded_main_module" time="0.001" />
+    <testcase classname="tests.test_updater.TestPortableLayoutHelpers" name="test_internal_worker_uses_application_root_for_portable_data" time="0.003" />
+    <testcase classname="tests.test_updater.TestPortableLayoutHelpers" name="test_launcher_layout_uses_parent_as_portable_base" time="0.004" />
+    <testcase classname="tests.test_updater.TestPortableLayoutHelpers" name="test_standard_frozen_layout_uses_exe_dir" time="0.002" />
+    <testcase classname="tests.test_updater.TestPortableLayoutHelpers" name="test_store_layout_uses_package_local_state" time="0.004" />
+    <testcase classname="tests.test_updater.TestUpdateProgressDialog" name="test_package_progress_dialog_centers_on_its_owner" time="0.017" />
+    <testcase classname="tests.test_updater.TestUpdateProgressDialog" name="test_tesseract_progress_dialog_uses_same_topmost_rounded_frame" time="0.009" />
+    <testcase classname="tests.test_updater.TestUpdateProgressDialog" name="test_update_progress_dialog_supports_update_flow_methods" time="0.009" />
+    <testcase classname="tests.test_updater.TestUpdateAssetSelection" name="test_installed_copy_prefers_full_installer_over_legacy_setup_bridge" time="0.001" />
+    <testcase classname="tests.test_updater.TestUpdateAssetSelection" name="test_installed_copy_prefers_setup_executable" time="0.001" />
+    <testcase classname="tests.test_updater.TestUpdateAssetSelection" name="test_pick_checksum_url_matches_expected_name" time="0.001" />
+    <testcase classname="tests.test_updater.TestUpdateAssetSelection" name="test_pick_update_asset_ignores_engine_bundles" time="0.001" />
+    <testcase classname="tests.test_updater.TestUpdateAssetSelection" name="test_pick_update_asset_prefers_windows_clickntranslate_zip" time="0.001" />
+    <testcase classname="tests.test_updater.TestUpdateAssetSelection" name="test_portable_copy_ignores_legacy_bootstrap_asset" time="0.001" />
+    <testcase classname="tests.test_updater.TestUpdateAssetSelection" name="test_private_asset_uses_authenticated_api_download_url" time="0.003" />
+    <testcase classname="tests.test_updater.TestUpdateAssetSelection" name="test_private_update_feed_uses_environment_url_and_bearer_token" time="0.006" />
+    <testcase classname="tests.test_updater.TestUpdateAssetSelection" name="test_release_153_assets_route_installed_and_portable_copies_correctly" time="0.001" />
+    <testcase classname="tests.test_updater.TestUpdateAssetSelection" name="test_release_1_4_7_detects_1_5_0_portable_update" time="0.001" />
+    <testcase classname="tests.test_updater.TestUpdateAssetSelection" name="test_update_token_is_not_sent_to_non_github_downloads" time="0.004" />
+    <testcase classname="tests.test_updater.TestUpdaterCommands" name="test_hidden_powershell_uses_run_as_path_when_elevation_is_required" time="0.002" />
+    <testcase classname="tests.test_updater.TestUpdaterCommands" name="test_install_dir_permission_probe_requests_elevation_on_access_denied" time="0.002" />
+    <testcase classname="tests.test_updater.TestUpdaterCommands" name="test_installed_updater_runs_inno_setup_with_restart_manager" time="0.003" />
+    <testcase classname="tests.test_updater.TestUpdaterCommands" name="test_launch_zip_updater_generates_expected_script" time="0.003" />
+    <testcase classname="tests.test_updater.TestUpdaterCommands" name="test_launch_zip_updater_rejects_non_frozen" time="0.001" />
+    <testcase classname="tests.test_updater.TestUpdaterCommands" name="test_store_package_never_launches_github_zip_updater" time="0.001" />
+    <testcase classname="tests.test_updater.TestUpdaterCommands" name="test_updater_script_applies_payload_and_preserves_data" time="1.920">
+      <failure />
+    </testcase>
+    <testcase classname="tests.test_updater.TestUpdaterCommands" name="test_updater_script_rolls_back_when_new_executable_cannot_start" time="1.297" />
+    <testcase classname="tests.test_updater.TestUpdaterCommands" name="test_updater_stops_locked_worker_before_replacing_install" time="1.414">
+      <failure />
+    </testcase>
+    <testcase classname="tests.test_updater.TestUpdaterCommands" name="test_updater_uses_external_cwd_and_preserves_installer_metadata" time="1.365">
+      <failure />
+    </testcase>
+    <testcase classname="tests.test_updater.TestMalformedReleaseResponses" name="test_asset_selection_failure_posts_one_terminal_error" time="0.003" />
+    <testcase classname="tests.test_updater.TestMalformedReleaseResponses" name="test_cancelled_response_posts_one_terminal_cancellation" time="0.002" />
+    <testcase classname="tests.test_updater.TestMalformedReleaseResponses" name="test_invalid_release_metadata_finishes_check_and_releases_busy_state" time="0.025" />
+    <testcase classname="tests.test_updater.TestUpdateCancellation" name="test_download_file_cancellation_raises" time="0.005" />
+    <testcase classname="tests.test_updater.TestUpdateCancellation" name="test_handle_update_progress_close_attempt_blocks_during_apply" time="0.001" />
+    <testcase classname="tests.test_updater.TestUpdateCancellation" name="test_handle_update_progress_close_attempt_requests_cancel_before_apply" time="0.002" />
+    <testcase classname="tests.test_updater.TestUpdateCancellation" name="test_restarting_phase_blocks_progress_close_attempt" time="0.001" />
+    <testcase classname="tests.test_updater.TestUpdateCancellation" name="test_update_ready_to_restart_uses_nonblocking_progress_dialog" time="0.002" />
+    <testcase classname="tests.test_updater.TestTesseractInstallerHelpers" name="test_check_tesseract_cancel_requested_raises" time="0.005" />
+    <testcase classname="tests.test_updater.TestTesseractInstallerHelpers" name="test_find_tesseract_exe_under_searches_recursively" time="0.003" />
+    <testcase classname="tests.test_updater.TestTesseractInstallerHelpers" name="test_get_tesseract_bundle_url_uses_release_asset" time="0.001" />
+    <testcase classname="tests.test_updater.TestTesseractInstallerHelpers" name="test_hide_tesseract_progress_hides_without_closing" time="0.001" />
+    <testcase classname="tests.test_updater.TestDownloadAndPrepareUpdate" name="test_download_prepare_failure_reports_error" time="0.008" />
+    <testcase classname="tests.test_updater.TestDownloadAndPrepareUpdate" name="test_download_prepare_success_invokes_restart_flow" time="0.007" />
+    <testcase classname="tests.test_updater.TestDownloadAndPrepareUpdate" name="test_installed_copy_downloads_and_launches_setup_package" time="0.011" />
+    <testcase classname="tests.test_user_report_november" name="test_posix_relaunch_only_offers_to_close_a_different_install[True]" time="0.004" />
+    <testcase classname="tests.test_user_report_november" name="test_posix_relaunch_only_offers_to_close_a_different_install[False]" time="0.003" />
+    <testcase classname="tests.test_user_report_november" name="test_shadow_preference_only_affects_automatic_startup[False-False-False]" time="0.001" />
+    <testcase classname="tests.test_user_report_november" name="test_shadow_preference_only_affects_automatic_startup[False-False-True]" time="0.001" />
+    <testcase classname="tests.test_user_report_november" name="test_shadow_preference_only_affects_automatic_startup[False-True-False]" time="0.001" />
+    <testcase classname="tests.test_user_report_november" name="test_shadow_preference_only_affects_automatic_startup[False-True-True]" time="0.001" />
+    <testcase classname="tests.test_user_report_november" name="test_shadow_preference_only_affects_automatic_startup[True-False-False]" time="0.001" />
+    <testcase classname="tests.test_user_report_november" name="test_shadow_preference_only_affects_automatic_startup[True-False-True]" time="0.001" />
+    <testcase classname="tests.test_user_report_november" name="test_shadow_preference_only_affects_automatic_startup[True-True-False]" time="0.001" />
+    <testcase classname="tests.test_user_report_november" name="test_shadow_preference_only_affects_automatic_startup[True-True-True]" time="0.001" />
+    <testcase classname="tests.test_user_report_november" name="test_shortcut_restores_same_running_install_without_replacing_it" time="0.002" />
+    <testcase classname="tests.test_user_report_november" name="test_hiding_desktop_companion_survives_recreation" time="0.650" />
+    <testcase classname="tests.test_user_report_november" name="test_clearing_source_also_clears_main_result_and_late_reply" time="0.622" />
+    <testcase classname="tests.test_user_report_november" name="test_gallery_copies_deduplicates_and_never_deletes_original" time="0.607" />
+    <testcase classname="tests.test_user_report_november" name="test_gallery_moves_with_the_portable_application" time="0.606" />
+    <testcase classname="tests.test_user_report_november" name="test_gallery_selection_and_delete_survive_source_file_removal" time="1.215" />
+    <testcase classname="tests.test_user_report_november" name="test_failed_image_import_restores_the_previous_display_mode" time="1.206" />
+    <testcase classname="tests.test_user_report_november" name="test_custom_gallery_controls_fit_fixed_viewport_at_all_scales[en]" time="1.408" />
+    <testcase classname="tests.test_user_report_november" name="test_custom_gallery_controls_fit_fixed_viewport_at_all_scales[ru]" time="1.818" />
+    <testcase classname="tests.test_user_report_november" name="test_custom_gallery_controls_fit_fixed_viewport_at_all_scales[es]" time="1.862" />
+    <testcase classname="tests.test_user_report_november" name="test_custom_gallery_controls_fit_fixed_viewport_at_all_scales[de]" time="1.765" />
+    <testcase classname="tests.test_user_report_november" name="test_custom_gallery_controls_fit_fixed_viewport_at_all_scales[fr]" time="1.792" />
+    <testcase classname="tests.test_user_report_november" name="test_custom_gallery_controls_fit_fixed_viewport_at_all_scales[zh]" time="1.843" />
+    <testcase classname="tests.test_user_report_november" name="test_custom_gallery_controls_fit_fixed_viewport_at_all_scales[pt]" time="1.746" />
+    <testcase classname="tests.test_user_report_november" name="test_custom_gallery_controls_fit_fixed_viewport_at_all_scales[it]" time="1.777" />
+    <testcase classname="tests.test_user_report_november" name="test_custom_gallery_controls_fit_fixed_viewport_at_all_scales[ar]" time="1.790" />
+    <testcase classname="tests.test_user_report_november" name="test_custom_gallery_controls_fit_fixed_viewport_at_all_scales[tr]" time="1.762" />
+    <testcase classname="tests.test_user_report_november" name="test_custom_gallery_controls_fit_fixed_viewport_at_all_scales[hi]" time="1.825" />
+    <testcase classname="tests.test_user_report_november" name="test_custom_gallery_controls_fit_fixed_viewport_at_all_scales[id]" time="1.783" />
+    <testcase classname="tests.test_user_report_november" name="test_background_task_is_visible_on_main_page_without_a_popup" time="0.613" />
+    <testcase classname="tests.test_user_report_november" name="test_translator_category_order_is_online_then_offline_then_api" time="0.009" />
+    <testcase classname="tests.test_user_report_november" name="test_main_argos_download_cannot_overlap_engine_installation" time="1.205" />
+    <testcase classname="tests.test_ux4_interactions" name="test_welcome_skip_is_a_visible_opaque_click_target_after_language_change[\u0422\u0435\u043c\u043d\u0430\u044f-100-ru]" time="0.124" />
+    <testcase classname="tests.test_ux4_interactions" name="test_welcome_skip_is_a_visible_opaque_click_target_after_language_change[\u0422\u0435\u043c\u043d\u0430\u044f-100-en]" time="0.110" />
+    <testcase classname="tests.test_ux4_interactions" name="test_welcome_skip_is_a_visible_opaque_click_target_after_language_change[\u0422\u0435\u043c\u043d\u0430\u044f-100-de]" time="0.110" />
+    <testcase classname="tests.test_ux4_interactions" name="test_welcome_skip_is_a_visible_opaque_click_target_after_language_change[\u0422\u0435\u043c\u043d\u0430\u044f-100-fr]" time="0.110" />
+    <testcase classname="tests.test_ux4_interactions" name="test_welcome_skip_is_a_visible_opaque_click_target_after_language_change[\u0422\u0435\u043c\u043d\u0430\u044f-100-es]" time="0.129" />
+    <testcase classname="tests.test_ux4_interactions" name="test_welcome_skip_is_a_visible_opaque_click_target_after_language_change[\u0422\u0435\u043c\u043d\u0430\u044f-100-zh]" time="0.118" />
+    <testcase classname="tests.test_ux4_interactions" name="test_welcome_skip_is_a_visible_opaque_click_target_after_language_change[\u0422\u0435\u043c\u043d\u0430\u044f-150-ru]" time="0.128" />
+    <testcase classname="tests.test_ux4_interactions" name="test_welcome_skip_is_a_visible_opaque_click_target_after_language_change[\u0422\u0435\u043c\u043d\u0430\u044f-150-en]" time="0.114" />
+    <testcase classname="tests.test_ux4_interactions" name="test_welcome_skip_is_a_visible_opaque_click_target_after_language_change[\u0422\u0435\u043c\u043d\u0430\u044f-150-de]" time="0.116" />
+    <testcase classname="tests.test_ux4_interactions" name="test_welcome_skip_is_a_visible_opaque_click_target_after_language_change[\u0422\u0435\u043c\u043d\u0430\u044f-150-fr]" time="0.114" />
+    <testcase classname="tests.test_ux4_interactions" name="test_welcome_skip_is_a_visible_opaque_click_target_after_language_change[\u0422\u0435\u043c\u043d\u0430\u044f-150-es]" time="0.117" />
+    <testcase classname="tests.test_ux4_interactions" name="test_welcome_skip_is_a_visible_opaque_click_target_after_language_change[\u0422\u0435\u043c\u043d\u0430\u044f-150-zh]" time="0.118" />
+    <testcase classname="tests.test_ux4_interactions" name="test_welcome_skip_is_a_visible_opaque_click_target_after_language_change[\u0422\u0435\u043c\u043d\u0430\u044f-200-ru]" time="0.124" />
+    <testcase classname="tests.test_ux4_interactions" name="test_welcome_skip_is_a_visible_opaque_click_target_after_language_change[\u0422\u0435\u043c\u043d\u0430\u044f-200-en]" time="0.113" />
+    <testcase classname="tests.test_ux4_interactions" name="test_welcome_skip_is_a_visible_opaque_click_target_after_language_change[\u0422\u0435\u043c\u043d\u0430\u044f-200-de]" time="0.129" />
+    <testcase classname="tests.test_ux4_interactions" name="test_welcome_skip_is_a_visible_opaque_click_target_after_language_change[\u0422\u0435\u043c\u043d\u0430\u044f-200-fr]" time="0.125" />
+    <testcase classname="tests.test_ux4_interactions" name="test_welcome_skip_is_a_visible_opaque_click_target_after_language_change[\u0422\u0435\u043c\u043d\u0430\u044f-200-es]" time="0.115" />
+    <testcase classname="tests.test_ux4_interactions" name="test_welcome_skip_is_a_visible_opaque_click_target_after_language_change[\u0422\u0435\u043c\u043d\u0430\u044f-200-zh]" time="0.121" />
+    <testcase classname="tests.test_ux4_interactions" name="test_welcome_skip_is_a_visible_opaque_click_target_after_language_change[\u0421\u0432\u0435\u0442\u043b\u0430\u044f-100-ru]" time="0.112" />
+    <testcase classname="tests.test_ux4_interactions" name="test_welcome_skip_is_a_visible_opaque_click_target_after_language_change[\u0421\u0432\u0435\u0442\u043b\u0430\u044f-100-en]" time="0.115" />
+    <testcase classname="tests.test_ux4_interactions" name="test_welcome_skip_is_a_visible_opaque_click_target_after_language_change[\u0421\u0432\u0435\u0442\u043b\u0430\u044f-100-de]" time="0.118" />
+    <testcase classname="tests.test_ux4_interactions" name="test_welcome_skip_is_a_visible_opaque_click_target_after_language_change[\u0421\u0432\u0435\u0442\u043b\u0430\u044f-100-fr]" time="0.111" />
+    <testcase classname="tests.test_ux4_interactions" name="test_welcome_skip_is_a_visible_opaque_click_target_after_language_change[\u0421\u0432\u0435\u0442\u043b\u0430\u044f-100-es]" time="0.110" />
+    <testcase classname="tests.test_ux4_interactions" name="test_welcome_skip_is_a_visible_opaque_click_target_after_language_change[\u0421\u0432\u0435\u0442\u043b\u0430\u044f-100-zh]" time="0.120" />
+    <testcase classname="tests.test_ux4_interactions" name="test_welcome_skip_is_a_visible_opaque_click_target_after_language_change[\u0421\u0432\u0435\u0442\u043b\u0430\u044f-150-ru]" time="0.118" />
+    <testcase classname="tests.test_ux4_interactions" name="test_welcome_skip_is_a_visible_opaque_click_target_after_language_change[\u0421\u0432\u0435\u0442\u043b\u0430\u044f-150-en]" time="0.112" />
+    <testcase classname="tests.test_ux4_interactions" name="test_welcome_skip_is_a_visible_opaque_click_target_after_language_change[\u0421\u0432\u0435\u0442\u043b\u0430\u044f-150-de]" time="0.115" />
+    <testcase classname="tests.test_ux4_interactions" name="test_welcome_skip_is_a_visible_opaque_click_target_after_language_change[\u0421\u0432\u0435\u0442\u043b\u0430\u044f-150-fr]" time="0.132" />
+    <testcase classname="tests.test_ux4_interactions" name="test_welcome_skip_is_a_visible_opaque_click_target_after_language_change[\u0421\u0432\u0435\u0442\u043b\u0430\u044f-150-es]" time="0.115" />
+    <testcase classname="tests.test_ux4_interactions" name="test_welcome_skip_is_a_visible_opaque_click_target_after_language_change[\u0421\u0432\u0435\u0442\u043b\u0430\u044f-150-zh]" time="0.116" />
+    <testcase classname="tests.test_ux4_interactions" name="test_welcome_skip_is_a_visible_opaque_click_target_after_language_change[\u0421\u0432\u0435\u0442\u043b\u0430\u044f-200-ru]" time="0.116" />
+    <testcase classname="tests.test_ux4_interactions" name="test_welcome_skip_is_a_visible_opaque_click_target_after_language_change[\u0421\u0432\u0435\u0442\u043b\u0430\u044f-200-en]" time="0.116" />
+    <testcase classname="tests.test_ux4_interactions" name="test_welcome_skip_is_a_visible_opaque_click_target_after_language_change[\u0421\u0432\u0435\u0442\u043b\u0430\u044f-200-de]" time="0.118" />
+    <testcase classname="tests.test_ux4_interactions" name="test_welcome_skip_is_a_visible_opaque_click_target_after_language_change[\u0421\u0432\u0435\u0442\u043b\u0430\u044f-200-fr]" time="0.119" />
+    <testcase classname="tests.test_ux4_interactions" name="test_welcome_skip_is_a_visible_opaque_click_target_after_language_change[\u0421\u0432\u0435\u0442\u043b\u0430\u044f-200-es]" time="0.119" />
+    <testcase classname="tests.test_ux4_interactions" name="test_welcome_skip_is_a_visible_opaque_click_target_after_language_change[\u0421\u0432\u0435\u0442\u043b\u0430\u044f-200-zh]" time="0.119" />
+    <testcase classname="tests.test_ux4_interactions" name="test_main_composer_has_unified_frame_and_unframed_send_button" time="1.113" />
+    <testcase classname="tests.test_ux4_interactions" name="test_light_hover_tip_has_no_opaque_native_corners" time="0.421" />
+    <testcase classname="tests.test_ux4_interactions" name="test_legacy_companion_modes_migrate_without_fake_animation[idle-animated]" time="0.001" />
+    <testcase classname="tests.test_ux4_interactions" name="test_legacy_companion_modes_migrate_without_fake_animation[walk-animated]" time="0.001" />
+    <testcase classname="tests.test_ux4_interactions" name="test_legacy_companion_modes_migrate_without_fake_animation[sleep-animated]" time="0.001" />
+    <testcase classname="tests.test_ux4_interactions" name="test_legacy_companion_modes_migrate_without_fake_animation[look-animated]" time="0.001" />
+    <testcase classname="tests.test_ux4_interactions" name="test_legacy_companion_modes_migrate_without_fake_animation[old_mode4-animated]" time="0.001" />
+    <testcase classname="tests.test_ux4_interactions" name="test_legacy_walking_profile_is_stationary_with_continuous_native_animation" time="0.626" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[en]" time="0.004" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[ru]" time="0.002" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[de]" time="0.002" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[fr]" time="0.002" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[es]" time="0.013" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[it]" time="0.003" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[pt]" time="0.005" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[pl]" time="0.003" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[uk]" time="0.003" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[tr]" time="0.003" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[nl]" time="0.003" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[zh]" time="0.003" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[ja]" time="0.002" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[ko]" time="0.003" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[ar]" time="0.003" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[hi]" time="0.003" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[af]" time="0.003" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[sq]" time="0.003" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[hy]" time="0.002" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[az]" time="0.002" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[eu]" time="0.008" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[be]" time="0.003" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[bn]" time="0.002" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[bs]" time="0.003" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[bg]" time="0.003" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[ca]" time="0.008" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[hr]" time="0.005" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[cs]" time="0.003" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[da]" time="0.002" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[et]" time="0.003" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[fi]" time="0.003" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[gl]" time="0.008" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[ka]" time="0.003" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[el]" time="0.003" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[gu]" time="0.002" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[he]" time="0.003" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[hu]" time="0.002" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[is]" time="0.002" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[id]" time="0.002" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[ga]" time="0.003" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[kk]" time="0.003" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[ky]" time="0.003" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[lv]" time="0.003" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[lt]" time="0.002" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[mk]" time="0.003" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[ms]" time="0.003" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[mt]" time="0.005" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[mr]" time="0.002" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[ne]" time="0.003" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[nb]" time="0.003" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[fa]" time="0.005" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[ro]" time="0.003" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[sr]" time="0.021" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[sk]" time="0.003" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[sl]" time="0.003" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[sw]" time="0.003" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[ta]" time="0.002" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[te]" time="0.002" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[ur]" time="0.003" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[uz]" time="0.003" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[vi]" time="0.002" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[cy]" time="0.005" />
+    <testcase classname="tests.test_vector_flags" name="test_every_language_has_a_self_contained_vector_flag[th]" time="0.003" />
+    <testcase classname="tests.test_vector_flags" name="test_us_flag_renders_all_fifty_stars_not_just_an_empty_canton" time="0.370" />
+    <testcase classname="tests.test_vector_flags" name="test_icon_uses_actual_painter_density_once[1-0.8]" time="0.001" />
+    <testcase classname="tests.test_vector_flags" name="test_icon_uses_actual_painter_density_once[1-1]" time="0.001" />
+    <testcase classname="tests.test_vector_flags" name="test_icon_uses_actual_painter_density_once[1-1.37]" time="0.001" />
+    <testcase classname="tests.test_vector_flags" name="test_icon_uses_actual_painter_density_once[1-2]" time="0.001" />
+    <testcase classname="tests.test_vector_flags" name="test_icon_uses_actual_painter_density_once[1-3]" time="0.001" />
+    <testcase classname="tests.test_vector_flags" name="test_icon_uses_actual_painter_density_once[1.25-0.8]" time="0.001" />
+    <testcase classname="tests.test_vector_flags" name="test_icon_uses_actual_painter_density_once[1.25-1]" time="0.001" />
+    <testcase classname="tests.test_vector_flags" name="test_icon_uses_actual_painter_density_once[1.25-1.37]" time="0.001" />
+    <testcase classname="tests.test_vector_flags" name="test_icon_uses_actual_painter_density_once[1.25-2]" time="0.001" />
+    <testcase classname="tests.test_vector_flags" name="test_icon_uses_actual_painter_density_once[1.25-3]" time="0.001" />
+    <testcase classname="tests.test_vector_flags" name="test_icon_uses_actual_painter_density_once[2-0.8]" time="0.001" />
+    <testcase classname="tests.test_vector_flags" name="test_icon_uses_actual_painter_density_once[2-1]" time="0.001" />
+    <testcase classname="tests.test_vector_flags" name="test_icon_uses_actual_painter_density_once[2-1.37]" time="0.001" />
+    <testcase classname="tests.test_vector_flags" name="test_icon_uses_actual_painter_density_once[2-2]" time="0.001" />
+    <testcase classname="tests.test_vector_flags" name="test_icon_uses_actual_painter_density_once[2-3]" time="0.001" />
+    <testcase classname="tests.test_vector_flags" name="test_icon_uses_actual_painter_density_once[3-0.8]" time="0.001" />
+    <testcase classname="tests.test_vector_flags" name="test_icon_uses_actual_painter_density_once[3-1]" time="0.001" />
+    <testcase classname="tests.test_vector_flags" name="test_icon_uses_actual_painter_density_once[3-1.37]" time="0.001" />
+    <testcase classname="tests.test_vector_flags" name="test_icon_uses_actual_painter_density_once[3-2]" time="0.001" />
+    <testcase classname="tests.test_vector_flags" name="test_icon_uses_actual_painter_density_once[3-3]" time="0.001" />
+    <testcase classname="tests.test_vector_flags" name="test_interface_flag_label_keeps_the_vector_until_paint" time="0.001" />
+    <testcase classname="tests.test_version_consistency" name="test_release_version_is_synchronized_everywhere" time="0.002" />
+    <testcase classname="tests.test_version_consistency" name="test_readmes_link_to_current_release_assets" time="0.002" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_welcome_tick_contrasts_after_shared_theme_and_scaling[80-\u0422\u0435\u043c\u043d\u0430\u044f]" time="0.053" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_welcome_tick_contrasts_after_shared_theme_and_scaling[80-\u0421\u0432\u0435\u0442\u043b\u0430\u044f]" time="0.048" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_welcome_tick_contrasts_after_shared_theme_and_scaling[150-\u0422\u0435\u043c\u043d\u0430\u044f]" time="0.052" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_welcome_tick_contrasts_after_shared_theme_and_scaling[150-\u0421\u0432\u0435\u0442\u043b\u0430\u044f]" time="0.048" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_welcome_can_grow_for_wrapped_copy[en]" time="0.119" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_welcome_can_grow_for_wrapped_copy[ru]" time="0.114" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_welcome_can_grow_for_wrapped_copy[es]" time="0.122" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_welcome_can_grow_for_wrapped_copy[de]" time="0.125" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_welcome_can_grow_for_wrapped_copy[fr]" time="0.116" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_welcome_can_grow_for_wrapped_copy[zh]" time="0.103" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_welcome_can_grow_for_wrapped_copy[pt]" time="0.110" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_welcome_can_grow_for_wrapped_copy[it]" time="0.125" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_welcome_can_grow_for_wrapped_copy[ar]" time="0.109" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_welcome_can_grow_for_wrapped_copy[tr]" time="0.126" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_welcome_can_grow_for_wrapped_copy[hi]" time="0.113" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_welcome_can_grow_for_wrapped_copy[id]" time="0.106" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_welcome_invites_support_in_each_language[en]" time="0.017" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_welcome_invites_support_in_each_language[ru]" time="0.017" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_welcome_invites_support_in_each_language[es]" time="0.017" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_welcome_invites_support_in_each_language[de]" time="0.018" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_welcome_invites_support_in_each_language[fr]" time="0.017" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_welcome_invites_support_in_each_language[zh]" time="0.017" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_welcome_invites_support_in_each_language[pt]" time="0.017" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_welcome_invites_support_in_each_language[it]" time="0.017" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_welcome_invites_support_in_each_language[ar]" time="0.018" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_welcome_invites_support_in_each_language[tr]" time="0.017" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_welcome_invites_support_in_each_language[hi]" time="0.021" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_welcome_invites_support_in_each_language[id]" time="0.017" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[80-\u0422\u0435\u043c\u043d\u0430\u044f-en]" time="0.106" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[80-\u0422\u0435\u043c\u043d\u0430\u044f-ru]" time="0.103" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[80-\u0422\u0435\u043c\u043d\u0430\u044f-es]" time="0.107" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[80-\u0422\u0435\u043c\u043d\u0430\u044f-de]" time="0.102" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[80-\u0422\u0435\u043c\u043d\u0430\u044f-fr]" time="0.102" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[80-\u0422\u0435\u043c\u043d\u0430\u044f-zh]" time="0.105" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[80-\u0422\u0435\u043c\u043d\u0430\u044f-pt]" time="0.103" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[80-\u0422\u0435\u043c\u043d\u0430\u044f-it]" time="0.103" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[80-\u0422\u0435\u043c\u043d\u0430\u044f-ar]" time="0.106" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[80-\u0422\u0435\u043c\u043d\u0430\u044f-tr]" time="0.102" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[80-\u0422\u0435\u043c\u043d\u0430\u044f-hi]" time="0.122" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[80-\u0422\u0435\u043c\u043d\u0430\u044f-id]" time="0.103" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[80-\u0421\u0432\u0435\u0442\u043b\u0430\u044f-en]" time="0.101" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[80-\u0421\u0432\u0435\u0442\u043b\u0430\u044f-ru]" time="0.103" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[80-\u0421\u0432\u0435\u0442\u043b\u0430\u044f-es]" time="0.103" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[80-\u0421\u0432\u0435\u0442\u043b\u0430\u044f-de]" time="0.105" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[80-\u0421\u0432\u0435\u0442\u043b\u0430\u044f-fr]" time="0.106" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[80-\u0421\u0432\u0435\u0442\u043b\u0430\u044f-zh]" time="0.107" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[80-\u0421\u0432\u0435\u0442\u043b\u0430\u044f-pt]" time="0.107" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[80-\u0421\u0432\u0435\u0442\u043b\u0430\u044f-it]" time="0.115" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[80-\u0421\u0432\u0435\u0442\u043b\u0430\u044f-ar]" time="0.116" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[80-\u0421\u0432\u0435\u0442\u043b\u0430\u044f-tr]" time="0.107" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[80-\u0421\u0432\u0435\u0442\u043b\u0430\u044f-hi]" time="0.117" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[80-\u0421\u0432\u0435\u0442\u043b\u0430\u044f-id]" time="0.112" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[150-\u0422\u0435\u043c\u043d\u0430\u044f-en]" time="0.109" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[150-\u0422\u0435\u043c\u043d\u0430\u044f-ru]" time="0.109" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[150-\u0422\u0435\u043c\u043d\u0430\u044f-es]" time="0.112" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[150-\u0422\u0435\u043c\u043d\u0430\u044f-de]" time="0.109" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[150-\u0422\u0435\u043c\u043d\u0430\u044f-fr]" time="0.108" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[150-\u0422\u0435\u043c\u043d\u0430\u044f-zh]" time="0.111" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[150-\u0422\u0435\u043c\u043d\u0430\u044f-pt]" time="0.109" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[150-\u0422\u0435\u043c\u043d\u0430\u044f-it]" time="0.108" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[150-\u0422\u0435\u043c\u043d\u0430\u044f-ar]" time="0.118" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[150-\u0422\u0435\u043c\u043d\u0430\u044f-tr]" time="0.108" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[150-\u0422\u0435\u043c\u043d\u0430\u044f-hi]" time="0.123" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[150-\u0422\u0435\u043c\u043d\u0430\u044f-id]" time="0.112" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[150-\u0421\u0432\u0435\u0442\u043b\u0430\u044f-en]" time="0.106" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[150-\u0421\u0432\u0435\u0442\u043b\u0430\u044f-ru]" time="0.108" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[150-\u0421\u0432\u0435\u0442\u043b\u0430\u044f-es]" time="0.108" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[150-\u0421\u0432\u0435\u0442\u043b\u0430\u044f-de]" time="0.108" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[150-\u0421\u0432\u0435\u0442\u043b\u0430\u044f-fr]" time="0.111" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[150-\u0421\u0432\u0435\u0442\u043b\u0430\u044f-zh]" time="0.108" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[150-\u0421\u0432\u0435\u0442\u043b\u0430\u044f-pt]" time="0.108" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[150-\u0421\u0432\u0435\u0442\u043b\u0430\u044f-it]" time="0.107" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[150-\u0421\u0432\u0435\u0442\u043b\u0430\u044f-ar]" time="0.112" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[150-\u0421\u0432\u0435\u0442\u043b\u0430\u044f-tr]" time="0.114" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[150-\u0421\u0432\u0435\u0442\u043b\u0430\u044f-hi]" time="0.117" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[150-\u0421\u0432\u0435\u0442\u043b\u0430\u044f-id]" time="0.107" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[200-\u0422\u0435\u043c\u043d\u0430\u044f-en]" time="0.106" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[200-\u0422\u0435\u043c\u043d\u0430\u044f-ru]" time="0.105" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[200-\u0422\u0435\u043c\u043d\u0430\u044f-es]" time="0.107" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[200-\u0422\u0435\u043c\u043d\u0430\u044f-de]" time="0.112" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[200-\u0422\u0435\u043c\u043d\u0430\u044f-fr]" time="0.112" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[200-\u0422\u0435\u043c\u043d\u0430\u044f-zh]" time="0.106" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[200-\u0422\u0435\u043c\u043d\u0430\u044f-pt]" time="0.105" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[200-\u0422\u0435\u043c\u043d\u0430\u044f-it]" time="0.114" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[200-\u0422\u0435\u043c\u043d\u0430\u044f-ar]" time="0.108" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[200-\u0422\u0435\u043c\u043d\u0430\u044f-tr]" time="0.105" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[200-\u0422\u0435\u043c\u043d\u0430\u044f-hi]" time="0.117" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[200-\u0422\u0435\u043c\u043d\u0430\u044f-id]" time="0.105" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[200-\u0421\u0432\u0435\u0442\u043b\u0430\u044f-en]" time="0.109" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[200-\u0421\u0432\u0435\u0442\u043b\u0430\u044f-ru]" time="0.108" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[200-\u0421\u0432\u0435\u0442\u043b\u0430\u044f-es]" time="0.111" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[200-\u0421\u0432\u0435\u0442\u043b\u0430\u044f-de]" time="0.128" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[200-\u0421\u0432\u0435\u0442\u043b\u0430\u044f-fr]" time="0.111" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[200-\u0421\u0432\u0435\u0442\u043b\u0430\u044f-zh]" time="0.131" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[200-\u0421\u0432\u0435\u0442\u043b\u0430\u044f-pt]" time="0.137" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[200-\u0421\u0432\u0435\u0442\u043b\u0430\u044f-it]" time="0.114" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[200-\u0421\u0432\u0435\u0442\u043b\u0430\u044f-ar]" time="0.109" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[200-\u0421\u0432\u0435\u0442\u043b\u0430\u044f-tr]" time="0.151" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[200-\u0421\u0432\u0435\u0442\u043b\u0430\u044f-hi]" time="0.150" />
+    <testcase classname="tests.test_welcome_content_fit" name="test_release_bullets_fit_and_mirror_after_language_change[200-\u0421\u0432\u0435\u0442\u043b\u0430\u044f-id]" time="0.123" />
+    <testcase classname="tests.test_window_appearance" name="test_dialogs_follow_global_scale_without_accumulating_changes" time="0.988" />
+    <testcase classname="tests.test_window_appearance" name="test_local_result_scale_keeps_global_setting_and_edits" time="0.853" />
+    <testcase classname="tests.test_window_appearance" name="test_copy_uses_edited_result" time="0.302" />
+    <testcase classname="tests.test_window_appearance" name="test_source_can_be_extended_and_retranslated" time="0.313" />
+    <testcase classname="tests.test_window_appearance" name="test_open_dialogs_and_hardcoded_surfaces_follow_light_theme" time="0.474" />
+    <testcase classname="tests.test_window_appearance" name="test_small_screen_limits_dialog_size_and_capture_widgets_are_untouched" time="0.424" />
+    <testcase classname="tests.test_window_appearance" name="test_tray_menu_keeps_native_size_and_position_at_every_window_scale" time="0.028" />
+    <testcase classname="tests.test_window_appearance" name="test_capture_controls_ignore_window_scale_and_keep_language_labels_visible[copy]" time="0.404" />
+    <testcase classname="tests.test_window_appearance" name="test_capture_controls_ignore_window_scale_and_keep_language_labels_visible[translate]" time="0.731" />
+    <testcase classname="tests.test_window_appearance" name="test_capture_controls_ignore_window_scale_and_keep_language_labels_visible[fullscreen]" time="0.423" />
+    <testcase classname="tests.test_window_appearance" name="test_capture_controls_ignore_window_scale_and_keep_language_labels_visible[game]" time="0.404" />
+    <testcase classname="tests.test_window_appearance" name="test_result_scale_steps_keep_the_arrow_under_the_pointer" time="0.698" />
+    <testcase classname="tests.test_window_appearance" name="test_light_language_popup_has_a_visible_outline" time="0.531" />
+    <testcase classname="tests.test_window_appearance" name="test_help_html_keeps_its_font_size_across_theme_and_scale_changes" time="0.039" />
+    <testcase classname="tests.test_window_appearance" name="test_faq_scales_authored_paragraphs_once_and_preserves_their_direction[en-0]" time="0.307" />
+    <testcase classname="tests.test_window_appearance" name="test_faq_scales_authored_paragraphs_once_and_preserves_their_direction[ru-0]" time="0.319" />
+    <testcase classname="tests.test_window_appearance" name="test_faq_scales_authored_paragraphs_once_and_preserves_their_direction[ar-1]" time="0.482" />
+    <testcase classname="tests.test_window_appearance" name="test_replacing_browser_document_content_keeps_new_link_and_original_text_scale" time="0.028" />
+    <testcase classname="tests.test_window_appearance" name="test_document_layout_and_private_qt_fonts_do_not_accumulate_scale" time="4.285" />
+    <testcase classname="tests.test_window_appearance" name="test_new_theme_icon_replaces_the_scaled_previous_icon" time="0.013" />
+    <testcase classname="tests.test_window_position" name="test_main_first_show_is_centered_and_reopen_preserves_a_user_move" time="0.954" />
+    <testcase classname="tests.test_window_position" name="test_secondary_windows_center_on_the_native_scaled_owner[packages-80]" time="3.631" />
+    <testcase classname="tests.test_window_position" name="test_secondary_windows_center_on_the_native_scaled_owner[packages-100]" time="4.008" />
+    <testcase classname="tests.test_window_position" name="test_secondary_windows_center_on_the_native_scaled_owner[packages-130]" time="3.485" />
+    <testcase classname="tests.test_window_position" name="test_secondary_windows_center_on_the_native_scaled_owner[update-80]" time="1.856" />
+    <testcase classname="tests.test_window_position" name="test_secondary_windows_center_on_the_native_scaled_owner[update-100]" time="1.658" />
+    <testcase classname="tests.test_window_position" name="test_secondary_windows_center_on_the_native_scaled_owner[update-130]" time="1.782" />
+    <testcase classname="tests.test_window_position" name="test_secondary_windows_center_on_the_native_scaled_owner[install-80]" time="1.896" />
+    <testcase classname="tests.test_window_position" name="test_secondary_windows_center_on_the_native_scaled_owner[install-100]" time="1.888" />
+    <testcase classname="tests.test_window_position" name="test_secondary_windows_center_on_the_native_scaled_owner[install-130]" time="1.920" />
+    <testcase classname="tests.test_window_position" name="test_secondary_windows_center_on_the_native_scaled_owner[argos-confirm-80]" time="1.760" />
+    <testcase classname="tests.test_window_position" name="test_secondary_windows_center_on_the_native_scaled_owner[argos-confirm-100]" time="1.808" />
+    <testcase classname="tests.test_window_position" name="test_secondary_windows_center_on_the_native_scaled_owner[argos-confirm-130]" time="1.740" />
+    <testcase classname="tests.test_window_position" name="test_secondary_windows_center_on_the_native_scaled_owner[argos-error-80]" time="1.648" />
+    <testcase classname="tests.test_window_position" name="test_secondary_windows_center_on_the_native_scaled_owner[argos-error-100]" time="1.634" />
+    <testcase classname="tests.test_window_position" name="test_secondary_windows_center_on_the_native_scaled_owner[argos-error-130]" time="1.568" />
+    <testcase classname="tests.test_window_position" name="test_explicit_dialog_position_and_popup_anchor_are_preserved" time="0.905" />
+    <testcase classname="tests.test_window_position" name="test_hidden_owner_centers_result_on_the_available_screen" time="0.773" />
+    <testcase classname="tests.test_window_position" name="test_centering_keeps_large_window_inside_the_selected_monitor[bounds0]" time="0.001" />
+    <testcase classname="tests.test_window_position" name="test_centering_keeps_large_window_inside_the_selected_monitor[bounds1]" time="0.001" />
+    <testcase classname="tests.test_window_provider_dispatch" name="test_window_selection_reaches_exact_backend[google-google_translate]" time="0.309" />
+    <testcase classname="tests.test_window_provider_dispatch" name="test_window_selection_reaches_exact_backend[mymemory-mymemory_translate]" time="0.305" />
+    <testcase classname="tests.test_window_provider_dispatch" name="test_window_selection_reaches_exact_backend[lingva-lingva_translate]" time="0.291" />
+    <testcase classname="tests.test_window_provider_dispatch" name="test_window_selection_reaches_exact_backend[libretranslate-libretranslate]" time="0.298" />
+    <testcase classname="tests.test_window_provider_dispatch" name="test_window_selection_reaches_exact_backend[argos-_try_argos_translate]" time="0.301" />
+    <testcase classname="tests.test_window_provider_dispatch" name="test_window_selection_reaches_exact_backend[hymt-hymt_translate]" time="0.300" />
+    <testcase classname="tests.test_window_provider_dispatch" name="test_result_and_document_api_choices_reach_the_selected_backend[openai]" time="0.447" />
+    <testcase classname="tests.test_window_provider_dispatch" name="test_result_and_document_api_choices_reach_the_selected_backend[openai-compatible]" time="0.457" />
+    <testcase classname="tests.test_window_provider_dispatch" name="test_result_and_document_api_choices_reach_the_selected_backend[gemini]" time="0.435" />
+    <testcase classname="tests.test_window_provider_dispatch" name="test_result_and_document_api_choices_reach_the_selected_backend[anthropic]" time="0.432" />
+    <testcase classname="tests.test_window_provider_dispatch" name="test_result_and_document_api_choices_reach_the_selected_backend[deepl]" time="0.438" />
+    <testcase classname="tests.test_windows_defender_scan" name="test_success_records_the_exact_bytes_and_diagnostic_scan_options" time="1.218" />
+    <testcase classname="tests.test_windows_defender_scan" name="test_detection_or_scanner_error_blocks_release_and_saves_evidence[2]" time="0.635" />
+    <testcase classname="tests.test_windows_defender_scan" name="test_detection_or_scanner_error_blocks_release_and_saves_evidence[5]" time="0.617" />
+    <testcase classname="tests.test_windows_defender_scan" name="test_unavailable_protection_stale_definitions_and_empty_target_fail_closed[options0]" time="0.498" />
+    <testcase classname="tests.test_windows_defender_scan" name="test_unavailable_protection_stale_definitions_and_empty_target_fail_closed[options1]" time="0.493" />
+    <testcase classname="tests.test_windows_defender_scan" name="test_unavailable_protection_stale_definitions_and_empty_target_fail_closed[options2]" time="0.500" />
+    <testcase classname="tests.test_windows_defender_scan" name="test_files_changed_during_scan_cannot_be_reported_clean" time="0.656" />
+    <testcase classname="tests.test_windows_defender_scan" name="test_report_cannot_be_written_into_the_release" time="0.437" />
+    <testcase classname="tests.test_windows_defender_scan" name="test_previous_report_is_never_overwritten" time="0.448" />
+    <testcase classname="tests.test_windows_defender_scan" name="test_single_archive_or_installer_can_be_scanned" time="0.545" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_listener_unregisters_on_its_registering_thread_before_replacement" time="0.003" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_message_pump_failure_still_releases_the_thread_owned_key" time="0.003" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_cancelled_listener_does_not_register_after_stop" time="0.001" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_failed_registration_never_unregisters_another_listeners_key" time="0.001" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_queued_action_after_stop_is_ignored_and_recording_shortcuts_does_not_launch" time="0.002" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_preview_and_layout_modes_save_preferences_without_registering_keys[copy_hotkey]" time="1.237" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_preview_and_layout_modes_save_preferences_without_registering_keys[translate_hotkey]" time="1.241" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_preview_and_layout_modes_save_preferences_without_registering_keys[fullscreen_translate_hotkey]" time="1.243" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_preview_and_layout_modes_save_preferences_without_registering_keys[translate_selection_hotkey]" time="1.233" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_preview_and_layout_modes_save_preferences_without_registering_keys[translate_replace_selection_hotkey]" time="1.247" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_preview_and_layout_modes_save_preferences_without_registering_keys[toggle_window_hotkey]" time="1.243" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_preview_and_layout_modes_save_preferences_without_registering_keys[game_translate_hotkey]" time="1.256" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_focus_out_without_editing_does_not_restart_a_working_shortcut[copy_hotkey]" time="1.253" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_focus_out_without_editing_does_not_restart_a_working_shortcut[translate_hotkey]" time="1.252" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_focus_out_without_editing_does_not_restart_a_working_shortcut[fullscreen_translate_hotkey]" time="1.264" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_focus_out_without_editing_does_not_restart_a_working_shortcut[translate_selection_hotkey]" time="1.347" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_focus_out_without_editing_does_not_restart_a_working_shortcut[translate_replace_selection_hotkey]" time="1.246" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_focus_out_without_editing_does_not_restart_a_working_shortcut[toggle_window_hotkey]" time="1.242" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_focus_out_without_editing_does_not_restart_a_working_shortcut[game_translate_hotkey]" time="1.254" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_changed_shortcut_replaces_only_its_listener_and_clear_keeps_it_disabled[copy_hotkey]" time="1.237" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_changed_shortcut_replaces_only_its_listener_and_clear_keeps_it_disabled[translate_hotkey]" time="1.233" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_changed_shortcut_replaces_only_its_listener_and_clear_keeps_it_disabled[fullscreen_translate_hotkey]" time="1.405" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_changed_shortcut_replaces_only_its_listener_and_clear_keeps_it_disabled[translate_selection_hotkey]" time="1.230" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_changed_shortcut_replaces_only_its_listener_and_clear_keeps_it_disabled[translate_replace_selection_hotkey]" time="1.249" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_changed_shortcut_replaces_only_its_listener_and_clear_keeps_it_disabled[toggle_window_hotkey]" time="1.261" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_changed_shortcut_replaces_only_its_listener_and_clear_keeps_it_disabled[game_translate_hotkey]" time="1.237" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_external_registration_conflict_preserves_saved_shortcut_and_editor" time="1.453" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_unchanged_shortcut_can_retry_a_failed_registration" time="1.217" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_linux_saves_changed_shortcut_without_registering_a_windows_listener" time="1.227" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_import_does_not_enable_hotkeys_in_a_preview" time="0.632" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_import_stops_all_old_listeners_before_starting_changed_bindings" time="0.608" />
+    <testcase classname="tests.test_windows_ocr_progress.WindowsOcrProgressTextTest" name="test_a_long_silence_is_explained_rather_than_left_to_guesswork" time="0.255" />
+    <testcase classname="tests.test_windows_ocr_progress.WindowsOcrProgressTextTest" name="test_a_normal_pause_is_not_called_out" time="0.263" />
+    <testcase classname="tests.test_windows_ocr_progress.WindowsOcrProgressTextTest" name="test_every_language_has_the_new_lines" time="0.257" />
+    <testcase classname="tests.test_windows_ocr_progress.WindowsOcrProgressTextTest" name="test_no_download_line_when_windows_reports_none" time="0.259" />
+    <testcase classname="tests.test_windows_ocr_progress.WindowsOcrProgressTextTest" name="test_the_bar_is_real_and_the_clock_is_shown" time="0.260" />
+    <testcase classname="tests.test_windows_ocr_progress.WindowsOcrProgressTextTest" name="test_windows_update_download_is_named_separately_from_the_component" time="0.272" />
+    <testcase classname="tests.test_windows_ocr_progress.WindowsOcrInstallerScriptTest" name="test_it_does_not_read_that_log_on_every_tick" time="0.261" />
+    <testcase classname="tests.test_windows_ocr_progress.WindowsOcrInstallerScriptTest" name="test_it_reads_only_the_tail_of_that_log" time="0.269" />
+    <testcase classname="tests.test_windows_ocr_progress.WindowsOcrInstallerScriptTest" name="test_it_reads_windows_update_progress_from_the_cbs_log" time="0.257" />
+    <testcase classname="tests.test_windows_ocr_progress.WindowsOcrInstallerScriptTest" name="test_it_reports_a_pending_restart_instead_of_claiming_success" time="0.264" />
+    <testcase classname="tests.test_windows_ocr_progress.WindowsOcrInstallerScriptTest" name="test_it_reports_how_long_nothing_has_moved" time="0.272" />
+    <testcase classname="tests.test_windows_ocr_progress.WindowsOcrInstallerScriptTest" name="test_the_bar_is_for_the_current_component_not_a_fake_whole_job" time="0.265" />
+    <testcase classname="tests.test_windows_ocr_progress.WindowsOcrInstallerScriptTest" name="test_the_script_has_no_unresolved_placeholders" time="0.271" />
+    <testcase classname="tests.test_windows_ocr_progress.WindowsOcrInstallerScriptTest" name="test_the_status_payload_stays_valid_json" time="0.265" />
+    <testcase classname="tests.test_windows_ocr_progress.ProgressDialogFitsItsMessageTest" name="test_windows_dialog_does_not_jump_when_the_long_status_arrives" time="0.077" />
+    <testcase classname="tests.test_windows_ocr_progress.BackgroundProgressCanBeReopenedTest" name="test_background_status_is_persistent_and_reopens_the_same_task" time="0.777" />
+    <testcase classname="tests.test_windows_ocr_progress.BackgroundProgressCanBeReopenedTest" name="test_compact_windows_status_names_the_component_percentage" time="0.271" />
+    <testcase classname="tests.test_windows_ocr_progress.PackageTaskConcurrencyTest" name="test_a_second_task_reopens_the_first_instead_of_starting" time="0.269" />
+    <testcase classname="tests.test_windows_ocr_progress.PackageTaskConcurrencyTest" name="test_mutating_actions_are_disabled_but_table_selection_is_preserved" time="0.289" />
+    <testcase classname="tests.test_windows_ocr_progress.WindowsOcrFailureAdviceTest" name="test_a_broken_script_is_not_blamed_on_windows" time="0.262" />
+    <testcase classname="tests.test_windows_ocr_progress.WindowsOcrFailureAdviceTest" name="test_a_real_pending_reboot_asks_for_the_restart" time="0.259" />
+    <testcase classname="tests.test_windows_ocr_progress.WindowsOcrFailureAdviceTest" name="test_a_second_dism_session_is_reported_as_busy" time="0.361" />
+    <testcase classname="tests.test_windows_ocr_progress.WindowsOcrFailureAdviceTest" name="test_busy_servicing_without_a_pending_reboot_does_not_ask_for_one" time="0.263" />
+    <testcase classname="tests.test_windows_ocr_progress.WindowsOcrFailureAdviceTest" name="test_every_language_has_both_messages" time="0.260" />
+    <testcase classname="tests.test_windows_ocr_progress.WindowsOcrFailureAdviceTest" name="test_policy_and_source_failures_keep_their_own_advice" time="0.263" />
+    <testcase classname="tests.test_windows_ocr_progress.WindowsOcrFailureAdviceTest" name="test_the_raw_text_is_kept_for_the_details_pane" time="0.262" />
+    <testcase classname="tests.test_windows_ocr_progress.WindowsServicingIsSerialisedTest" name="test_the_capability_query_takes_the_servicing_lock" time="0.002" />
+    <testcase classname="tests.test_windows_ocr_progress.WindowsServicingIsSerialisedTest" name="test_the_elevated_install_holds_the_same_lock_until_it_exits" time="0.002" />
+    <testcase classname="tests.test_windows_ocr_progress.GeneratedPowerShellParsesTest" name="test_no_block_lost_its_braces_to_the_f_string" time="0.273" />
+    <testcase classname="tests.test_windows_ocr_progress.GeneratedPowerShellParsesTest" name="test_powershell_itself_accepts_them" time="0.696" />
+    <testcase classname="tests.test_windows_ocr_progress.GeneratedPowerShellParsesTest" name="test_the_restart_result_is_written_as_powershell_not_as_text" time="0.270" />
+    <testcase classname="tests.test_windows_portable_archive" name="test_archive_keeps_hidden_manifest_and_program_bytes" time="0.030" />
+    <testcase classname="tests.test_windows_portable_archive" name="test_archive_rejects_output_inside_stage" time="0.015" />
+    <testcase classname="tests.test_windows_portable_archive" name="test_archive_rejects_damaged_stage" time="0.020" />
+    <testcase classname="tests.test_windows_release_signing" name="test_signed_stage_requires_a_certificate_before_building" time="0.356" />
+    <testcase classname="tests.test_windows_release_signing" name="test_audit_identifies_unsigned_exes_and_preserves_every_file" time="1.120" />
+    <testcase classname="tests.test_windows_release_signing" name="test_missing_worker_cannot_produce_a_complete_audit" time="0.472" />
+    <testcase classname="tests.test_windows_release_signing" name="test_report_cannot_overwrite_an_executable" time="0.421" />
+    <testcase classname="tests.test_windows_release_signing" name="test_signtool_rejects_an_actual_unsigned_executable" time="1.153" />
+    <testcase classname="tests.test_windows_release_signing" name="test_inno_calls_the_signing_gate_and_cannot_complete_without_a_certificate" time="0.010">
+      <skipped type="pytest.skip" message="Inno Setup is not installed on this runner" />
+    </testcase>
+    <testcase classname="tests.test_windows_release_signing" name="test_verification_checks_timestamp_and_certificate_even_after_tool_success[True-False]" time="0.481" />
+    <testcase classname="tests.test_windows_release_signing" name="test_verification_checks_timestamp_and_certificate_even_after_tool_success[False-True]" time="0.472" />
+    <testcase classname="tests.test_windows_release_signing" name="test_windows_version_resources_roundtrip_through_real_pe[ClicknTranslateApp.exe]" time="0.164" />
+    <testcase classname="tests.test_windows_release_signing" name="test_windows_version_resources_roundtrip_through_real_pe[ArgosWorker.exe]" time="0.087" />
+    <testcase classname="tests.test_windows_release_signing" name="test_windows_version_resources_roundtrip_through_real_pe[OcrWorker.exe]" time="0.087" />
+    <testcase classname="tests.test_windows_release_signing" name="test_invalid_windows_versions_cannot_be_embedded[bad]" time="0.001" />
+    <testcase classname="tests.test_windows_release_signing" name="test_invalid_windows_versions_cannot_be_embedded[1.7]" time="0.001" />
+    <testcase classname="tests.test_windows_release_signing" name="test_invalid_windows_versions_cannot_be_embedded[1.7.1.2.3]" time="0.001" />
+    <testcase classname="tests.test_windows_release_signing" name="test_invalid_windows_versions_cannot_be_embedded[65536.1.0]" time="0.001" />
+    <testcase classname="tests.test_windows_uia_activation" name="test_generated_coclass_reads_selection_without_a_registered_progid[False]" time="0.001" />
+    <testcase classname="tests.test_windows_uia_activation" name="test_generated_coclass_reads_selection_without_a_registered_progid[True]" time="0.001" />
+    <testcase classname="tests.test_windows_uia_contract" name="test_uia_read_owns_only_its_calling_thread_initializations[none]" time="0.001" />
+    <testcase classname="tests.test_windows_uia_contract" name="test_uia_read_owns_only_its_calling_thread_initializations[implicit]" time="0.001" />
+    <testcase classname="tests.test_windows_uia_contract" name="test_uia_read_owns_only_its_calling_thread_initializations[mta]" time="0.001" />
+    <testcase classname="tests.test_windows_uia_contract" name="test_incompatible_or_unknown_parent_apartment_is_not_changed[sta]" time="0.001" />
+    <testcase classname="tests.test_windows_uia_contract" name="test_incompatible_or_unknown_parent_apartment_is_not_changed[mainsta]" time="0.001" />
+    <testcase classname="tests.test_windows_uia_contract" name="test_incompatible_or_unknown_parent_apartment_is_not_changed[neutral]" time="0.001" />
+    <testcase classname="tests.test_windows_uia_contract" name="test_incompatible_or_unknown_parent_apartment_is_not_changed[unknown]" time="0.001" />
+    <testcase classname="tests.test_windows_uia_contract" name="test_failed_explicit_initialization_never_uninitializes_or_reads_uia[2147549446]" time="0.001" />
+    <testcase classname="tests.test_windows_uia_contract" name="test_failed_explicit_initialization_never_uninitializes_or_reads_uia[2147500037]" time="0.001" />
+    <testcase classname="tests.test_windows_uia_contract" name="test_provider_failures_release_every_pointer_before_owned_uninitialize[typelib]" time="0.001" />
+    <testcase classname="tests.test_windows_uia_contract" name="test_provider_failures_release_every_pointer_before_owned_uninitialize[create]" time="0.001" />
+    <testcase classname="tests.test_windows_uia_contract" name="test_provider_failures_release_every_pointer_before_owned_uninitialize[element]" time="0.001" />
+    <testcase classname="tests.test_windows_uia_contract" name="test_provider_failures_release_every_pointer_before_owned_uninitialize[pattern]" time="0.001" />
+    <testcase classname="tests.test_windows_uia_contract" name="test_provider_failures_release_every_pointer_before_owned_uninitialize[qi]" time="0.001" />
+    <testcase classname="tests.test_windows_uia_contract" name="test_provider_failures_release_every_pointer_before_owned_uninitialize[selection]" time="0.001" />
+    <testcase classname="tests.test_windows_uia_contract" name="test_provider_failures_release_every_pointer_before_owned_uninitialize[range]" time="0.001" />
+    <testcase classname="tests.test_windows_uia_contract" name="test_provider_failures_release_every_pointer_before_owned_uninitialize[text]" time="0.001" />
+    <testcase classname="tests.test_windows_uia_contract" name="test_empty_uia_result_still_balances_owned_initialization[element]" time="0.001" />
+    <testcase classname="tests.test_windows_uia_contract" name="test_empty_uia_result_still_balances_owned_initialization[pattern]" time="0.001" />
+    <testcase classname="tests.test_windows_uia_contract" name="test_empty_uia_result_still_balances_owned_initialization[ranges]" time="0.001" />
+    <testcase classname="tests.test_windows_uia_contract" name="test_empty_uia_result_still_balances_owned_initialization[count]" time="0.001" />
+    <testcase classname="tests.test_windows_uia_contract" name="test_main_bootstrap_and_library_shutdown_stay_on_the_original_thread" time="0.001" />
+    <testcase classname="tests.test_windows_uia_contract" name="test_bootstrap_failure_never_uninitializes_an_existing_mta" time="0.001" />
+    <testcase classname="tests.test_windows_uia_contract" name="test_failed_client_import_leaves_library_main_apartment_for_its_own_shutdown" time="0.001" />
+    <testcase classname="tests.test_windows_uia_contract" name="test_worker_cannot_be_the_first_comtypes_importer" time="0.001" />
+    <testcase classname="tests.test_windows_uia_contract" name="test_worker_cannot_prepare_the_global_client_or_its_main_apartment" time="0.001" />
+    <testcase classname="tests.test_windows_uia_contract" name="test_imported_client_of_unknown_thread_ownership_is_not_adopted" time="0.001" />
+    <testcase classname="tests.test_windows_uia_contract" name="test_failed_first_bootstrap_cannot_adopt_a_later_foreign_import" time="0.001" />
+    <testcase classname="tests.test_windows_uia_contract" name="test_quick_feature_prepares_backend_only_when_enabled[False]" time="0.001" />
+    <testcase classname="tests.test_windows_uia_contract" name="test_quick_feature_prepares_backend_only_when_enabled[True]" time="0.001" />
+    <testcase classname="tests.test_windows_uia_contract" name="test_cached_import_initializes_each_actual_python_worker_independently" time="0.002" />
+    <testcase classname="tests.test_windows_uia_contract" name="test_successful_typed_uia_read_skips_the_copy_fallback" time="0.001" />
+    <testcase classname="tests.test_windows_uia_contract" name="test_windows_dependency_and_packager_explicitly_include_the_existing_uia_backend" time="0.002" />
+    <testcase classname="tests.test_winrt_packaging" name="test_winrt_ocr_runtime_namespaces_are_required" time="0.001" />
+    <testcase classname="tests.test_winrt_packaging" name="test_winrt_ocr_runtime_namespaces_are_packaged" time="0.002" />
+  </testsuite>
+</testsuites>

@@ -1,0 +1,15 @@
+{
+  "command": [
+    "qa-reports/windows/work/ps-modules/nuget.exe",
+    "verify",
+    "-All",
+    "qa-reports/windows/work/ps-modules/microsoft.powershell.archive.1.2.7.nupkg",
+    "-NonInteractive"
+  ],
+  "pid": 23752,
+  "exit_code": 0,
+  "seconds": 1.16,
+  "qt": "offscreen",
+  "private_station": "QA-station",
+  "private_desktop": "QA"
+}

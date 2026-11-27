@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites name="pytest tests">
+  <testsuite name="pytest" errors="0" failures="0" skipped="0" tests="48" time="650.834" timestamp="2026-11-27T13:19:35.447745+00:00">
+    <testcase classname="tests.test_interface_language_picker" name="test_picker_preserves_home_draft_size_and_language_pair" time="9.464" />
+    <testcase classname="tests.test_interface_language_picker" name="test_live_choice_preserves_settings_page_and_panel_geometry[0]" time="23.245" />
+    <testcase classname="tests.test_interface_language_picker" name="test_live_choice_preserves_settings_page_and_panel_geometry[1]" time="22.817" />
+    <testcase classname="tests.test_interface_language_picker" name="test_live_choice_preserves_settings_page_and_panel_geometry[2]" time="36.190" />
+    <testcase classname="tests.test_interface_language_picker" name="test_live_choice_preserves_settings_page_and_panel_geometry[3]" time="23.535" />
+    <testcase classname="tests.test_interface_language_picker" name="test_live_choice_preserves_settings_page_and_panel_geometry[4]" time="19.222" />
+    <testcase classname="tests.test_interface_language_picker" name="test_catalog_grows_by_scrolling_without_pages_or_empty_cells[12]" time="1.118" />
+    <testcase classname="tests.test_interface_language_picker" name="test_catalog_grows_by_scrolling_without_pages_or_empty_cells[20]" time="1.363" />
+    <testcase classname="tests.test_interface_language_picker" name="test_catalog_grows_by_scrolling_without_pages_or_empty_cells[40]" time="2.043" />
+    <testcase classname="tests.test_interface_language_picker" name="test_filter_supports_native_english_localized_code_and_accents[Arabic-ar]" time="0.829" />
+    <testcase classname="tests.test_interface_language_picker" name="test_filter_supports_native_english_localized_code_and_accents[\u0627\u0644\u0639\u0631\u0628\u064a\u0629-ar]" time="0.713" />
+    <testcase classname="tests.test_interface_language_picker" name="test_filter_supports_native_english_localized_code_and_accents[\u0430\u0440\u0430\u0431\u0441\u043a\u0438\u0439-ar]" time="0.732" />
+    <testcase classname="tests.test_interface_language_picker" name="test_filter_supports_native_english_localized_code_and_accents[turkce-tr]" time="0.770" />
+    <testcase classname="tests.test_interface_language_picker" name="test_filter_supports_native_english_localized_code_and_accents[Franz\xf6sisch-fr]" time="0.811" />
+    <testcase classname="tests.test_interface_language_picker" name="test_filter_supports_native_english_localized_code_and_accents[Indonesian-id]" time="0.654" />
+    <testcase classname="tests.test_interface_language_picker" name="test_filter_supports_native_english_localized_code_and_accents[pt-pt]" time="0.667" />
+    <testcase classname="tests.test_interface_language_picker" name="test_no_matches_keeps_search_and_close_accessible_then_recovers" time="2.714" />
+    <testcase classname="tests.test_interface_language_picker" name="test_keyboard_roving_grid_and_filter_apply_only_on_activation" time="0.833" />
+    <testcase classname="tests.test_interface_language_picker" name="test_short_final_row_arrows_never_focus_an_empty_cell" time="0.683" />
+    <testcase classname="tests.test_interface_language_picker" name="test_rtl_names_flags_check_and_theme_do_not_rearrange_catalog[True]" time="0.853" />
+    <testcase classname="tests.test_interface_language_picker" name="test_rtl_names_flags_check_and_theme_do_not_rearrange_catalog[False]" time="0.795" />
+    <testcase classname="tests.test_interface_language_picker" name="test_navigating_away_closes_picker_cleanly" time="13.847" />
+    <testcase classname="tests.test_interface_language_picker" name="test_actual_canvas_catalog_surface_matches_theme[True]" time="12.601" />
+    <testcase classname="tests.test_interface_language_picker" name="test_actual_canvas_catalog_surface_matches_theme[False]" time="9.672" />
+    <testcase classname="tests.test_interface_language_picker" name="test_outer_contour_covers_corner_cell_fills_at_fractional_scales[True]" time="23.083" />
+    <testcase classname="tests.test_interface_language_picker" name="test_outer_contour_covers_corner_cell_fills_at_fractional_scales[False]" time="21.783" />
+    <testcase classname="tests.test_interface_language_picker" name="test_picker_fits_at_all_interface_scales_in_both_themes[en]" time="21.051" />
+    <testcase classname="tests.test_interface_language_picker" name="test_picker_fits_at_all_interface_scales_in_both_themes[ru]" time="23.374" />
+    <testcase classname="tests.test_interface_language_picker" name="test_picker_fits_at_all_interface_scales_in_both_themes[es]" time="24.557" />
+    <testcase classname="tests.test_interface_language_picker" name="test_picker_fits_at_all_interface_scales_in_both_themes[de]" time="24.906" />
+    <testcase classname="tests.test_interface_language_picker" name="test_picker_fits_at_all_interface_scales_in_both_themes[fr]" time="33.801" />
+    <testcase classname="tests.test_interface_language_picker" name="test_picker_fits_at_all_interface_scales_in_both_themes[zh]" time="26.190" />
+    <testcase classname="tests.test_interface_language_picker" name="test_picker_fits_at_all_interface_scales_in_both_themes[pt]" time="23.984" />
+    <testcase classname="tests.test_interface_language_picker" name="test_picker_fits_at_all_interface_scales_in_both_themes[it]" time="23.541" />
+    <testcase classname="tests.test_interface_language_picker" name="test_picker_fits_at_all_interface_scales_in_both_themes[ar]" time="20.884" />
+    <testcase classname="tests.test_interface_language_picker" name="test_picker_fits_at_all_interface_scales_in_both_themes[tr]" time="23.722" />
+    <testcase classname="tests.test_interface_language_picker" name="test_picker_fits_at_all_interface_scales_in_both_themes[hi]" time="22.995" />
+    <testcase classname="tests.test_interface_language_picker" name="test_picker_fits_at_all_interface_scales_in_both_themes[id]" time="23.947" />
+    <testcase classname="tests.test_interface_language_picker" name="test_scrolled_intermediate_row_cannot_cover_bottom_outline[True-20]" time="9.678" />
+    <testcase classname="tests.test_interface_language_picker" name="test_scrolled_intermediate_row_cannot_cover_bottom_outline[True-40]" time="10.248" />
+    <testcase classname="tests.test_interface_language_picker" name="test_scrolled_intermediate_row_cannot_cover_bottom_outline[False-20]" time="7.357" />
+    <testcase classname="tests.test_interface_language_picker" name="test_scrolled_intermediate_row_cannot_cover_bottom_outline[False-40]" time="7.731" />
+    <testcase classname="tests.test_lazy_engine_tables" name="test_constructor_leaves_hidden_tables_unpopulated" time="14.488" />
+    <testcase classname="tests.test_lazy_engine_tables" name="test_selecting_an_engine_populates_once_before_returning_from_the_click" time="14.382" />
+    <testcase classname="tests.test_lazy_engine_tables" name="test_runtime_results_are_cached_without_constructing_hidden_rows" time="14.472" />
+    <testcase classname="tests.test_lazy_engine_tables" name="test_refresh_marks_hidden_rows_dirty_but_preserves_pending_selection" time="15.201" />
+    <testcase classname="tests.test_lazy_engine_tables" name="test_api_and_diagnostics_do_not_fill_unrelated_engine_tables" time="15.044" />
+    <testcase classname="tests.test_lazy_engine_tables" name="test_argos_catalog_refresh_defers_rows_until_its_tab_is_opened" time="14.655" />
+  </testsuite>
+</testsuites>

@@ -1,0 +1,18 @@
+{
+  "Windows": {
+    "tests": 9106,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 100,
+    "passed": 9006,
+    "profiles_unchanged": true
+  },
+  "Linux": {
+    "tests": 9112,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 187,
+    "passed": 8925,
+    "profiles_unchanged": true
+  }
+}

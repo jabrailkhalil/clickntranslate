@@ -1,0 +1,39 @@
+{
+  "qt_platform": "xcb",
+  "qt_version": "5.15.14",
+  "channel": "stable",
+  "platform": {
+    "os": "linux",
+    "arch": "x86_64",
+    "os_version": "6.8.0",
+    "libc": "glibc",
+    "libc_version": "2.39"
+  },
+  "engine_actions": [
+    "Проверить обновления",
+    "Удалить движок",
+    "Обновить список пакетов"
+  ],
+  "update_status": "Для этой системы и канала обновлений пока нет проверенного совместимого обновления. [no_compatible_update]",
+  "visible_status": true,
+  "status_label": "Нет пакета для этой системы\nДля этой системы и канала обновлений пока нет проверенного совместимого обновления. [no_compatible_update]",
+  "downloaded_catalog": true,
+  "catalog_revision": 4,
+  "linux_stable_count": 0,
+  "linux_preview_count": 0,
+  "download_connections": {
+    "catalog": [
+      "Доступен · 1367 мс",
+      "jabrailkhalil.github.io"
+    ],
+    "api": [
+      "Доступ ограничен · HTTP 403 · 1341 мс",
+      "api.github.com"
+    ],
+    "files": [
+      "Доступен · 2091 мс",
+      "release-assets.githubusercontent.com"
+    ]
+  },
+  "passed": true
+}

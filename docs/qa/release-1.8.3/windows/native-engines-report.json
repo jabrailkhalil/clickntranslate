@@ -1,0 +1,68 @@
+{
+  "winrt-en": {
+    "ok": true,
+    "backend": "Windows.Media.Ocr",
+    "text": "Hello portable translation",
+    "boxes": [
+      [
+        21.0,
+        36.0,
+        434.0,
+        37.0,
+        "Hello portable translation"
+      ]
+    ]
+  },
+  "rapid-en": {
+    "ok": true,
+    "backend": "bundled OcrWorker.exe",
+    "text": "Hello portable translation",
+    "time_ms": 1251.032699999996
+  },
+  "winrt-ru": {
+    "ok": true,
+    "backend": "Windows.Media.Ocr",
+    "text": "Проверка перевода текста",
+    "boxes": [
+      [
+        21.0,
+        36.0,
+        490.0,
+        37.0,
+        "Проверка перевода текста"
+      ]
+    ]
+  },
+  "rapid-ru": {
+    "ok": false,
+    "error": "Traceback (most recent call last):\n  File \"qa-reports/windows/native_engines.py\", line 23, in record\n    report[name] = {\"ok\":True, **fn()}\n                                 ^^^^\n  File \"qa-reports/windows/native_engines.py\", line 71, in check_rapid\n    assert not result.get(\"error\") and result[\"text\"].strip().casefold() == value.casefold(), result\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: {'label': 'image', 'text': '7 роверка перевода текста', 'confidence': 0.8974125, 'boxes_count': 4, 'items': [[[[23.0, 40.0], [43.0, 37.0], [47.0, 57.0], [26.0, 60.0]], '7', 0.66509], [[[38.0, 30.0], [206.0, 34.0], [205.0, 87.0], [36.0, 82.0]], 'роверка', 0.98207], [[[199.0, 35.0], [391.0, 35.0], [392.0, 81.0], [199.0, 82.0]], 'перевода', 0.96343], [[[389.0, 39.0], [514.0, 40.0], [514.0, 71.0], [389.0, 69.0]], 'текста', 0.97906]], 'elapsed_ms': 1330.4719999998724, 'error': ''}\n"
+  },
+  "argos-en_ru": {
+    "ok": true,
+    "backend": "bundled ArgosWorker.exe",
+    "model_sha256": "591d743ae103752b88ffc38785c50421320f4eff93c8967e0d3d2e14d4e27811",
+    "source": "Hello world.",
+    "translation": "Привет, мир."
+  },
+  "argos-ru_en": {
+    "ok": true,
+    "backend": "bundled ArgosWorker.exe",
+    "model_sha256": "e9ba8bf722d10a4a4c39f74289d5938fd47eac08dbe4ed0afd22d89445a5c3ac",
+    "source": "Большое спасибо.",
+    "translation": "Thank you very much."
+  },
+  "argos-en_ar": {
+    "ok": true,
+    "backend": "bundled ArgosWorker.exe",
+    "model_sha256": "e2a6e84337f7ebbb55f9dc61dcba3a861c0d786ae5a46fa198fd8d6473f5c775",
+    "source": "Thank you.",
+    "translation": "شكراً لك"
+  },
+  "argos-ar_en": {
+    "ok": true,
+    "backend": "bundled ArgosWorker.exe",
+    "model_sha256": "bc98cd4e27ca1cebfae9b7086b2ebc635e4dbed45e7cb5f0891cb7d22feacfad",
+    "source": "مرحبا بالعالم.",
+    "translation": "Welcome to the world."
+  }
+}

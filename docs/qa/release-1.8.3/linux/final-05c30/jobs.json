@@ -1,0 +1,56 @@
+[
+  {
+    "id": 140531998443,
+    "name": "ubuntu-latest (part 2/6)",
+    "head_sha": "05c30f30bc288b7b9ce582ae5952c3315f5fdb82",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/jabrailkhalil/clickntranslate/actions/runs/46006833564/job/140531998443",
+    "completed_at": "2026-11-27T13:45:13Z"
+  },
+  {
+    "id": 140531998464,
+    "name": "ubuntu-latest (part 5/6)",
+    "head_sha": "05c30f30bc288b7b9ce582ae5952c3315f5fdb82",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/jabrailkhalil/clickntranslate/actions/runs/46006833564/job/140531998464",
+    "completed_at": "2026-11-27T13:31:42Z"
+  },
+  {
+    "id": 140531998473,
+    "name": "ubuntu-latest (part 3/6)",
+    "head_sha": "05c30f30bc288b7b9ce582ae5952c3315f5fdb82",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/jabrailkhalil/clickntranslate/actions/runs/46006833564/job/140531998473",
+    "completed_at": "2026-11-27T13:32:10Z"
+  },
+  {
+    "id": 140531998555,
+    "name": "ubuntu-latest (part 6/6)",
+    "head_sha": "05c30f30bc288b7b9ce582ae5952c3315f5fdb82",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/jabrailkhalil/clickntranslate/actions/runs/46006833564/job/140531998555",
+    "completed_at": "2026-11-27T13:27:31Z"
+  },
+  {
+    "id": 140531998598,
+    "name": "ubuntu-latest (part 1/6)",
+    "head_sha": "05c30f30bc288b7b9ce582ae5952c3315f5fdb82",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/jabrailkhalil/clickntranslate/actions/runs/46006833564/job/140531998598",
+    "completed_at": "2026-11-27T13:28:16Z"
+  },
+  {
+    "id": 140531998617,
+    "name": "ubuntu-latest (part 4/6)",
+    "head_sha": "05c30f30bc288b7b9ce582ae5952c3315f5fdb82",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/jabrailkhalil/clickntranslate/actions/runs/46006833564/job/140531998617",
+    "completed_at": "2026-11-27T13:29:21Z"
+  }
+]

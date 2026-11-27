@@ -1,0 +1,22 @@
+{
+  "command": [
+    "powershell.exe",
+    "-NoProfile",
+    "-NonInteractive",
+    "-ExecutionPolicy",
+    "Bypass",
+    "-File",
+    "qa-work/s/tools/stage_release.ps1",
+    "-Version",
+    "1.8.3",
+    "-SkipPyInstaller",
+    "-StageName",
+    "final-local"
+  ],
+  "pid": 9728,
+  "exit_code": 0,
+  "seconds": 23.41,
+  "qt": "offscreen",
+  "private_station": "QA-station",
+  "private_desktop": "QA"
+}

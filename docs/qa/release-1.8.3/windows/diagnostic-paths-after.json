@@ -1,0 +1,29 @@
+{
+  "short": {
+    "desktop_length": 76,
+    "destination_length": 104,
+    "app_folder_length": 147,
+    "normal_zip_length": 194,
+    "zip_written": true,
+    "actual_length": 194,
+    "actual": "ClicknTranslate-bug-report-20261127-114909.zip"
+  },
+  "medium": {
+    "desktop_length": 152,
+    "destination_length": 180,
+    "app_folder_length": 223,
+    "normal_zip_length": 270,
+    "zip_written": true,
+    "actual_length": 243,
+    "actual": "ClicknTranslate-bug-report-20261127-114909.zip"
+  },
+  "long": {
+    "desktop_length": 186,
+    "destination_length": 214,
+    "app_folder_length": 257,
+    "normal_zip_length": 304,
+    "zip_written": true,
+    "actual_length": 241,
+    "actual": "report.zip"
+  }
+}

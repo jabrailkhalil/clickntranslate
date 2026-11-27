@@ -1,0 +1,34 @@
+{
+  "platform": "xcb",
+  "mode": "missing",
+  "command": "",
+  "active_is_tesseract": true,
+  "visible_rows": 0,
+  "ready": true,
+  "available_table_visible": false,
+  "missing_view": true,
+  "missing_title": "Tesseract is not installed",
+  "hidden_rows": [
+    [
+      "easyocr_table",
+      0,
+      true
+    ],
+    [
+      "rapidocr_table",
+      0,
+      true
+    ],
+    [
+      "hymt_table",
+      0,
+      true
+    ],
+    [
+      "argos_table",
+      0,
+      true
+    ]
+  ],
+  "passed": true
+}

@@ -1,0 +1,50 @@
+{
+  "run": 45966236423,
+  "artifact": 15183946285,
+  "tests": {
+    "device-suite.json": {
+      "tests": 137,
+      "passed": 120,
+      "skipped": 17,
+      "failed": 0,
+      "seconds": 21.132
+    },
+    "arabic-ocr.json": {
+      "tests": 3,
+      "passed": 3,
+      "skipped": 0,
+      "failed": 0,
+      "seconds": 12.892
+    },
+    "native-page.json": {
+      "tests": 1,
+      "passed": 1,
+      "skipped": 0,
+      "failed": 0,
+      "seconds": 11.01
+    },
+    "onboarding/result.json": {
+      "keys": [
+        "serial",
+        "package",
+        "stages",
+        "launches",
+        "passed"
+      ]
+    },
+    "paddle-arabic.json": {
+      "tests": 4,
+      "passed": 4,
+      "skipped": 0,
+      "failed": 0,
+      "seconds": 22.2
+    },
+    "screen-consent.json": {
+      "tests": 1,
+      "passed": 1,
+      "skipped": 0,
+      "failed": 0,
+      "seconds": 11.143
+    }
+  }
+}

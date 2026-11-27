@@ -1,0 +1,41 @@
+{
+  "backend": "xcb",
+  "system_chinese": [],
+  "registered": true,
+  "fonts": {
+    "zh": [
+      [
+        "ClicknTranslate Han",
+        true
+      ]
+    ],
+    "en": [
+      [
+        "Liberation Sans",
+        true
+      ]
+    ],
+    "ru": [
+      [
+        "Liberation Sans",
+        true
+      ]
+    ],
+    "ar": [
+      [
+        "DejaVu Sans",
+        true
+      ]
+    ],
+    "hi": [
+      [
+        "Liberation Sans",
+        true
+      ],
+      [
+        "Noto Sans Devanagari",
+        true
+      ]
+    ]
+  }
+}

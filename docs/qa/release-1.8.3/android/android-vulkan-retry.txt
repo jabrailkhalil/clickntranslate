@@ -1,0 +1,129 @@
+Reusing configuration cache.
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preReleaseBuild UP-TO-DATE
+> Task :app:buildKotlinToolingMetadata UP-TO-DATE
+> Task :llama-android:preBuild UP-TO-DATE
+> Task :app:generateReleaseBuildConfig UP-TO-DATE
+> Task :llama-android:preReleaseBuild UP-TO-DATE
+> Task :llama-android:writeReleaseAarMetadata UP-TO-DATE
+> Task :app:generateReleaseResValues UP-TO-DATE
+> Task :llama-android:generateReleaseResValues UP-TO-DATE
+> Task :llama-android:generateReleaseResources UP-TO-DATE
+> Task :llama-android:packageReleaseResources UP-TO-DATE
+> Task :app:checkReleaseAarMetadata UP-TO-DATE
+> Task :app:generateReleaseResources UP-TO-DATE
+> Task :app:mapReleaseSourceSetPaths UP-TO-DATE
+> Task :app:mergeReleaseResources UP-TO-DATE
+> Task :app:createReleaseCompatibleScreenManifests UP-TO-DATE
+> Task :app:packageReleaseResources UP-TO-DATE
+> Task :app:extractDeepLinksRelease UP-TO-DATE
+> Task :app:parseReleaseLocalResources UP-TO-DATE
+> Task :llama-android:extractDeepLinksRelease UP-TO-DATE
+> Task :llama-android:processReleaseManifest UP-TO-DATE
+> Task :llama-android:parseReleaseLocalResources UP-TO-DATE
+> Task :llama-android:generateReleaseRFile UP-TO-DATE
+> Task :llama-android:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :llama-android:generateReleaseBuildConfig UP-TO-DATE
+> Task :app:processReleaseMainManifest UP-TO-DATE
+> Task :llama-android:compileReleaseKotlin UP-TO-DATE
+> Task :llama-android:javaPreCompileRelease UP-TO-DATE
+> Task :app:processReleaseManifest UP-TO-DATE
+> Task :app:processReleaseManifestForPackage UP-TO-DATE
+> Task :llama-android:compileReleaseJavaWithJavac UP-TO-DATE
+> Task :llama-android:bundleLibCompileToJarRelease UP-TO-DATE
+> Task :app:javaPreCompileRelease UP-TO-DATE
+> Task :app:extractProguardFiles UP-TO-DATE
+> Task :llama-android:bundleLibRuntimeToJarRelease UP-TO-DATE
+> Task :llama-android:processReleaseJavaRes UP-TO-DATE
+> Task :llama-android:createFullJarRelease UP-TO-DATE
+> Task :llama-android:extractProguardFiles UP-TO-DATE
+> Task :llama-android:generateReleaseLintModel UP-TO-DATE
+> Task :llama-android:prepareLintJarForPublish UP-TO-DATE
+> Task :app:processReleaseResources UP-TO-DATE
+> Task :app:kspReleaseKotlin UP-TO-DATE
+> Task :app:compileReleaseKotlin UP-TO-DATE
+> Task :app:compileReleaseJavaWithJavac UP-TO-DATE
+> Task :app:hiltAggregateDepsRelease FROM-CACHE
+
+> Task :llama-android:configureCMakeRelease[arm64-v8a]-2
+C/C++: CMAKE_BUILD_TYPE=Release
+
+> Task :app:hiltJavaCompileRelease
+> Task :app:generateReleaseLintVitalReportModel
+> Task :llama-android:mergeReleaseJniLibFolders
+> Task :llama-android:extractDeepLinksForAarRelease FROM-CACHE
+> Task :llama-android:extractReleaseAnnotations
+> Task :llama-android:mergeReleaseGeneratedProguardFiles
+> Task :llama-android:mergeReleaseConsumerProguardFiles
+> Task :llama-android:mergeReleaseShaders
+> Task :llama-android:compileReleaseShaders NO-SOURCE
+> Task :llama-android:generateReleaseAssets UP-TO-DATE
+> Task :llama-android:packageReleaseAssets
+> Task :llama-android:prepareReleaseArtProfile
+> Task :llama-android:mergeReleaseJavaResource
+> Task :llama-android:syncReleaseLibJars
+> Task :llama-android:lintVitalAnalyzeRelease
+> Task :llama-android:writeReleaseLintModelMetadata
+> Task :llama-android:generateReleaseLintVitalModel
+> Task :app:mergeReleaseJniLibFolders
+> Task :llama-android:exportReleaseConsumerProguardFiles
+> Task :app:checkReleaseDuplicateClasses
+> Task :app:mergeReleaseArtProfile
+> Task :app:transformReleaseClassesWithAsm
+> Task :llama-android:buildCMakeRelease[arm64-v8a]-2
+> Task :app:expandReleaseArtProfileWildcards
+> Task :app:mergeReleaseGeneratedProguardFiles
+> Task :app:processReleaseJavaRes
+> Task :app:mergeReleaseJavaResource
+> Task :app:mergeReleaseStartupProfile
+> Task :app:minifyReleaseWithR8
+> Task :app:compileReleaseArtProfile
+> Task :app:mergeReleaseShaders
+> Task :app:compileReleaseShaders NO-SOURCE
+> Task :app:generateReleaseAssets UP-TO-DATE
+> Task :app:mergeReleaseAssets
+> Task :app:compressReleaseAssets
+> Task :app:extractReleaseVersionControlInfo
+> Task :app:convertLinkedResourcesToProtoRelease
+> Task :app:shrinkReleaseRes
+> Task :app:convertShrunkResourcesToBinaryRelease
+> Task :app:optimizeReleaseResources
+> Task :app:collectReleaseDependencies
+> Task :app:sdkReleaseDependencyData
+> Task :app:writeReleaseAppMetadata
+> Task :app:writeReleaseSigningConfigVersions
+> Task :app:generateReleaseLintReportModel
+> Task :app:bundleReleaseClassesToCompileJar
+> Task :app:preReleaseUnitTestBuild UP-TO-DATE
+> Task :llama-android:lintAnalyzeRelease
+> Task :llama-android:preReleaseUnitTestBuild UP-TO-DATE
+> Task :llama-android:mergeReleaseNativeLibs
+> Task :llama-android:stripReleaseDebugSymbols
+> Task :llama-android:copyReleaseJniLibsProjectAndLocalJars
+> Task :llama-android:copyReleaseJniLibsProjectOnly
+> Task :llama-android:bundleReleaseLocalLintAar
+> Task :app:mergeReleaseNativeLibs
+> Task :app:stripReleaseDebugSymbols
+> Task :app:extractReleaseNativeSymbolTables
+> Task :app:mergeReleaseNativeDebugMetadata
+> Task :app:packageRelease
+> Task :app:createReleaseApkListingFileRedirect
+> Task :app:generateReleaseUnitTestLintModel
+> Task :app:lintVitalAnalyzeRelease
+> Task :app:lintVitalReportRelease SKIPPED
+> Task :app:lintVitalRelease SKIPPED
+> Task :app:assembleRelease
+> Task :app:lintAnalyzeRelease
+> Task :app:lintAnalyzeReleaseUnitTest
+> Task :llama-android:generateReleaseUnitTestLintModel
+> Task :llama-android:lintAnalyzeReleaseUnitTest
+
+> Task :app:lintReportRelease
+Wrote HTML report to repo/app/build/reports/lint-results-release.html
+
+> Task :app:lintRelease
+
+BUILD SUCCESSFUL in 14m 59s
+103 actionable tasks: 62 executed, 2 from cache, 39 up-to-date
+Configuration cache entry reused.

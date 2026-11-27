@@ -1,0 +1,36 @@
+{
+  "qt_platform": "xcb",
+  "qt_version": "5.15.13",
+  "channel": "stable",
+  "platform": {
+    "os": "linux",
+    "arch": "x86_64",
+    "os_version": "6.8.0",
+    "libc": "glibc",
+    "libc_version": "2.39"
+  },
+  "engine_actions": [
+    "Проверить обновления",
+    "Удалить движок",
+    "Обновить список пакетов"
+  ],
+  "update_status": "Не удалось установить компонент. Прежняя рабочая версия сохранена. [operation_busy]",
+  "visible_status": true,
+  "status_label": "Размер неизвестен\nНе удалось установить компонент. Прежняя рабочая версия сохранена. [operation_busy]",
+  "downloaded_catalog": false,
+  "download_connections": {
+    "catalog": [
+      "Доступен · 747 мс",
+      "jabrailkhalil.github.io"
+    ],
+    "api": [
+      "Доступ ограничен · HTTP 403 · 662 мс",
+      "api.github.com"
+    ],
+    "files": [
+      "Не проверен",
+      ""
+    ]
+  },
+  "passed": false
+}

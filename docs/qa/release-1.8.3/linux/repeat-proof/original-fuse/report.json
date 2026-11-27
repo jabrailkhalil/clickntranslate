@@ -1,0 +1,27 @@
+{
+  "mode": "original-fuse",
+  "qt_native": "xcb",
+  "original_pid": 6752,
+  "window_geometry": {
+    "WINDOW": "2097158",
+    "X": "202",
+    "Y": "200",
+    "WIDTH": "875",
+    "HEIGHT": "500",
+    "SCREEN": "0"
+  },
+  "before_second_launch": "Unsigned draft retained in the active editor",
+  "replacement_prompt": {
+    "WINDOW": "4194310",
+    "X": "327",
+    "Y": "322",
+    "WIDTH": "625",
+    "HEIGHT": "255",
+    "SCREEN": "0"
+  },
+  "second_returncode_before_input": null,
+  "original_owner_preserved": true,
+  "after_second_launch": "Unsigned draft retained in the active editor",
+  "original_exit_code": 0,
+  "passed": true
+}

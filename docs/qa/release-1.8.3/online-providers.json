@@ -1,0 +1,24 @@
+{
+  "input": "Good morning. Thank you very much.",
+  "pair": "en→ru",
+  "providers": {
+    "Google": {
+      "text": "Доброе утро. Большое спасибо.",
+      "received_russian": true,
+      "seconds": 0.9
+    },
+    "MyMemory": {
+      "text": "Доброе утро. Большое спасибо.",
+      "received_russian": true,
+      "seconds": 1.35
+    },
+    "Lingva": {
+      "error": "Lingva translate failed: https://translate.plausibility.cloud: HTTP 502",
+      "seconds": 3.35
+    },
+    "LibreTranslate": {
+      "error": "LibreTranslate failed: https://translate.disroot.org: HTTP 502",
+      "seconds": 2.79
+    }
+  }
+}

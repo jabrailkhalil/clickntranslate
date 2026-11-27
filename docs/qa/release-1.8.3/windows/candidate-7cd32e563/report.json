@@ -1,0 +1,17 @@
+{
+  "sha": "7cd32e563c917e33cabfbdd104dfd7069b4c2e0f",
+  "version": "1.8.3",
+  "test_only": true,
+  "production_signed": false,
+  "package": "qa-work/rc-7cd32e563/s/releases/private-candidate/ClicknTranslate",
+  "smoke": "qa-reports/windows/candidate-7cd32e563/frozen/report.json",
+  "manifest_sha256": "ef9d009781b016b3d9f5ce5e85d82e99455a3146c14ae05bf63cda6c69c40517",
+  "package_files": 4254,
+  "app_sha256": "e98e778677852ac23e3bfb18a7c3b9f1ae22f656517c2f51c41b3be606c98cc2",
+  "display": {
+    "status": "passed",
+    "platform": "win32",
+    "architecture": "AMD64",
+    "frozen": true
+  }
+}

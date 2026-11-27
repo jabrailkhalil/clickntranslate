@@ -1,0 +1,18 @@
+{
+  "root.json": {
+    "version": 1,
+    "expires": "2028-10-25T08:21:35Z"
+  },
+  "snapshot.json": {
+    "version": 41,
+    "expires": "2026-12-26T15:23:26Z"
+  },
+  "targets.json": {
+    "version": 5,
+    "expires": "2027-01-24T19:49:00Z"
+  },
+  "timestamp.json": {
+    "version": 41,
+    "expires": "2026-12-03T15:23:26Z"
+  }
+}

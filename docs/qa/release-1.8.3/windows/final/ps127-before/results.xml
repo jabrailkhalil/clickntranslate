@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites name="pytest tests">
+  <testsuite name="pytest" errors="0" failures="3" skipped="0" tests="3" time="4.299" timestamp="2026-11-27T16:23:56.146115+03:00">
+    <testcase classname="tests.test_updater.TestUpdaterCommands" name="test_updater_script_applies_payload_and_preserves_data" time="1.375">
+      <failure />
+    </testcase>
+    <testcase classname="tests.test_updater.TestUpdaterCommands" name="test_updater_stops_locked_worker_before_replacing_install" time="1.336">
+      <failure />
+    </testcase>
+    <testcase classname="tests.test_updater.TestUpdaterCommands" name="test_updater_uses_external_cwd_and_preserves_installer_metadata" time="1.236">
+      <failure />
+    </testcase>
+  </testsuite>
+</testsuites>

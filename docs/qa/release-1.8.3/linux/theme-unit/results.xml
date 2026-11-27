@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites name="pytest tests">
+  <testsuite name="pytest" errors="0" failures="0" skipped="0" tests="11" time="1.404" timestamp="2026-11-27T13:11:46.926351+00:00">
+    <testcase classname="tests.test_config_migration" name="test_old_config_receives_all_new_default_hotkeys" time="0.006" />
+    <testcase classname="tests.test_config_migration" name="test_old_shared_language_pairs_are_migrated_to_each_hotkey_mode" time="0.005" />
+    <testcase classname="tests.test_config_migration" name="test_old_default_is_removed_but_custom_values_are_preserved" time="0.006" />
+    <testcase classname="tests.test_config_migration" name="test_revision_two_defaults_are_cleared_without_touching_custom_hotkeys" time="0.006" />
+    <testcase classname="tests.test_config_migration" name="test_intentionally_removed_hotkey_stays_empty" time="0.005" />
+    <testcase classname="tests.test_config_migration" name="test_app_load_persists_migrated_defaults" time="0.014" />
+    <testcase classname="tests.test_config_migration" name="test_broken_config_falls_back_to_defaults_and_is_repaired" time="0.029" />
+    <testcase classname="tests.test_config_migration" name="test_revision_three_gets_gaming_default_but_preserves_custom_or_current_empty" time="0.007" />
+    <testcase classname="tests.test_config_migration" name="test_revision_four_receives_defaults_for_every_visible_action" time="0.005" />
+    <testcase classname="tests.test_config_migration" name="test_window_toggle_preserves_tray_or_taskbar_destination" time="0.006" />
+    <testcase classname="tests.test_config_migration" name="test_unknown_theme_is_repaired_without_resetting_other_preferences" time="0.019" />
+  </testsuite>
+</testsuites>

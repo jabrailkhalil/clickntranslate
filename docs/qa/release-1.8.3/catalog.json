@@ -1,0 +1,142 @@
+{
+  "revision": 4,
+  "platforms": {
+    "Windows x64": {
+      "ocr.easyocr": "easyocr-windows-x64-stable-r2",
+      "ocr.rapidocr": "rapidocr-windows-x64-stable-r4",
+      "ocr.tesseract": "tesseract-windows-x64-native-stable-r2",
+      "translation.argos": "argos-windows-x64-stable-r2",
+      "translation.hymt": "hymt-windows-x64-b11899-stable-r3"
+    },
+    "Linux x64": {
+      "ocr.easyocr": "no_compatible_update",
+      "ocr.rapidocr": "no_compatible_update",
+      "ocr.tesseract": "no_compatible_update",
+      "translation.argos": "no_compatible_update",
+      "translation.hymt": "no_compatible_update"
+    },
+    "macOS arm64": {
+      "ocr.easyocr": "no_compatible_update",
+      "ocr.rapidocr": "no_compatible_update",
+      "ocr.tesseract": "no_compatible_update",
+      "translation.argos": "no_compatible_update",
+      "translation.hymt": "no_compatible_update"
+    },
+    "macOS Intel": {
+      "ocr.easyocr": "no_compatible_update",
+      "ocr.rapidocr": "no_compatible_update",
+      "ocr.tesseract": "no_compatible_update",
+      "translation.argos": "no_compatible_update",
+      "translation.hymt": "no_compatible_update"
+    }
+  },
+  "github_assets": {
+    "06bf8a39607b155e14b64756b04ea69b03e7d17ac3d8d58d7d270f86b24c47d2": {
+      "name": "hymt-windows-x64-b11899-runtime.zip",
+      "bytes": 21039000,
+      "match": true
+    },
+    "1b5eaebf1c062de6205560c97ffcfa8dc0e6f413c340e8adc5cfc57e159f61ff": {
+      "name": "english_g2.zip",
+      "bytes": 14040947,
+      "match": false
+    },
+    "29f1920c493378da65a59793fb70e7e190504662b6bed57ab26f4067eb5f3769": {
+      "name": "latin_g2.zip",
+      "bytes": 14284936,
+      "match": false
+    },
+    "2bdcf834399a24f9293734d039eb0d4eca60692661bc90bfa99c64d624ff9944": {
+      "name": "rapidocr-windows-x64-cp312-runtime.zip",
+      "bytes": 121253668,
+      "match": true
+    },
+    "34060353accfadd4e429f28d392f88cf70c2fc9d2633710a3b00c21412dc627b": {
+      "name": "cyrillic_g2.zip",
+      "bytes": 14140353,
+      "match": false
+    },
+    "3cdaad22676723040ceb5c6fe72089d656b3bc1f630889c373ade86f3ab38c2e": {
+      "name": "korean_g2.zip",
+      "bytes": 14910151,
+      "match": false
+    },
+    "408ef9d7b68b99366d1dafc9b1275db80ed529252c2e1fa1038d4114cb9ef1d2": {
+      "name": "kannada.zip",
+      "bytes": 14105056,
+      "match": false
+    },
+    "462a75e10de1ed1f34fbdc4761ccee341d59664fc46ecb3463f60be4862e01f9": {
+      "name": "devanagari.zip",
+      "bytes": 199886824,
+      "match": false
+    },
+    "4f26ffd98dd28cca89ff6fe0bc761ab865c2b38fabd76a3ce2143d1d88c0d7f1": {
+      "name": "thai.zip",
+      "bytes": 199881630,
+      "match": false
+    },
+    "71cb95f601ce0c062860224ff3e1d2e807d784f2be92bf53ba500bb1736dabd5": {
+      "name": "chinese.zip",
+      "bytes": 209821039,
+      "match": false
+    },
+    "72abd2543ef80eed2598cfefb5441ea507e89e0f72f9cc2d204763c0068f3f11": {
+      "name": "easyocr-windows-x64-cp312-cpu-runtime.zip",
+      "bytes": 266527468,
+      "match": true
+    },
+    "7b45d23da9b001e296590ed202a45bc1fcaf06ab661f457c463ed502de766fb5": {
+      "name": "japanese_g2.zip",
+      "bytes": 16065475,
+      "match": false
+    },
+    "8dc6a1c703a89ed56308ef742d26ebd45c656248cbbbda6e7fe60e569f873e65": {
+      "name": "craft_mlt_25k.zip",
+      "bytes": 77251756,
+      "match": false
+    },
+    "90b08b8e456d435bcdd96141221db5f116ef03ab3efc2d3239cfb24520ad7756": {
+      "name": "arabic.zip",
+      "bytes": 199916962,
+      "match": false
+    },
+    "9373b449ce9bec752cf9d6c56b5fa9f86def57a65eca137378200b78a7b3a295": {
+      "name": "tesseract-windows-x64-5.5.3-native-runtime.zip",
+      "bytes": 1754060,
+      "match": true
+    },
+    "9e4e5aaf1afe12eea42812f22b9e3be4e3694a5bfe8198c456d7ce141a1109e6": {
+      "name": "argos-windows-x64-cp312-runtime.zip",
+      "bytes": 47894945,
+      "match": true
+    },
+    "a6f372175127ab106c620b1d6af184e7075bd629d1e2aa22a88ac05bae68050d": {
+      "name": "tamil.zip",
+      "bytes": 199783937,
+      "match": false
+    },
+    "b9f88f7beef9aa5480c62e9f84c50be82214e5b209d0115465c30175eca4f944": {
+      "name": "bengali.zip",
+      "bytes": 199852959,
+      "match": false
+    },
+    "cbcb5f570dc3cc36e9187f6d407610dadbc0dc88e214757b9182d45043a11d1f": {
+      "name": "telugu.zip",
+      "bytes": 14108882,
+      "match": false
+    },
+    "eed38bdd9e612bd150f13d2f70fd8e5b24c79c2e2fe621a02603b38d385503e9": {
+      "name": "zh_sim_g2.zip",
+      "bytes": 20288076,
+      "match": false
+    }
+  },
+  "live_samples": {
+    "a0bb039b004b8fa225ce1db982137ccc80c70cf4ebf122f519cf5ec48cb4cf98": true,
+    "a4da60d844ebb9dbaeb8843a92290083c1fd275b167fc9c9686d790ccd311fab": true,
+    "e47acedf663230f8863ff1ab0e64dd2d82b838fceb5957146dab185a89d6215c": true,
+    "9373b449ce9bec752cf9d6c56b5fa9f86def57a65eca137378200b78a7b3a295": true
+  },
+  "signed_artifacts_used_by_stable": 158
+}

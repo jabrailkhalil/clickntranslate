@@ -1,0 +1,48 @@
+{
+  "device": "OnePlus 15 (CPH2745), Android API 37, 4096-byte pages",
+  "commit": "6f2bf9af65967cadd3ab0035003c6279376e26d8",
+  "apk_bytes": 64346843,
+  "qa_unsigned_sha256": "b5794821de7e7e611305264e591dd11b38aac7f34b9046314b433610ef204d73",
+  "jvm": {
+    "tests": 1937,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": 497
+  },
+  "lint": {
+    "debug": {
+      "Warning": 915,
+      "Information": 42
+    },
+    "release": {
+      "Warning": 914,
+      "Information": 42
+    }
+  },
+  "physical_unique": 102,
+  "groups": {
+    "native-ocr": 12,
+    "storage-features": 21,
+    "gallery": 53,
+    "successfulImportPersistsInterfaceChoicesTogetherWithProfilesTermsAndFonts": 1,
+    "cleanupFailureAfterCommittedDecisionNeverRollsBackCommittedData": 1,
+    "unreadableEncryptedJournalExposesNoPartialStateAndCanRetryAfterRepair": 1,
+    "journal-sequence": 36,
+    "journal-witness-1": 36,
+    "journal-witness-2": 36
+  },
+  "duration_seconds": {
+    "native-ocr": 16.183,
+    "storage-features": 1.349,
+    "gallery": 1.692,
+    "successfulImportPersistsInterfaceChoicesTogetherWithProfilesTermsAndFonts": 0.723,
+    "cleanupFailureAfterCommittedDecisionNeverRollsBackCommittedData": 0.722,
+    "unreadableEncryptedJournalExposesNoPartialStateAndCanRetryAfterRepair": 0.796,
+    "journal-sequence": 15.649,
+    "journal-witness-1": 17.19,
+    "journal-witness-2": 12.646
+  },
+  "dark_arabic_cases": 87,
+  "dark_arabic_semantic_cases": 16
+}

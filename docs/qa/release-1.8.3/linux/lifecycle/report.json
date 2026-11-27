@@ -1,0 +1,111 @@
+{
+  "launches": [
+    {
+      "label": "image-published",
+      "version": "1.8.2",
+      "show_ipc": "accepted",
+      "preferences": {
+        "audit_marker": "qa-private-config",
+        "theme": "Светлая",
+        "ui_scale_percent": 100,
+        "interface_language": "en",
+        "autostart": false
+      },
+      "marker_files": [
+        "data/QA-marker",
+        "ocr/QA-marker",
+        "translators/QA-marker"
+      ],
+      "windows": [],
+      "exit_code": 0,
+      "process_exited": true
+    },
+    {
+      "label": "image-candidate",
+      "version": "1.8.3",
+      "show_ipc": "accepted",
+      "preferences": {
+        "audit_marker": "qa-private-config",
+        "theme": "Светлая",
+        "ui_scale_percent": 100,
+        "interface_language": "en",
+        "autostart": false
+      },
+      "marker_files": [
+        "data/QA-marker",
+        "ocr/QA-marker",
+        "translators/QA-marker"
+      ],
+      "windows": [
+        "0x200009 \"ClicknTranslate\": ()  700x400+0+0  +0+0",
+        "0x200008 \"ClicknTranslate\": ()  1x1+0+0  +0+0"
+      ],
+      "second_process_returncode_before_input": null,
+      "second_launch_windows": [
+        "0x400008 \"ClicknTranslate\": ()  1x1+0+0  +0+0",
+        "0x400006 \"The app is already running\": ()  640x480+0+0  +0+0",
+        "0x200009 \"ClicknTranslate\": ()  700x400+0+0  +0+0",
+        "0x200008 \"ClicknTranslate\": ()  1x1+0+0  +0+0"
+      ],
+      "exit_code": 1,
+      "process_exited": true
+    },
+    {
+      "label": "tar-candidate",
+      "version": "1.8.3",
+      "show_ipc": "accepted",
+      "preferences": {
+        "audit_marker": "qa-private-config",
+        "theme": "Светлая",
+        "ui_scale_percent": 100,
+        "interface_language": "en",
+        "autostart": false
+      },
+      "marker_files": [
+        "data/QA-marker",
+        "ocr/QA-marker",
+        "translators/QA-marker"
+      ],
+      "windows": [
+        "0x200009 \"ClicknTranslate\": ()  700x400+0+0  +0+0",
+        "0x200008 \"ClicknTranslate\": ()  1x1+0+0  +0+0"
+      ],
+      "second_process_returncode_before_input": null,
+      "second_launch_windows": [
+        "0x400008 \"ClicknTranslate\": ()  1x1+0+0  +0+0",
+        "0x400006 \"The app is already running\": ()  625x218+0+0  +0+0",
+        "0x200009 \"ClicknTranslate\": ()  700x400+0+0  +0+0",
+        "0x200008 \"ClicknTranslate\": ()  1x1+0+0  +0+0"
+      ],
+      "exit_code": 0,
+      "process_exited": true
+    },
+    {
+      "label": "tar-restart",
+      "version": "1.8.3",
+      "show_ipc": "accepted",
+      "preferences": {
+        "audit_marker": "qa-private-config",
+        "theme": "Светлая",
+        "ui_scale_percent": 100,
+        "interface_language": "en",
+        "autostart": false
+      },
+      "marker_files": [
+        "data/QA-marker",
+        "ocr/QA-marker",
+        "translators/QA-marker"
+      ],
+      "windows": [
+        "0x200009 \"ClicknTranslate\": ()  700x400+0+0  +0+0",
+        "0x200008 \"ClicknTranslate\": ()  1x1+0+0  +0+0"
+      ],
+      "exit_code": 0,
+      "process_exited": true
+    }
+  ],
+  "transition": "manual replacement of published 1.8.2 AppImage at exact same path",
+  "display": "X11/Xvfb",
+  "tar_kept_data_in_its_folder": true,
+  "status": "passed"
+}

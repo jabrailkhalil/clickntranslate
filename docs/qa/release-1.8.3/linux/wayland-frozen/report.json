@@ -1,0 +1,21 @@
+{
+  "binary": "unpublished AppImage 1.8.3",
+  "qt_qpa_platform": "wayland",
+  "display": null,
+  "wayland_display": "wayland-1",
+  "gui_version": "1.8.3",
+  "compositor_windows": [
+    {
+      "app_id": "io.github.jabrailkhalil.clickntranslate",
+      "name": "Click'n'Translate",
+      "rect": {
+        "x": 102,
+        "y": 110,
+        "width": 875,
+        "height": 500
+      }
+    }
+  ],
+  "exit_code": 0,
+  "passed": true
+}

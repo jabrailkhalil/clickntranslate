@@ -1,0 +1,33 @@
+{
+  "short": {
+    "desktop_length": 76,
+    "destination_length": 104,
+    "app_folder_length": 147,
+    "normal_zip_length": 194,
+    "zip_written": true,
+    "actual_length": 194,
+    "actual": "ClicknTranslate-bug-report-20261127-114534.zip"
+  },
+  "medium": {
+    "desktop_length": 152,
+    "destination_length": 180,
+    "app_folder_length": 223,
+    "normal_zip_length": 270,
+    "zip_written": false,
+    "error_type": "FileNotFoundError",
+    "error_file": "qa-work/local-sdk-diag2/tmp/private-export/medium/rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr/Desktop/ClicknTranslate Bug Reports/ClicknTranslate-bug-report-20261127-114534/ClicknTranslate-bug-report-20261127-114534.zip",
+    "error_path_length": 270,
+    "manually_shortened_zip_length": 234,
+    "manual_zip_opened": true
+  },
+  "long": {
+    "desktop_length": 186,
+    "destination_length": 214,
+    "app_folder_length": 257,
+    "normal_zip_length": 304,
+    "zip_written": false,
+    "error_type": "FileNotFoundError",
+    "error_file": "qa-work/local-sdk-diag2/tmp/private-export/long/rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr/Desktop/ClicknTranslate Bug Reports/ClicknTranslate-bug-report-20261127-114534",
+    "error_path_length": 257
+  }
+}

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites name="pytest tests">
+  <testsuite name="pytest" errors="0" failures="0" skipped="0" tests="10" time="198.522" timestamp="2026-11-27T13:04:16.147714+00:00">
+    <testcase classname="tests.test_provider_usage_routing" name="test_save_and_select_changes_only_the_requested_engines[text-gemini-Tesseract]" time="14.569" />
+    <testcase classname="tests.test_rounded_popup_edges" name="test_short_tab_tooltip_rtl_glyphs_fit_the_actual_bubble[1.0-True-zh]" time="0.251" />
+    <testcase classname="tests.test_rounded_popup_edges" name="test_short_tab_tooltip_rtl_glyphs_fit_the_actual_bubble[1.0-False-zh]" time="0.097" />
+    <testcase classname="tests.test_rounded_popup_edges" name="test_actual_frameless_dialogs_keep_transparent_corners_and_full_frames[ru-True]" time="17.249" />
+    <testcase classname="tests.test_rounded_popup_edges" name="test_actual_frameless_dialogs_keep_transparent_corners_and_full_frames[ru-False]" time="27.009" />
+    <testcase classname="tests.test_rounded_popup_edges" name="test_actual_frameless_dialogs_keep_transparent_corners_and_full_frames[ar-True]" time="31.572" />
+    <testcase classname="tests.test_rounded_popup_edges" name="test_actual_frameless_dialogs_keep_transparent_corners_and_full_frames[ar-False]" time="24.712" />
+    <testcase classname="tests.test_runtime_bootstrap" name="test_normal_source_interpreter_does_not_load_or_change_dll_search_paths" time="0.009" />
+    <testcase classname="tests.test_settings_sections" name="test_five_pages_fit_every_theme_and_scale_and_overflow_is_reachable[ar]" time="37.730" />
+    <testcase classname="tests.test_settings_visual_polish" name="test_section_buttons_and_longest_dynamic_names_fit_every_theme_and_zoom[ar]" time="43.618" />
+  </testsuite>
+</testsuites>

@@ -1,0 +1,293 @@
+{
+  "platform": "xcb",
+  "bounds": [
+    0,
+    0,
+    1280,
+    900
+  ],
+  "results": {
+    "es": {
+      "before": {
+        "overlay": [
+          14,
+          48,
+          672,
+          162
+        ],
+        "target": [
+          14,
+          48,
+          672,
+          162
+        ],
+        "fits": true
+      },
+      "immediate": {
+        "overlay": [
+          14,
+          48,
+          672,
+          162
+        ],
+        "target": [
+          0,
+          0,
+          640,
+          480
+        ],
+        "fits": false
+      },
+      "settled": {
+        "overlay": [
+          14,
+          48,
+          672,
+          162
+        ],
+        "target": [
+          14,
+          48,
+          672,
+          162
+        ],
+        "fits": true
+      }
+    },
+    "ar": {
+      "before": {
+        "overlay": [
+          14,
+          48,
+          672,
+          162
+        ],
+        "target": [
+          14,
+          48,
+          672,
+          162
+        ],
+        "fits": true
+      },
+      "immediate": {
+        "overlay": [
+          14,
+          48,
+          672,
+          162
+        ],
+        "target": [
+          0,
+          0,
+          640,
+          480
+        ],
+        "fits": false
+      },
+      "settled": {
+        "overlay": [
+          14,
+          48,
+          672,
+          154
+        ],
+        "target": [
+          14,
+          48,
+          672,
+          154
+        ],
+        "fits": true
+      }
+    },
+    "hi": {
+      "before": {
+        "overlay": [
+          14,
+          48,
+          672,
+          154
+        ],
+        "target": [
+          14,
+          48,
+          672,
+          154
+        ],
+        "fits": true
+      },
+      "immediate": {
+        "overlay": [
+          14,
+          48,
+          672,
+          154
+        ],
+        "target": [
+          0,
+          0,
+          640,
+          480
+        ],
+        "fits": false
+      },
+      "settled": {
+        "overlay": [
+          14,
+          48,
+          672,
+          150
+        ],
+        "target": [
+          14,
+          48,
+          672,
+          150
+        ],
+        "fits": true
+      }
+    },
+    "id": {
+      "before": {
+        "overlay": [
+          14,
+          48,
+          672,
+          150
+        ],
+        "target": [
+          14,
+          48,
+          672,
+          150
+        ],
+        "fits": true
+      },
+      "immediate": {
+        "overlay": [
+          14,
+          48,
+          672,
+          150
+        ],
+        "target": [
+          0,
+          0,
+          640,
+          480
+        ],
+        "fits": false
+      },
+      "settled": {
+        "overlay": [
+          14,
+          48,
+          672,
+          162
+        ],
+        "target": [
+          14,
+          48,
+          672,
+          162
+        ],
+        "fits": true
+      }
+    },
+    "en": {
+      "before": {
+        "overlay": [
+          14,
+          48,
+          672,
+          162
+        ],
+        "target": [
+          14,
+          48,
+          672,
+          162
+        ],
+        "fits": true
+      },
+      "immediate": {
+        "overlay": [
+          14,
+          48,
+          672,
+          162
+        ],
+        "target": [
+          0,
+          0,
+          640,
+          480
+        ],
+        "fits": false
+      },
+      "settled": {
+        "overlay": [
+          14,
+          48,
+          672,
+          162
+        ],
+        "target": [
+          14,
+          48,
+          672,
+          162
+        ],
+        "fits": true
+      }
+    },
+    "ru": {
+      "before": {
+        "overlay": [
+          14,
+          48,
+          672,
+          162
+        ],
+        "target": [
+          14,
+          48,
+          672,
+          162
+        ],
+        "fits": true
+      },
+      "immediate": {
+        "overlay": [
+          14,
+          48,
+          672,
+          162
+        ],
+        "target": [
+          0,
+          0,
+          640,
+          480
+        ],
+        "fits": false
+      },
+      "settled": {
+        "overlay": [
+          14,
+          48,
+          672,
+          162
+        ],
+        "target": [
+          14,
+          48,
+          672,
+          162
+        ],
+        "fits": true
+      }
+    }
+  }
+}

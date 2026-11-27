@@ -1,0 +1,21 @@
+{
+  "mode": "fixed-extract",
+  "qt_native": "xcb",
+  "original_pid": 17576,
+  "window_geometry": {
+    "WINDOW": "2097158",
+    "X": "202",
+    "Y": "200",
+    "WIDTH": "875",
+    "HEIGHT": "500",
+    "SCREEN": "0"
+  },
+  "executable_before": "qa-work/repeat-proof/fixed-extract/tmp/appimage_extracted_c0b04921d41e1f1b9e3956b228da9222/usr/bin/clickntranslate",
+  "before_second_launch": "Unsigned draft retained in the active editor",
+  "second_returncode": 0,
+  "executable_present_after_second_launch": false,
+  "original_owner_preserved": true,
+  "after_second_launch": "Unsigned draft retained in the active editor",
+  "original_exit_code": 1,
+  "passed": false
+}

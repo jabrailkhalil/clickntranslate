@@ -1,0 +1,154 @@
+{
+  "timestamp": "2026-11-27T09:10:37.829222+00:00",
+  "input": "Good morning. Thank you very much.",
+  "source": "en",
+  "target": "ru",
+  "route": "Windows host. The system proxy route and direct route are distinct only when explicitly listed.",
+  "results": [
+    {
+      "engine": "lingva",
+      "host": "lingva.vercel.app",
+      "mode": "system",
+      "seconds": 0.81,
+      "status": 500,
+      "server": "Vercel",
+      "response_type": "application/json",
+      "text": null,
+      "error": "An error occurred while retrieving the translation",
+      "redirect": null,
+      "language_ok": false
+    },
+    {
+      "engine": "lingva",
+      "host": "translate.plausibility.cloud",
+      "mode": "system",
+      "seconds": 0.45,
+      "status": 502,
+      "server": "cloudflare",
+      "response_type": "text/html",
+      "text": null,
+      "error": null,
+      "redirect": null,
+      "language_ok": false
+    },
+    {
+      "engine": "lingva",
+      "host": "lingva.ml",
+      "mode": "system",
+      "seconds": 0.62,
+      "status": 503,
+      "server": "cloudflare",
+      "response_type": "application/json",
+      "text": null,
+      "error": "Translation provider temporarily unavailable.",
+      "redirect": null,
+      "language_ok": false
+    },
+    {
+      "engine": "lingva",
+      "host": "translate.igna.wtf",
+      "mode": "system",
+      "seconds": 11.08,
+      "status": null,
+      "error": "HTTPSConnectionPool(host='translate.igna.wtf', port=443): Max retries exceeded with url: /api/v1/en/ru/Good%20morning.%20Thank%20you%20very%20much. (Caused by NameResolutionError(\"HTTPSConnection(host='translate.igna.wtf', port=443): Failed to resolve 'translate.igna.wtf' ([Errno 11001] getaddrinfo failed)\"))",
+      "language_ok": false
+    },
+    {
+      "engine": "lingva",
+      "host": "lingva.lunar.icu",
+      "mode": "system",
+      "seconds": 5.24,
+      "status": null,
+      "error": "HTTPSConnectionPool(host='lingva.lunar.icu', port=443): Read timed out. (read timeout=5)",
+      "language_ok": false
+    },
+    {
+      "engine": "lingva",
+      "host": "translate.projectsegfau.lt",
+      "mode": "system",
+      "seconds": 5.2,
+      "status": null,
+      "error": "HTTPSConnectionPool(host='translate.projectsegfau.lt', port=443): Read timed out. (read timeout=5)",
+      "language_ok": false
+    },
+    {
+      "engine": "lingva",
+      "host": "translate.dr460nf1r3.org",
+      "mode": "system",
+      "seconds": 0.3,
+      "status": null,
+      "error": "HTTPSConnectionPool(host='translate.dr460nf1r3.org', port=443): Max retries exceeded with url: /api/v1/en/ru/Good%20morning.%20Thank%20you%20very%20much. (Caused by NameResolutionError(\"HTTPSConnection(host='translate.dr460nf1r3.org', port=443): Failed to resolve 'translate.dr460nf1r3.org' ([Errno 11001] getaddrinfo fa",
+      "language_ok": false
+    },
+    {
+      "engine": "lingva",
+      "host": "lingva.garudalinux.org",
+      "mode": "system",
+      "seconds": 0.36,
+      "status": 403,
+      "server": "cloudflare",
+      "response_type": "text/html",
+      "text": null,
+      "error": null,
+      "redirect": null,
+      "language_ok": false
+    },
+    {
+      "engine": "lingva",
+      "host": "translate.jae.fi",
+      "mode": "system",
+      "seconds": 11.08,
+      "status": null,
+      "error": "HTTPSConnectionPool(host='translate.jae.fi', port=443): Max retries exceeded with url: /api/v1/en/ru/Good%20morning.%20Thank%20you%20very%20much. (Caused by NameResolutionError(\"HTTPSConnection(host='translate.jae.fi', port=443): Failed to resolve 'translate.jae.fi' ([Errno 11001] getaddrinfo failed)\"))",
+      "language_ok": false
+    },
+    {
+      "engine": "libre",
+      "host": "translate.disroot.org",
+      "mode": "system",
+      "seconds": 2.45,
+      "status": 502,
+      "server": "nginx",
+      "response_type": "text/html",
+      "text": null,
+      "error": null,
+      "redirect": null,
+      "language_ok": false
+    },
+    {
+      "engine": "libre",
+      "host": "translate.cutie.dating",
+      "mode": "system",
+      "seconds": 5.3,
+      "status": null,
+      "error": "HTTPSConnectionPool(host='translate.cutie.dating', port=443): Max retries exceeded with url: /translate (Caused by SSLError(SSLEOFError(8, '[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1010)')))",
+      "language_ok": false
+    },
+    {
+      "engine": "libre",
+      "host": "translate.fedilab.app",
+      "mode": "system",
+      "seconds": 0.41,
+      "status": 403,
+      "server": null,
+      "response_type": "text/html",
+      "text": null,
+      "error": null,
+      "redirect": null,
+      "language_ok": false
+    },
+    {
+      "engine": "libre",
+      "host": "libretranslate.com",
+      "mode": "system",
+      "seconds": 0.39,
+      "status": 403,
+      "server": "cloudflare",
+      "response_type": "text/html",
+      "text": null,
+      "error": null,
+      "redirect": null,
+      "language_ok": false
+    }
+  ]
+}

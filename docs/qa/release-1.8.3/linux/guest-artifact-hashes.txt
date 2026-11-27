@@ -1,0 +1,3 @@
+c7f4ffee4fec4b80842846335e34e0c1d475fb4afd8702b3c8f30a88a5f4872d  candidate.AppImage
+92ea642e3d9c504fcb499f9130cb4d29b1505fc93f8f54eb6fbc44cb9502e313  candidate.tar.gz
+fa0ecdd3823377aaa1265412ff6bedcf4f09ff7d6d81016fefe5a89cd501058b  published.AppImage

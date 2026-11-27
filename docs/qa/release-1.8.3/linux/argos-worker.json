@@ -1,0 +1,27 @@
+{
+  "runtime": "candidate archive frozen ArgosWorker",
+  "fixture_model_seeded_from_archive": true,
+  "requests": [
+    {
+      "action": "probe",
+      "pair_installed": false,
+      "result": null,
+      "error": ""
+    },
+    {
+      "action": "probe",
+      "pair_installed": true,
+      "result": null,
+      "error": ""
+    },
+    {
+      "action": "translate",
+      "pair_installed": null,
+      "result": "Доброе утро. Большое спасибо.",
+      "error": ""
+    }
+  ],
+  "model_sha256": "591d743ae103752b88ffc38785c50421320f4eff93c8967e0d3d2e14d4e27811",
+  "input": "Good morning. Thank you very much.",
+  "passed": true
+}

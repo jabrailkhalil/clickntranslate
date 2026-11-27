@@ -1,0 +1,16 @@
+{
+  "status": "passed",
+  "kind": "macos",
+  "scenario": "rollback",
+  "scope": "Native update integration: source Settings UI -> HTTP -> real frozen GUI.\n\nThis deliberately tests current source before rebuilding distribution packages.\nOnly frozen-install discovery and the current version are simulated in the\nsource controller; release requests, downloads, checksums, staging, detached\nreplacement, shutdown, native GUI readiness and rollback are production code.\nIt does NOT establish that an older released GUI contains the new updater.\nAll installations, profiles and IPC sockets are private disposable copies.\n",
+  "package_sha256": "9ffc631a90e2bd03bfc133cc8818e4034d33c4d0a716a1339d5c746de445cf0d",
+  "requests": [
+    "/latest",
+    "/package",
+    "/checksum"
+  ],
+  "real_gui_acknowledged": true,
+  "atomic_replacement_verified": true,
+  "real_gui_running": true,
+  "preferences_and_models_preserved": true
+}

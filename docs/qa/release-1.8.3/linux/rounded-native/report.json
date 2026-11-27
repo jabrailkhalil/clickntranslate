@@ -1,0 +1,230 @@
+[
+  {
+    "locale": "ar",
+    "dark": true,
+    "name": "AssistantActionsDialog",
+    "uses_alpha": false,
+    "mask": true,
+    "size": [
+      525,
+      525
+    ],
+    "corner_alpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "clipped": 0,
+    "sample": []
+  },
+  {
+    "locale": "ar",
+    "dark": true,
+    "name": "TranslationResultDialog",
+    "uses_alpha": false,
+    "mask": true,
+    "size": [
+      700,
+      496
+    ],
+    "corner_alpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "clipped": 0,
+    "sample": []
+  },
+  {
+    "locale": "ar",
+    "dark": true,
+    "name": "DocumentTranslationDialog",
+    "uses_alpha": false,
+    "mask": true,
+    "size": [
+      1080,
+      700
+    ],
+    "corner_alpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "clipped": 0,
+    "sample": []
+  },
+  {
+    "locale": "ar",
+    "dark": true,
+    "name": "WelcomeDialog",
+    "uses_alpha": false,
+    "mask": true,
+    "size": [
+      560,
+      390
+    ],
+    "corner_alpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "clipped": 0,
+    "sample": []
+  },
+  {
+    "locale": "ar",
+    "dark": true,
+    "name": "HotkeyLanguageDialog",
+    "uses_alpha": false,
+    "mask": true,
+    "size": [
+      520,
+      302
+    ],
+    "corner_alpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "clipped": 0,
+    "sample": []
+  },
+  {
+    "locale": "ar",
+    "dark": true,
+    "name": "AssistantMenu",
+    "uses_alpha": false,
+    "mask": true,
+    "size": [
+      302,
+      289
+    ],
+    "corner_alpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "clipped": 0,
+    "sample": []
+  },
+  {
+    "locale": "ru",
+    "dark": false,
+    "name": "AssistantActionsDialog",
+    "uses_alpha": false,
+    "mask": true,
+    "size": [
+      525,
+      525
+    ],
+    "corner_alpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "clipped": 0,
+    "sample": []
+  },
+  {
+    "locale": "ru",
+    "dark": false,
+    "name": "TranslationResultDialog",
+    "uses_alpha": false,
+    "mask": true,
+    "size": [
+      700,
+      496
+    ],
+    "corner_alpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "clipped": 0,
+    "sample": []
+  },
+  {
+    "locale": "ru",
+    "dark": false,
+    "name": "DocumentTranslationDialog",
+    "uses_alpha": false,
+    "mask": true,
+    "size": [
+      1080,
+      700
+    ],
+    "corner_alpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "clipped": 0,
+    "sample": []
+  },
+  {
+    "locale": "ru",
+    "dark": false,
+    "name": "WelcomeDialog",
+    "uses_alpha": false,
+    "mask": true,
+    "size": [
+      560,
+      390
+    ],
+    "corner_alpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "clipped": 0,
+    "sample": []
+  },
+  {
+    "locale": "ru",
+    "dark": false,
+    "name": "HotkeyLanguageDialog",
+    "uses_alpha": false,
+    "mask": true,
+    "size": [
+      520,
+      302
+    ],
+    "corner_alpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "clipped": 0,
+    "sample": []
+  },
+  {
+    "locale": "ru",
+    "dark": false,
+    "name": "AssistantMenu",
+    "uses_alpha": false,
+    "mask": true,
+    "size": [
+      350,
+      275
+    ],
+    "corner_alpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "clipped": 0,
+    "sample": []
+  }
+]

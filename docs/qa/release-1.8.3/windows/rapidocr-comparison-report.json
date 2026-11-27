@@ -1,0 +1,82 @@
+{
+  "candidate-1.8.3": {
+    "worker_sha256": "7876127ade1ad04e20dfec8f1b0b9eaf0f73a73645299792f37a61b7430fc694",
+    "cases": [
+      {
+        "label": "Arial-40",
+        "source": "Проверка перевода текста",
+        "actual": "7 роверка перевода текста",
+        "exact": false,
+        "confidence": 0.8974125
+      },
+      {
+        "label": "Segoe-40",
+        "source": "Проверка перевода текста",
+        "actual": "роверка перевода текста",
+        "exact": false,
+        "confidence": 0.95464
+      },
+      {
+        "label": "Arial-30",
+        "source": "Проверка перевода текста",
+        "actual": "Проверка перевода текста",
+        "exact": true,
+        "confidence": 0.9633433333333333
+      },
+      {
+        "label": "Arial-40-vopros",
+        "source": "Сохранить перевод текста",
+        "actual": "перевод текста",
+        "exact": false,
+        "confidence": 0.92496
+      },
+      {
+        "label": "Segoe-32-vopros",
+        "source": "Доброе утро",
+        "actual": "брое утро",
+        "exact": false,
+        "confidence": 0.94802
+      }
+    ]
+  },
+  "test-1.8.2-2026-11-14": {
+    "worker_sha256": "52c56891b044433e82d08da583613c3375ef83beb97da0e495bb0f5a9e34ad0b",
+    "cases": [
+      {
+        "label": "Arial-40",
+        "source": "Проверка перевода текста",
+        "actual": "7 роверка перевода текста",
+        "exact": false,
+        "confidence": 0.8974125
+      },
+      {
+        "label": "Segoe-40",
+        "source": "Проверка перевода текста",
+        "actual": "роверка перевода текста",
+        "exact": false,
+        "confidence": 0.95464
+      },
+      {
+        "label": "Arial-30",
+        "source": "Проверка перевода текста",
+        "actual": "Проверка перевода текста",
+        "exact": true,
+        "confidence": 0.9633433333333333
+      },
+      {
+        "label": "Arial-40-vopros",
+        "source": "Сохранить перевод текста",
+        "actual": "перевод текста",
+        "exact": false,
+        "confidence": 0.92496
+      },
+      {
+        "label": "Segoe-32-vopros",
+        "source": "Доброе утро",
+        "actual": "брое утро",
+        "exact": false,
+        "confidence": 0.94802
+      }
+    ]
+  }
+}

@@ -1,0 +1,220 @@
+{
+  "apk": "app-release-unsigned.apk",
+  "all_native_16k": true,
+  "native_libraries": [
+    {
+      "file": "lib/arm64-v8a/libai-chat.so",
+      "bytes": 87184,
+      "sha256": "6869d72dfefee569331e5bc1f41799052474aef17e0341f99fbcf435fadc63b5",
+      "load_alignments": [
+        16384,
+        16384,
+        16384,
+        16384
+      ],
+      "page16k": true
+    },
+    {
+      "file": "lib/arm64-v8a/libandroidx.graphics.path.so",
+      "bytes": 10096,
+      "sha256": "41e9a793c43a0f4fddb19e33f346bace464f30f888ba7b9eaf96294ea115bfb6",
+      "load_alignments": [
+        16384,
+        16384,
+        16384
+      ],
+      "page16k": true
+    },
+    {
+      "file": "lib/arm64-v8a/libdatastore_shared_counter.so",
+      "bytes": 7112,
+      "sha256": "d3e48717c9aa147e0ab21063ba0e8e0211cabf8bf40b222640829519edbf58e1",
+      "load_alignments": [
+        16384,
+        16384,
+        16384
+      ],
+      "page16k": true
+    },
+    {
+      "file": "lib/arm64-v8a/libggml-base.so",
+      "bytes": 1129992,
+      "sha256": "18fd50e9b58fb5b513c41e6194f92197656bcab7aa84b43486e1b9e71b18685d",
+      "load_alignments": [
+        16384,
+        16384,
+        16384,
+        16384
+      ],
+      "page16k": true
+    },
+    {
+      "file": "lib/arm64-v8a/libggml-cpu-android_armv8.0_1.so",
+      "bytes": 1370216,
+      "sha256": "cd7e0212b397eddc928bfcda0abbbc828394a7befc12e4f5c47be06c5aecd48a",
+      "load_alignments": [
+        16384,
+        16384,
+        16384,
+        16384
+      ],
+      "page16k": true
+    },
+    {
+      "file": "lib/arm64-v8a/libggml-cpu-android_armv8.2_2.so",
+      "bytes": 1414400,
+      "sha256": "28a5ce29c533200de6188288760decbd146b5e022cd2b3e55530752e09165d0f",
+      "load_alignments": [
+        16384,
+        16384,
+        16384,
+        16384
+      ],
+      "page16k": true
+    },
+    {
+      "file": "lib/arm64-v8a/libggml-vulkan.so",
+      "bytes": 33690192,
+      "sha256": "caaad338e7b960c3499fb9460a8e9bd5121f076fc0674b9a6f8f0ddbc13989fd",
+      "load_alignments": [
+        16384,
+        16384,
+        16384,
+        16384
+      ],
+      "page16k": true
+    },
+    {
+      "file": "lib/arm64-v8a/libggml.so",
+      "bytes": 121256,
+      "sha256": "4e0bf68aa02b0d94ad51c4b7e76f1f3e7efc5eb2b793a2b0ec8249a7e66d58a8",
+      "load_alignments": [
+        16384,
+        16384,
+        16384,
+        16384
+      ],
+      "page16k": true
+    },
+    {
+      "file": "lib/arm64-v8a/libjpeg.so",
+      "bytes": 251888,
+      "sha256": "0e751fcd26f2a60e8b87c2da274473c6c2a26352e5a9071033f1f88a93b39308",
+      "load_alignments": [
+        16384,
+        16384
+      ],
+      "page16k": true
+    },
+    {
+      "file": "lib/arm64-v8a/liblanguage_id_l2c_jni.so",
+      "bytes": 1019552,
+      "sha256": "b93e65a48200df45dbbfc82e17560ae689b1b462ab4ecdce5fd2c093802e1a94",
+      "load_alignments": [
+        16384,
+        16384,
+        16384
+      ],
+      "page16k": true
+    },
+    {
+      "file": "lib/arm64-v8a/libleptonica.so",
+      "bytes": 2878240,
+      "sha256": "00436d8562bc833a22111a1451cf46147f05aecf8a257751e127689a1ee6e3c4",
+      "load_alignments": [
+        16384,
+        16384,
+        16384
+      ],
+      "page16k": true
+    },
+    {
+      "file": "lib/arm64-v8a/libllama-common.so",
+      "bytes": 4392224,
+      "sha256": "36ebe4c2319c5833269dc8043b4f529338a5a0e470978d323dd52c7d50a9b95f",
+      "load_alignments": [
+        16384,
+        16384,
+        16384,
+        16384
+      ],
+      "page16k": true
+    },
+    {
+      "file": "lib/arm64-v8a/libllama.so",
+      "bytes": 3205592,
+      "sha256": "057e10c494678c006704c7e38ddd9206ab7e751ba60834cdf2c1455442022db0",
+      "load_alignments": [
+        16384,
+        16384,
+        16384,
+        16384
+      ],
+      "page16k": true
+    },
+    {
+      "file": "lib/arm64-v8a/libmlkit_google_ocr_pipeline.so",
+      "bytes": 11064544,
+      "sha256": "fa41d509a661e8aa8b3e3ac1a28541f8823f308414fcad733fe26d61feea2646",
+      "load_alignments": [
+        16384,
+        16384,
+        16384
+      ],
+      "page16k": true
+    },
+    {
+      "file": "lib/arm64-v8a/libonnxruntime.so",
+      "bytes": 17908496,
+      "sha256": "67465b2bcf0ad501d389cc2c0f7f04278fb26fcf32e50c16a74deb4472c99706",
+      "load_alignments": [
+        16384,
+        16384,
+        16384
+      ],
+      "page16k": true
+    },
+    {
+      "file": "lib/arm64-v8a/libonnxruntime4j_jni.so",
+      "bytes": 75720,
+      "sha256": "bf631163d6350e904e59503eaa8c5a351f4655e7fa582a1878841c312dfea78b",
+      "load_alignments": [
+        16384,
+        16384
+      ],
+      "page16k": true
+    },
+    {
+      "file": "lib/arm64-v8a/libpngx.so",
+      "bytes": 219880,
+      "sha256": "e70d48e405b56f1df06921c4ebbee0612140a8f2c7b0a2641fbbf6fea53eda4c",
+      "load_alignments": [
+        16384,
+        16384
+      ],
+      "page16k": true
+    },
+    {
+      "file": "lib/arm64-v8a/libtesseract.so",
+      "bytes": 4164360,
+      "sha256": "bce8dcca1544d9f8708ac126c1e920bfa92481509672d8472470e8c2eebcd43c",
+      "load_alignments": [
+        16384,
+        16384,
+        16384
+      ],
+      "page16k": true
+    },
+    {
+      "file": "lib/arm64-v8a/libtranslate_jni.so",
+      "bytes": 16361032,
+      "sha256": "45040ff0cdd194d6e601589d759e6f1ba733de5f95790f76cc3e2046919046be",
+      "load_alignments": [
+        16384,
+        16384,
+        16384
+      ],
+      "page16k": true
+    }
+  ]
+}

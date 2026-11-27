@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites name="pytest tests">
+  <testsuite name="pytest" errors="0" failures="0" skipped="0" tests="16" time="90.368" timestamp="2026-11-27T08:56:50.676748+00:00">
+    <testcase classname="tests.test_assistant_actions" name="test_menu_buttons_action_uses_the_footer_and_changes_apply_live" time="12.357" />
+    <testcase classname="tests.test_companion_calm_menu" name="test_selection_modes_restore_external_focus_before_dispatch[selection-launch_translate_selection]" time="0.104" />
+    <testcase classname="tests.test_companion_calm_menu" name="test_selection_modes_restore_external_focus_before_dispatch[replace-launch_translate_replace_selection]" time="0.030" />
+    <testcase classname="tests.test_companion_persistent_panel" name="test_fresh_external_source_is_used_instead_of_the_source_at_opening[replace]" time="0.764" />
+    <testcase classname="tests.test_companion_persistent_panel" name="test_failed_focus_handoff_keeps_the_panel_and_never_starts_translation[replace]" time="0.808" />
+    <testcase classname="tests.test_companion_request_ownership" name="test_retired_companion_request_cannot_complete_or_notify_its_replacement[replace]" time="1.601" />
+    <testcase classname="tests.test_copy_notification_flows" name="test_notification_fits_cursor_monitor_and_localized_text[192-bounds2-False-pt]" time="0.059" />
+    <testcase classname="tests.test_copy_notification_flows" name="test_notification_fits_cursor_monitor_and_localized_text[192-bounds2-True-pt]" time="0.029" />
+    <testcase classname="tests.test_demand_performance" name="test_source_adapter_uses_private_python_only_for_known_sdk" time="0.005" />
+    <testcase classname="tests.test_desktop_assistant" name="test_actions_reuse_existing_workflows_and_preserve_provider[replace]" time="0.635" />
+    <testcase classname="tests.test_diagnostics" name="test_report_identifies_separate_workers_and_cpu_without_running_engines" time="0.144" />
+    <testcase classname="tests.test_main_window_layout.MainWindowGeometryTest" name="test_clicking_a_highlighted_control_also_locks_next_until_new_card" time="7.855" />
+    <testcase classname="tests.test_main_window_layout.MainWindowGeometryTest" name="test_next_button_cannot_skip_multiple_cards_during_transition" time="7.049" />
+    <testcase classname="tests.test_passive_selection_safety" name="test_foreground_process_uses_full_width_hwnd_without_touching_an_application" time="0.004" />
+    <testcase classname="tests.test_picker_overlay_bounds" name="test_live_language_changes_do_not_expand_before_home_layout_settles" time="33.998" />
+    <testcase classname="tests.test_provider_usage_routing" name="test_save_and_select_changes_only_the_requested_engines[text-gemini-Tesseract]" time="23.075" />
+  </testsuite>
+</testsuites>

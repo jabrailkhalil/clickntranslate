@@ -1,0 +1,31 @@
+{
+  "source_sha": "7cd32e563c917e33cabfbdd104dfd7069b4c2e0f",
+  "architecture": "arm64",
+  "qt": "cocoa",
+  "fonts": {
+    "Regular": {
+      "covered_codepoints": 780,
+      "sha256": "07e586f705783d020bf153144fb9343f94f684934cd2b1cffcb119fdfb554cf2"
+    },
+    "Bold": {
+      "covered_codepoints": 780,
+      "sha256": "d575c29d2b36c2a34c8c10a7f0dee23ccb604079de16c5185520b25a83639608"
+    }
+  },
+  "tiff": {
+    "raw": 12,
+    "tiff_lzw": 12,
+    "tiff_adobe_deflate": 12
+  },
+  "invalid_theme_gui": {
+    "version": "1.8.3",
+    "input": "invalid-theme-macos-qa",
+    "recovered_theme": "Светлая",
+    "requested_socket_bytes": 193,
+    "bound_socket_bytes": 68,
+    "second_frozen_process_exit": 0,
+    "first_process_still_accepts_show": true,
+    "seconds_to_gui": 2.47,
+    "captured": true
+  }
+}

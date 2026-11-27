@@ -1,0 +1,21 @@
+Linux cnt-qa 6.8.0-151-generic #151-Ubuntu SMP PREEMPT_DYNAMIC Wed Nov 11 01:28:36 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux
+PRETTY_NAME="Ubuntu 24.04.5 LTS"
+NAME="Ubuntu"
+VERSION_ID="24.04"
+VERSION="24.04.5 LTS (Noble Numbat)"
+VERSION_CODENAME=noble
+ID=ubuntu
+ID_LIKE=debian
+HOME_URL="https://www.ubuntu.com/"
+SUPPORT_URL="https://help.ubuntu.com/"
+BUG_REPORT_URL="https://bugs.launchpad.net/ubuntu/"
+PRIVACY_POLICY_URL="https://www.ubuntu.com/legal/terms-and-policies/privacy-policy"
+UBUNTU_CODENAME=noble
+LOGO=ubuntu-logo
+python3-pyqt5	5.15.10+dfsg-1build6
+qtwayland5:amd64	5.15.13-1
+sway	1.9-1build2
+tesseract-ocr	5.3.4-1build5
+xdg-desktop-portal	1.18.4-1ubuntu2.24.04.3
+xdg-desktop-portal-wlr	0.7.1-1build2
+xvfb	2:21.1.12-1ubuntu1.9

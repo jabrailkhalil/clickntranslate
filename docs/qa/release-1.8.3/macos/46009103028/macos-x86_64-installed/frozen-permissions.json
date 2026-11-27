@@ -1,0 +1,14 @@
+{
+  "time": "2026-11-27T13:51:40.686884+00:00",
+  "pid": 9753,
+  "executable": "/Applications/ClicknTranslate.app/Contents/MacOS/ClicknTranslate",
+  "bundle": "/Applications/ClicknTranslate.app",
+  "permissions": {
+    "screen": false,
+    "accessibility": false
+  },
+  "capture": {
+    "attempted": false,
+    "reason": "Screen Recording is not granted"
+  }
+}

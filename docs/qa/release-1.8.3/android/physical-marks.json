@@ -1,0 +1,25 @@
+{
+  "api": "37",
+  "page_size": "4096",
+  "build": "CPH2745",
+  "started": "2026-11-27T09:00:39.272598+00:00",
+  "groups": {
+    "dark-arabic-matrix": {
+      "log": "qa-reports/android/dark-arabic-matrix.log",
+      "sha256": "42003dc994929fdb6b5ce91a2c9c259198cebebc5e2593c872c4c8a7cefdaacd",
+      "tests": 1,
+      "passed": 1,
+      "skipped": 0,
+      "failed": 0,
+      "seconds": 16.593,
+      "cases": [
+        {
+          "class": "dev.clickn.translate.ocr.ArabicMarksIntegrationTest",
+          "test": "recognizeOwnedCards",
+          "result": "passed"
+        }
+      ]
+    }
+  },
+  "cleanup": true
+}

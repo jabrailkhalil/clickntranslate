@@ -1,0 +1,24 @@
+{
+  "old_version": "1.8.2",
+  "new_version": "1.8.3",
+  "setup": "qa-reports/windows/work/qa-inno/ClicknTranslate-Setup-v1.8.3-win64.exe",
+  "controls": "private window station; disposable AppId and shell folders; update acknowledgement in layout editor mode",
+  "private_shell_folders": [
+    "qa-work/local-inno-e2e/user/AppData/Roaming/Microsoft/Windows/Start Menu/Programs",
+    "qa-work/local-inno-e2e/user/Desktop",
+    "qa-work/local-inno-e2e/user/AppData/Roaming"
+  ],
+  "old_zip_sha256": "8ee34cf794aa85764db549f7642b47630be3698c578d3ffbaeac1adc2f16429d",
+  "old_manifest_files": 4064,
+  "setup_sha256": "20b825e15e264daab22a881f347dea3eb8a25cf1ddd4f107faf85211b81c0500",
+  "new_manifest_files": 4249,
+  "config_and_history_after_install": {
+    "config.json": true,
+    "user_history.json": true
+  },
+  "ready_version": "1.8.3",
+  "disposable_registration_removed": true,
+  "app_removed": true,
+  "history_after_uninstall": true,
+  "config_after_uninstall": true
+}

@@ -1,0 +1,46 @@
+{
+  "status": "passed",
+  "platform": "linux",
+  "architecture": "x86_64",
+  "frozen": true,
+  "screenshots": [
+    "en-dark.png",
+    "en-light.png",
+    "ru-dark.png",
+    "ru-light.png",
+    "ar-dark.png",
+    "ar-light.png",
+    "hi-dark.png",
+    "hi-light.png",
+    "center-en-dark-0.png",
+    "center-en-dark-1.png",
+    "center-en-dark-2.png",
+    "center-en-light-0.png",
+    "center-en-light-1.png",
+    "center-en-light-2.png",
+    "center-ar-dark-0.png",
+    "center-ar-dark-1.png",
+    "center-ar-dark-2.png",
+    "center-ar-light-0.png",
+    "center-ar-light-1.png",
+    "center-ar-light-2.png",
+    "popup-host-en-main.png",
+    "popup-host-en-dynamic.png",
+    "popup-host-ar-main.png",
+    "popup-host-ar-dynamic.png"
+  ],
+  "checks": {
+    "gui": "four locales, two themes, five settings pages",
+    "engine_center": "stationary tabs and footer; OCR/translation/API, en/ar, both themes",
+    "popup_scroll": "full visible list repainted after scrolling without hover",
+    "popup_host_scaling": "retained proxy; main/dynamic, en/ar, 135%, two openings and search",
+    "tesseract": {
+      "version": "5.3.4",
+      "fullscreen_text": "NATIVE OCR CHECK",
+      "paragraph_text": "NATIVE OCR CHECK",
+      "process_environment": "actual bundled runtime"
+    },
+    "ocr_worker": "bundled RapidOCR recognized the generated fixture",
+    "argos_worker": "bundled probe returned structured data"
+  }
+}

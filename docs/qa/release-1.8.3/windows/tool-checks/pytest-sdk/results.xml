@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites name="pytest tests">
+  <testsuite name="pytest" errors="0" failures="0" skipped="0" tests="45" time="122.336" timestamp="2026-11-27T11:40:32.063110+03:00">
+    <testcase classname="tests.test_windows_release_signing" name="test_signed_stage_requires_a_certificate_before_building" time="0.351" />
+    <testcase classname="tests.test_windows_release_signing" name="test_audit_identifies_unsigned_exes_and_preserves_every_file" time="1.192" />
+    <testcase classname="tests.test_windows_release_signing" name="test_missing_worker_cannot_produce_a_complete_audit" time="0.370" />
+    <testcase classname="tests.test_windows_release_signing" name="test_report_cannot_overwrite_an_executable" time="0.344" />
+    <testcase classname="tests.test_windows_release_signing" name="test_signtool_rejects_an_actual_unsigned_executable" time="0.502" />
+    <testcase classname="tests.test_windows_release_signing" name="test_inno_calls_the_signing_gate_and_cannot_complete_without_a_certificate" time="4.086" />
+    <testcase classname="tests.test_windows_release_signing" name="test_verification_checks_timestamp_and_certificate_even_after_tool_success[True-False]" time="1.278" />
+    <testcase classname="tests.test_windows_release_signing" name="test_verification_checks_timestamp_and_certificate_even_after_tool_success[False-True]" time="1.059" />
+    <testcase classname="tests.test_windows_release_signing" name="test_windows_version_resources_roundtrip_through_real_pe[ClicknTranslateApp.exe]" time="0.198" />
+    <testcase classname="tests.test_windows_release_signing" name="test_windows_version_resources_roundtrip_through_real_pe[ArgosWorker.exe]" time="0.113" />
+    <testcase classname="tests.test_windows_release_signing" name="test_windows_version_resources_roundtrip_through_real_pe[OcrWorker.exe]" time="0.105" />
+    <testcase classname="tests.test_windows_release_signing" name="test_invalid_windows_versions_cannot_be_embedded[bad]" time="0.001" />
+    <testcase classname="tests.test_windows_release_signing" name="test_invalid_windows_versions_cannot_be_embedded[1.7]" time="0.000" />
+    <testcase classname="tests.test_windows_release_signing" name="test_invalid_windows_versions_cannot_be_embedded[1.7.1.2.3]" time="0.000" />
+    <testcase classname="tests.test_windows_release_signing" name="test_invalid_windows_versions_cannot_be_embedded[65536.1.0]" time="0.000" />
+    <testcase classname="tests.test_update_handshake" name="test_application_ack_is_atomic_and_uses_runtime_version" time="0.005" />
+    <testcase classname="tests.test_update_handshake" name="test_failed_ack_does_not_leave_an_empty_confirmation" time="0.002" />
+    <testcase classname="tests.test_update_handshake" name="test_launcher_waits_for_child_readiness_without_creating_ack[False]" time="1.536" />
+    <testcase classname="tests.test_update_handshake" name="test_launcher_waits_for_child_readiness_without_creating_ack[True]" time="0.310" />
+    <testcase classname="tests.test_update_handshake" name="test_missing_application_report_identifies_modules_and_interrupted_update" time="0.091" />
+    <testcase classname="tests.test_update_handshake" name="test_update_rejects_old_app_under_new_launcher[old]" time="0.187" />
+    <testcase classname="tests.test_update_handshake" name="test_update_rejects_old_app_under_new_launcher[current]" time="0.158" />
+    <testcase classname="tests.test_update_handshake" name="test_real_updater_replaces_all_files_or_restores_all_old_files[None-zip]" time="8.978" />
+    <testcase classname="tests.test_update_handshake" name="test_real_updater_replaces_all_files_or_restores_all_old_files[None-setup]" time="10.552" />
+    <testcase classname="tests.test_update_handshake" name="test_real_updater_replaces_all_files_or_restores_all_old_files[app/_internal/provider.dll-zip]" time="0.519" />
+    <testcase classname="tests.test_update_handshake" name="test_real_updater_replaces_all_files_or_restores_all_old_files[app/_internal/provider.dll-setup]" time="2.398" />
+    <testcase classname="tests.test_update_handshake" name="test_real_updater_replaces_all_files_or_restores_all_old_files[app/_internal/OcrWorker.exe-zip]" time="0.405" />
+    <testcase classname="tests.test_update_handshake" name="test_real_updater_replaces_all_files_or_restores_all_old_files[app/_internal/OcrWorker.exe-setup]" time="2.165" />
+    <testcase classname="tests.test_update_handshake" name="test_real_updater_replaces_all_files_or_restores_all_old_files[locked_backup-zip]" time="31.872" />
+    <testcase classname="tests.test_update_handshake" name="test_real_updater_replaces_all_files_or_restores_all_old_files[locked_backup-setup]" time="32.686" />
+    <testcase classname="tests.test_update_handshake" name="test_real_updater_replaces_all_files_or_restores_all_old_files[gui_crash-zip]" time="9.965" />
+    <testcase classname="tests.test_update_handshake" name="test_real_updater_replaces_all_files_or_restores_all_old_files[gui_crash-setup]" time="10.689" />
+    <testcase classname="tests.test_msix_packaging.TestMsixPackaging" name="test_build_script_excludes_portable_user_data" time="0.001" />
+    <testcase classname="tests.test_msix_packaging.TestMsixPackaging" name="test_main_executable_declares_per_monitor_v2_dpi" time="0.007" />
+    <testcase classname="tests.test_msix_packaging.TestMsixPackaging" name="test_manifest_assets_have_exact_pixel_sizes" time="0.017" />
+    <testcase classname="tests.test_msix_packaging.TestMsixPackaging" name="test_manifest_has_full_trust_desktop_entry_and_startup_task" time="0.001" />
+    <testcase classname="tests.test_msix_packaging.TestMsixPackaging" name="test_store_has_real_desktop_screenshots" time="0.009" />
+  </testsuite>
+</testsuites>

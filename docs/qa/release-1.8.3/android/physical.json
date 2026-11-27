@@ -1,0 +1,520 @@
+{
+  "api": "37",
+  "page_size": "4096",
+  "build": "CPH2745",
+  "started": "2026-11-27T08:36:43.781340+00:00",
+  "groups": {
+    "native-ocr": {
+      "log": "qa-reports/android/native-ocr.log",
+      "sha256": "37707ee171e7356dc205bbdfd1f2c0fdd7275fe30a684df6ba5c6a8d619ddb82",
+      "tests": 12,
+      "passed": 12,
+      "skipped": 0,
+      "failed": 0,
+      "seconds": 16.183,
+      "cases": [
+        {
+          "class": "dev.clickn.translate.ocr.DBPostprocessorIntegrationTest",
+          "test": "hollowBoxScoreIncludesOnlyPixelCentersInsideItsHull",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.ocr.DBPostprocessorIntegrationTest",
+          "test": "diagonalTouchAtTheFrameEdgeJoinsOnlyTheTwoTouchingComponents",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.ocr.OnnxRuntimeIdentityIntegrationTest",
+          "test": "nativeRuntimeRunsOwnedFloatIdentityAndReleasesOnlyItsOwnedResources",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.ocr.AutomaticOcrParagraphIntegrationTest",
+          "test": "ownedSilverAndGentlePageKeepsTwoIndependentCompleteParagraphs",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.ocr.AutomaticOcrParagraphIntegrationTest",
+          "test": "automaticOcrKeepsColumnOrderAfterCombiningRecognizerPasses",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.ocr.AutomaticOcrParagraphIntegrationTest",
+          "test": "automaticOcrRetainsSeparateLatinAndCjkRegions",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.ocr.AutomaticOcrParagraphIntegrationTest",
+          "test": "twoColumnPixelsReachTheExtractionCardInReadingOrder",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.ocr.PaddleArabicParagraphIntegrationTest",
+          "test": "ownedArabicPageKeepsBothCompleteParagraphsMixedOcrWordAndEnglishButton",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.ocr.TesseractArabicOcrIntegrationTest",
+          "test": "actualArabicEnglishParagraphsKeepLogicalTextIndependentBoundsAndOfflineReuse",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.ocr.TesseractArabicOcrIntegrationTest",
+          "test": "cancellationDrainsTheRealNativeWorkerAndTheEngineCanRecognizeAgain",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.ocr.TesseractArabicOcrIntegrationTest",
+          "test": "missingModelsRejectRecognitionWithoutStartingAnyNetworkOrNativeTask",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.ocr.ArabicMarksIntegrationTest",
+          "test": "aSecondDetachedMarkBelowAFathaPreventsShaddaRemoval",
+          "result": "passed"
+        }
+      ]
+    },
+    "storage-features": {
+      "log": "qa-reports/android/storage-features.log",
+      "sha256": "77a944bf9c06ef13cbb7cdc33b19e105bbebba8fc3f0876c8c711c02758b1e34",
+      "tests": 21,
+      "passed": 21,
+      "skipped": 0,
+      "failed": 0,
+      "seconds": 1.349,
+      "cases": [
+        {
+          "class": "dev.clickn.translate.history.TextHistoryIntegrationTest",
+          "test": "malformedLegacyRemainsRecoverableAndDoesNotBlockNewRoomHistory",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.history.TextHistoryIntegrationTest",
+          "test": "lateEraseFailureCannotOverrideAnotherSuccessfulClear",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.history.TextHistoryIntegrationTest",
+          "test": "failedLegacyEraseIsVisibleAndRetriedWithoutDeletingUnrelatedPreferences",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.history.TextHistoryIntegrationTest",
+          "test": "importsAllLegacyFieldsWithoutTruncationAndReopensWithoutReimporting",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.history.TextHistoryIntegrationTest",
+          "test": "failedInsertRollsBackEveryImportedRowAndTheReceipt",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.history.TextHistoryIntegrationTest",
+          "test": "initializationAndExplicitClearNeverReadOrWriteLegacyPreferencesOnMain",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.history.TextHistoryIntegrationTest",
+          "test": "clearWinsAgainstAnImportAlreadyReadingItsOldSnapshot",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.history.TextHistoryIntegrationTest",
+          "test": "concurrentRepositoriesImportOnceEvenWithEqualLegacyTimestamps",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.history.TextHistoryIntegrationTest",
+          "test": "interruptedClearFinishesLegacyErasureAfterReopenWithoutResurrectingRows",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.history.TextHistoryIntegrationTest",
+          "test": "clearRejectsResultsFromBeforeClearAndNewResultsKeepTheirLanguageAndProviderScope",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.glossary.SettingsGlossaryRollbackIntegrationTest",
+          "test": "cancelledImportRetainsLaterEditsAndNewTermsAndReversesRepeatedIds",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.glossary.SettingsGlossaryRollbackIntegrationTest",
+          "test": "failedRoomTransactionDiscardsItsJournalWithoutTouchingLaterRows",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.data.SettingsImportJournalConcurrencyIntegrationTest",
+          "test": "concurrentCheckpointsFromDifferentInstancesRetainBothStoreIntents",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.data.SettingsImportJournalConcurrencyIntegrationTest",
+          "test": "lateCallbackCannotOverwriteTheNextImportAfterOldIntentWasCleaned",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.data.SettingsImportJournalConcurrencyIntegrationTest",
+          "test": "directorySyncFailureAfterFinishKeepsThePublishedIntentAndItsBackups",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.data.SettingsImportJournalConcurrencyIntegrationTest",
+          "test": "terminalDecisionRejectsLateStoreIntentAndCannotBeChangedToRollback",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.dictionary.DictionaryPackIntegrationTest",
+          "test": "cancellingAnActualPartialPipeCopyKeepsV2CleansStagingAndAllowsNextImport",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.dictionary.DictionaryPackIntegrationTest",
+          "test": "invalidReplacementsKeepV1BytesAndV2AtomicallyReplacesItsDefinitions",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.dictionary.DictionaryPackIntegrationTest",
+          "test": "installReadsFormsNfkcAndExactArabicDefinitionsFromRealSqlite",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.update.InstalledApkVerificationTest",
+          "test": "anApkWithAnotherApplicationIdIsRejectedByTheInstalledPackageCheck",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.update.InstalledApkVerificationTest",
+          "test": "ownInstalledArchiveIsRecognizedAndReadableThroughTheInstallerUri",
+          "result": "passed"
+        }
+      ]
+    },
+    "gallery": {
+      "log": "qa-reports/android/gallery.log",
+      "sha256": "e57483c71e33b11b9c5419d83c7e6e768fa33daebce0c3efe7c3492c7b14f23b",
+      "tests": 53,
+      "passed": 53,
+      "skipped": 0,
+      "failed": 0,
+      "seconds": 1.692,
+      "cases": [
+        {
+          "class": "dev.clickn.translate.gallery.GalleryBackendIntegrationTest",
+          "test": "largeMirroredImageHasBoundedDecodedAllocationAndOrientedDimensions",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryBackendIntegrationTest",
+          "test": "upscaleMappingRetainsThinAndOddOcrBoxesIncludingSourceEraseGeometry",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryBackendIntegrationTest",
+          "test": "durableRetryReceiptIsOneUseAndDoesNotResetAFailureFromItsNewAttempt",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryBackendIntegrationTest",
+          "test": "cancelledTaskRejectsLateClaimCompletionFailureAndFinalization",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryBackendIntegrationTest",
+          "test": "restartAndExplicitRetryNeverReuseAnOldClaimEvenAtTheSameClockTick",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryBackendIntegrationTest",
+          "test": "subsequentCancelRejectsQueuedRetryAndRetryNeverProcessesCanceledRemainder",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryBackendIntegrationTest",
+          "test": "redecodingForExportPreservesEveryExifOrientationAndScaledCoordinates",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryBackendIntegrationTest",
+          "test": "configurationFailureKeepsCompletedResultsAndCannotUndoCancellation",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryBackendIntegrationTest",
+          "test": "allEightExifOrientationsMatchAnIndependentCornerOracle",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryBackendIntegrationTest",
+          "test": "savedRouteAndClaimVersionSurviveClosingAndReopeningActualRoom",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryPartialRecoveryIntegrationTest",
+          "test": "partialImageRetainsItsFirstParagraphAndRetriesOnlyTheMissingSecondParagraph",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryPartialRecoveryIntegrationTest",
+          "test": "fileBackedRestartReclaimsTheCheckpointWithoutLosingOcrOrAcceptingTheOldClaim",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryPartialRecoveryIntegrationTest",
+          "test": "repairLeavesCanceledAndActiveTasksAloneAndCanRepairOneThatFinishesAfterTheScan",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryPartialRecoveryIntegrationTest",
+          "test": "legacyFalseSuccessBecomesRetryableWithoutLosingContentGeometryOrItsFinishTime",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryPartialRecoveryIntegrationTest",
+          "test": "persistedSegmentsRestoreRealAndroidRectsRegionsOrientationsAndPresentationRotation",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryExportReceiptsIntegrationTest",
+          "test": "revokedReadGrantAndMissingOrTamperedSourceNeverAuthorizeDeletion",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryExportReceiptsIntegrationTest",
+          "test": "transientBindFailurePersistsTheReturnedUriBeforeLosingTheExportCall",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryExportReceiptsIntegrationTest",
+          "test": "durableTerminalMarkersNeverReadOrDeleteRemoteDocuments",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryExportReceiptsIntegrationTest",
+          "test": "preparedUnknownUriAndCorruptJournalArePreservedWithoutProviderCalls",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryExportReceiptsIntegrationTest",
+          "test": "realProviderRegrantKeepsPartialOutputAndExplicitKeepClearsLocalReceiptOnly",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryExportReceiptsIntegrationTest",
+          "test": "exactPrefixAndSameNamedOtherDocumentAreRetainedWithoutCheckDeleteRace",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryExportReceiptsIntegrationTest",
+          "test": "knownUriSurvivesTwoDiskFailuresForALaterRecoveryWithinTheSameProcess",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryExportReceiptsIntegrationTest",
+          "test": "cancellationAfterCreateDurablyBindsEmptyOutputAndDoesNotBlindlyDeleteIt",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryExportReceiptsIntegrationTest",
+          "test": "cancellationDuringPrivatePreparationCreatesNoRemoteDocument",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryExportReceiptsIntegrationTest",
+          "test": "foreignEmptyAndPartialOutputsRemainUnresolved",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryExportReceiptsIntegrationTest",
+          "test": "realContentResolverDocumentsProviderSupportsExactPngAndUtf8Outputs",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryExportReceiptsIntegrationTest",
+          "test": "durableCursorAdvancesPastUncertainEntriesWithinEachRecoveryBudget",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryExportReceiptsIntegrationTest",
+          "test": "keepCannotAcknowledgeExportsCreatedAfterTheDisplayedSnapshot",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryExportReceiptsIntegrationTest",
+          "test": "providerWriteFailureRetainsPartialOutputUntilCompletedAndRedactsProviderException",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryExportReceiptsIntegrationTest",
+          "test": "fullyWrittenPendingDocumentIsPreservedAndCompletionSurvivesLaterEdits",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryExportReceiptsIntegrationTest",
+          "test": "successfulWriteBindsBeforeOpenAndNeverRevisitsFinishedOutput",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryExportReceiptsIntegrationTest",
+          "test": "cancellationMidWriteKeepsPartialFileAndCancellationAfterCloseKeepsFullFile",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryExportReceiptsIntegrationTest",
+          "test": "failedKeepCommitPreservesTheReceiptAndPrivateSource",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryExportReceiptsIntegrationTest",
+          "test": "explicitKeepForKnownAndUnknownDestinationsRemovesOnlyLocalRecoveryData",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryExportReceiptsIntegrationTest",
+          "test": "recoveryDefersBeyondItsDocumentBudgetWithoutClaimingAllClean",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryPrivateInputCleanupIntegrationTest",
+          "test": "aPausedFirstScanAndALiveImportPublicationUseTheSameProcessMutex",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryPrivateInputCleanupIntegrationTest",
+          "test": "retainsEveryDatabaseTaskStatusAndDeletesOnlyAnUnreferencedUuidDirectory",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryPrivateInputCleanupIntegrationTest",
+          "test": "aNestedSymlinkRetainsItsWholeCandidateAndNeverTouchesItsTarget",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryPrivateInputCleanupIntegrationTest",
+          "test": "aSymlinkAtTheOwnedRootIsNeverTraversed",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryPrivateInputCleanupIntegrationTest",
+          "test": "aCrossTaskLocalPathAndLegacyExternalAndUriOnlyRowsRemainUntouched",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryPrivateInputCleanupIntegrationTest",
+          "test": "canceledReferenceReadDoesNotDeleteAndTheNextAccessRetriesMaintenance",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryPrivateInputCleanupIntegrationTest",
+          "test": "anUnlinkedPhysicalReferenceProtectsInputReachedThroughAnAncestorAlias",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryPrivateInputCleanupIntegrationTest",
+          "test": "externalAndAmbiguousRelativeDotAndSymlinkReferencesFailClosed",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryRetryProgressIntegrationTest",
+          "test": "resetAllFailuresPreservesSuccessAndCanceledRowsAndAutomaticRetryKeepsTheNewInterval",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryRetryProgressIntegrationTest",
+          "test": "selectedRetryAtomicallyPublishesEighteenOfTwentyAndStartsANewElapsedInterval",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryRetryProgressIntegrationTest",
+          "test": "noFailedRowsLeavesThePriorCompletedIntervalAndProgressUntouched",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryRetryProgressIntegrationTest",
+          "test": "rejectedOrReplayedReceiptCannotResetCountersOrElapsedAndLaterCancelStillWins",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryTransientFilesIntegrationTest",
+          "test": "concurrentExportAndCancelledWaiterNeverDeleteAnActiveEncodedPng",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryTransientFilesIntegrationTest",
+          "test": "cancelledPreviewPreparationDoesNotPublishReadyAndNextAccessCanRemoveOldTemp",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryTransientFilesIntegrationTest",
+          "test": "previewCleanupNeverTraversesNestedDirectoriesOrSymlinksAndKeepsUnknownNames",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryTransientFilesIntegrationTest",
+          "test": "realPreviewAccessClearsOldTempsAndRetainsJpgBeforeGeneratingItsReplacement",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryTransientFilesIntegrationTest",
+          "test": "symlinkedPreviewAndExportRootsAreRetainedAndCannotRedirectNewTemporaryFiles",
+          "result": "passed"
+        },
+        {
+          "class": "dev.clickn.translate.gallery.GalleryTransientFilesIntegrationTest",
+          "test": "exportCleanupOnlyDeletesDedicatedEncodedPngsAndRetainsLegacyCacheFiles",
+          "result": "passed"
+        }
+      ]
+    },
+    "successfulImportPersistsInterfaceChoicesTogetherWithProfilesTermsAndFonts": {
+      "log": "qa-reports/android/successfulImportPersistsInterfaceChoicesTogetherWithProfilesTermsAndFonts.log",
+      "sha256": "4c12bf023946c8ad76ebf1ad13bb605c26b5d5fce1060f20f8301ff6460d6937",
+      "tests": 1,
+      "passed": 1,
+      "skipped": 0,
+      "failed": 0,
+      "seconds": 0.723,
+      "cases": [
+        {
+          "class": "dev.clickn.translate.data.DurableSettingsImportIntegrationTest",
+          "test": "successfulImportPersistsInterfaceChoicesTogetherWithProfilesTermsAndFonts",
+          "result": "passed"
+        }
+      ]
+    },
+    "cleanupFailureAfterCommittedDecisionNeverRollsBackCommittedData": {
+      "log": "qa-reports/android/cleanupFailureAfterCommittedDecisionNeverRollsBackCommittedData.log",
+      "sha256": "459c90504264daefb0884f818bf79a019c0ad92fafe6c33a90f10caaa336e136",
+      "tests": 1,
+      "passed": 1,
+      "skipped": 0,
+      "failed": 0,
+      "seconds": 0.722,
+      "cases": [
+        {
+          "class": "dev.clickn.translate.data.DurableSettingsImportIntegrationTest",
+          "test": "cleanupFailureAfterCommittedDecisionNeverRollsBackCommittedData",
+          "result": "passed"
+        }
+      ]
+    },
+    "unreadableEncryptedJournalExposesNoPartialStateAndCanRetryAfterRepair": {
+      "log": "qa-reports/android/unreadableEncryptedJournalExposesNoPartialStateAndCanRetryAfterRepair.log",
+      "sha256": "fd47f6299231b738a964311bb269b5b38281dbb82d33d8525790065652d7fbf8",
+      "tests": 1,
+      "passed": 1,
+      "skipped": 0,
+      "failed": 0,
+      "seconds": 0.796,
+      "cases": [
+        {
+          "class": "dev.clickn.translate.data.DurableSettingsImportIntegrationTest",
+          "test": "unreadableEncryptedJournalExposesNoPartialStateAndCanRetryAfterRepair",
+          "result": "passed"
+        }
+      ]
+    }
+  },
+  "cleanup": true
+}

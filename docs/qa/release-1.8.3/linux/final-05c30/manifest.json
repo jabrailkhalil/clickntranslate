@@ -1,0 +1,11 @@
+{
+  "head_sha": "05c30f30bc288b7b9ce582ae5952c3315f5fdb82",
+  "actions_run": "46006849811",
+  "job": "https://github.com/jabrailkhalil/clickntranslate/actions/runs/46006849811/job/140532054141",
+  "candidate_artifact": 15201398482,
+  "artifact_digest": "sha256:2219f33eb7779ad450c8b2948675d44d4f1453279f120410ee72b0fc29bb8658",
+  "hashes": {
+    "Click-n-Translate-1.8.3-linux-x86_64.tar.gz": "b69f39d5f233555f815d2d704286b49dca0f0bb7eebebc887b4e95b2c06850aa",
+    "Click-n-Translate-1.8.3-linux-x86_64.AppImage": "70378310711ffdd901fea6a36af131ab559fafe8ccf78533446978041487812b"
+  }
+}

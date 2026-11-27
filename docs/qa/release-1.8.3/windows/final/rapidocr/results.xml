@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites name="pytest tests">
+  <testsuite name="pytest" errors="0" failures="0" skipped="0" tests="19" time="0.355" timestamp="2026-11-27T12:05:02.869661+03:00">
+    <testcase classname="tests.test_rapidocr_v5" name="test_installer_and_platform_requirements_agree_on_the_backend_version" time="0.006" />
+    <testcase classname="tests.test_rapidocr_v5" name="test_modern_numpy_output_survives_worker_protocol_and_retains_arabic_order" time="0.007" />
+    <testcase classname="tests.test_rapidocr_v5" name="test_empty_modern_result_is_not_an_error" time="0.000" />
+    <testcase classname="tests.test_rapidocr_v5" name="test_availability_probe_exercises_lazy_recognizer_and_detector" time="0.001" />
+    <testcase classname="tests.test_rapidocr_v5" name="test_winrt_arabic_words_are_joined_by_geometry_without_reversing_characters" time="0.000" />
+    <testcase classname="tests.test_rapidocr_v5" name="test_latin_phrase_and_number_keep_their_internal_order_in_arabic_line[False]" time="0.000" />
+    <testcase classname="tests.test_rapidocr_v5" name="test_latin_phrase_and_number_keep_their_internal_order_in_arabic_line[True]" time="0.001" />
+    <testcase classname="tests.test_rapidocr_v5" name="test_rapid_source_language_reaches_native_worker" time="0.001" />
+    <testcase classname="tests.test_rapidocr_v5" name="test_fullscreen_source_language_reaches_native_worker" time="0.001" />
+    <testcase classname="tests.test_rapidocr_v5" name="test_each_language_requires_its_installed_recognizer_and_shared_models" time="0.020" />
+    <testcase classname="tests.test_rapidocr_v5" name="test_corrupt_model_is_rejected_before_engine_creation" time="0.002" />
+    <testcase classname="tests.test_rapidocr_v5" name="test_download_cancellation_stops_before_next_model" time="0.002" />
+    <testcase classname="tests.test_rapidocr_v5" name="test_legacy_backend_does_not_claim_to_recognize_arabic" time="0.000" />
+    <testcase classname="tests.test_rapidocr_v5" name="test_modern_profile_pins_v5_and_local_paths_instead_of_upstream_defaults[en-en-True-448]" time="0.002" />
+    <testcase classname="tests.test_rapidocr_v5" name="test_modern_profile_pins_v5_and_local_paths_instead_of_upstream_defaults[ru-cyrillic-True-448]" time="0.002" />
+    <testcase classname="tests.test_rapidocr_v5" name="test_modern_profile_pins_v5_and_local_paths_instead_of_upstream_defaults[ar-arabic-False-736]" time="0.002" />
+    <testcase classname="tests.test_rapidocr_v5" name="test_modern_profile_pins_v5_and_local_paths_instead_of_upstream_defaults[zh-ch-True-736]" time="0.002" />
+    <testcase classname="tests.test_rapidocr_v5" name="test_modern_profile_pins_v5_and_local_paths_instead_of_upstream_defaults[de-latin-True-736]" time="0.002" />
+    <testcase classname="tests.test_rapidocr_v5" name="test_pinned_model_data_is_required_before_packaging" time="0.001" />
+  </testsuite>
+</testsuites>

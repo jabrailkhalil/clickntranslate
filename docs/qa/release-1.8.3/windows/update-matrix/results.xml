@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites name="pytest tests">
+  <testsuite name="pytest" errors="0" failures="0" skipped="0" tests="8" time="0.369" timestamp="2026-11-27T16:33:44.439285+03:00">
+    <testcase classname="tests.test_update_evidence" name="test_only_exact_artifacts_and_old_helpers_satisfy_release_gate[1.8.1]" time="0.067" />
+    <testcase classname="tests.test_update_evidence" name="test_only_exact_artifacts_and_old_helpers_satisfy_release_gate[1.8.2]" time="0.065" />
+    <testcase classname="tests.test_update_evidence" name="test_only_exact_artifacts_and_old_helpers_satisfy_release_gate[1.8.3]" time="0.080" />
+    <testcase classname="tests.test_private_release_download" name="test_draft_asset_redirect_starts_a_request_without_authorization" time="0.001" />
+    <testcase classname="tests.test_private_release_download" name="test_untrusted_draft_redirect_is_rejected[http://release-assets.githubusercontent.com/file]" time="0.001" />
+    <testcase classname="tests.test_private_release_download" name="test_untrusted_draft_redirect_is_rejected[https://githubusercontent.com.attacker.test/file]" time="0.001" />
+    <testcase classname="tests.test_version_consistency" name="test_release_version_is_synchronized_everywhere" time="0.002" />
+    <testcase classname="tests.test_version_consistency" name="test_readmes_link_to_current_release_assets" time="0.025" />
+  </testsuite>
+</testsuites>

@@ -1,0 +1,28 @@
+{
+  "case": "zip-182-to-183",
+  "status": "passed",
+  "old_version": "1.8.2",
+  "new_version": "1.8.3",
+  "old_sha256": "8ee34cf794aa85764db549f7642b47630be3698c578d3ffbaeac1adc2f16429d",
+  "new_sha256": "c241951dac726874a8f10678f1916a3f09a829afc22cf2c8ee985050d0612e33",
+  "old_helper_sha256": "f23a8b61fe8bcf37b2ca7f4b950c25c4cd4f8be8f6e362795505c16da8dffa01",
+  "invoked_helper_sha256": "f23a8b61fe8bcf37b2ca7f4b950c25c4cd4f8be8f6e362795505c16da8dffa01",
+  "helper_override": false,
+  "install": "repo/build/update-audit/zip-182-to-183/Копия с пробелами/ClicknTranslate",
+  "temp": "qa-temp/cntqa-zwfx_27r",
+  "markers": {
+    "data/update-test-marker.bin": "aa0079648aeccb9fdaae7dbea3d8bd82a25e7d93f243489ba638bc35c4083072",
+    "ocr/update-test-model.bin": "784b2549a0c3059334d10a248199d9d58b78c370a6781892591acbb8d75add61",
+    "translators/update-test-model.bin": "d7f1bdefd3450c13147727299ddf4fbdf90dc522c80bd4606a32edec63367f22"
+  },
+  "scope": "Old released helper CLI, real released GUIs; no download/UI automation",
+  "mode": "zip",
+  "old_gui_pid": 2680,
+  "helper_exit_code": 0,
+  "helper_failure_reported": false,
+  "verified_program_files": 4206,
+  "preferences_preserved": true,
+  "restarted_gui_pid": 2104,
+  "cleanup_completed": true,
+  "finished_at": "2026-11-27T13:40:03+0000"
+}

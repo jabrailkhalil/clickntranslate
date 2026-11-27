@@ -1,0 +1,72 @@
+{
+  "platform": "wayland",
+  "screens": [
+    {
+      "name": "HEADLESS-1",
+      "bounds": [
+        0,
+        0,
+        640,
+        360
+      ],
+      "qt_dpr": 2.0,
+      "image_size": [
+        1280,
+        720
+      ],
+      "image_dpr": 2.0,
+      "sampled_colors": [
+        "#14644d",
+        "#14644d",
+        "#14644d",
+        "#14644d",
+        "#14644d",
+        "#14644d",
+        "#14644d",
+        "#14644d",
+        "#14644d"
+      ]
+    },
+    {
+      "name": "HEADLESS-2",
+      "bounds": [
+        -1024,
+        0,
+        1024,
+        768
+      ],
+      "qt_dpr": 1.0,
+      "image_size": [
+        2048,
+        1536
+      ],
+      "image_dpr": 2.0,
+      "sampled_colors": [
+        "#263555",
+        "#263555",
+        "#263555",
+        "#263555",
+        "#263555",
+        "#263555",
+        "#263555",
+        "#263555",
+        "#263555"
+      ]
+    }
+  ],
+  "failures": [],
+  "portal_available": true,
+  "direct_portal_image": true,
+  "screen_0_image": true,
+  "screen_0_logical_coordinates": true,
+  "screen_0_proportions": true,
+  "screen_0_background": true,
+  "screen_1_image": true,
+  "screen_1_logical_coordinates": true,
+  "screen_1_proportions": true,
+  "screen_1_background": true,
+  "expected_screens": true,
+  "clipboard_write": true,
+  "clipboard_roundtrip": true,
+  "passed": true
+}

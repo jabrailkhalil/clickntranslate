@@ -1,0 +1,20 @@
+{
+  "command": [
+    "pwsh.exe",
+    "-NoProfile",
+    "-NonInteractive",
+    "-File",
+    "qa-reports/windows/work/source/tools/build_msix.ps1",
+    "-SkipPyInstaller",
+    "-Version",
+    "1.8.3.0",
+    "-OutputPath",
+    "qa-reports/windows/work/pwsh-1.8.3-x64.msix"
+  ],
+  "pid": 28700,
+  "exit_code": 0,
+  "seconds": 71.72,
+  "qt": "offscreen",
+  "private_station": "QA-station",
+  "private_desktop": "QA"
+}

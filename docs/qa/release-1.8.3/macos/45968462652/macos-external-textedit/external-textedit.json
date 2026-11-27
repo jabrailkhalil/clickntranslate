@@ -1,0 +1,39 @@
+{
+  "source_sha": "62ac7ee9dbae0a9570dc454678744e3e6aaa8134",
+  "stage": "passed",
+  "source_permissions": {
+    "screen": true,
+    "accessibility": true
+  },
+  "source_test_target": "com.apple.TextEdit",
+  "screen_capture": {
+    "path": "ScreenCaptureKit",
+    "region": [
+      79,
+      25,
+      625,
+      686
+    ],
+    "pixel_dimensions": [
+      625,
+      686
+    ],
+    "density": 1.0,
+    "vision_read_fixture": true
+  },
+  "accessibility_read": {
+    "path": "AXSelectedText",
+    "fixture": true,
+    "clipboard_unchanged": true
+  },
+  "replacement": {
+    "action": "Cmd+C and Cmd+V",
+    "textedit_value_verified": true,
+    "clipboard_restored": true
+  },
+  "focus_change": {
+    "same_application_different_window": true,
+    "reason": "focus_changed",
+    "document_unchanged": true
+  }
+}

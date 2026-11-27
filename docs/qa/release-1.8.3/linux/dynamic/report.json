@@ -1,0 +1,31 @@
+{
+  "platform": "xcb",
+  "density": 1.0,
+  "source": [
+    40,
+    200,
+    270,
+    100
+  ],
+  "output": [
+    370,
+    350,
+    310,
+    120
+  ],
+  "native_ocr": true,
+  "independent_output": true,
+  "translation_only": true,
+  "disjoint_capture": true,
+  "disjoint_no_flicker": true,
+  "overlap_visible": true,
+  "overlap_excluded": true,
+  "overlap_restored": true,
+  "controls_background": true,
+  "move_resize": true,
+  "template_roundtrip": true,
+  "hidden_toolbar_output": true,
+  "stop_session": true,
+  "failures": [],
+  "passed": true
+}

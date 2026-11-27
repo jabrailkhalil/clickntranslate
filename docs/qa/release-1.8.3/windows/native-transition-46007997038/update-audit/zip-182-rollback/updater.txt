@@ -1,0 +1,7 @@
+2026-11-27T13:41:16.6839886+00:00 Apply failed; starting rollback.
+2026-11-27T13:41:19.3551096+00:00 Updater failed: System.IO.InvalidDataException: The installed ClicknTranslateApp.exe has the wrong version.
+   at ClicknTranslateApplyUpdate.VerifyInstalledFiles(String appDirectory, String executableName, String version)
+   at ClicknTranslateApplyUpdate.UpdateWindow.PrepareZip(String packagePath, String extract)
+   at ClicknTranslateApplyUpdate.UpdateWindow.ApplyUpdate()
+   at System.ComponentModel.BackgroundWorker.OnDoWork(DoWorkEventArgs e)
+   at System.ComponentModel.BackgroundWorker.WorkerThreadStart(Object argument)

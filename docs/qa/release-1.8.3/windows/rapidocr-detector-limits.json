@@ -1,0 +1,604 @@
+{
+  "448": [
+    {
+      "lang": "ru",
+      "label": "Arial-40",
+      "text": "Проверка перевода текста",
+      "expected": "Проверка перевода текста",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "Segoe-40",
+      "text": "Проверка перевода текста",
+      "expected": "Проверка перевода текста",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "Arial-30",
+      "text": "Проверка перевода текста",
+      "expected": "Проверка перевода текста",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "Arial-40-vopros",
+      "text": "Сохранить перевод текста",
+      "expected": "Сохранить перевод текста",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "Segoe-32-vopros",
+      "text": "Доброе утро",
+      "expected": "Доброе утро",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "RU24",
+      "text": "Окно перевода",
+      "expected": "Окно перевода",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "RU36",
+      "text": "Откройте настройки",
+      "expected": "Откройте настройки",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "RU48",
+      "text": "Работа с текстом",
+      "expected": "Работа с текстом",
+      "exact": true
+    },
+    {
+      "lang": "en",
+      "label": "EN40",
+      "text": "CLICK TRANSLATE",
+      "expected": "CLICK TRANSLATE",
+      "exact": true
+    },
+    {
+      "lang": "en",
+      "label": "EN25",
+      "text": "Save the translation",
+      "expected": "Save the translation",
+      "exact": true
+    },
+    {
+      "lang": "en",
+      "label": "EN30",
+      "text": "This is a sample line.",
+      "expected": "This is a sample line.",
+      "exact": true
+    },
+    {
+      "lang": "en",
+      "label": "EN50",
+      "text": "LARGE LETTERS",
+      "expected": "LARGE LETTERS",
+      "exact": true
+    }
+  ],
+  "480": [
+    {
+      "lang": "ru",
+      "label": "Arial-40",
+      "text": "Проверка перевода текста",
+      "expected": "Проверка перевода текста",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "Segoe-40",
+      "text": "Проверка перевода текста",
+      "expected": "Проверка перевода текста",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "Arial-30",
+      "text": "Проверка перевода текста",
+      "expected": "Проверка перевода текста",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "Arial-40-vopros",
+      "text": "Сохранить перевод текста",
+      "expected": "Сохранить перевод текста",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "Segoe-32-vopros",
+      "text": "Доброе утро",
+      "expected": "Доброе утро",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "RU24",
+      "text": "Окно перевода",
+      "expected": "Окно перевода",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "RU36",
+      "text": "Откройте настройки",
+      "expected": "Откройте настройки",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "RU48",
+      "text": "Работа с текстом",
+      "expected": "Работа с текстом",
+      "exact": true
+    },
+    {
+      "lang": "en",
+      "label": "EN40",
+      "text": "CLICK TRANSLATE",
+      "expected": "CLICK TRANSLATE",
+      "exact": true
+    },
+    {
+      "lang": "en",
+      "label": "EN25",
+      "text": "Save the translation",
+      "expected": "Save the translation",
+      "exact": true
+    },
+    {
+      "lang": "en",
+      "label": "EN30",
+      "text": "This s is a sample line.",
+      "expected": "This is a sample line.",
+      "exact": false
+    },
+    {
+      "lang": "en",
+      "label": "EN50",
+      "text": "LARGE LETTERS",
+      "expected": "LARGE LETTERS",
+      "exact": true
+    }
+  ],
+  "512": [
+    {
+      "lang": "ru",
+      "label": "Arial-40",
+      "text": "Проверка перевода текста",
+      "expected": "Проверка перевода текста",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "Segoe-40",
+      "text": "Проверка перевода текста",
+      "expected": "Проверка перевода текста",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "Arial-30",
+      "text": "Проверка перевода текста",
+      "expected": "Проверка перевода текста",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "Arial-40-vopros",
+      "text": "Сохранить перевод текста",
+      "expected": "Сохранить перевод текста",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "Segoe-32-vopros",
+      "text": "Доброе утро",
+      "expected": "Доброе утро",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "RU24",
+      "text": "Окно перевода",
+      "expected": "Окно перевода",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "RU36",
+      "text": "Откройте настройки",
+      "expected": "Откройте настройки",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "RU48",
+      "text": "Работа с текстом",
+      "expected": "Работа с текстом",
+      "exact": true
+    },
+    {
+      "lang": "en",
+      "label": "EN40",
+      "text": "CLICK TRANSLATE",
+      "expected": "CLICK TRANSLATE",
+      "exact": true
+    },
+    {
+      "lang": "en",
+      "label": "EN25",
+      "text": "Save the translation",
+      "expected": "Save the translation",
+      "exact": true
+    },
+    {
+      "lang": "en",
+      "label": "EN30",
+      "text": "This is a s sample line.",
+      "expected": "This is a sample line.",
+      "exact": false
+    },
+    {
+      "lang": "en",
+      "label": "EN50",
+      "text": "LARGE LETTERS",
+      "expected": "LARGE LETTERS",
+      "exact": true
+    }
+  ],
+  "416": [
+    {
+      "lang": "ru",
+      "label": "Arial-40",
+      "text": "Проверка перевода текста",
+      "expected": "Проверка перевода текста",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "Segoe-40",
+      "text": "Проверка перевода текста",
+      "expected": "Проверка перевода текста",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "Arial-30",
+      "text": "Проверка перевода текста",
+      "expected": "Проверка перевода текста",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "Arial-40-vopros",
+      "text": "Сохранить перевод текста",
+      "expected": "Сохранить перевод текста",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "Segoe-32-vopros",
+      "text": "Доброе утро",
+      "expected": "Доброе утро",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "RU24",
+      "text": "Окно перевода",
+      "expected": "Окно перевода",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "RU36",
+      "text": "Откройте настройки",
+      "expected": "Откройте настройки",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "RU48",
+      "text": "Работа с текстом",
+      "expected": "Работа с текстом",
+      "exact": true
+    },
+    {
+      "lang": "en",
+      "label": "EN40",
+      "text": "CLICK TRANSLATE",
+      "expected": "CLICK TRANSLATE",
+      "exact": true
+    },
+    {
+      "lang": "en",
+      "label": "EN25",
+      "text": "Save the translation",
+      "expected": "Save the translation",
+      "exact": true
+    },
+    {
+      "lang": "en",
+      "label": "EN30",
+      "text": "This s is a sample line.",
+      "expected": "This is a sample line.",
+      "exact": false
+    },
+    {
+      "lang": "en",
+      "label": "EN50",
+      "text": "LARGE LETTERS",
+      "expected": "LARGE LETTERS",
+      "exact": true
+    }
+  ],
+  "320": [
+    {
+      "lang": "ru",
+      "label": "Arial-40",
+      "text": "Проверка перевода текста",
+      "expected": "Проверка перевода текста",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "Segoe-40",
+      "text": "Проверка перевода текста",
+      "expected": "Проверка перевода текста",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "Arial-30",
+      "text": "Проверка перевода текста",
+      "expected": "Проверка перевода текста",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "Arial-40-vopros",
+      "text": "Сохранить перевод текста",
+      "expected": "Сохранить перевод текста",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "Segoe-32-vopros",
+      "text": "Доброе утро",
+      "expected": "Доброе утро",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "RU24",
+      "text": "Окно перевода",
+      "expected": "Окно перевода",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "RU36",
+      "text": "Откройте е настройки",
+      "expected": "Откройте настройки",
+      "exact": false
+    },
+    {
+      "lang": "ru",
+      "label": "RU48",
+      "text": "Работа с текстом",
+      "expected": "Работа с текстом",
+      "exact": true
+    },
+    {
+      "lang": "en",
+      "label": "EN40",
+      "text": "CLICK TRANSLATE",
+      "expected": "CLICK TRANSLATE",
+      "exact": true
+    },
+    {
+      "lang": "en",
+      "label": "EN25",
+      "text": "Save the translation",
+      "expected": "Save the translation",
+      "exact": true
+    },
+    {
+      "lang": "en",
+      "label": "EN30",
+      "text": "This is a sample line.",
+      "expected": "This is a sample line.",
+      "exact": true
+    },
+    {
+      "lang": "en",
+      "label": "EN50",
+      "text": "LARGE LETTERS",
+      "expected": "LARGE LETTERS",
+      "exact": true
+    }
+  ],
+  "384": [
+    {
+      "lang": "ru",
+      "label": "Arial-40",
+      "text": "Проверка перевода текста",
+      "expected": "Проверка перевода текста",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "Segoe-40",
+      "text": "Проверка перевода текста",
+      "expected": "Проверка перевода текста",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "Arial-30",
+      "text": "Проверка а перевода а текста",
+      "expected": "Проверка перевода текста",
+      "exact": false
+    },
+    {
+      "lang": "ru",
+      "label": "Arial-40-vopros",
+      "text": "Сохранить перевод текста",
+      "expected": "Сохранить перевод текста",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "Segoe-32-vopros",
+      "text": "Доброе утро",
+      "expected": "Доброе утро",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "RU24",
+      "text": "Окно г перевода",
+      "expected": "Окно перевода",
+      "exact": false
+    },
+    {
+      "lang": "ru",
+      "label": "RU36",
+      "text": "Откройте настройки",
+      "expected": "Откройте настройки",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "RU48",
+      "text": "Работа с текстом",
+      "expected": "Работа с текстом",
+      "exact": true
+    },
+    {
+      "lang": "en",
+      "label": "EN40",
+      "text": "CLICK TRANSLATE",
+      "expected": "CLICK TRANSLATE",
+      "exact": true
+    },
+    {
+      "lang": "en",
+      "label": "EN25",
+      "text": "Save the translation",
+      "expected": "Save the translation",
+      "exact": true
+    },
+    {
+      "lang": "en",
+      "label": "EN30",
+      "text": "This is a s sample line.",
+      "expected": "This is a sample line.",
+      "exact": false
+    },
+    {
+      "lang": "en",
+      "label": "EN50",
+      "text": "LARGE LETTERS",
+      "expected": "LARGE LETTERS",
+      "exact": true
+    }
+  ],
+  "736": [
+    {
+      "lang": "ru",
+      "label": "Arial-40",
+      "text": "7 роверка перевода текста",
+      "expected": "Проверка перевода текста",
+      "exact": false
+    },
+    {
+      "lang": "ru",
+      "label": "Segoe-40",
+      "text": "роверка перевода текста",
+      "expected": "Проверка перевода текста",
+      "exact": false
+    },
+    {
+      "lang": "ru",
+      "label": "Arial-30",
+      "text": "Проверка перевода текста",
+      "expected": "Проверка перевода текста",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "Arial-40-vopros",
+      "text": "перевод текста",
+      "expected": "Сохранить перевод текста",
+      "exact": false
+    },
+    {
+      "lang": "ru",
+      "label": "Segoe-32-vopros",
+      "text": "брое утро",
+      "expected": "Доброе утро",
+      "exact": false
+    },
+    {
+      "lang": "ru",
+      "label": "RU24",
+      "text": "Окно перевода",
+      "expected": "Окно перевода",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "RU36",
+      "text": "Откройте настройки",
+      "expected": "Откройте настройки",
+      "exact": true
+    },
+    {
+      "lang": "ru",
+      "label": "RU48",
+      "text": "Работа с текстом",
+      "expected": "Работа с текстом",
+      "exact": true
+    },
+    {
+      "lang": "en",
+      "label": "EN40",
+      "text": "CLICK TRANSLATE",
+      "expected": "CLICK TRANSLATE",
+      "exact": true
+    },
+    {
+      "lang": "en",
+      "label": "EN25",
+      "text": "Save the translation",
+      "expected": "Save the translation",
+      "exact": true
+    },
+    {
+      "lang": "en",
+      "label": "EN30",
+      "text": "This is a sample line.",
+      "expected": "This is a sample line.",
+      "exact": true
+    },
+    {
+      "lang": "en",
+      "label": "EN50",
+      "text": "LARGE LETTERS",
+      "expected": "LARGE LETTERS",
+      "exact": true
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "mode": "fixed",
+  "qt": "xcb",
+  "saved_theme_before": "Unknown desktop theme",
+  "version_ack": "1.8.3",
+  "preferences": {
+    "theme": "Светлая",
+    "interface_language": "de",
+    "custom_setting": "keep-this",
+    "ui_scale_percent": 125
+  },
+  "exit_code": 0,
+  "passed": true
+}

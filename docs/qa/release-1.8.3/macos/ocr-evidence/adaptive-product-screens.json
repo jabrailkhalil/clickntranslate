@@ -1,0 +1,194 @@
+{
+  "production": {
+    "en": {
+      "release": {
+        "actual": "CLICK TRANSLATE",
+        "expected": "CLICK TRANSLATE",
+        "exact": true
+      },
+      "small": {
+        "actual": "Click to translate",
+        "expected": "Click to translate",
+        "exact": true
+      },
+      "large": {
+        "actual": "LARGE LETTERS",
+        "expected": "LARGE LETTERS",
+        "exact": true
+      },
+      "wide": {
+        "actual": "Click to translate a longer sentence",
+        "expected": "Click to translate a longer sentence",
+        "exact": true
+      },
+      "multiline": {
+        "actual": "First line of text Second line of text",
+        "expected": "First line of text Second line of text",
+        "exact": true
+      },
+      "compact-11": {
+        "actual": "Book 1684",
+        "expected": "Book 1684",
+        "exact": true
+      },
+      "desktop-11": {
+        "actual": "Display 7360",
+        "expected": "Display 7360",
+        "exact": true
+      },
+      "compact-13": {
+        "actual": "Book 1684",
+        "expected": "Book 1684",
+        "exact": true
+      },
+      "desktop-13": {
+        "actual": "Display 7360",
+        "expected": "Display 7360",
+        "exact": true
+      },
+      "compact-18": {
+        "actual": "Book 1684",
+        "expected": "Book 1684",
+        "exact": true
+      },
+      "desktop-18": {
+        "actual": "Display 7360",
+        "expected": "Display 7360",
+        "exact": true
+      },
+      "compact-24": {
+        "actual": "Book 1684",
+        "expected": "Book 1684",
+        "exact": true
+      },
+      "desktop-24": {
+        "actual": "Display 7360",
+        "expected": "Display 7360",
+        "exact": true
+      },
+      "compact-36": {
+        "actual": "Book 1684",
+        "expected": "Book 1684",
+        "exact": true
+      },
+      "desktop-36": {
+        "actual": "Display 7360",
+        "expected": "Display 7360",
+        "exact": true
+      },
+      "compact-55": {
+        "actual": "Book 1684",
+        "expected": "Book 1684",
+        "exact": true
+      },
+      "desktop-55": {
+        "actual": "Display 7360",
+        "expected": "Display 7360",
+        "exact": true
+      },
+      "desktop-88": {
+        "actual": "Display 7360",
+        "expected": "Display 7360",
+        "exact": true
+      },
+      "desktop-120": {
+        "actual": "Display 7360",
+        "expected": "Display 7360",
+        "exact": true
+      },
+      "mac-screen-smoke-combo-dark-80-main-source_lang": {
+        "actual": "Click'n'Translate x NepeBoA teKcta PycokM 2 AHrnn HañT b.. 3,gecb norentce nepeo, OnpegenMTb A3bIK AHr PycckM e KnAMwM Hemeukn CKM Pycckmü paHuy3 Mcna KonMpoBaTb TeKcT TxC KTb M/M Kb OKHO oxSpace MTabAHCKM M oμ TXG MaCKoT . opr/bM nepeaoJ4nK: Google PexKHM TeHM PacnoaHaBaHHe: Apple Vision",
+        "expected": null,
+        "exact": null
+      },
+      "mac-screen-smoke-dark-main-100": {
+        "actual": "Click'n'Translate X Text translation Russian 2 English Enter text to translate Your translation appears here Keyboard shortcuts Translate selection Russian English Translate area TXT Copy text THC Translate screen XXF Show or hide window Space Translate selection XxQ Dynamic translation THG Replace with translation HQ Companion : Translator: Google Shadow mode Text recognition: Apple Vision",
+        "expected": null,
+        "exact": null
+      },
+      "mac-screen-smoke-light-settings-100": {
+        "actual": "Click'n'Translate · v1.8.3 A Application Translation OCR Dynamic Companion Start with OS Scale: < 100% < Start in shadow mode Result text: < Medium < Save copy history Sample text Save translation history Button hover tips V Check for updates when the app starts Clear cache Reset Update Export Import Bug report Engines and API Configure hotkeys",
+        "expected": null,
+        "exact": null
+      },
+      "win-independent": {
+        "actual": "This is a sample line.",
+        "expected": "This is a sample line.",
+        "exact": true
+      }
+    },
+    "ru": {
+      "Arial-40": {
+        "actual": "Проверка перевода текста",
+        "expected": "Проверка перевода текста",
+        "exact": true
+      },
+      "Segoe-40": {
+        "actual": "Проверка перевода текста",
+        "expected": "Проверка перевода текста",
+        "exact": true
+      },
+      "Arial-30": {
+        "actual": "Проверка перевода текста",
+        "expected": "Проверка перевода текста",
+        "exact": true
+      },
+      "Arial-40-vopros": {
+        "actual": "Сохранить перевод текста",
+        "expected": "Сохранить перевод текста",
+        "exact": true
+      },
+      "Segoe-32-vopros": {
+        "actual": "Доброе утро",
+        "expected": "Доброе утро",
+        "exact": true
+      },
+      "mixed-11": {
+        "actual": "Перевод текста",
+        "expected": "Перевод текста",
+        "exact": true
+      },
+      "two-11": {
+        "actual": "Строка один Вторая строка",
+        "expected": "Строка один Вторая строка",
+        "exact": true
+      },
+      "mixed-15": {
+        "actual": "Перевод текста",
+        "expected": "Перевод текста",
+        "exact": true
+      },
+      "two-15": {
+        "actual": "Строка один Вторая строка",
+        "expected": "Строка один Вторая строка",
+        "exact": true
+      },
+      "mixed-22": {
+        "actual": "Перевод текста",
+        "expected": "Перевод текста",
+        "exact": true
+      },
+      "two-22": {
+        "actual": "Строка один Вторая строка",
+        "expected": "Строка один Вторая строка",
+        "exact": true
+      },
+      "mixed-36": {
+        "actual": "Перевод текста",
+        "expected": "Перевод текста",
+        "exact": true
+      },
+      "two-36": {
+        "actual": "Строка один Вторая строка",
+        "expected": "Строка один Вторая строка",
+        "exact": true
+      },
+      "mac-real-popup": {
+        "actual": "Click'n'Translate X Перевод текста Русский Английский Найти язык… Здесь появится перевод Определить язык Английский Русский не клавиши Немецкий жий Русский Французский Испанский Копировать текст тжс Показать или скрыть окно OXSpace Итальянский Динамический перевод TXG Маскот 8 Португальский Переводчик: Gooдле Режим тени Распознавание: Аррiе Vision",
+        "expected": null,
+        "exact": null
+      }
+    },
+    "ar": {}
+  }
+}

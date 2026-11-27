@@ -1,0 +1,969 @@
+{
+  "018952d1b4b3d4fd6ee5ebbacf90603c9cef6221951359937c274fe1f190f8d3": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 2299099,
+    "name": "cos.traineddata",
+    "status": "verified"
+  },
+  "02aa6c25cfe9e583fa7b5d4131eac948f962308983f0f397df077dea58212b03": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 4640561,
+    "name": "mya.traineddata",
+    "status": "verified"
+  },
+  "0451eb4f8049ae78196806bf878a389a2f40f1386fe038568cf4441226ba6ef2": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 3610079,
+    "name": "nor.traineddata",
+    "status": "verified"
+  },
+  "06051412588963b34b663cc59a468dbf10753329f015ccd574ee711e8c6b84c3": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 1774535,
+    "name": "div.traineddata",
+    "status": "verified"
+  },
+  "06bf8a39607b155e14b64756b04ea69b03e7d17ac3d8d58d7d270f86b24c47d2": {
+    "host": "github.com",
+    "bytes": 21039000,
+    "name": "hymt-windows-x64-b11899-runtime.zip",
+    "status": "verified",
+    "http_status": 206
+  },
+  "0ba3f2d116972e72fe9e176bc84c38e81dfb6670f4ed1f7f6c8e16a27da7cb61": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 2118233,
+    "name": "mar.traineddata",
+    "status": "verified"
+  },
+  "0e39021eefe692906b50d9bd22e580fa57fe43fa35db6846ad8b6369ddc21ea8": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 6470703,
+    "name": "uzb.traineddata",
+    "status": "verified"
+  },
+  "0ed46203c283c952b7de0530d1c6e6ac9a25a79773fb89cadd149275ffea9a80": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 3439772,
+    "name": "fao.traineddata",
+    "status": "verified"
+  },
+  "11d89a6763ff134ef8f7e41b995974d36fba5d1a807156d3202d7bf991bb1823": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 2894755,
+    "name": "spa_old.traineddata",
+    "status": "verified"
+  },
+  "11f9e43ab227f786352a50f75c94c2e9906f1baba86d93276da19da7ce0904db": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 961404,
+    "name": "heb.traineddata",
+    "status": "verified"
+  },
+  "126d480bfae95be2a911ed4916465e27bde75fea2da631e21b96762e5f239646": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 2652786,
+    "name": "afr.traineddata",
+    "status": "verified"
+  },
+  "163b360268c39fc69e0c0dc9299c06dfe7a6c51ef8f33766da75022217b69b22": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 2794272,
+    "name": "uig.traineddata",
+    "status": "verified"
+  },
+  "17ab3855f1ba9056183759a84e4c11cebf417a7d3c8c2cdcc37537d7fbffba3d": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 963400,
+    "name": "yor.traineddata",
+    "status": "verified"
+  },
+  "19d219bbb6672c869d20a9636c6816a81eb9a71796cb93ebe0cb1530e2cdb22d": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 1525436,
+    "name": "deu.traineddata",
+    "status": "verified"
+  },
+  "1aab1db8dae337dfc8fa0f94a1c137c47e4c7857c3e6b30093ec726cef912a0b": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 1966440,
+    "name": "bod.traineddata",
+    "status": "verified"
+  },
+  "1b5eaebf1c062de6205560c97ffcfa8dc0e6f413c340e8adc5cfc57e159f61ff": {
+    "host": "github.com",
+    "bytes": 14040947,
+    "name": "english_g2.zip",
+    "status": "verified"
+  },
+  "1d89621d9afe8ddf35b403ecf8951edea52c3a960d241f287b1a7b2c5ba8daac": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 1874705,
+    "name": "sqi.traineddata",
+    "status": "verified"
+  },
+  "1df02a4b210e5c217b783819538b63e9dfe6904e2b5e53b62664f1b9f7a989d0": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 1824756,
+    "name": "chi_tra_vert.traineddata",
+    "status": "verified"
+  },
+  "1e383df5b055583bc01cb5764ecdf74c540753f2cb3f8205e7105361da4bc989": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 3154896,
+    "name": "lit.traineddata",
+    "status": "verified"
+  },
+  "1ec0907fc3534065ea9ae190c6bb7ec9e5c74fd9d2fa996aaec7407f11ad8131": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 497721,
+    "name": "pan.traineddata",
+    "status": "verified"
+  },
+  "1f5de9236d2e85f5fdf4b3c500f2d4926f8d9449f28f5394472d9e8d83b91b4d": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 2471260,
+    "name": "jpn.traineddata",
+    "status": "verified"
+  },
+  "20124962e93e68121e02c49a949d1f9df5db87dd62e5e4aa578362ca532444f8": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 6386744,
+    "name": "lao.traineddata",
+    "status": "verified"
+  },
+  "20590de84725bab69cde93bd6e8ed360a13cc5421a7e7364ddeb93e9af53d6da": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 1927902,
+    "name": "chi_sim_vert.traineddata",
+    "status": "verified"
+  },
+  "23d36448a3c59499da59502419ffcaa279056fa369a0fa2c798e066321d01bd1": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 947249,
+    "name": "ton.traineddata",
+    "status": "verified"
+  },
+  "250db73cd5b380d2798581295dc12f20d0828cdb335a65d833d12dfdbf57117d": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 1146012,
+    "name": "cat.traineddata",
+    "status": "verified"
+  },
+  "280ba9450b4f21afbf5985e0de87857b75a972577c50ef0603c141ddde4f1cb8": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 1002911,
+    "name": "nep.traineddata",
+    "status": "verified"
+  },
+  "294227cc2d1292b0acb28d61d4115c88252b96d466ca90b417cf4cf0c67bf07c": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 1072600,
+    "name": "tha.traineddata",
+    "status": "verified"
+  },
+  "299c7f6135ac72ca4820d4c39e3cf65b32b24127fc78c4938d11153adbb9fa77": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 2045427,
+    "name": "asm.traineddata",
+    "status": "verified"
+  },
+  "29f1920c493378da65a59793fb70e7e190504662b6bed57ab26f4067eb5f3769": {
+    "host": "github.com",
+    "bytes": 14284936,
+    "name": "latin_g2.zip",
+    "status": "verified"
+  },
+  "2b17f68014ab44b88b5e2334ebcd0ce0090d9af7c6fbef6fab22e0bbd9a934dd": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 1841715,
+    "name": "fil.traineddata",
+    "status": "verified"
+  },
+  "2bdcf834399a24f9293734d039eb0d4eca60692661bc90bfa99c64d624ff9944": {
+    "host": "github.com",
+    "bytes": 121253668,
+    "name": "rapidocr-windows-x64-cp312-runtime.zip",
+    "status": "verified",
+    "http_status": 206
+  },
+  "2e96ab67817819e14a3a2d6250261130457c8e78dde3077841ab391fe003551c": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 1943672,
+    "name": "aze_cyrl.traineddata",
+    "status": "verified"
+  },
+  "2fe9ba6119aac7e2a20d6cfb69ed91afe9520f41bc7e3a903f84280f2663858d": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 1181824,
+    "name": "gle.traineddata",
+    "status": "verified"
+  },
+  "3040b443d5d49e4183da0eaaf58d1033c3a616153d35d2342a56777f9bbb31c7": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 2308796,
+    "name": "mlt.traineddata",
+    "status": "verified"
+  },
+  "31163084c279aaebd376216f0c3d5c17ad4b5fee8db49dae79c20000b5de5964": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 855841,
+    "name": "ben.traineddata",
+    "status": "verified"
+  },
+  "34060353accfadd4e429f28d392f88cf70c2fc9d2633710a3b00c21412dc627b": {
+    "host": "github.com",
+    "bytes": 14140353,
+    "name": "cyrillic_g2.zip",
+    "status": "verified"
+  },
+  "346a39de801495c93ece6656d018d7d19d298af7db42d82ebae99dfe8ee14961": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 716214,
+    "name": "ceb.traineddata",
+    "status": "verified"
+  },
+  "35067e7cfe102dcdc953f9a758fdfaa6296b17a1ee6d874ee780fa306430b9fb": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 5296273,
+    "name": "hun.traineddata",
+    "status": "verified"
+  },
+  "364d244fad3f8d4438c9f7ee7642b9b876a4620cf76c0115619b979d6bfef1fa": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 449596,
+    "name": "dzo.traineddata",
+    "status": "verified"
+  },
+  "36f3135e61d501a3acfad41f5fe60b8e791274fff4c5375c969fdcca980cdbac": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 1480066,
+    "name": "ori.traineddata",
+    "status": "verified"
+  },
+  "3859d8ba60404f4b79830622625bbc76fb4ee2808eac1ad360ffa77f0a533328": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 3187463,
+    "name": "lat.traineddata",
+    "status": "verified"
+  },
+  "395439d1ec308535066cbaea9b15e0e4cc81f8609170af76ab7e7e8d3ec42f3e": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 2167651,
+    "name": "swa.traineddata",
+    "status": "verified"
+  },
+  "3cdaad22676723040ceb5c6fe72089d656b3bc1f630889c373ade86f3ab38c2e": {
+    "host": "github.com",
+    "bytes": 14910151,
+    "name": "korean_g2.zip",
+    "status": "verified"
+  },
+  "3ec3311833a108e07d58a1152b00c0cf1848752e4f85769d46e8ca2b718a2ccc": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 5470094,
+    "name": "amh.traineddata",
+    "status": "verified"
+  },
+  "3fe6eed7108136a85dbbf53baf23d9fb435afe1262323f5fba7711b6c6048728": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 2024948,
+    "name": "frm.traineddata",
+    "status": "verified"
+  },
+  "408ef9d7b68b99366d1dafc9b1275db80ed529252c2e1fa1038d4114cb9ef1d2": {
+    "host": "github.com",
+    "bytes": 14105056,
+    "name": "kannada.zip",
+    "status": "verified"
+  },
+  "40e7418296c355d9fd9ca843d115c51e740089e576e887443e61704823cd6624": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 5175921,
+    "name": "eus.traineddata",
+    "status": "verified"
+  },
+  "4383ac0c3c8e476de98ff979c2a3f069f8c4fb385e7860cf2d28da896cc477c7": {
+    "host": "huggingface.co",
+    "bytes": 1133080512,
+    "name": "HY-MT1.5-1.8B-Q4_K_M.gguf",
+    "status": "verified",
+    "http_status": 206
+  },
+  "46107b6bed3bf2d9617e5e192e52524e368242543fead1a7175c363dddd400f2": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 2982741,
+    "name": "jav.traineddata",
+    "status": "verified"
+  },
+  "462a75e10de1ed1f34fbdc4761ccee341d59664fc46ecb3463f60be4862e01f9": {
+    "host": "github.com",
+    "bytes": 199886824,
+    "name": "devanagari.zip",
+    "status": "verified",
+    "http_status": 206
+  },
+  "47f110575341b322052f3becbefee61a3ecf1ef549352b5d4d33d28afe30d099": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 1446926,
+    "name": "khm.traineddata",
+    "status": "verified"
+  },
+  "4c73ffc59d497c186b19d1e90f5d721d678ea6b2e277b719bee4e2af12271825": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 1122751,
+    "name": "hin.traineddata",
+    "status": "verified"
+  },
+  "4d97c44a20d30a81aad087d6a396b08f786c4635742afc391f6621f5c6ae78ae": {
+    "host": "www.modelscope.cn",
+    "bytes": 4819576,
+    "name": "ch_PP-OCRv5_det_mobile.onnx",
+    "status": "verified"
+  },
+  "4f26ffd98dd28cca89ff6fe0bc761ab865c2b38fabd76a3ce2143d1d88c0d7f1": {
+    "host": "github.com",
+    "bytes": 199881630,
+    "name": "thai.zip",
+    "status": "verified",
+    "http_status": 206
+  },
+  "4fba8a0b461038d51f1c20d043d4f2ac38c4e778f1b90830847f7bd8fa3ba726": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 1419514,
+    "name": "ell.traineddata",
+    "status": "verified"
+  },
+  "515d4a773682b286369511e83fe412bcff16a92a886f99c761c1d760a7e30456": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 4458101,
+    "name": "est.traineddata",
+    "status": "verified"
+  },
+  "529c5b5797d64b126065cd55f2bb4c7fd7b15790798091b1ff259941a829330b": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 2366642,
+    "name": "chi_tra.traineddata",
+    "status": "verified"
+  },
+  "54b2e001bd8a336bdffc249c1487b8b7cb712f0a031f2551930ba050ebefa2a0": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 3281787,
+    "name": "srp_latn.traineddata",
+    "status": "verified"
+  },
+  "5516a78efa30c050da7eb0727fec3de59670c19735c00678a67fdad98e4b3ec1": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 2606426,
+    "name": "ltz.traineddata",
+    "status": "verified"
+  },
+  "557abb6f1c68bc1b286f1bdd00bb6b82f85a427a91899807dab6c2f6c7986731": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 2524769,
+    "name": "kat.traineddata",
+    "status": "verified"
+  },
+  "57b735557eeb67503803cf9f99786dd0b62417931352601952a0b1a23b6c4759": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 2246328,
+    "name": "grc.traineddata",
+    "status": "verified"
+  },
+  "5825fc7ebf84ae7a412be049820b4d86d77620f204a041697b0494669b1742c5": {
+    "host": "www.modelscope.cn",
+    "bytes": 16631306,
+    "name": "ch_PP-OCRv5_rec_mobile.onnx",
+    "status": "verified"
+  },
+  "58622bf154830fa62103359938564aeb8112b929759e22a48224f3ecfaac34c6": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 1600188,
+    "name": "mkd.traineddata",
+    "status": "verified"
+  },
+  "591d743ae103752b88ffc38785c50421320f4eff93c8967e0d3d2e14d4e27811": {
+    "host": "argos-net.com",
+    "bytes": 195746693,
+    "name": "translate-en_ru-1_9.argosmodel",
+    "status": "verified",
+    "http_status": 206
+  },
+  "5ec828c363f3f0062c3caf08216677cf5f3c0c981b05fab445123a16b98f10a9": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 2278973,
+    "name": "isl.traineddata",
+    "status": "verified"
+  },
+  "61a04cd62b507c3d9ae0e1cda399e6715ebf49dea9df47897c8acdcd3bd3e13c": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 7865732,
+    "name": "fin.traineddata",
+    "status": "verified"
+  },
+  "62e8250ce2a994106e313a82e26a516a39e2cf159d0ce3c5b5008387fd0d555f": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 1398718,
+    "name": "urd.traineddata",
+    "status": "verified"
+  },
+  "69786901da87ab8766c1ea7fbb10b28f2110c14da3f6c8f2735df131fba95d88": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 1122661,
+    "name": "ind.traineddata",
+    "status": "verified"
+  },
+  "6b85e11d9bbf07863b97b3523b1b112844c43e713df8b66418a081fd1060b3b2": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 1677415,
+    "name": "kor.traineddata",
+    "status": "verified"
+  },
+  "6cc8cc87cf1afbfa6a41febb725dbadb14bed96a46685906440a6eb8a7892f04": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 2498242,
+    "name": "bos.traineddata",
+    "status": "verified"
+  },
+  "6f2e04d02774a18f01bed44b1111f2cd7f3ba7ac9dc4373cd3f898a40ea6b464": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 2294433,
+    "name": "spa.traineddata",
+    "status": "verified"
+  },
+  "71181a6a07af3812aeedfa1aa993623424f4b8a6aac3e271b36ec11774e674d9": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 4728393,
+    "name": "epo.traineddata",
+    "status": "verified"
+  },
+  "71cb95f601ce0c062860224ff3e1d2e807d784f2be92bf53ba500bb1736dabd5": {
+    "host": "github.com",
+    "bytes": 209821039,
+    "name": "chinese.zip",
+    "status": "verified",
+    "http_status": 206,
+    "full_retry_verified_bytes": 209821039
+  },
+  "72abd2543ef80eed2598cfefb5441ea507e89e0f72f9cc2d204763c0068f3f11": {
+    "host": "github.com",
+    "bytes": 266527468,
+    "name": "easyocr-windows-x64-cp312-cpu-runtime.zip",
+    "status": "verified",
+    "http_status": 206,
+    "full_retry_verified_bytes": 266527468
+  },
+  "7393381111e1152420fc4092cb44eef4237580d21b92bf30d7d221aad192c6b7": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 4550554,
+    "name": "tur.traineddata",
+    "status": "verified"
+  },
+  "73d7430c22a062b061f603a2c1d70c4ea4aa092f7a932a97921926e15b4fdb3d": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 378822,
+    "name": "tir.traineddata",
+    "status": "verified"
+  },
+  "7435b43466da8343619bdc43c4da8dc8581f21aab3337fa1bd22ed8a8c10af04": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 2207208,
+    "name": "syr.traineddata",
+    "status": "verified"
+  },
+  "747b9be4c5b80b4c730ce4f426a3b85060a1bb0de54cd566fcbdcb7f407940c9": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 6322087,
+    "name": "oci.traineddata",
+    "status": "verified"
+  },
+  "7947619c5544d86849f563bd737ad90dbea9f5319fbd838c4747a7a1cd40b260": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 2554555,
+    "name": "glg.traineddata",
+    "status": "verified"
+  },
+  "79df64caf7bcfb2a27df5042ecb6121e196eada34da774956995747636d5bfa1": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 531275,
+    "name": "vie.traineddata",
+    "status": "verified"
+  },
+  "7ad946d753f4b9688e4e4bcf525a931f486da4aaa9020e32b6a7262718bdf093": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 1072896,
+    "name": "tat.traineddata",
+    "status": "verified"
+  },
+  "7b32ed1374649b9b44b9a20ed07f1e86c1e1004c3bd11ce182496a47a18cb321": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 2602685,
+    "name": "tgk.traineddata",
+    "status": "verified"
+  },
+  "7b45d23da9b001e296590ed202a45bc1fcaf06ab661f457c463ed502de766fb5": {
+    "host": "github.com",
+    "bytes": 16065475,
+    "name": "japanese_g2.zip",
+    "status": "verified"
+  },
+  "7b77290303d5d88db6adc5b679d1eb876e3c62f64c8999e919bcb4608af379bc": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 423167,
+    "name": "kat_old.traineddata",
+    "status": "verified"
+  },
+  "7c9dbc47ef3848e33b623d1b927dd4d998ed39ff750fbc0f14aeb0f627b5da15": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 1906018,
+    "name": "fry.traineddata",
+    "status": "verified"
+  },
+  "7cd1b541e9d3884b9546a7d292c4f349cdb45ff646b4b43166dfc5099a8ad1a1": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 6423052,
+    "name": "deu_latf.traineddata",
+    "status": "verified"
+  },
+  "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 4113088,
+    "name": "eng.traineddata",
+    "status": "verified"
+  },
+  "7d9eaf22254b381f18b806cd6cb647862a397a7221adbce3e22cc421793a8847": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 2717247,
+    "name": "lav.traineddata",
+    "status": "verified"
+  },
+  "7f6ee3374749645a7c92dfe773f5c3d6492194d371712ecfd775edc53c363fb4": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 2208919,
+    "name": "cym.traineddata",
+    "status": "verified"
+  },
+  "81ef16ee0fa0a3548c8a2d1ff10786e3278b6720e51cefd9a81a506f52660223": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 2802266,
+    "name": "iku.traineddata",
+    "status": "verified"
+  },
+  "842e489a0e0eb12c72b5cb12e9e6624aae5928de1d097d76445474c263ce8b5a": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 1976902,
+    "name": "hat.traineddata",
+    "status": "verified"
+  },
+  "8552be985e8fa0210d6d815d736151d645089b590a56f2d92391fb864e8bf9c9": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 862973,
+    "name": "mri.traineddata",
+    "status": "verified"
+  },
+  "8dc6a1c703a89ed56308ef742d26ebd45c656248cbbbda6e7fe60e569f873e65": {
+    "host": "github.com",
+    "bytes": 77251756,
+    "name": "craft_mlt_25k.zip",
+    "status": "verified",
+    "http_status": 206
+  },
+  "8f660323d8a7b7a0e8d2fae1a3439e6e470222bfbb990b2ab7fe9e1fb4791c0b": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 2251950,
+    "name": "equ.traineddata",
+    "status": "verified"
+  },
+  "90b08b8e456d435bcdd96141221db5f116ef03ab3efc2d3239cfb24520ad7756": {
+    "host": "github.com",
+    "bytes": 199916962,
+    "name": "arabic.zip",
+    "status": "verified",
+    "http_status": 206,
+    "full_retry_verified_bytes": 199916962
+  },
+  "90f761b4bfcce0c8c561c0cb5c887b0971d3ec01c32164bdf7374a35b0982711": {
+    "host": "www.modelscope.cn",
+    "bytes": 8074092,
+    "name": "cyrillic_PP-OCRv5_rec_mobile.onnx",
+    "status": "verified"
+  },
+  "934bcaf97ef3348413263331131c9fa7f55f30db333c711929c124fb635f7e1b": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 3795684,
+    "name": "ces.traineddata",
+    "status": "verified"
+  },
+  "9373b449ce9bec752cf9d6c56b5fa9f86def57a65eca137378200b78a7b3a295": {
+    "host": "github.com",
+    "bytes": 1754060,
+    "name": "tesseract-windows-x64-5.5.3-native-runtime.zip",
+    "status": "verified"
+  },
+  "9777956300900b528d26932cf80693f95e75143433fb851d567194bcc38a31ae": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 9928497,
+    "name": "kir.traineddata",
+    "status": "verified"
+  },
+  "9a3f78b010254ae237a7ca89e65e6d0c349221e437ac1575df1877e63a76bf57": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 5026336,
+    "name": "que.traineddata",
+    "status": "verified"
+  },
+  "9adfde6b51ba4b97efd10ea37c3070fd3fc2bad7815e81f5c3c198cd96216cc9": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 2376323,
+    "name": "ron.traineddata",
+    "status": "verified"
+  },
+  "9c6668a0b202f3dcfe074b64620d108e1902ca7498a40b5a11b4a3da6112d58f": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 3692098,
+    "name": "bel.traineddata",
+    "status": "verified"
+  },
+  "9e4e5aaf1afe12eea42812f22b9e3be4e3694a5bfe8198c456d7ce141a1109e6": {
+    "host": "github.com",
+    "bytes": 47894945,
+    "name": "argos-windows-x64-cp312-runtime.zip",
+    "status": "verified",
+    "http_status": 206
+  },
+  "9e515d9832ce259dbab550b1cc6b998f8b929faf2edacaaca981b05adb130571": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 4103348,
+    "name": "hrv.traineddata",
+    "status": "verified"
+  },
+  "a0bb039b004b8fa225ce1db982137ccc80c70cf4ebf122f519cf5ec48cb4cf98": {
+    "host": "huggingface.co",
+    "bytes": 8088,
+    "name": "README.md",
+    "status": "verified"
+  },
+  "a151a3806d61ac43619cd383896d551ba5c3b07388ffec6fc83c8c604d677570": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 2137042,
+    "name": "mon.traineddata",
+    "status": "verified"
+  },
+  "a2fe0b3f0eb4a5e46252470160ad51cc5f3c4c0f390ba67d1911beb0dbe80cc8": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 1563501,
+    "name": "uzb_cyrl.traineddata",
+    "status": "verified"
+  },
+  "a365310848aecb739f19369cb3831d4660fcd9345d798e91a3042455f9ccc9f0": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 3524799,
+    "name": "aze.traineddata",
+    "status": "verified"
+  },
+  "a399958921c64e7d2319369ade1e74b4db2577744ac5bfeabd16663cf743b91c": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 12404677,
+    "name": "san.traineddata",
+    "status": "verified"
+  },
+  "a3ef2daa828399ca8d6ae69edfa21ed21aa5abb3f868e2024d3235406312e7b6": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 3568615,
+    "name": "kmr.traineddata",
+    "status": "verified"
+  },
+  "a4da60d844ebb9dbaeb8843a92290083c1fd275b167fc9c9686d790ccd311fab": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 374944,
+    "name": "chr.traineddata",
+    "status": "verified"
+  },
+  "a5fcb6f0db1e1d6d8522f39db4e848f05984669172e584e8d76b6b3141e1f730": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 2469156,
+    "name": "chi_sim.traineddata",
+    "status": "verified"
+  },
+  "a6f372175127ab106c620b1d6af184e7075bd629d1e2aa22a88ac05bae68050d": {
+    "host": "github.com",
+    "bytes": 199783937,
+    "name": "tamil.zip",
+    "status": "verified",
+    "http_status": 206
+  },
+  "aa41ae3d9cc705e60d398ab38a5c3cc8b772c0d420c7d4f0859beb13d0e321b6": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 2149931,
+    "name": "srp.traineddata",
+    "status": "verified"
+  },
+  "acb1fd074487a31d1294fcdfd7d7c673467ffd8aeacb2ccd61ebcbf04eb4e2fa": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 2580059,
+    "name": "dan.traineddata",
+    "status": "verified"
+  },
+  "aebc9b0fcc8cfaf8a9f38a02bb7b85052bd850744696a2c11cf0081820e5b21e": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 1675212,
+    "name": "bul.traineddata",
+    "status": "verified"
+  },
+  "b20bd37c168a570f583afbc8cd7925603890efbcdc000a59e22c269d160b5f5a": {
+    "host": "www.modelscope.cn",
+    "bytes": 7904513,
+    "name": "latin_PP-OCRv5_rec_mobile.onnx",
+    "status": "verified"
+  },
+  "b701d0d95799a716143dedb0197504e56f27a1bb133d6607ff5778c6988cb67c": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 3463717,
+    "name": "hye.traineddata",
+    "status": "verified"
+  },
+  "b8f89e1e785118dac4d51ae042c029a64edb5c3ee42ef73027a6d412748d8827": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 2701314,
+    "name": "ita.traineddata",
+    "status": "verified"
+  },
+  "b937632c17ce5fdf20535d25feec044da10a0c4c8234f4302d5606fd671cf60d": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 3003829,
+    "name": "slv.traineddata",
+    "status": "verified"
+  },
+  "b9f88f7beef9aa5480c62e9f84c50be82214e5b209d0115465c30175eca4f944": {
+    "host": "github.com",
+    "bytes": 199852959,
+    "name": "bengali.zip",
+    "status": "verified",
+    "http_status": 206
+  },
+  "bc75c6df2375a30c9f7e759fa7d4b58ae3ecf9ce72668a702d01acb13e551422": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 1727413,
+    "name": "sin.traineddata",
+    "status": "verified"
+  },
+  "bc98cd4e27ca1cebfae9b7086b2ebc635e4dbed45e7cb5f0891cb7d22feacfad": {
+    "host": "argos-net.com",
+    "bytes": 81869670,
+    "name": "translate-ar_en-1_0.argosmodel",
+    "status": "verified",
+    "http_status": 206
+  },
+  "bd05cbf1b197e7810d2903419aedb06f9ef77bfedf50b358673c1d18d707cdb4": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 5275996,
+    "name": "mal.traineddata",
+    "status": "verified"
+  },
+  "bd31e6b6ae93271e3bcf5383d306d8eefbb91542937cd6d735a5930c970e61d8": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 3608331,
+    "name": "kan.traineddata",
+    "status": "verified"
+  },
+  "bf1e2640954691797e2dc14f38533e601b59ee37958698ae0f0b81dc6f09c71b": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 3037480,
+    "name": "jpn_vert.traineddata",
+    "status": "verified"
+  },
+  "c1192e632d0baa9146ae5b756a0e635e3dc63c1733737ebfd1629e87144e9295": {
+    "host": "www.modelscope.cn",
+    "bytes": 8023828,
+    "name": "arabic_PP-OCRv5_rec_mobile.onnx",
+    "status": "verified"
+  },
+  "c28f19dee36927baba5215fb793a3c00fff3ef2cfbcaa100122401d8f4374869": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 1113715,
+    "name": "kor_vert.traineddata",
+    "status": "verified"
+  },
+  "c3461add59bb4323ecba96a492ab75e06dda42467c9e3d0c18db5d1d21924be8": {
+    "host": "www.modelscope.cn",
+    "bytes": 7872351,
+    "name": "en_PP-OCRv5_rec_mobile.onnx",
+    "status": "verified"
+  },
+  "c4476cdbc0e33d898d32345122b7be1cbf85ace15f920f06c7714756e1ef79b2": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 4765518,
+    "name": "pol.traineddata",
+    "status": "verified"
+  },
+  "c4932b937207a9514b7514d518b931a99938c02a28a5a5a553f8599ed58b7deb": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 1982756,
+    "name": "por.traineddata",
+    "status": "verified"
+  },
+  "cb7b206d9f56b601d1666683ea8a516c8bb9c04362dbb874fc9665b339b72adf": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 3068307,
+    "name": "gla.traineddata",
+    "status": "verified"
+  },
+  "cbcb5f570dc3cc36e9187f6d407610dadbc0dc88e214757b9182d45043a11d1f": {
+    "host": "github.com",
+    "bytes": 14108882,
+    "name": "telugu.zip",
+    "status": "verified"
+  },
+  "ced037562e8c80c13122dece28dd477d399af80911a28791a66a63ac1e3445ca": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 1130365,
+    "name": "fra.traineddata",
+    "status": "verified"
+  },
+  "ced0e5e046a84c908a6aa7accbef9a232c4a5d9a8276691b81c6ee64d02963f6": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 6050296,
+    "name": "nld.traineddata",
+    "status": "verified"
+  },
+  "d02fbec24be4b07e32e80d0ccfc3b6b67a3c5d61c9d0a7c8532677990912c6ec": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 3237963,
+    "name": "tam.traineddata",
+    "status": "verified"
+  },
+  "d10691fddd5b67802e1c12800ebb321d3b8bcd8d24a2ac3ff206f93188c04ab5": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 2769654,
+    "name": "tel.traineddata",
+    "status": "verified"
+  },
+  "d312ab5aafc9f99a78082c75e035b0873d2da6cb6d95cde03e219c1b26750034": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 3101551,
+    "name": "enm.traineddata",
+    "status": "verified"
+  },
+  "d59e53e2bded32f4445f124b4b00240fcac7e8044c003ab822ccb94f0b3db59b": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 3825102,
+    "name": "ukr.traineddata",
+    "status": "verified"
+  },
+  "d7d9db858500ac9073f4b5decef8e208454357226f535f65079ce4376047569f": {
+    "host": "huggingface.co",
+    "bytes": 16270,
+    "name": "License.txt",
+    "status": "verified"
+  },
+  "db1c0a91208aff00d3cf1ed2c1d23f76419afd5f024688b4f71adc3f2ce4a505": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 431500,
+    "name": "fas.traineddata",
+    "status": "verified"
+  },
+  "db8b31f76b986d63b82dfff9e84e252bf5f7dc53d9128167aaab18b3ec96dd49": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 6335007,
+    "name": "bre.traineddata",
+    "status": "verified"
+  },
+  "e16e5e036cce1d9ec2b00063cf8b54472625b9e14d893a169e2b0dedeb4df225": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 3861738,
+    "name": "rus.traineddata",
+    "status": "verified"
+  },
+  "e2a6e84337f7ebbb55f9dc61dcba3a861c0d786ae5a46fa198fd8d6473f5c775": {
+    "host": "argos-net.com",
+    "bytes": 88502631,
+    "name": "translate-en_ar-1_0.argosmodel",
+    "status": "verified",
+    "http_status": 206
+  },
+  "e3206d3dc87fd50c24a0fb9f01838615911d25168f4e64415244b67d2bb3e729": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 1432056,
+    "name": "ara.traineddata",
+    "status": "verified"
+  },
+  "e41a3e5febfec50c90371eb1cbb17a48b10cad387900e3420b1f134c1b766cba": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 1747801,
+    "name": "msa.traineddata",
+    "status": "verified"
+  },
+  "e47acedf663230f8863ff1ab0e64dd2d82b838fceb5957146dab185a89d6215c": {
+    "host": "www.modelscope.cn",
+    "bytes": 585532,
+    "name": "ch_ppocr_mobile_v2.0_cls_mobile.onnx",
+    "status": "verified"
+  },
+  "e9ba8bf722d10a4a4c39f74289d5938fd47eac08dbe4ed0afd22d89445a5c3ac": {
+    "host": "argos-net.com",
+    "bytes": 156239112,
+    "name": "translate-ru_en-1_9.argosmodel",
+    "status": "verified",
+    "http_status": 206
+  },
+  "ee85de25acf70d5eeefdb3012424814a18ab368183099cc2c3f2fe2d3dce3b02": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 3286123,
+    "name": "ita_old.traineddata",
+    "status": "verified"
+  },
+  "eed38bdd9e612bd150f13d2f70fd8e5b24c79c2e2fe621a02603b38d385503e9": {
+    "host": "github.com",
+    "bytes": 20288076,
+    "name": "zh_sim_g2.zip",
+    "status": "verified"
+  },
+  "f15550bfe3a20ca781cf5afb7b2af6ee769c6521cf4bb990848e72856b484600": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 1772087,
+    "name": "pus.traineddata",
+    "status": "verified"
+  },
+  "f25cae3b325b0a6dc4dd5d8aeb3ac40b129a18bdd92666317022ee198f7878a7": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 1694035,
+    "name": "snd.traineddata",
+    "status": "verified"
+  },
+  "f7304988d41f833efebcc2d529df54b1903ecebbc3da1faabd19a0fddd4fe586": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 4167034,
+    "name": "swe.traineddata",
+    "status": "verified"
+  },
+  "f9a3d74076460a505dc0c6b59a0f5bd1108c6436d570954223b3695988d1666d": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 545606,
+    "name": "yid.traineddata",
+    "status": "verified"
+  },
+  "fa69658614b4946a9afae8853d67e0689838803dfa3d12c2e35ec53ee6f8df34": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 1418394,
+    "name": "guj.traineddata",
+    "status": "verified"
+  },
+  "fa939213b005b3477a1032b7222f63cd0b0ac486f83fd9554caf653d6e6c6ffe": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 1369500,
+    "name": "sun.traineddata",
+    "status": "verified"
+  },
+  "fbcc400a9c74c6a13d922fcb1211b655d1b165387b675ed75cd2dbd756b974a5": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 4427661,
+    "name": "slk.traineddata",
+    "status": "verified"
+  },
+  "fcc01eed3815a42b9c6321c4c9d3606f39b166cbf95ade98b7d8d12063eae53d": {
+    "host": "raw.githubusercontent.com",
+    "bytes": 4734644,
+    "name": "kaz.traineddata",
+    "status": "verified"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "command": [
+    "qa-reports/windows/work/venv/Scripts/python.exe",
+    "-m",
+    "PyInstaller",
+    "--clean",
+    "--noconfirm",
+    "tools/packaging/ClicknTranslate.spec"
+  ],
+  "pid": 10856,
+  "exit_code": 0,
+  "seconds": 204.25,
+  "qt": "offscreen",
+  "private_station": "QA-station",
+  "private_desktop": "QA"
+}

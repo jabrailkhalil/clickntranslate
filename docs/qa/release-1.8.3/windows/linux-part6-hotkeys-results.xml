@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites name="pytest tests">
+  <testsuite name="pytest" errors="0" failures="0" skipped="0" tests="31" time="393.909" timestamp="2026-11-27T13:03:44.203720+00:00">
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_listener_unregisters_on_its_registering_thread_before_replacement" time="0.018" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_message_pump_failure_still_releases_the_thread_owned_key" time="0.067" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_cancelled_listener_does_not_register_after_stop" time="0.006" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_failed_registration_never_unregisters_another_listeners_key" time="0.006" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_queued_action_after_stop_is_ignored_and_recording_shortcuts_does_not_launch" time="0.023" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_preview_and_layout_modes_save_preferences_without_registering_keys[copy_hotkey]" time="13.634" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_preview_and_layout_modes_save_preferences_without_registering_keys[translate_hotkey]" time="13.499" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_preview_and_layout_modes_save_preferences_without_registering_keys[fullscreen_translate_hotkey]" time="12.083" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_preview_and_layout_modes_save_preferences_without_registering_keys[translate_selection_hotkey]" time="11.728" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_preview_and_layout_modes_save_preferences_without_registering_keys[translate_replace_selection_hotkey]" time="11.831" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_preview_and_layout_modes_save_preferences_without_registering_keys[toggle_window_hotkey]" time="18.258" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_preview_and_layout_modes_save_preferences_without_registering_keys[game_translate_hotkey]" time="20.425" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_focus_out_without_editing_does_not_restart_a_working_shortcut[copy_hotkey]" time="18.740" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_focus_out_without_editing_does_not_restart_a_working_shortcut[translate_hotkey]" time="18.243" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_focus_out_without_editing_does_not_restart_a_working_shortcut[fullscreen_translate_hotkey]" time="15.765" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_focus_out_without_editing_does_not_restart_a_working_shortcut[translate_selection_hotkey]" time="10.793" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_focus_out_without_editing_does_not_restart_a_working_shortcut[translate_replace_selection_hotkey]" time="14.365" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_focus_out_without_editing_does_not_restart_a_working_shortcut[toggle_window_hotkey]" time="11.918" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_focus_out_without_editing_does_not_restart_a_working_shortcut[game_translate_hotkey]" time="14.731" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_changed_shortcut_replaces_only_its_listener_and_clear_keeps_it_disabled[copy_hotkey]" time="16.427" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_changed_shortcut_replaces_only_its_listener_and_clear_keeps_it_disabled[translate_hotkey]" time="13.913" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_changed_shortcut_replaces_only_its_listener_and_clear_keeps_it_disabled[fullscreen_translate_hotkey]" time="11.781" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_changed_shortcut_replaces_only_its_listener_and_clear_keeps_it_disabled[translate_selection_hotkey]" time="11.889" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_changed_shortcut_replaces_only_its_listener_and_clear_keeps_it_disabled[translate_replace_selection_hotkey]" time="16.943" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_changed_shortcut_replaces_only_its_listener_and_clear_keeps_it_disabled[toggle_window_hotkey]" time="15.846" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_changed_shortcut_replaces_only_its_listener_and_clear_keeps_it_disabled[game_translate_hotkey]" time="17.741" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_external_registration_conflict_preserves_saved_shortcut_and_editor" time="22.627" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_unchanged_shortcut_can_retry_a_failed_registration" time="19.382" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_linux_saves_changed_shortcut_without_registering_a_windows_listener" time="21.027" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_import_does_not_enable_hotkeys_in_a_preview" time="9.610" />
+    <testcase classname="tests.test_windows_hotkey_lifecycle" name="test_import_stops_all_old_listeners_before_starting_changed_bindings" time="9.040" />
+  </testsuite>
+</testsuites>

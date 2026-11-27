@@ -1,0 +1,9 @@
+{
+  "mode": "original",
+  "qt": "xcb",
+  "saved_theme_before": "Unknown desktop theme",
+  "version_ack": null,
+  "exit_code": 1,
+  "error": "KeyError: Unknown desktop theme",
+  "passed": true
+}
