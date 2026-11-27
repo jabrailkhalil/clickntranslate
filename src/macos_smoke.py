@@ -299,9 +299,11 @@ def dropdown_screenshots(main, app, window, report_path, screenshots):
     """Check first/repeated list geometry in the frozen Cocoa application."""
     from PyQt5 import QtCore, QtWidgets
     from PyQt5.QtTest import QTest
+    from settings_sections import PAGE_DYNAMIC, PAGE_OCR, PAGE_TRANSLATION
 
     checked = []
     def inspect(combo, name, requested, effective):
+        assert combo.isVisible(), name
         previous = None
         for attempt in (1, 2):
             combo.showPopup()
@@ -354,14 +356,14 @@ def dropdown_screenshots(main, app, window, report_path, screenshots):
                 inspect(getattr(window, key), prefix + '-main-' + key, percent, actual)
             window.show_settings()
             settings = window.settings_window
-            settings._set_settings_page(0)
-            inspect(settings.result_window_control, prefix + '-settings-result_window_control', percent, actual)
-            settings._set_settings_page(1)
-            for key in ('ocr_engine_combo', 'translator_combo'):
-                inspect(getattr(settings, key), prefix + '-settings-' + key, percent, actual)
-            settings._set_settings_page(2)
-            for key in ('game_source_combo', 'game_target_combo'):
-                inspect(getattr(settings, key), prefix + '-settings-' + key, percent, actual)
+            for page, controls in (
+                (PAGE_TRANSLATION, ('result_window_control', 'translator_combo')),
+                (PAGE_OCR, ('ocr_engine_combo',)),
+                (PAGE_DYNAMIC, ('game_source_combo', 'game_target_combo')),
+            ):
+                settings._set_settings_page(page)
+                for key in controls:
+                    inspect(getattr(settings, key), prefix + '-settings-' + key, percent, actual)
             window.show_main_screen()
             result = main.TranslationResultDialog(window, 'Привет!', auto_copy=False,
                          lang='ru', theme=window.current_theme, source_text='Hello!',
@@ -518,7 +520,7 @@ def translation_draft_check(main, app, window, report_path, screenshots):
 
 def main_direction_and_theme_check(main, app, window):
     """Exercise the actual scaled buttons, including Argos before model setup."""
-    from PyQt5.QtCore import Qt
+    from PyQt5.QtCore import QElapsedTimer, Qt
     from PyQt5.QtTest import QTest
     previous = dict(window.config)
     results = {'direction_clicks': 0, 'theme_clicks': 0, 'theme_frames': 0}
@@ -547,6 +549,11 @@ def main_direction_and_theme_check(main, app, window):
             for _ in range(4):
                 previous_theme = window.current_theme
                 click(window.theme_button)
+                timer = QElapsedTimer()
+                timer.start()
+                while window._ui_operation.active and timer.elapsed() < 5000:
+                    QTest.qWait(10)
+                assert not window._ui_operation.active, (page, previous_theme)
                 expected_theme = 'Светлая' if previous_theme == 'Темная' else 'Темная'
                 assert window.current_theme == expected_theme, (page, previous_theme, window.current_theme)
                 assert window.config['theme'] == expected_theme
