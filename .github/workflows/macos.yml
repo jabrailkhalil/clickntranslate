@@ -1,20 +1,89 @@
-name: First opening of a quarantined Mac download
+name: Verify final installed and quarantined Mac packages
 on:
   workflow_dispatch:
     inputs:
       run_id:
         required: true
         type: string
-        description: Signed candidate workflow run
+        description: Source run containing the staged packages
       source_sha:
         required: true
         type: string
-        description: Exact source revision
+        description: Exact expected source commit
 permissions:
   contents: read
   actions: read
 jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: macos-15, arch: arm64}
+          - {runner: macos-15-intel, arch: x86_64}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 28
+    env:
+      TARGET_RUN: ${{ inputs.run_id }}
+      EXPECTED_SHA: ${{ inputs.source_sha }}
+      ARCH: ${{ matrix.arch }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+          path: release-source
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: release-source/tools/requirements/macos.txt
+      - name: Locate the exact candidate and architecture in Actions
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          [[ "$TARGET_RUN" =~ ^[0-9]+$ && "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$TARGET_RUN" --jq '.head_sha')" = "$EXPECTED_SHA"
+          for attempt in $(seq 1 55); do
+            if gh api "repos/$GITHUB_REPOSITORY/actions/runs/$TARGET_RUN/artifacts" --jq '.artifacts[].name' | grep -Fxq "macos-$ARCH-prepared"; then exit 0; fi
+            if [ "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$TARGET_RUN" --jq '.status')" = completed ]; then exit 1; fi
+            sleep 15
+          done
+          exit 1
+      - uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ github.token }}
+          name: macos-${{ matrix.arch }}-prepared
+          path: ${{ runner.temp }}/candidate
+      - name: Validate both hashes and install the unchanged signed DMG
+        run: |
+          set -eu
+          export CANDIDATE="$RUNNER_TEMP/candidate"
+          mkdir -p "$RUNNER_TEMP/cnt-dmg"
+          (cd "$CANDIDATE" && shasum -a 256 -c *"$ARCH".sha256)
+          dmg="$CANDIDATE/Click-n-Translate-1.8.3-macos-$ARCH.dmg"
+          hdiutil verify "$dmg"
+          hdiutil attach -readonly -nobrowse -mountpoint "$RUNNER_TEMP/cnt-dmg" "$dmg"
+          test ! -e /Applications/ClicknTranslate.app
+          sudo ditto "$RUNNER_TEMP/cnt-dmg/ClicknTranslate.app" /Applications/ClicknTranslate.app
+          hdiutil detach "$RUNNER_TEMP/cnt-dmg"
+          codesign --verify --deep --strict -R '=identifier "io.github.jabrailkhalil.clickntranslate" and certificate root = H"fc6752f0026d34e5b63433544af788b8fc1899ef"' /Applications/ClicknTranslate.app
+          python tools/qa_installed_macos_package.py
+      - name: Install the candidate's exact native Qt dependency set
+        working-directory: release-source
+        run: bash tools/setup_macos_env.sh
+      - name: Verify installed Chinese fallback faces and the candidate TIFF loader
+        run: release-source/.venv-macos/bin/python tools/qa_final_mac_resources.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: macos-${{ matrix.arch }}-installed
+          path: build/macos/trace/
+
   quarantine:
+    needs: verify
     runs-on: macos-15
     timeout-minutes: 7
     env:
