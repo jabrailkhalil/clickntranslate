@@ -547,6 +547,7 @@ class TestUpdaterCommands(unittest.TestCase):
             self.assertIn("Resolve-ComparablePath", script_text)
             self.assertIn("Stop-InstallProcesses", script_text)
             self.assertIn("^unins\\d*\\.(exe|dat|msg)$", script_text)
+            self.assertIn("[System.IO.Compression.ZipFile]::ExtractToDirectory($ZipPath, $extractDir)", script_text)
             self.assertIn("Update archive does not contain $ExeName", script_text)
             self.assertIn("-TargetPid", popen_mock.call_args.args[0])
         finally:

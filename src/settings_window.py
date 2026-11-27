@@ -15163,7 +15163,10 @@ try {
     Stop-InstallProcesses -InstallRoot $AppDir -KnownChildPids $knownChildPids
     $extractDir = Join-Path ([System.IO.Path]::GetTempPath()) ("clickntranslate_extract_" + [Guid]::NewGuid().ToString("N"))
     New-Item -Path $extractDir -ItemType Directory -Force | Out-Null
-    Expand-Archive -LiteralPath $ZipPath -DestinationPath $extractDir -Force
+    # The archive module shipped with newer PowerShell can be inherited by
+    # Windows PowerShell 5.1 and call an unavailable .NET overload.
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    [System.IO.Compression.ZipFile]::ExtractToDirectory($ZipPath, $extractDir)
     Write-UpdateLog "Archive unpacked to $extractDir"
 
     $exeMatch = Get-ChildItem -LiteralPath $extractDir -Filter $ExeName -File -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
