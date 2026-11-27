@@ -23,7 +23,7 @@ def settle(app):
     app.processEvents()
 
 
-def test_first_open_uses_the_final_field_width_when_layout_settles(app):
+def test_first_open_uses_the_final_size_when_layout_settles(app):
     owner = QtWidgets.QWidget()
     layout = QtWidgets.QVBoxLayout(owner)
     combo = DropDownCombo(owner)
@@ -39,12 +39,13 @@ def test_first_open_uses_the_final_field_width_when_layout_settles(app):
         # A scaled Cocoa page can finish laying out its field after Show.
         owner.resize(330, 100)
         settle(app)
-        first = popup_rect(combo).width()
+        first = popup_rect(combo).size()
         combo.hidePopup()
         combo.showPopup()
         settle(app)
         assert combo.width() < initial_field_width
-        assert first == popup_rect(combo).width() < initial_field_width
+        assert first.width() < initial_field_width
+        assert first == popup_rect(combo).size()
     finally:
         combo.hidePopup()
         owner.close()

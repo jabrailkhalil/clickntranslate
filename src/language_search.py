@@ -147,6 +147,8 @@ def prepare_language_search(combo):
     combo._language_empty.setStyleSheet(f"color:{colors['muted']}; background:transparent; border:0; padding:4px; font-size:{font_pixels}px;")
     # Replace a former host's explicit CSS font before measuring the new one.
     # QWidget.setFont alone cannot override an existing stylesheet font size.
+    search.ensurePolished()
+    combo._language_empty.ensurePolished()
     combo._language_empty.setFixedHeight(max(round(34*factor), combo._language_empty.fontMetrics().height()+round(12*factor)))
     search.setFixedHeight(max(round(32*factor), search.fontMetrics().height()+round(12*factor)))
     search.show()
