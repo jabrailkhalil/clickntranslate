@@ -9,6 +9,17 @@ import sys
 from unittest import mock
 
 
+def _wait_for(condition, context):
+    from PyQt5.QtCore import QElapsedTimer
+    from PyQt5.QtTest import QTest
+
+    timer = QElapsedTimer()
+    timer.start()
+    while not condition() and timer.elapsed() < 5000:
+        QTest.qWait(10)
+    assert condition(), context
+
+
 def package_preview(owner):
     """Render installed-package controls without starting catalogs or probes."""
     from settings_window import OcrLanguageManagerDialog
@@ -303,7 +314,7 @@ def dropdown_screenshots(main, app, window, report_path, screenshots):
 
     checked = []
     def inspect(combo, name, requested, effective):
-        assert combo.isVisible(), name
+        _wait_for(combo.isVisible, name)
         previous = None
         for attempt in (1, 2):
             combo.showPopup()
@@ -520,7 +531,7 @@ def translation_draft_check(main, app, window, report_path, screenshots):
 
 def main_direction_and_theme_check(main, app, window):
     """Exercise the actual scaled buttons, including Argos before model setup."""
-    from PyQt5.QtCore import QElapsedTimer, Qt
+    from PyQt5.QtCore import Qt
     from PyQt5.QtTest import QTest
     previous = dict(window.config)
     results = {'direction_clicks': 0, 'theme_clicks': 0, 'theme_frames': 0}
@@ -549,11 +560,7 @@ def main_direction_and_theme_check(main, app, window):
             for _ in range(4):
                 previous_theme = window.current_theme
                 click(window.theme_button)
-                timer = QElapsedTimer()
-                timer.start()
-                while window._ui_operation.active and timer.elapsed() < 5000:
-                    QTest.qWait(10)
-                assert not window._ui_operation.active, (page, previous_theme)
+                _wait_for(lambda: not window._ui_operation.active, (page, previous_theme))
                 expected_theme = 'Светлая' if previous_theme == 'Темная' else 'Темная'
                 assert window.current_theme == expected_theme, (page, previous_theme, window.current_theme)
                 assert window.config['theme'] == expected_theme
