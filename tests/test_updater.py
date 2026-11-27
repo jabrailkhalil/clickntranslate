@@ -477,7 +477,11 @@ class TestUpdaterCommands(unittest.TestCase):
             os.environ.get("SystemRoot", r"C:\Windows"),
             "System32", "WindowsPowerShell", "v1.0", "powershell.exe",
         )
-        return subprocess.run(
+        # The updater logs both a successful apply and a rollback before its shell exits.
+        # Keep each log with the synthetic installation so failing assertions can show it.
+        work = Path(app_dir).parent / "updater-temp"
+        work.mkdir()
+        result = subprocess.run(
             [
                 powershell,
                 "-NoProfile",
@@ -494,7 +498,12 @@ class TestUpdaterCommands(unittest.TestCase):
             timeout=60,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
             cwd=cwd,
+            env={**os.environ, "TEMP": str(work), "TMP": str(work)},
         )
+        log = work / "clickntranslate_update.log"
+        if log.is_file():
+            result.stderr += "\n" + log.read_text(encoding="mbcs", errors="replace")
+        return result
 
     def test_launch_zip_updater_generates_expected_script(self):
         dummy = types.SimpleNamespace()
@@ -653,7 +662,7 @@ class TestUpdaterCommands(unittest.TestCase):
             result = self._run_updater_script(script_path, app_dir, zip_path)
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertTrue(os.path.isfile(os.path.join(app_dir, "_internal", "new.txt")))
+            self.assertTrue(os.path.isfile(os.path.join(app_dir, "_internal", "new.txt")), result.stderr)
             self.assertFalse(os.path.exists(os.path.join(app_dir, "_internal", "old.txt")))
             self.assertTrue(os.path.isfile(os.path.join(app_dir, "data", "marker.txt")))
             self.assertFalse(any(name.startswith(".clickntranslate_backup_") for name in os.listdir(root)))
@@ -703,7 +712,7 @@ class TestUpdaterCommands(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertTrue(os.path.isfile(os.path.join(inner_dir, "_internal", "new.txt")))
+            self.assertTrue(os.path.isfile(os.path.join(inner_dir, "_internal", "new.txt")), result.stderr)
             self.assertFalse(os.path.exists(os.path.join(inner_dir, "_internal", "old.txt")))
             self.assertTrue(os.path.isfile(os.path.join(app_dir, "data", "marker.txt")))
             self.assertTrue(os.path.isfile(os.path.join(app_dir, "unins000.exe")))
@@ -758,7 +767,7 @@ class TestUpdaterCommands(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertTrue(os.path.isfile(os.path.join(inner_dir, "_internal", "new.txt")))
+            self.assertTrue(os.path.isfile(os.path.join(inner_dir, "_internal", "new.txt")), result.stderr)
             self.assertFalse(os.path.exists(os.path.join(inner_dir, "_internal", "old.txt")))
             self.assertTrue(os.path.isfile(os.path.join(app_dir, "data", "marker.txt")))
             try:
