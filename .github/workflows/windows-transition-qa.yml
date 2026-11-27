@@ -1,0 +1,111 @@
+name: Isolated Windows 1.8.2 to candidate transition
+on:
+  push:
+    branches: [codex/windows-transition-183-20261127]
+permissions:
+  contents: read
+jobs:
+  upgrade:
+    runs-on: windows-2022
+    timeout-minutes: 75
+    env:
+      PYTHONUTF8: '1'
+      PIP_DISABLE_PIP_VERSION_CHECK: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 05c30f30bc288b7b9ce582ae5952c3315f5fdb82
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.10'
+          cache: pip
+          cache-dependency-path: tools/requirements/windows.txt
+      - name: Verify published old package and exact candidate source
+        shell: python
+        run: |
+          import json
+          from pathlib import Path
+          import subprocess
+          import sys
+          sys.path.insert(0, str(Path.cwd() / 'tools'))
+          from qa_published_update import download, release
+          out=Path('build/transition-fixtures')
+          out.mkdir(parents=True)
+          sha=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
+          assert sha=='05c30f30bc288b7b9ce582ae5952c3315f5fdb82',sha
+          rel=release('1.8.2')
+          name='Click-n-Translate-1.8.2-windows-portable-x64.zip'
+          old,checksum=download(rel,name,out)
+          assert checksum=='8ee34cf794aa85764db549f7642b47630be3698c578d3ffbaeac1adc2f16429d'
+          (out/'build-receipt.json').write_text(json.dumps(dict(candidate_sha=sha,old_tag=rel['tag_name'],old_release_id=rel['id'],old_sha256=checksum),indent=2))
+      - name: Build exact candidate application and public Windows launcher
+        shell: pwsh
+        run: |
+          python -m venv .venv
+          ./.venv/Scripts/python.exe -m pip install -r tools/requirements/windows.txt pyinstaller
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          ./tools/stage_release.ps1 -Version 1.8.3 -StageName transition-candidate
+      - name: Package and hash the complete program
+        shell: python
+        run: |
+          import hashlib, json, shutil, subprocess
+          from pathlib import Path
+          root=Path.cwd().resolve()
+          out=root/'build/transition-fixtures'
+          stage=root/'releases/transition-candidate/ClicknTranslate'
+          pkg=out/'candidate-good.zip'
+          subprocess.run([str(root/'.venv/Scripts/python.exe'),'tools/package_windows_portable.py',str(stage),str(pkg),'1.8.3'], check=True)
+          metadata=json.loads((out/'build-receipt.json').read_text())
+          with pkg.open('rb') as source: metadata['candidate_sha256']=hashlib.file_digest(source,'sha256').hexdigest()
+          metadata['candidate_size']=pkg.stat().st_size
+          (out/'build-receipt.json').write_text(json.dumps(metadata,indent=2))
+          for path in (root/'dist',root/'build/ClicknTranslate'):
+              if path.exists() and path.resolve().is_relative_to(root):
+                  shutil.rmtree(path)
+      - name: Run the released helper and verify both real GUIs and user markers
+        shell: python
+        run: |
+          import json, subprocess
+          from pathlib import Path
+          root=Path.cwd()
+          out=root/'build/transition-fixtures'
+          m=json.loads((out/'build-receipt.json').read_text())
+          args=[str(root/'.venv/Scripts/python.exe'),'tools/qa_update_transition.py','--case','zip-182-to-183',
+                '--old-zip',str(out/'Click-n-Translate-1.8.2-windows-portable-x64.zip'),'--old-version','1.8.2','--old-sha256',m['old_sha256'],
+                '--new-zip',str(out/'candidate-good.zip'),'--new-version','1.8.3','--new-sha256',m['candidate_sha256']]
+          subprocess.run(args,check=True)
+      - name: Verify rollback after a candidate GUI cannot launch
+        shell: python
+        run: |
+          import hashlib, json, subprocess
+          from pathlib import Path
+          root=Path.cwd()
+          py=str(root/'.venv/Scripts/python.exe')
+          out=root/'build/transition-fixtures'
+          stage=root/'releases/transition-candidate/ClicknTranslate'
+          (stage/'app/ClicknTranslateApp.exe').write_bytes(b'Disposable rollback fixture: intentionally not executable.')
+          manifest=stage/'program-files.sha256'
+          subprocess.run(['attrib','-H',str(manifest)],check=True)
+          subprocess.run([py,'src/release_manifest.py','write',str(stage),'1.8.3'],check=True)
+          subprocess.run(['attrib','+H',str(manifest)],check=True)
+          broken=out/'candidate-cannot-start.zip'
+          subprocess.run([py,'tools/package_windows_portable.py',str(stage),str(broken),'1.8.3'],check=True)
+          m=json.loads((out/'build-receipt.json').read_text())
+          with broken.open('rb') as src: checksum=hashlib.file_digest(src,'sha256').hexdigest()
+          subprocess.run([py,'tools/qa_update_transition.py','--case','zip-182-rollback','--expect-rollback',
+                          '--old-zip',str(out/'Click-n-Translate-1.8.2-windows-portable-x64.zip'),'--old-version','1.8.2','--old-sha256',m['old_sha256'],
+                          '--new-zip',str(broken),'--new-version','1.8.3','--new-sha256',checksum],check=True)
+      - name: Keep receipts and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-182-transition-receipts
+          retention-days: 7
+          path: |
+            build/transition-fixtures/build-receipt.json
+            build/update-audit/*/result.json
+            build/update-audit/*/application.log
+            build/update-audit/*/updater.log
+            build/update-audit/*/old-ready.txt
+            build/update-audit/*/restart-ready.txt
