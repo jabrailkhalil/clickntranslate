@@ -11911,9 +11911,9 @@ class SettingsWindow(QWidget):
         self.translation_font_label.setBuddy(self.translation_font_control)
         self.translation_font_preview = QLabel(settings_text(lang, "translation_result_font_sample"))
         self.translation_font_preview.setObjectName("translationResultFontPreview")
-        # Use the spare right-column rows without increasing the fixed form's
-        # height. A 24px font needs more than a 28px input row for descenders.
-        self.translation_font_preview.setFixedSize(engine_combo_width, 40)
+        # The two reserved rows also fit scripts with taller fallback glyphs.
+        self.translation_font_preview.setFixedWidth(engine_combo_width)
+        self.translation_font_preview.setMinimumHeight(40)
         self.translation_font_preview.setAlignment(Qt.AlignCenter)
         self.translation_font_preview.setToolTip(font_tooltip)
         self._refresh_translation_font_preview()
