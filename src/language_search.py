@@ -47,8 +47,12 @@ def stable_search_popup_size(combo, desired):
     if search is None or search.isHidden():
         return desired
     previous = getattr(combo, '_language_popup_size', None)
-    size = QSize(max(desired.width(), previous.width()) if previous is not None else desired.width(),
-                 desired.height())
+    # An unfiltered menu tracks the field as its layout settles after Show.
+    # A query can hide the widest label, so retain the width while filtering.
+    width = desired.width()
+    if search.text() and previous is not None:
+        width = max(width, previous.width())
+    size = QSize(width, desired.height())
     combo._language_popup_size = QSize(size)
     return size
 
