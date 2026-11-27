@@ -15,6 +15,7 @@ from PyQt5 import QtGui, QtWidgets
 candidate = Path('release-source').resolve()
 sys.path[:0] = [str(candidate / 'src'), str(candidate)]
 from image_input import load_image
+import single_instance
 from tools.build_chinese_ui_font import FAMILY, interface_codepoints
 
 app = QtWidgets.QApplication([])
@@ -65,10 +66,12 @@ out = trace / 'final-resources.json'
 out.write_text(json.dumps(evidence, indent=2))
 with tempfile.TemporaryDirectory(prefix='cnt-theme-', dir='/tmp') as directory:
     profile = Path(directory)
-    runtime = profile / 'runtime'
+    runtime = profile / ('运行用户-' + '界' * 45)
     runtime.mkdir(mode=0o700)
-    socket_bytes = len(os.fsencode(runtime / 'clickntranslate.sock'))
-    assert socket_bytes < 100
+    requested_bytes = len(os.fsencode(runtime / single_instance.SOCKET_NAME))
+    socket_path = Path(single_instance.socket_path(runtime))
+    socket_bytes = len(os.fsencode(socket_path))
+    assert requested_bytes > 107 and socket_bytes <= 103
     data = profile / 'Library/Application Support/ClicknTranslate/data'
     data.mkdir(parents=True)
     preferences = {'theme': 'invalid-theme-macos-qa', 'interface_language': 'en', 'qa_marker': 'preserve',
@@ -93,13 +96,17 @@ with tempfile.TemporaryDirectory(prefix='cnt-theme-', dir='/tmp') as directory:
             repaired = json.loads((data / 'config.json').read_text())
             assert isinstance(repaired['theme'], str) and repaired['theme'] != preferences['theme']
             assert repaired['interface_language'] == 'en' and repaired['qa_marker'] == 'preserve'
+            ready_seconds = round(time.monotonic() - started, 2)
+            assert socket_path.is_socket()
+            second = subprocess.run([str(program), '--autostart'], env=env, capture_output=True,
+                                    text=True, timeout=30)
+            assert second.returncode == 0, (second.returncode, second.stderr)
+            assert child.poll() is None and single_instance.send_command('show', str(socket_path))
             evidence['invalid_theme_gui'] = {'version': ack.read_text(), 'input': preferences['theme'],
                                              'recovered_theme': repaired['theme'],
-                                             'test_socket_path_bytes': socket_bytes,
-                                             'previous_fixture_socket_path_bytes': len(os.fsencode(
-                                                 Path(tempfile.gettempdir()) / 'cnt-invalid-theme-00000000'
-                                                 / 'runtime/clickntranslate.sock')),
-                                             'seconds_to_gui': round(time.monotonic() - started, 2)}
+                                             'requested_socket_bytes': requested_bytes, 'bound_socket_bytes': socket_bytes,
+                                             'second_frozen_process_exit': second.returncode,
+                                             'first_process_still_accepts_show': True, 'seconds_to_gui': ready_seconds}
             import Quartz
             windows = Quartz.CGWindowListCopyWindowInfo(Quartz.kCGWindowListOptionOnScreenOnly, 0)
             candidates = [window for window in windows if int(window.get(Quartz.kCGWindowOwnerPID, -1)) == child.pid

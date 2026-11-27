@@ -10,11 +10,37 @@ on:
         required: true
         type: string
         description: Exact expected source commit
+      sockets_only:
+        required: false
+        type: boolean
+        default: false
+        description: Run the native Unix socket checks only
 permissions:
   contents: read
   actions: read
 jobs:
+  sockets:
+    if: inputs.sockets_only
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15, macos-15-intel, ubuntu-24.04]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install psutil
+      - name: Verify Unicode session directories and real owner and client processes
+        env:
+          PYTHONPATH: src
+        run: python -m unittest discover -s tests -p test_single_instance.py -v
   verify:
+    if: '!inputs.sockets_only'
     strategy:
       fail-fast: false
       matrix:
