@@ -35,7 +35,7 @@ def record(topic, combo, **kwargs):
         "control": point_rect(combo.geometry()), "popup": point_rect(popup.geometry()),
         "proxy": point_rect(proxy.geometry()) if proxy is not None else None,
         "canvas": point_rect(combo.window().rect()), "popup_min": dims(popup.minimumSize()),
-        "stable": dims(combo._language_popup_size) if combo._language_popup_size is not None else None,
+        "stable": dims(combo._language_popup_size) if getattr(combo, "_language_popup_size", None) is not None else None,
         "children": [[w.metaObject().className(),w.isHidden(),dims(w.minimumSizeHint()),dims(w.size())] for w in widgets if w is not None],
     }
     if proxy is not None:
