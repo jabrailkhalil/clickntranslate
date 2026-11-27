@@ -1,7 +1,7 @@
 name: Isolated Windows 1.8.2 to candidate transition
 on:
   push:
-    branches: [codex/windows-transition-183-20261127]
+    branches: [windows-transition-1.8.3-qa]
 permissions:
   contents: read
 jobs:
