@@ -24,7 +24,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'ndk;28.2.13676358' 'cmake;3.22.1'
       - run: python3 tools/check_android_tree.py --allow-project-reuse
-      - run: bash gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug --console plain -ParchiveCpuDebug=true -ParchiveNdkVersion=28.2.13676358
+      - run: bash gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug --console plain -ParchiveCpuDebug=true
+      - run: python3 tools/audit_apk.py --check-native-pages app/build/outputs/apk/debug/app-debug.apk
       - uses: actions/upload-artifact@v4
         if: always()
         with:

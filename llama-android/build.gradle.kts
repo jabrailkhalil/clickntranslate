@@ -20,16 +20,13 @@ plugins {
 // Only the explicitly requested Debug preview may omit Vulkan host shader generation.
 // Default Debug and every Release retain Vulkan; this is not a product feature reduction.
 val archiveCpuDebug = providers.gradleProperty("archiveCpuDebug").map { it.toBooleanStrict() }.orElse(false)
-val archiveNdkVersion = providers.gradleProperty("archiveNdkVersion").orElse("26.1.10909125")
 
 android {
     namespace = "com.arm.aichat"
     // Click'n'Translate :app 用 35，AGP 8.7.3 不支持 36；compileSdk 跟随主工程。
     compileSdk = 35
     buildToolsVersion = "35.0.0"
-    ndkVersion = archiveNdkVersion.get()
-
-    // Pin the NDK in both modules so local and CI native builds use the same toolchain.
+    ndkVersion = providers.gradleProperty("archiveNdkVersion").get()
 
     defaultConfig {
         minSdk = 33

@@ -12,9 +12,6 @@ hilt {
     enableAggregatingTask = true
 }
 
-// Explicit host-build override; the archived toolchain remains the default.
-val archiveNdkVersion = providers.gradleProperty("archiveNdkVersion").orElse("26.1.10909125")
-
 val localLlmGenerationThreads = providers
     .gradleProperty("localLlmGenerationThreads")
     .orElse("6")
@@ -50,7 +47,7 @@ android {
     namespace = "dev.clickn.translate"
     compileSdk = 35
     buildToolsVersion = "35.0.0"
-    ndkVersion = archiveNdkVersion.get()
+    ndkVersion = providers.gradleProperty("archiveNdkVersion").get()
 
     defaultConfig {
         applicationId = "dev.clickn.translate"
