@@ -21,22 +21,29 @@ permissions:
   contents: write
 
 jobs:
+  windows-plan:
+    if: inputs.platform != 'linux'
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: List earlier supported Windows releases
+        id: plan
+        env:
+          CANDIDATE: ${{ inputs.candidate }}
+        run: |
+          matrix=$(python3 tools/verify_update_evidence.py --matrix --version "$CANDIDATE")
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
   transition:
+    needs: windows-plan
     if: inputs.platform != 'linux'
     runs-on: windows-2022
     timeout-minutes: 20
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - {old: '1.6.0', mode: zip}
-          - {old: '1.6.1', mode: zip}
-          - {old: '1.7.0', mode: zip}
-          - {old: '1.7.0', mode: setup}
-          - {old: '1.8.0', mode: zip}
-          - {old: '1.8.0', mode: setup}
-          - {old: '1.8.1', mode: zip}
-          - {old: '1.8.1', mode: setup}
+      matrix: ${{ fromJSON(needs.windows-plan.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

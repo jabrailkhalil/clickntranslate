@@ -6,10 +6,22 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import re
 import zipfile
 
 REQUIRED = {('1.6.0', 'zip'), ('1.6.1', 'zip'), ('1.7.0', 'zip'),
-            ('1.7.0', 'setup'), ('1.8.0', 'zip'), ('1.8.0', 'setup')}
+            ('1.7.0', 'setup'), ('1.8.0', 'zip'), ('1.8.0', 'setup'),
+            ('1.8.1', 'zip'), ('1.8.1', 'setup'), ('1.8.2', 'zip'), ('1.8.2', 'setup')}
+
+
+def required_transitions(version):
+    if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', version):
+        raise ValueError('Use a numeric three-part candidate version without v')
+    target = tuple(map(int, version.split('.')))
+    result = {(old, mode) for old, mode in REQUIRED if tuple(map(int, old.split('.'))) < target}
+    if not result:
+        raise ValueError('No earlier supported Windows release for this candidate')
+    return result
 
 
 def sha256(path):
@@ -18,6 +30,7 @@ def sha256(path):
 
 
 def verify(candidate, version, receipts):
+    required = required_transitions(version)
     archive = candidate / f'Click-n-Translate-{version}-windows-portable-x64.zip'
     setup = candidate / f'Click-n-Translate-{version}-windows-x64-installer.exe'
     zip_hash, setup_hash = sha256(archive), sha256(setup)
@@ -28,7 +41,7 @@ def verify(candidate, version, receipts):
     for path in receipts:
         receipt = json.loads(path.read_text(encoding='utf-8'))
         key = (receipt.get('old_version'), receipt.get('mode'))
-        if key not in REQUIRED:
+        if key not in required:
             continue
         valid = (
             receipt.get('status') == 'passed'
@@ -50,7 +63,7 @@ def verify(candidate, version, receipts):
             accepted[key] = str(path)
         else:
             rejected.append(str(path))
-    missing = REQUIRED - accepted.keys()
+    missing = required - accepted.keys()
     return {'passed': not missing, 'version': version, 'zip_sha256': zip_hash,
             'setup_sha256': setup_hash, 'program_files': count,
             'accepted': {old + '/' + mode: path for (old, mode), path in sorted(accepted.items())},
@@ -59,10 +72,20 @@ def verify(candidate, version, receipts):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--candidate', type=Path, required=True)
     parser.add_argument('--version', required=True)
-    parser.add_argument('--receipts', type=Path, required=True)
+    parser.add_argument('--matrix', action='store_true', help='Print the GitHub Actions matrix for this candidate')
+    parser.add_argument('--candidate', type=Path)
+    parser.add_argument('--receipts', type=Path)
     args = parser.parse_args()
+    if args.matrix:
+        try:
+            transitions = sorted(required_transitions(args.version))
+        except ValueError as error:
+            parser.error(str(error))
+        print(json.dumps({'include': [{'old': old, 'mode': mode} for old, mode in transitions]}))
+        raise SystemExit(0)
+    if not args.candidate or not args.receipts:
+        parser.error('--candidate and --receipts are required to verify update evidence')
     result = verify(args.candidate, args.version, args.receipts.rglob('result.json'))
     print(json.dumps(result, indent=2))
     raise SystemExit(0 if result['passed'] else 1)
