@@ -69,7 +69,7 @@ with tempfile.TemporaryDirectory(prefix='cnt-invalid-theme-') as directory:
     runtime.mkdir(mode=0o700)
     data = profile / 'Library/Application Support/ClicknTranslate/data'
     data.mkdir(parents=True)
-    preferences = {'theme': 'invalid-theme-macos-qa', 'interface_language': 'en',
+    preferences = {'theme': 'invalid-theme-macos-qa', 'interface_language': 'en', 'qa_marker': 'preserve',
                    'show_update_info': False, 'update_check_on_launch': False,
                    'first_run_guide_completed': True, 'first_run_guide_pending': False}
     (data / 'config.json').write_text(json.dumps(preferences))
@@ -88,7 +88,11 @@ with tempfile.TemporaryDirectory(prefix='cnt-invalid-theme-') as directory:
                 raise AssertionError(f'Invalid-theme profile failed to start: {child.poll()}, '
                                      f'{(profile / "startup.log").read_text()[-1500:]}')
             assert ack.read_text() == '1.8.3'
+            repaired = json.loads((data / 'config.json').read_text())
+            assert isinstance(repaired['theme'], str) and repaired['theme'] != preferences['theme']
+            assert repaired['interface_language'] == 'en' and repaired['qa_marker'] == 'preserve'
             evidence['invalid_theme_gui'] = {'version': ack.read_text(), 'input': preferences['theme'],
+                                             'recovered_theme': repaired['theme'],
                                              'seconds_to_gui': round(time.monotonic() - started, 2)}
             import Quartz
             windows = Quartz.CGWindowListCopyWindowInfo(Quartz.kCGWindowListOptionOnScreenOnly, 0)
