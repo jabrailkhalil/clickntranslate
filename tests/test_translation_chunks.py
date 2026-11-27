@@ -221,7 +221,10 @@ def test_cache_never_crosses_provider_or_custom_server_boundaries(isolated_trans
     assert cache.get('Hello', 'google') is None
     cache.save('Hello', 'From server A', 'libretranslate')
     monkeypatch.setenv('CLICKNTRANSLATE_LIBRETRANSLATE_URL', 'https://other.example.test')
-    assert cache.get('Hello', 'libretranslate') is None
+    # An in-flight operation keeps A's identity even after settings change.
+    assert cache.get('Hello', 'libretranslate') == 'From server A'
+    new_operation = translater._TranslationCache('en', 'ru')
+    assert new_operation.get('Hello', 'libretranslate') is None
 
 
 def test_rate_limit_stops_remaining_batches_but_keeps_cached_results(isolated_translation, monkeypatch):

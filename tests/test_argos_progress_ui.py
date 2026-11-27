@@ -40,6 +40,8 @@ class ArgosProgressUiTest(unittest.TestCase):
         dummy = SimpleNamespace(
             current_interface_language="ru",
             _main_translation_running=False,
+            settings_window=None,
+            _cached_settings_window=None,
             _argos_install_required=False,
             _argos_cancel_enabled=False,
             _argos_active_pair="",
@@ -138,9 +140,9 @@ class ArgosProgressUiTest(unittest.TestCase):
             self.assertFalse(dialog.install_button.autoDefault())
             self.assertIn("argosRouteCard", dialog.styleSheet())
             if theme == "Темная":
-                self.assertIn("background: #111216", dialog.styleSheet())
+                self.assertIn("background: #111111", dialog.styleSheet())
             else:
-                self.assertIn("background: #ece7f0", dialog.styleSheet())
+                self.assertIn("background: #f0ecf3", dialog.styleSheet())
             dialog.close()
 
     def test_package_prompt_buttons_return_the_expected_result(self):
@@ -181,9 +183,9 @@ class ArgosProgressUiTest(unittest.TestCase):
             self.assertGreaterEqual(dialog.close_button.width(), dialog.close_button.sizeHint().width())
             self.assertFalse(dialog.close_button.autoDefault())
             if theme == "Темная":
-                self.assertIn("background: #111216", dialog.styleSheet())
+                self.assertIn("background: #111111", dialog.styleSheet())
             else:
-                self.assertIn("background: #ece7f0", dialog.styleSheet())
+                self.assertIn("background: #f0ecf3", dialog.styleSheet())
             dialog.close()
 
     def test_translation_error_dialog_has_localized_fallback_for_empty_error(self):
@@ -200,6 +202,8 @@ class ArgosProgressUiTest(unittest.TestCase):
             current_theme="Темная",
             _argos_active_pair="RU→PT",
             _main_active_engine="argos",
+            _argos_cancel_requested=threading.Event(),
+            _argos_install_required=False,
             _finish_main_translation_state=mock.Mock(),
             _show_argos_translation_error=mock.Mock(),
         )

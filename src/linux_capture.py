@@ -252,15 +252,22 @@ def capture_with_portal():
 
 
 def uri_to_path(uri):
-    """Local filesystem path for a file:// URI."""
+    """Decode explicitly local file URIs, retaining legacy plain paths."""
     from urllib.parse import unquote, urlparse
 
     text = str(uri or "")
     if not text:
         return ""
-    if not text.startswith("file://"):
+    if not text.lower().startswith("file:"):
         return text
-    parsed = urlparse(text)
+    try:
+        parsed = urlparse(text)
+    except ValueError:
+        return ""
+    # Dropping a remote authority could load and then delete a different local
+    # file with the same path. No hostname lookup is needed for local forms.
+    if parsed.netloc.lower() not in ("", "localhost") or not parsed.path.startswith('/'):
+        return ""
     return unquote(parsed.path)
 
 

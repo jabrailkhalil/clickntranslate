@@ -10,6 +10,17 @@ import settings_window
 from qt_layout_test_support import ensure_layout_fonts
 
 
+def assert_label_near_field(label, control):
+    alignment = QStyle.visualAlignment(label.layoutDirection(), label.alignment())
+    ink = label.style().itemTextRect(label.fontMetrics(), label.contentsRect(),
+                                    alignment, label.isEnabled(), label.text())
+    ink.moveTopLeft(label.mapTo(control.parentWidget(), ink.topLeft()))
+    field = control.geometry()
+    gap = (ink.left() - field.right() - 1 if label.isRightToLeft()
+           else field.left() - ink.right() - 1)
+    assert 0 <= gap <= 18, (label.text(), gap, ink, field)
+
+
 @pytest.fixture
 def window():
     app = QApplication.instance() or QApplication([])
@@ -28,7 +39,7 @@ def window():
         app.processEvents()
 
 
-@pytest.mark.parametrize('language', ['ru', 'en', 'es', 'de', 'fr', 'zh', 'pt', 'it'])
+@pytest.mark.parametrize('language', tuple(main.INTERFACE_LANGUAGE_BY_CODE))
 @pytest.mark.parametrize('theme', ['Темная', 'Светлая'])
 def test_translation_controls_fit_all_languages_and_scales(window, language, theme):
     if window.current_theme != theme:
@@ -36,26 +47,41 @@ def test_translation_controls_fit_all_languages_and_scales(window, language, the
     window.set_interface_language(language)
     window.show_settings()
     settings = window.settings_window
-    for scale in (80, 100, 120, 150):
+    for scale in (80, 100, 125, 150, 200):
         window._ui_scale_controller.set_percent(scale)
         settings._set_settings_page(1)
         QApplication.processEvents()
+        for label, control in ((settings.translator_engine_label, settings.translator_combo),
+                               (settings.result_window_label, settings.result_window_control)):
+            assert_label_near_field(label, control)
         scroll = settings.translation_settings_scroll
         assert scroll.horizontalScrollBar().maximum() == 0
-        for control in (settings.ocr_engine_combo, settings.translator_combo,
-                        settings.close_result_on_outside_click_checkbox,
-                        settings.ocr_join_paragraphs_checkbox,
-                        settings.copy_notification_checkbox):
+        for control in (settings.translator_combo, settings.result_window_control,
+                        settings.close_result_on_outside_click_checkbox):
+            scroll.ensureWidgetVisible(control, 0, 0)
+            QApplication.processEvents()
             rect = QRect(control.mapTo(scroll.viewport(), QPoint()), control.size())
             assert scroll.viewport().rect().contains(rect), (language, scale, control.objectName(), rect)
         for flag in (settings.copy_translated_checkbox, settings.restore_clipboard_checkbox,
-                     settings.ocr_join_paragraphs_checkbox,
                      settings.close_result_on_outside_click_checkbox):
             assert flag.fontMetrics().horizontalAdvance(flag.text()) + 30 <= flag.width() + 2, (language, flag.text())
+        settings._set_settings_page(4)
+        QApplication.processEvents()
+        assert_label_near_field(settings.ocr_engine_label, settings.ocr_engine_combo)
+        scroll = settings.ocr_settings_scroll
+        assert scroll.horizontalScrollBar().maximum() == 0
+        for control in (settings.ocr_engine_combo, settings.ocr_join_paragraphs_checkbox,
+                        settings.freeze_screen_checkbox, settings.keep_visible_checkbox,
+                        settings.copy_notification_checkbox):
+            scroll.ensureWidgetVisible(control, 0, 0)
+            QApplication.processEvents()
+            rect = QRect(control.mapTo(scroll.viewport(), QPoint()), control.size())
+            assert scroll.viewport().rect().contains(rect), (language, scale, control.objectName(), rect)
         settings._set_settings_page(0)
         QApplication.processEvents()
         page = settings.settings_general_page
-        for control in (settings.result_window_control, settings.translation_font_control,
+        assert not hasattr(settings, 'interface_language_button')
+        for control in (settings.translation_font_control,
                         settings.translation_font_preview, settings.ui_scale_control,
                         settings.copy_history_checkbox, settings.history_checkbox):
             rect = QRect(control.mapTo(page, QPoint()), control.size())
@@ -66,12 +92,12 @@ def test_translation_controls_fit_all_languages_and_scales(window, language, the
 def test_flags_persist_and_ocr_options_are_reachable(window):
     window.show_settings()
     settings = window.settings_window
-    settings._set_settings_page(1)
-    for key, flag in (
-        ('close_result_window_on_outside_click', settings.close_result_on_outside_click_checkbox),
-        ('ocr_join_paragraphs', settings.ocr_join_paragraphs_checkbox),
-        ('freeze_screen_on_ocr', settings.freeze_screen_checkbox),
+    for page, key, flag in (
+        (1, 'close_result_window_on_outside_click', settings.close_result_on_outside_click_checkbox),
+        (4, 'ocr_join_paragraphs', settings.ocr_join_paragraphs_checkbox),
+        (4, 'freeze_screen_on_ocr', settings.freeze_screen_checkbox),
     ):
+        settings._set_settings_page(page)
         flag.setChecked(False)
         flag.click()
         assert window.config[key] is True
@@ -79,7 +105,8 @@ def test_flags_persist_and_ocr_options_are_reachable(window):
     assert settings.keep_visible_checkbox.isVisible()
     assert not hasattr(settings, 'ocr_options_button')
     assert not hasattr(settings, 'selection_quick_translate_checkbox')
-    settings.translation_settings_scroll.ensureWidgetVisible(settings.copy_notification_checkbox)
+    settings._set_settings_page(4)
+    settings.ocr_settings_scroll.ensureWidgetVisible(settings.copy_notification_checkbox)
     QApplication.processEvents()
     assert not settings.copy_notification_checkbox.visibleRegion().isEmpty()
     settings.show_hotkeys_screen()
@@ -140,7 +167,7 @@ def test_unavailable_update_stays_in_app_without_a_release_download_link(window,
         assert 'GitHub' not in panel.label.text()
 
 
-@pytest.mark.parametrize('language', ['ru','en','es','de','fr','zh','pt','it'])
+@pytest.mark.parametrize('language', ['ru','en','es','de','fr','zh','pt','it','ar','tr','hi','id'])
 def test_api_editor_lives_in_packages_and_fits(window, language):
     from provider_settings import show_provider_settings
     from api_providers import PROVIDERS
@@ -174,27 +201,73 @@ def test_api_editor_lives_in_packages_and_fits(window, language):
 def test_translation_footer_matches_general_button_rows(window):
     window.show_settings()
     settings=window.settings_window
-    for button in (settings.ocr_languages_btn,settings.copy_history_btn,settings.translation_history_btn):
-        assert button.height() == settings.clear_cache_btn.height()
-        assert button.font().pixelSize() == settings.clear_cache_btn.font().pixelSize()
+    for button in (settings.ocr_languages_btn, settings.translation_offline_button,
+                   settings.translation_api_button, settings.ocr_api_button):
+        assert button.height() == settings.hotkeys_button.height()
+        assert button.font().pixelSize() == settings.hotkeys_button.font().pixelSize()
         assert 'padding:0 6px' in button.styleSheet()
 
 
 def test_api_theme_switch_refreshes_form_and_popups(window):
     from provider_settings import show_provider_settings
+    from classic_style import classic_palette
+    from PyQt5.QtGui import QPalette
     window.show_settings()
     settings=window.settings_window
     with mock.patch('provider_secrets.get_key',return_value=''), \
          mock.patch.object(settings_window.OcrLanguageManagerDialog, '_start_runtime_probe'), \
          mock.patch.object(settings_window.OcrLanguageManagerDialog, '_start_argos_catalog_refresh'):
         page=show_provider_settings(settings)
-        for theme, field in (('Светлая','#f3eff5'), ('Темная','#17181d'), ('Светлая','#f3eff5')):
+        for theme, field in (('Светлая','#e9e4ed'), ('Темная','#17181d'), ('Светлая','#e9e4ed')):
             if window.current_theme != theme:
                 window.toggle_theme()
             QApplication.processEvents()
             assert field in page.styleSheet()
             for combo in (page.service, page.usage):
-                assert ('#f1edf4' if theme == 'Светлая' else '#20212a') in combo.styleSheet()
+                assert field in combo.styleSheet()
+                assert combo.popup_colors()['surface'] == field
+            for editor in (page.address, page.key, page.model):
+                assert editor.palette().color(QPalette.PlaceholderText).name() == classic_palette(theme != 'Светлая')['muted']
+        settings._language_manager_dialog.close()
+
+
+@pytest.mark.parametrize('language', ['en', 'ar'])
+def test_api_inline_feedback_is_visible_while_permanent_help_stays_on_the_fields(window, language):
+    from provider_settings import show_provider_settings, connection_text, provider_text
+    window.set_interface_language(language)
+    window.show_settings()
+    settings = window.settings_window
+    with (mock.patch('provider_secrets.get_key', return_value=''),
+          mock.patch('provider_secrets.set_key', return_value=False) as save_key,
+          mock.patch.object(settings_window.OcrLanguageManagerDialog, '_start_runtime_probe'),
+          mock.patch.object(settings_window.OcrLanguageManagerDialog, '_start_argos_catalog_refresh')):
+        page = show_provider_settings(settings, 'openai-compatible')
+        for theme in ('Темная', 'Светлая'):
+            if window.current_theme != theme:
+                window.toggle_theme()
+            QApplication.processEvents()
+            assert page.note.isHidden()
+            assert page.note.text() in page.usage.accessibleDescription()
+            assert provider_text(language, 'help') in page.usage.accessibleDescription()
+            page.model.clear()
+            page.address.setText('https://example.test/v1')
+            page.save.click()
+            QApplication.processEvents()
+            assert page.status.isVisible()
+            assert page.status.text() == connection_text(language, 8)
+            page.model.setText('qa-model')
+            page.key.setText('qa-only-key')
+            page.save.click()
+            QApplication.processEvents()
+            assert page.status.isVisible()
+            assert page.status.text() == provider_text(language, 'session')
+            page.scroll.ensureWidgetVisible(page.status)
+            QApplication.processEvents()
+            assert page.status.heightForWidth(page.status.width()) <= page.status.height()
+            assert 'qa-only-key' not in json.dumps(window.config)
+            page.load_profile()
+            assert page.status.isHidden()
+        assert save_key.call_count == 2
         settings._language_manager_dialog.close()
 
 

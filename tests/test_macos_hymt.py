@@ -61,9 +61,11 @@ def test_mac_hymt_failure_keeps_selected_translator(monkeypatch):
     monkeypatch.setattr(platform_support, 'IS_MAC', True)
     owner = SimpleNamespace(parent=SimpleNamespace(current_interface_language='ru'),
         _finish_hymt_install_state=mock.Mock(), _hide_hymt_progress=mock.Mock(),
-        _restore_settings_view=mock.Mock(), auto_save_setting=mock.Mock())
+        _restore_settings_view=mock.Mock(), auto_save_setting=mock.Mock(),
+        _report_engine_task=mock.Mock())
     warning = mock.Mock()
     monkeypatch.setattr(sw.QMessageBox, 'warning', warning)
     sw.SettingsWindow._on_hymt_install_failed(owner, 'checksum mismatch')
     owner.auto_save_setting.assert_not_called()
     assert 'checksum mismatch' in warning.call_args.args[-1]
+    owner._report_engine_task.assert_called_once_with('hymt', 'checksum mismatch', kind='failed')

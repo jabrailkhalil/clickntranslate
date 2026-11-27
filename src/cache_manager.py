@@ -284,7 +284,7 @@ def _load_translation_cache(data_dir):
                         except (ValueError, TypeError, OverflowError):
                             entry[stamp] = 0
                     clean[key] = entry
-        except (OSError, ValueError):
+        except (OSError, ValueError, RecursionError):
             pass
         if len(clean) > MAX_TRANSLATION_CACHE:
             clean = dict(sorted(clean.items(), key=lambda item: item[1]['accessed'])[-MAX_TRANSLATION_CACHE:])

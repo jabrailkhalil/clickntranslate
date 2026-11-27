@@ -2,7 +2,7 @@ param(
     [string]$IdentityName = "JabrailDigital.ClicknTranslate.Test",
     [string]$Publisher = "CN=Jabrail Digital Test",
     [string]$PublisherDisplayName = "Jabrail Digital",
-    [string]$Version = "1.8.2.0",
+    [string]$Version = "1.8.3.0",
     [string]$BuildPath = "",
     [string]$OutputPath = "",
     [string]$CertificatePath = "",
@@ -55,6 +55,8 @@ if (-not $SkipPyInstaller) {
     if (-not (Test-Path -LiteralPath $python)) {
         throw "Python environment not found: $python"
     }
+    & $python (Join-Path $repoRoot 'tools/prepare_rapidocr_models.py')
+    if ($LASTEXITCODE -ne 0) { throw 'PP-OCRv5 model preparation failed.' }
     & $python -m PyInstaller (Join-Path $repoRoot "tools/packaging/ClicknTranslate.spec") --clean --noconfirm
     if ($LASTEXITCODE -ne 0) {
         throw "PyInstaller build failed with exit code $LASTEXITCODE."
@@ -109,11 +111,16 @@ $manifest = $manifest.Replace("__VERSION__", $Version)
     [System.Text.UTF8Encoding]::new($false)
 )
 
-$makeAppx = Get-ChildItem -Path "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\makeappx.exe" |
+$sdkTools = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\bin\*\x64\makeappx.exe'
+$makeAppx = Get-ChildItem -Path $sdkTools -File -ErrorAction SilentlyContinue |
     Sort-Object -Property FullName -Descending |
     Select-Object -First 1
 if (-not $makeAppx) {
-    throw "MakeAppx.exe was not found. Install the Windows SDK."
+    $sdkCommand = Get-Command makeappx.exe -CommandType Application -ErrorAction SilentlyContinue
+    if ($sdkCommand) { $makeAppx = Get-Item -LiteralPath $sdkCommand.Source }
+}
+if (-not $makeAppx) {
+    throw "MakeAppx.exe was not found. Install the Windows SDK or add its tools directory to PATH."
 }
 
 if (-not $OutputPath) {

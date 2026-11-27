@@ -1,19 +1,56 @@
 """Filter language popup rows in place, retaining the original item indexes."""
-from PyQt5.QtCore import Qt, QEvent, QObject
-from PyQt5.QtWidgets import QLineEdit, QApplication
+from PyQt5.QtCore import Qt, QEvent, QObject, QSize
+from PyQt5.QtWidgets import QLineEdit, QLabel, QApplication
+from PyQt5.QtGui import QFont, QFontInfo
 from languages import LANGUAGES, LOCALIZED_LANGUAGE_NAMES, AUTO_LANGUAGE_NAMES
 
 _NAMES = {l.code for l in LANGUAGES} | {l.short_label for l in LANGUAGES}
 for _mapping in LOCALIZED_LANGUAGE_NAMES.values():
     _NAMES.update(_mapping.values())
 _NAMES.update(AUTO_LANGUAGE_NAMES.values())
+SEARCH_TEXT = {
+    'en': ('Find a language…', 'No languages found'),
+    'ru': ('Найти язык…', 'Языки не найдены'),
+    'es': ('Buscar idioma…', 'No se encontraron idiomas'),
+    'de': ('Sprache suchen…', 'Keine Sprachen gefunden'),
+    'fr': ('Rechercher une langue…', 'Aucune langue trouvée'),
+    'zh': ('搜索语言…', '未找到语言'),
+    'pt': ('Encontre um idioma…', 'Nenhum idioma encontrado'),
+    'it': ('Trova una lingua…', 'Nessuna lingua trovata'),
+    'ar': ('ابحث عن لغة…', 'لم يتم العثور على لغات'),
+    'tr': ('Dil bul…', 'Dil bulunamadı'),
+    'hi': ('भाषा खोजें…', 'कोई भाषा नहीं मिली'),
+    'id': ('Cari bahasa…', 'Bahasa tidak ditemukan'),
+}
 _SEARCH_TERMS = {}
+_OPTION_CODES = {}
 for _language in LANGUAGES:
     _terms = [_language.code, _language.english_name, _language.russian_name]
     _terms += [_language.display_name(locale) for locale in LOCALIZED_LANGUAGE_NAMES]
     _joined = '\n'.join(_terms).casefold()
     for _term in _terms + [_language.short_label]:
         _SEARCH_TERMS[_term] = _joined
+        _OPTION_CODES[_term.strip().casefold()] = _language.code
+
+
+def language_code_for_option_text(label):
+    return _OPTION_CODES.get(str(label).strip().casefold())
+
+
+def stable_search_popup_size(combo, desired):
+    """Keep row/flag columns stable, while height follows the search results.
+
+    DropDownCombo pins the first placement separately, so shrinking an
+    above-field menu does not move the search box or flip it below its field.
+    """
+    search = getattr(combo, '_language_search', None)
+    if search is None or search.isHidden():
+        return desired
+    previous = getattr(combo, '_language_popup_size', None)
+    size = QSize(max(desired.width(), previous.width()) if previous is not None else desired.width(),
+                 desired.height())
+    combo._language_popup_size = QSize(size)
+    return size
 
 
 class _SearchKeys(QObject):
@@ -44,54 +81,73 @@ class _SearchKeys(QObject):
 
 
 def prepare_language_search(combo):
-    # Engine/mode pickers retain their existing appearance and behaviour.
+    # Short menus do not need an input. A language provider can change while
+    # the same control survives, so remove the previous search chrome as well.
     if combo.count() < 12 or sum(combo.itemText(i) in _NAMES or str(combo.itemData(i)) in _NAMES
                                 for i in range(combo.count())) < combo.count() * .8:
+        if getattr(combo, '_language_search', None) is not None:
+            combo._language_search.clear()
+            combo._language_search.hide()
+            combo._language_empty.hide()
+            combo.itemDelegate().invalidate_metrics()
         return
     search = getattr(combo, '_language_search', None)
     if search is None:
         popup = combo.view().window()
         search = QLineEdit(popup)
         search.setObjectName('languageSearch')
-        lang = getattr(combo, 'interface_language', 'en')
-        owner = combo
-        while owner is not None:
-            config = getattr(owner, 'config', None)
-            if not isinstance(config, dict):
-                config = getattr(getattr(owner, 'parent', None), 'config', None)
-            if isinstance(config, dict):
-                lang = config.get('interface_language', lang)
-                break
-            owner = owner.parentWidget()
-        search.setPlaceholderText({'ru': 'Найти язык…', 'es': 'Buscar idioma…', 'de': 'Sprache suchen…',
-                                   'fr': 'Rechercher une langue…', 'zh': '搜索语言…',
-            'pt': 'Encontre um idioma…',
-            'it': 'Trova una lingua...',
-        }.get(lang, 'Find a language…'))
-        search.setAccessibleName(search.placeholderText())
         search.setClearButtonEnabled(True)
         popup.layout().insertWidget(0, search)
         combo._language_search = search
+        combo._language_empty = QLabel(popup)
+        combo._language_empty.setObjectName('languageSearchEmpty')
+        combo._language_empty.setAlignment(Qt.AlignCenter)
+        popup.layout().insertWidget(1, combo._language_empty)
+        combo._language_empty.hide()
         combo._language_search_keys = _SearchKeys(combo)
         search.installEventFilter(combo._language_search_keys)
 
         def apply_filter(text):
             query = text.strip().casefold()
+            matches = 0
             for row in range(combo.count()):
                 value = combo.itemData(row)
                 terms = _SEARCH_TERMS.get(str(value), _SEARCH_TERMS.get(combo.itemText(row), combo.itemText(row).casefold()))
-                combo.view().setRowHidden(row, bool(query and query not in terms))
+                hidden = bool(query and query not in terms)
+                combo.view().setRowHidden(row, hidden)
+                matches += not hidden
+            combo._language_empty.setVisible(not matches)
             combo.view().doItemsLayout()
+            combo.view().verticalScrollBar().setValue(0)
             combo._queue_popup_layout()
         search.textChanged.connect(apply_filter)
     combo.setMaxVisibleItems(8)
-    search.setFont(combo.font())
-    search.setFixedHeight(max(28, combo.fontMetrics().height() + 10))
-    dark = getattr(combo, '_popup_background', '#20212a')
-    from PyQt5.QtGui import QColor
-    is_dark = QColor(dark).lightness() < 128
-    search.setStyleSheet('QLineEdit { background:%s; color:%s; border:1px solid #786989; border-radius:4px; padding:3px 6px; }' %
-                        ('#20212a' if is_dark else '#f1edf4', '#f4f6fb' if is_dark else '#202124'))
+    from combo_popup import popup_scale
+    from dialog_text import dialog_language
+    factor = popup_scale(combo)
+    colors = combo.popup_colors()
+    labels = SEARCH_TEXT.get(dialog_language(combo), SEARCH_TEXT['en'])
+    search.setPlaceholderText(labels[0])
+    search.setAccessibleName(labels[0])
+    combo._language_empty.setText(labels[1])
+    from combo_popup import popup_font
+    font = popup_font(combo)
+    font.setWeight(QFont.Normal)
+    font_pixels = font.pixelSize() if font.pixelSize() > 0 else QFontInfo(font).pixelSize()
+    search.setFont(font)
+    combo._language_empty.setFont(font)
+    search.setStyleSheet(f'''QLineEdit {{ background:{colors['surface']}; color:{colors['text']};
+        border:1px solid {colors['border']}; border-radius:{round(5*factor)}px;
+        padding:0 {round(9*factor)}px; font-size:{font_pixels}px; font-weight:400; }}
+        QLineEdit:focus {{ border-color:{colors['accent']}; }}''')
+    combo._language_empty.setStyleSheet(f"color:{colors['muted']}; background:transparent; border:0; padding:4px; font-size:{font_pixels}px;")
+    # Replace a former host's explicit CSS font before measuring the new one.
+    # QWidget.setFont alone cannot override an existing stylesheet font size.
+    combo._language_empty.setFixedHeight(max(round(34*factor), combo._language_empty.fontMetrics().height()+round(12*factor)))
+    search.setFixedHeight(max(round(32*factor), search.fontMetrics().height()+round(12*factor)))
+    search.show()
+    combo.itemDelegate().invalidate_metrics()
     search.clear()
+    combo._language_empty.hide()
     for row in range(combo.count()):
         combo.view().setRowHidden(row, False)

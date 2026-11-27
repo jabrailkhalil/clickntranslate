@@ -59,6 +59,15 @@ def run():
                         '-o', 'faulthandler_timeout=90',
                         '-o', 'cache_dir=' + str(output / 'pytest-cache'),
                         '--junitxml=' + str(output / 'results.xml'), *(arguments or ['tests'])])
+    # Dispose of test-owned widgets while QApplication and its proxy styles
+    # are still alive. Some standalone hosts do not use the normal app loop.
+    from PyQt5.QtCore import QEvent
+    from PyQt5 import sip
+    for widget in list(QApplication.topLevelWidgets()):
+        if not sip.isdeleted(widget):
+            widget.deleteLater()
+    QApplication.sendPostedEvents(None, QEvent.DeferredDelete)
+    app.processEvents()
     after = data_hashes()
     unchanged = before == after
     code = int(code) if unchanged else 1

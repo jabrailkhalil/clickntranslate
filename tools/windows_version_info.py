@@ -27,7 +27,7 @@ def make_version_info(version, filename, description):
                 StringStruct("FileVersion", ".".join(map(str, parts))),
                 StringStruct("InternalName", filename.removesuffix(".exe")),
                 StringStruct("OriginalFilename", filename),
-                StringStruct("ProductName", "Click'n'Translate"),
+                StringStruct("ProductName", "ClicknTranslate"),
                 StringStruct("ProductVersion", version),
                 StringStruct("LegalCopyright", "Jabrail Digital. GPL-3.0-only."),
             ])]),

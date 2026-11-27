@@ -28,7 +28,7 @@ PROJECT_EXES = (
 def run_script(script, *args):
     return subprocess.run(
         [POWERSHELL, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", str(script), *map(str, args)],
-        capture_output=True, text=True, timeout=90,
+        capture_output=True, encoding="oem", timeout=90,
     )
 
 
@@ -148,11 +148,13 @@ def test_windows_version_resources_roundtrip_through_real_pe(executable, tmp_pat
     versioninfo = pytest.importorskip("PyInstaller.utils.win32.versioninfo")
     path = tmp_path / name
     shutil.copyfile(executable, path)
-    versioninfo.write_version_info_to_executable(str(path), make_version_info(APP_VERSION, name, "Translation"))
+    description = 'ClicknTranslate' if name == 'ClicknTranslateApp.exe' else 'Translation'
+    versioninfo.write_version_info_to_executable(str(path), make_version_info(APP_VERSION, name, description))
     result = versioninfo.read_version_info_from_executable(str(path))
     fields = {item.name: item.val for item in result.kids[0].kids[0].kids}
     assert fields["CompanyName"] == "Jabrail Digital"
-    assert fields["ProductName"] == "Click'n'Translate"
+    assert fields["ProductName"] == "ClicknTranslate"
+    assert fields["FileDescription"] == description
     assert fields["FileVersion"] == APP_VERSION + ".0"
     assert fields["ProductVersion"] == APP_VERSION
     assert fields["OriginalFilename"] == name

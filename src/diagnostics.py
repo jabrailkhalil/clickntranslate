@@ -105,12 +105,66 @@ def _redactor() -> tuple[tuple[str, str], ...]:
     return tuple(replacements)
 
 
+def _redact_quoted_credentials(text: str) -> str:
+    fields = r'''(?ix)["']?(?:authorization|x-api-key|x-goog-api-key|api[_-]?key|auth[_-]?key|access_token|refresh_token|password)\\*["']?\s*[:=]\s*(?:bearer\s+)?(?P<quote>\\*["'])'''
+    parts, cursor = [], 0
+    for match in re.finditer(fields, text):
+        if match.start() < cursor:
+            continue
+        delimiter = match.group('quote')
+        escaped = len(delimiter) - 1
+        slashes, end = 0, len(text)
+        for index in range(match.end(), len(text)):
+            char = text[index]
+            if char == '\\':
+                slashes += 1
+                continue
+            # Nested JSON adds escape slashes to both delimiters. A closing
+            # quote has this depth's delimiter plus encoded backslash pairs;
+            # an escaped quote inside the value lies between those positions.
+            if (char == delimiter[-1] and slashes >= escaped
+                    and (slashes - escaped) % (2 * (escaped + 1)) == 0):
+                end = index - escaped
+                break
+            slashes = 0
+        if end > match.end():
+            parts.extend((text[cursor:match.end()], '<redacted>'))
+            cursor = end
+        if end == len(text):
+            break  # A truncated quoted field must not disclose its tail.
+    parts.append(text[cursor:])
+    return ''.join(parts)
+
+
+def _redact_credentials(text: str, depth: int = 0) -> str:
+    def redact_literal(match):
+        raw = match.group()
+        try:
+            decoded = json.loads(raw)
+        except json.JSONDecodeError:
+            return raw
+        if not re.search(r'''(?ix)(?:authorization|x-api-key|x-goog-api-key|api[_-]?key|auth[_-]?key|access_token|refresh_token|password)\\*["']?\s*[:=]''', decoded):
+            return raw
+        # Decode individual JSON strings, never the entire log's escaping.
+        # Nonoverlapping literals cannot grow on decoding. The depth limit
+        # bounds total work and fails closed while retaining the outer JSON.
+        cleaned = '<redacted>' if depth >= 32 else _redact_credentials(decoded, depth + 1)
+        return json.dumps(cleaned, ensure_ascii=True) if cleaned != decoded else raw
+
+    # An escaped quote cannot start a new literal after an unterminated one.
+    text = re.sub(r'(?<!\\)"(?:[^"\\\x00-\x1f]|\\.)*"', redact_literal, text)
+    text = _redact_quoted_credentials(text)
+    # Leave quoted values (also after Bearer) to the scanner. Keep the original
+    # unquoted token class, including backslashes in ordinary header values.
+    return re.sub(r'''(?ix)(["']?(?:authorization|x-api-key|x-goog-api-key|api[_-]?key|auth[_-]?key|access_token|refresh_token|password)["']?\s*[:=]\s*(?!(?:bearer\s+)?\\*["'])(?:bearer\s+)?)[^\s,"';}&]+''', r'\1<redacted>', text)
+
+
 def _redact(value: object) -> str:
     text = str(value)
     for source, replacement in _redactor():
         text = re.sub(re.escape(source), replacement, text, flags=re.IGNORECASE)
     # Redact obvious bearer/API tokens that may have reached a third-party log.
-    text = re.sub(r'''(?ix)(["']?(?:authorization|x-api-key|x-goog-api-key|api[_-]?key|auth[_-]?key|access_token|refresh_token|password)["']?\s*[:=]\s*["']?(?:bearer\s+)?)[^\s,"';}&]+''', r'\1<redacted>', text)
+    text = _redact_credentials(text)
     text = re.sub(r'(?i)([?&](?:key|api_key|access_token)=)[^&\s]+', r'\1<redacted>', text)
     text = re.sub(r'(?i)(https?://)[^/\s@]+@', r'\1<redacted>@', text)
     text = re.sub(r'\bsk-(?:proj-)?[A-Za-z0-9_-]{12,}', '<redacted>', text)
@@ -142,6 +196,15 @@ def _file_line(label: str, path: Path) -> str:
         return f"{label}: unreadable, path={_redact(path)}, error={_redact(error)}"
 
 
+def _worker_line(label: str, root: Path, stem: str) -> str:
+    from platform_support import executable_name
+    name = executable_name(stem)
+    candidates = (root / 'app' / '_internal' / name, root / '_internal' / name, root / name)
+    # Windows uses app/_internal, Linux _internal, Cocoa Contents/MacOS itself.
+    path = next((candidate for candidate in candidates if candidate.is_file()), candidates[0])
+    return _file_line(label, path)
+
+
 def _safe_config(data_root: Path) -> dict[str, object]:
     path = data_root / "config.json"
     try:
@@ -158,7 +221,7 @@ def _tail(path: Path, limit: int = MAX_LOG_BYTES) -> bytes:
         source.seek(0, os.SEEK_END)
         size = source.tell()
         source.seek(max(0, size - limit))
-        return source.read()
+        return source.read(limit)
 
 
 def _default_output_dir() -> Path:
@@ -198,7 +261,10 @@ def _package_versions() -> dict[str, str]:
         try:
             versions[distribution] = importlib.metadata.version(distribution)
         except importlib.metadata.PackageNotFoundError:
-            versions[distribution] = "not installed"
+            # Optional SDKs can live in separate frozen/private workers. Missing
+            # GUI metadata does not establish that an engine is uninstalled.
+            versions[distribution] = ("metadata unavailable in this process"
+                                      if getattr(sys, "frozen", False) else "not installed")
         except Exception as error:
             versions[distribution] = f"unknown: {_redact(error)}"
     return versions
@@ -219,6 +285,8 @@ def _environment_report(root: Path, app_version: str) -> dict[str, object]:
         "platform": _redact(platform.platform()),
         "windows_version": _redact(platform.win32_ver()),
         "machine": platform.machine(),
+        "processor": _redact(platform.processor()),
+        "cpu_count": os.cpu_count(),
         "process_bits": struct.calcsize("P") * 8,
         "python": platform.python_version(),
         "frozen": bool(getattr(sys, "frozen", False)),
@@ -231,6 +299,7 @@ def _environment_report(root: Path, app_version: str) -> dict[str, object]:
         },
         "disk": disk_info,
         "packages": _package_versions(),
+        "packages_scope": "Current process metadata; optional engines may run in separate workers.",
     }
 
 
@@ -296,12 +365,17 @@ def create_bug_report(output_dir: str | os.PathLike[str] | None = None, *, app_v
     destination = Path(output_dir) if output_dir is not None else _default_output_dir()
     destination.mkdir(parents=True, exist_ok=True)
     stamp = time.strftime("%Y%m%d-%H%M%S")
-    report_dir = destination / f"ClicknTranslate-bug-report-{stamp}"
-    counter = 2
-    while report_dir.exists():
-        report_dir = destination / f"ClicknTranslate-bug-report-{stamp}-{counter}"
-        counter += 1
-    report_dir.mkdir(parents=True)
+    counter = 1
+    while True:
+        suffix = "" if counter == 1 else f"-{counter}"
+        report_dir = destination / f"ClicknTranslate-bug-report-{stamp}{suffix}"
+        try:
+            # Reserve the name atomically across independent report jobs.
+            report_dir.mkdir(parents=True)
+        except FileExistsError:
+            counter += 1
+        else:
+            break
     report_path = report_dir / f"ClicknTranslate-bug-report-{stamp}.zip"
     instructions = _send_instructions(report_path.name)
     (report_dir / "HOW_TO_SEND.txt").write_text(instructions, encoding="utf-8")
@@ -325,6 +399,8 @@ def create_bug_report(output_dir: str | os.PathLike[str] | None = None, *, app_v
         _file_line("public_launcher", launcher),
         _file_line("application", inner),
         _file_line("updater", updater),
+        _worker_line("argos_worker", root, "ArgosWorker"),
+        _worker_line("ocr_worker", root, "OcrWorker"),
         "",
         "safe_config:",
         json.dumps(_safe_config(data_root), ensure_ascii=False, indent=2, sort_keys=True),

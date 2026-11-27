@@ -23,6 +23,34 @@ def test_easyocr_install_is_pinned_to_cpu_packages():
     assert sw.EASYOCR_EXTRA_INDEX_URL == "https://download.pytorch.org/whl/cpu"
 
 
+def test_linux_easyocr_version_probe_uses_system_environment(monkeypatch, tmp_path):
+    appdir = str(tmp_path / "runtime.AppDir")
+    private_libraries = os.path.join(appdir, "usr", "bin", "_internal")
+    user_libraries = str(tmp_path / "user-libraries")
+    inherited = os.pathsep.join((private_libraries, user_libraries))
+    monkeypatch.setenv("APPDIR", appdir)
+    monkeypatch.setenv("LD_LIBRARY_PATH", inherited)
+    monkeypatch.setattr(platform_support, "IS_LINUX", True)
+    monkeypatch.setattr(platform_support, "IS_WINDOWS", False)
+    monkeypatch.setattr(platform_support, "IS_MAC", False)
+    seen = []
+
+    def python_version(command, **kwargs):
+        env = kwargs.get("env", os.environ)
+        seen.append(dict(env))
+        # A distro interpreter may fail to load against the AppImage's native
+        # libraries. That must not silently choose unpinned EasyOCR packages.
+        if private_libraries in env.get("LD_LIBRARY_PATH", ""):
+            return sw.subprocess.CompletedProcess(command, 1, "", "bundled library conflict")
+        return sw.subprocess.CompletedProcess(command, 0, "3 12\n", "")
+
+    monkeypatch.setattr(sw.subprocess, "run", python_version)
+    dummy = SimpleNamespace(_pip_target_python_version=sw.SettingsWindow._pip_target_python_version)
+    assert sw.SettingsWindow._easyocr_requirements(dummy, ["/usr/bin/python3.12"]) == sw.EASYOCR_PIP_PACKAGES
+    assert seen[0]["LD_LIBRARY_PATH"] == user_libraries
+    assert os.environ["LD_LIBRARY_PATH"] == inherited
+
+
 @pytest.mark.skipif(
     not platform_support.IS_WINDOWS, reason="the embedded Python bootstrap is Windows-only"
 )
@@ -166,12 +194,14 @@ def test_mac_easyocr_install_error_does_not_select_another_ocr(monkeypatch):
         parent=SimpleNamespace(current_interface_language='ru'),
         _finish_easyocr_install_state=mock.Mock(), _hide_easyocr_progress=mock.Mock(),
         _restore_settings_view=mock.Mock(), save_ocr_engine=mock.Mock(),
+        _report_engine_task=mock.Mock(),
     )
     warning = mock.Mock()
     monkeypatch.setattr(sw.QMessageBox, 'warning', warning)
     sw.SettingsWindow._on_easyocr_install_failed(owner, 'download failed')
     owner.save_ocr_engine.assert_not_called()
     assert 'download failed' in warning.call_args.args[-1]
+    owner._report_engine_task.assert_called_once_with('easyocr', 'download failed', kind='failed')
 
 
 @pytest.mark.parametrize('code,expected', [('ru', ['ru', 'en']), ('en', ['en']),

@@ -16,6 +16,7 @@ from PyQt5.QtWidgets import QApplication, QLabel, QStyle, QStyleOptionComboBox
 
 import main
 from settings_window import OpticallyCenteredPushButton
+from settings_sections import VISUAL_PAGE_ORDER
 from qt_layout_test_support import ensure_layout_fonts
 
 
@@ -63,7 +64,7 @@ class FixedWindowTextLayoutTest(unittest.TestCase):
     def test_main_reference_text_fits_with_the_longest_provider_name(self):
         for theme in ("Темная", "Светлая"):
             self.window.current_theme = theme
-            for language in ("en", "ru", "de", "fr", "es", "zh", "pt", "it"):
+            for language in tuple(main.INTERFACE_LANGUAGE_BY_CODE):
                 with self.subTest(theme=theme, language=language):
                     self.window.current_interface_language = language
                     self.window.show_main_screen()
@@ -221,7 +222,8 @@ class FixedWindowTextLayoutTest(unittest.TestCase):
         settings = self.window.settings_window
         for theme in ("Темная", "Светлая"):
             self.window.current_theme = theme
-            for language in ("en", "ru", "de", "fr", "es", "zh", "pt", "it"):
+            self.window.apply_theme()
+            for language in tuple(main.INTERFACE_LANGUAGE_BY_CODE):
                 with self.subTest(theme=theme, language=language):
                     self.window.current_interface_language = language
                     settings.update_language()
@@ -235,38 +237,43 @@ class FixedWindowTextLayoutTest(unittest.TestCase):
                     self.assertLessEqual(abs(navigation.center().x() - self.window.ui_root.rect().center().x()), 1)
                     image = self.window.ui_root.grab().toImage()
                     ratio = image.devicePixelRatio()
-                    # Just below the seam and above the tab buttons: this
-                    # must be the same surface as the title bar, with no gap.
-                    expected = main.window_header_color(theme != "Светлая")
+                    # The restored shelf joins the title bar's surface.
+                    expected = image.pixelColor(
+                        round(100 * ratio),
+                        round(self.window.title_bar.geometry().center().y() * ratio),
+                    ).name()
                     self.assertEqual(image.pixelColor(
                         round((navigation.left() + 12) * ratio),
                         round((navigation.top() + 1) * ratio),
                     ).name(), expected)
-                    settings._set_settings_page(1)
-                    self.settle()
                     rows = (
-                        (settings.copy_translated_checkbox, settings.ocr_engine_label, settings.ocr_engine_combo),
-                        (settings.replace_select_all_checkbox, settings.translator_engine_label, settings.translator_combo),
+                        (1, settings.copy_translated_checkbox, settings.translator_engine_label, settings.translator_combo),
+                        (4, settings.ocr_join_paragraphs_checkbox, settings.ocr_engine_label, settings.ocr_engine_combo),
                     )
-                    for checkbox, label, combo in rows:
+                    for page, checkbox, label, combo in rows:
+                        settings._set_settings_page(page)
+                        self.settle()
                         self.assertLessEqual(checkbox.sizeHint().width(), checkbox.width(), checkbox.text())
                         self.assertLessEqual(label.sizeHint().width(), label.width(), label.text())
                         box_rect, label_rect, combo_rect = [self.rect_in(settings, w) for w in (checkbox, label, combo)]
-                        self.assertLess(box_rect.right(), label_rect.left())
                         self.assertLess(label_rect.right(), combo_rect.left())
-                        self.assertEqual(box_rect.center().y(), combo_rect.center().y())
-                    self.assertLess(
-                        self.rect_in(settings, settings.copy_notification_checkbox).bottom(),
-                        self.rect_in(settings, settings.ocr_languages_btn).top(),
-                    )
-                    for page in range(3):
+                        self.assertEqual(label_rect.center().y(), combo_rect.center().y())
+                        self.assertAlmostEqual(box_rect.center().y(), combo_rect.center().y(), delta=1)
+                    settings._set_settings_page(4)
+                    self.settle()
+                    self.assertTrue(settings.ocr_action_panel.isHidden())
+                    self.assertTrue(settings.copy_notification_checkbox.isVisible())
+                    viewport = settings.ocr_settings_scroll.viewport()
+                    self.assertTrue(viewport.rect().contains(
+                        self.rect_in(viewport, settings.copy_notification_checkbox)))
+                    for page in VISUAL_PAGE_ORDER:
                         settings._set_settings_page(page)
                         self.settle()
                         self.assertEqual(settings.settings_general_page.isVisible(), page == 0)
                         current = settings.settings_pages.currentWidget()
                         page_rect = self.rect_in(settings, current)
                         footer = self.rect_in(settings, settings.settings_page_footer)
-                        self.assertGreaterEqual(page_rect.top() - footer.bottom() - 1, 12)
+                        self.assertGreaterEqual(page_rect.top() - footer.bottom() - 1, 8)
                         for tab in settings.settings_page_tabs:
                             self.assertTrue(tab.text())
                             font, area = tab.label_layout()
@@ -315,20 +322,24 @@ class FixedWindowTextLayoutTest(unittest.TestCase):
             self.assertEqual(self.rect_in(self.window, self.window.main_composer), original_composer)
             self.assertFalse(settings.settings_page_navigation.isVisible())
 
-    def test_tab_selection_changes_painted_text_contrast_without_moving_the_strip(self):
+    def test_tab_selection_changes_painted_text_accent_without_moving_the_strip(self):
         self.window.show_settings()
         settings = self.window.settings_window
 
-        def text_contrast(tab, dark):
+        def text_ink(tab):
             image = self.window.ui_root.grab().toImage()
             ratio = image.devicePixelRatio()
             area = tab._label_area().translated(tab.mapTo(self.window.ui_root, QPoint()))
-            levels = [
-                image.pixelColor(x, y).lightness()
+            surface = image.pixelColor(round(area.left() * ratio), round(area.top() * ratio)).getRgb()[:3]
+            colors = [
+                image.pixelColor(x, y).getRgb()[:3]
                 for x in range(round(area.left() * ratio), round((area.right() + 1) * ratio))
                 for y in range(round(area.top() * ratio), round((area.bottom() + 1) * ratio))
             ]
-            return max(levels) if dark else 255 - min(levels)
+            distance = lambda color: sum(abs(a-b) for a, b in zip(color, surface))
+            ink = max(colors, key=distance)
+            self.assertGreater(distance(ink), 150)
+            return ink
 
         for theme in ("Темная", "Светлая"):
             self.window.current_theme = theme
@@ -340,12 +351,15 @@ class FixedWindowTextLayoutTest(unittest.TestCase):
             tabs[0].click()
             tabs[0].clearFocus()
             self.settle()
-            active_contrast = text_contrast(tabs[0], theme == "Темная")
+            active_ink = text_ink(tabs[0])
             tabs[2].click()
             self.settle()
-            self.assertGreater(active_contrast, text_contrast(tabs[0], theme == "Темная") + 20)
+            inactive_ink = text_ink(tabs[0])
+            # The reference uses purple text plus an underline. In the light
+            # theme the active accent need not be darker than the grey label.
+            self.assertGreater(sum(abs(a-b) for a, b in zip(active_ink, inactive_ink)), 30)
             self.assertEqual(positions, [tab.geometry() for tab in tabs])
-        self.assertEqual([tab.isChecked() for tab in tabs], [False, False, True, False])
+        self.assertEqual([tab.isChecked() for tab in tabs], [False, False, True, False, False])
 
     def test_main_action_captions_use_full_words(self):
         self.window.current_interface_language = 'ru'

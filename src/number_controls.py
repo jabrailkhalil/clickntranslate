@@ -34,6 +34,21 @@ class _NumberBox(QtWidgets.QSpinBox):
         self.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
         self.setAlignment(QtCore.Qt.AlignCenter)
 
+    def keyPressEvent(self, event):
+        if event.key() == QtCore.Qt.Key_Escape:
+            self.lineEdit().setText(self.prefix() + self.textFromValue(self.value()) + self.suffix())
+            self.lineEdit().deselect()
+            event.accept()
+            return
+        super().keyPressEvent(event)
+
+    def wheelEvent(self, event):
+        # Scrolling a settings page must not silently resize/fade a companion.
+        if not self.hasFocus() and not self.lineEdit().hasFocus():
+            event.ignore()
+            return
+        super().wheelEvent(event)
+
     def _digits(self, value):
         value = value.strip()
         if self.suffix() and value.endswith(self.suffix()):
@@ -64,6 +79,8 @@ class StepperFrame(QtWidgets.QFrame):
     def __init__(self, editor, parent=None, *, dark=True, font_size=15):
         super().__init__(parent)
         self.setProperty('numberStepper', True)
+        # Numeric arrows retain left=decrease, right=increase in RTL interfaces.
+        self.setLayoutDirection(QtCore.Qt.LeftToRight)
         self._editor_font_size = int(font_size)
         self.editor = editor
         self.decrease = ScaleArrowButton(self)
@@ -86,13 +103,21 @@ class StepperFrame(QtWidgets.QFrame):
         self.setFocusProxy(editor)
         self.set_theme(dark)
 
-    def set_theme(self, dark):
+    def _step_editor_from_arrow(self, steps):
+        self.editor.stepBy(steps)
+        # QSpinBox.stepBy selects its numeric text even while our separate
+        # arrow owns focus. That orphaned selection receives no FocusOut and
+        # survives a later blank click. An arrow changes a value, not its text
+        # selection; direct editor typing/native Up/Down keep their behavior.
+        self.editor.lineEdit().deselect()
+
+    def set_theme(self, dark, *, inset=True):
         from button_styles import button_qss
         background, border, ink = (('#17181d', '#3d3948', '#f4f6fb') if dark
                                    else ('#e9e4ed', '#d7cde7', '#202124'))
         self.setStyleSheet(f'''
             QFrame[numberStepper="true"] {{ background:{background}; border:1px solid {border};
-                border-radius:7px; margin:1px 3px; }}
+                border-radius:7px; margin:{'1px 3px' if inset else '0'}; }}
             QLineEdit, QSpinBox {{ color:{ink}; background:transparent; border:0;
                 padding:0; margin:0; min-height:0; font-size:{self._editor_font_size}px; font-weight:400; }}
             QLineEdit:disabled, QSpinBox:disabled {{ color:{'#7d7487' if dark else '#958b9f'}; }}
@@ -125,6 +150,10 @@ class ChoiceStepper(StepperFrame):
 
     def value(self):
         return self._choices[self._index][0]
+
+    def set_labels(self, labels):
+        self._choices = tuple((key, labels[key]) for key, _label in self._choices)
+        self._sync_choice()
 
     def setValue(self, value):
         index = tuple(key for key, _label in self._choices).index(value)
@@ -159,10 +188,10 @@ class ChoiceStepper(StepperFrame):
 class NumberStepper(StepperFrame):
     valueChanged = QtCore.pyqtSignal(int)
 
-    def __init__(self, parent=None, *, dark=True):
-        super().__init__(_NumberBox(), parent, dark=dark)
-        self.decrease.clicked.connect(lambda: self.editor.stepBy(-1))
-        self.increase.clicked.connect(lambda: self.editor.stepBy(1))
+    def __init__(self, parent=None, *, dark=True, font_size=15):
+        super().__init__(_NumberBox(), parent, dark=dark, font_size=font_size)
+        self.decrease.clicked.connect(lambda: self._step_editor_from_arrow(-1))
+        self.increase.clicked.connect(lambda: self._step_editor_from_arrow(1))
         self.editor.valueChanged.connect(self._value_changed)
         self._sync_steps()
 

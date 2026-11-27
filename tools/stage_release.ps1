@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "1.8.2",
+    [string]$Version = "1.8.3",
     [switch]$SkipPyInstaller,
     # Separate private test builds from an existing stage and its user data.
     [ValidatePattern('^$|^[A-Za-z0-9][A-Za-z0-9._-]*$')][string]$StageName = "",
@@ -36,6 +36,8 @@ if ($CertificateThumbprint) {
 if (-not $SkipPyInstaller) {
     Push-Location $repoRoot
     try {
+        & (Join-Path $repoRoot '.venv\Scripts\python.exe') (Join-Path $repoRoot 'tools/prepare_rapidocr_models.py')
+        if ($LASTEXITCODE -ne 0) { throw 'PP-OCRv5 model preparation failed.' }
         & (Join-Path $repoRoot ".venv\Scripts\python.exe") -m PyInstaller `
             (Join-Path $repoRoot "tools/packaging/ClicknTranslate.spec") --clean --noconfirm
         if ($LASTEXITCODE -ne 0) {

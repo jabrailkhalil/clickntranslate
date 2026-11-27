@@ -23,6 +23,11 @@ def _app():
 class _Receiver(QtWidgets.QWidget):
     _copy_notification_signal = QtCore.pyqtSignal(str)
 
+    def __init__(self):
+        super().__init__()
+        from copy_feedback import register_copy_feedback
+        register_copy_feedback(self)
+
 
 class _NotificationHarness:
     _show_copy_notification = main.DarkThemeApp._show_copy_notification
@@ -74,7 +79,7 @@ def test_repeated_copy_extends_notice_instead_of_old_timeout_hiding_it():
         popup.close()
 
 
-def test_copy_notification_dispatch_is_opt_in_and_thread_safe_signal_based():
+def test_copy_notification_dispatch_respects_setting_and_uses_thread_safe_signal():
     app = _app()
     receiver = _Receiver()
     received = []

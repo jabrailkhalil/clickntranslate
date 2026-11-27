@@ -58,6 +58,29 @@ class SpriteAtlas:
         self.mascot = mascot_id(mascot)
         self._pixmap = None
         self._thumbnail = None
+        self._gaze_layouts = {}
+        self._rest_bounds = None
+
+    def gaze_layout(self, angle):
+        """Align whole directional cells to the resting height and baseline.
+
+        Generated direction cells include different amounts of transparent
+        padding. Uniform fitting preserves anatomy; a fixed baseline prevents
+        the character from shrinking or hopping when only its gaze changes.
+        """
+        direction = look_index(angle)
+        if direction not in self._gaze_layouts:
+            if self._rest_bounds is None:
+                _image, rest = self.source('idle', index=0)
+                self._rest_bounds = QtGui.QRegion(self.pixmap.copy(rest).mask()).boundingRect()
+            _image, frame = self.source(gaze=angle)
+            bounds = QtGui.QRegion(self.pixmap.copy(frame).mask()).boundingRect()
+            base = self._rest_bounds
+            factor = base.height() / max(1, bounds.height())
+            x = base.x() + base.width()/2 - (bounds.x()+bounds.width()/2)*factor
+            y = base.bottom()+1 - (bounds.bottom()+1)*factor
+            self._gaze_layouts[direction] = QtCore.QRectF(x, y, CELL.width()*factor, CELL.height()*factor)
+        return self._gaze_layouts[direction]
 
     def _frame_column(self, state, column):
         return FRAME_REPLACEMENTS.get((self.mascot, state), {}).get(column, column)
@@ -130,6 +153,11 @@ def paint_sprite(painter, rect, mascot, state='idle', seconds=0., *, facing=1, g
     size = QtCore.QSizeF(CELL).scaled(rect.size(), QtCore.Qt.KeepAspectRatio)
     target = QtCore.QRectF(rect.center().x() - size.width() / 2,
                          rect.bottom() - size.height(), size.width(), size.height())
+    if gaze is not None:
+        aligned = artwork.gaze_layout(gaze)
+        scale = size.width()/CELL.width()
+        target = QtCore.QRectF(target.x()+aligned.x()*scale, target.y()+aligned.y()*scale,
+                              aligned.width()*scale, aligned.height()*scale)
     painter.save()
     painter.setRenderHint(QtGui.QPainter.SmoothPixmapTransform)
     painter.drawPixmap(target, pixmap, QtCore.QRectF(source))

@@ -1,2 +1,5 @@
 # Build scripts must also run after a checkout or source transfer from Windows.
 *.sh text eol=lf
+# Keep the recorded vector-asset hashes reproducible on Windows and POSIX.
+/src/icons/flags/*.svg text eol=lf
+/src/icons/flags/vector-sources.json text eol=lf

@@ -2,7 +2,7 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 from assistant_art import MASCOTS, DEFAULT_MASCOT, companion_art
-from assistant_text import assistant_text
+from assistant_text import assistant_text, companion_display_name
 from button_styles import button_qss
 from ui_scaling import ScaleArrowButton
 from assistant_motion import PetMotion, paint_pet
@@ -44,6 +44,7 @@ class MascotStage(QtWidgets.QWidget):
             button.setFixedSize(36, 36)
             button.setCursor(QtCore.Qt.PointingHandCursor)
             button.setFocusPolicy(QtCore.Qt.StrongFocus)
+            button.setProperty('keyboardArrowControl', True)
             button.setAccessibleName(assistant_text(language, key))
             button.setToolTip(assistant_text(language, key))
             button.installEventFilter(self)
@@ -75,7 +76,12 @@ class MascotStage(QtWidgets.QWidget):
         self.mascot, self.appearance, self.custom_image = mascot, appearance, custom_image
         self.motion.mascot = mascot
         self.motion.reactions = self.owner.config.get('desktop_assistant_reactions', True) is True
-        self.setAccessibleName(assistant_text(self.owner.current_interface_language, mascot))
+        language = self.owner.current_interface_language
+        self.setAccessibleName(companion_display_name(language, mascot, appearance))
+        for button, key in ((self.previous_button, 'previous_mascot'), (self.next_button, 'next_mascot')):
+            label = assistant_text(language, key)
+            button.setAccessibleName(label)
+            button.setToolTip(label)
         self._style_buttons()
         if changed:
             self.motion.greet()
@@ -154,6 +160,7 @@ class MascotStage(QtWidgets.QWidget):
 
     def _sync_animation(self):
         active = self.isVisible() and not self.owner.isMinimized() and self._animated()
+        self.timer.setInterval(33 if self.mascot == 'click' and self.motion.action() != 'idle' else 80)
         if active and not self.timer.isActive():
             self.clock.start()
             self.timer.start()
@@ -181,9 +188,11 @@ class MascotStage(QtWidgets.QWidget):
         return super().eventFilter(watched, event)
 
     def _tick(self):
+        previous = self.motion.render_key()
         self.motion.advance(min(.2, self.clock.restart()/1000))
         self._sync_animation()
-        self.update()
+        if self.motion.render_key() != previous:
+            self.update()
 
     def mouseReleaseEvent(self, event):
         if event.button() == QtCore.Qt.LeftButton:
@@ -227,7 +236,7 @@ class MascotStage(QtWidgets.QWidget):
         painter.setFont(font)
         painter.setPen(QtGui.QColor('#eee7f5' if dark else '#554264'))
         painter.drawText(QtCore.QRectF(cx-96, 3, 192, 22), QtCore.Qt.AlignCenter,
-                         assistant_text(self.owner.current_interface_language, self.mascot))
+                         companion_display_name(self.owner.current_interface_language, self.mascot, self.appearance))
         painter.setPen(QtCore.Qt.NoPen)
         painter.setBrush(QtGui.QColor(0, 0, 0, 25 if dark else 13))
         painter.drawEllipse(QtCore.QRectF(cx-85, ground+3, 170, 15))

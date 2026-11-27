@@ -1,4 +1,7 @@
 """First opening, live models and available-space limits of actual Qt lists."""
+import os
+from pathlib import Path
+
 import pytest
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtTest import QTest
@@ -89,3 +92,68 @@ def test_monitor_edges_include_negative_coordinates(bounds):
     assert bounds.contains(result)
     assert result.bottom() == anchor.top() - 4
     assert result.right() == bounds.right()
+
+
+@pytest.mark.parametrize('rtl', (False, True))
+@pytest.mark.parametrize('dark', (False, True))
+@pytest.mark.parametrize('embedded', (False, True))
+@pytest.mark.parametrize('factor', (.8, 1., 1.37, 2.))
+@pytest.mark.parametrize('label', ('Dialogue — subtitles near the bottom of the screen',
+                                  'حوار مترجم ونصوص طويلة بالقرب من أسفل الشاشة'), ids=('latin', 'arabic'))
+def test_closed_plain_label_elides_without_clipping_and_retains_full_value(monkeypatch, tmp_path, rtl, dark, embedded, factor, label):
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    owner = QtWidgets.QWidget()
+    owner.setFixedSize(round(260*factor), round(80*factor))
+    owner.setLayoutDirection(QtCore.Qt.RightToLeft if rtl else QtCore.Qt.LeftToRight)
+    combo = DropDownCombo(owner)
+    combo.setGeometry(round(20*factor), round(20*factor), round(200*factor), round(32*factor))
+    combo.setStyleSheet(modern_combo_style(dark, round(14*factor)))
+    combo.addItem(label, 'saved-template')
+    combo.setAccessibleName('Saved layout')
+    combo.setToolTip(label)
+    view = scene = None
+    if embedded:
+        scene = QtWidgets.QGraphicsScene()
+        scene.addWidget(owner)
+        view = QtWidgets.QGraphicsView(scene)
+        view.setFixedSize(owner.size()+QtCore.QSize(20, 20))
+        view.show()
+    else:
+        owner.show()
+    app.processEvents()
+    drawn = []
+
+    class RecordingPainter(QtWidgets.QStylePainter):
+        def drawControl(self, control, option):
+            if control == QtWidgets.QStyle.CE_ComboBoxLabel:
+                drawn.append(option.currentText)
+            return super().drawControl(control, option)
+
+    try:
+        monkeypatch.setattr(QtWidgets, 'QStylePainter', RecordingPainter)
+        image = combo.grab()
+        output = Path(os.environ.get('XDG_DATA_HOME', str(tmp_path))).parent/'closed-label-renders'
+        output.mkdir(exist_ok=True)
+        suffix = f'{"arabic" if label.startswith("حوار") else "latin"}-{"rtl" if rtl else "ltr"}-{"dark" if dark else "light"}-{"proxy" if embedded else "window"}-{factor}'
+        assert image.save(str(output/(suffix+'.png')))
+        assert drawn and '…' in drawn[-1] and len(drawn[-1]) < len(label)
+        option = QtWidgets.QStyleOptionComboBox()
+        combo.initStyleOption(option)
+        field = combo.style().subControlRect(QtWidgets.QStyle.CC_ComboBox, option,
+                                            QtWidgets.QStyle.SC_ComboBoxEditField, combo)
+        assert combo.fontMetrics().horizontalAdvance(drawn[-1]) <= field.width()
+        assert combo.currentText() == label and combo.currentData() == 'saved-template'
+        assert combo.accessibleName() == 'Saved layout'
+        document = QtGui.QTextDocument()
+        document.setHtml(combo.elided_value_tooltip())
+        assert label in document.toPlainText()
+    finally:
+        owner.close()
+        if view is not None:
+            view.close()
+            view.deleteLater()
+            scene.deleteLater()
+        else:
+            owner.deleteLater()
+        app.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)
+        app.processEvents()

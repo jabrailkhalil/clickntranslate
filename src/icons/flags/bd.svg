@@ -1,0 +1,4 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 90 80" width="90" height="80"><defs><clipPath id="cnt-flag-shape"><rect x="6" y="10" width="78" height="60" rx="8" /></clipPath></defs><rect x="2" y="6" width="86" height="68" rx="12" fill="#fff" /><g clip-path="url(#cnt-flag-shape)"><g id="flag-icons-bd" transform="translate(6 10) scale(0.121875 0.125) translate(-0 -0)"><path fill="#006a4e" d="M0 0h640v480H0z" />
+  <circle cx="280" cy="240" r="160" fill="#f42a41" />
+</g></g></svg>

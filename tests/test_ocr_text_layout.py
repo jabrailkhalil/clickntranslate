@@ -48,3 +48,23 @@ def test_large_drop_cap_does_not_merge_two_lines():
         (box(0, 0, 20, 35), 'T', .9),
     ]
     assert 'first second' not in ocr_text_from_items(items)
+
+
+@pytest.mark.parametrize('paragraphs', [False, True])
+@pytest.mark.parametrize('fragments,arabic', [
+    (['1', '.', '2'], 'رقم الإصدار'),
+    (['12', ':', '34'], 'موعد الاجتماع'),
+    (['1', ',', '250'], 'المبلغ الإجمالي'),
+    (['example', '.', 'com'], 'الموقع الرسمي لهذا البرنامج'),
+    (['https', ':', '/', '/', 'example', '.', 'com'], 'الموقع الرسمي لهذا البرنامج'),
+])
+def test_neutral_separators_inside_latin_and_numeric_runs_do_not_reverse_them(paragraphs, fragments, arabic):
+    texts = fragments + [arabic]
+    items = [(box(index*20, 0, index*20+18, 20), text, .99) for index, text in enumerate(texts)]
+    assert ocr_text_from_items(items, join_paragraphs=paragraphs) == arabic + ' ' + ' '.join(fragments)
+
+
+def test_arabic_punctuation_does_not_become_a_latin_run():
+    items = [(box(index*20, 0, index*20+18, 20), text, .99)
+             for index, text in enumerate(['الثاني', '،', 'الأول'])]
+    assert ocr_text_from_items(items) == 'الأول ، الثاني'

@@ -22,13 +22,20 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
         cls.app = QApplication.instance() or QApplication([])
 
     def setUp(self):
+        # FullScreenTranslateOverlay captures in its constructor. All tests in
+        # this class exercise routing/layout against generated pixels only.
+        screenshot = ocr.QtGui.QPixmap(800, 600)
+        screenshot.fill(ocr.QtGui.QColor('white'))
+        screen_patch = mock.patch.object(ocr, 'grab_screen_pixmap', return_value=screenshot)
+        screen_patch.start()
+        self.addCleanup(screen_patch.stop)
         # An overlay whose language combo has no entries shows a modal "install a
         # language pack" dialog, which blocks a headless run forever. That is the
         # right behaviour for a user, but these tests are about the overlay
         # itself, so a machine (or a leftover config) without installed OCR
         # languages gets a deterministic pair instead.
-        # Patching the Tesseract lookup rather than installed_ocr_language_codes
-        # keeps the EasyOCR/RapidOCR filter tests running against the real thing.
+        # Patch the local backends, not installed_ocr_language_codes, so the
+        # EasyOCR/RapidOCR filtering tests still exercise their real routing.
         self._language_patch = None
         if not ocr.installed_ocr_language_codes():
             self._language_patch = mock.patch.object(
@@ -36,6 +43,10 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
             )
             self._language_patch.start()
             self.addCleanup(self._language_patch.stop)
+            windows_languages = mock.patch.object(
+                ocr, '_get_available_windows_ocr_language_tags', return_value=['en-US', 'ru-RU'])
+            windows_languages.start()
+            self.addCleanup(windows_languages.stop)
 
     def test_pytesseract_uses_the_system_environment_on_linux(self):
         original = mock.Mock(return_value={"stdin": object()})
@@ -57,13 +68,13 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
         ocr._QT_ICON_CACHE.clear()
         self.addCleanup(ocr._QT_ICON_CACHE.clear)
         decoded_icon = object()
-        with mock.patch.object(ocr.QtGui, "QIcon", return_value=decoded_icon) as qicon:
+        with mock.patch("icon_rendering.load_icon", return_value=decoded_icon) as load_icon:
             first = ocr._cached_qt_icon(r"icons\American_flag.png")
             second = ocr._cached_qt_icon("icons/American_flag.png")
 
         self.assertIs(first, decoded_icon)
         self.assertIs(second, decoded_icon)
-        qicon.assert_called_once()
+        load_icon.assert_called_once_with(ocr.resource_path("icons/American_flag.png"))
 
     def test_overlay_is_tool_topmost_and_frameless(self):
         overlay = ocr.ScreenCaptureOverlay("copy", defer_show=True)
@@ -1106,8 +1117,8 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
                 return object()
 
         with mock.patch.object(ocr, "_WINRT_AVAILABLE", True):
-            with mock.patch.object(ocr, "winrt_glob", SimpleNamespace(Language=Language)):
-                with mock.patch.object(ocr, "winrt_ocr", SimpleNamespace(OcrEngine=OcrEngine)):
+            with mock.patch.object(ocr, "winrt_glob", SimpleNamespace(Language=Language), create=True):
+                with mock.patch.object(ocr, "winrt_ocr", SimpleNamespace(OcrEngine=OcrEngine), create=True):
                     with mock.patch.object(
                         ocr,
                         "_get_available_windows_ocr_language_tags",
@@ -1149,16 +1160,36 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
             self.assertNotIn("zh", easy_codes)
 
             rapid_root = Path(root, "rapid")
-            rapid_package = rapid_root / "site-packages" / "rapidocr"
+            rapid_package = rapid_root / "site-packages" / "rapidocr_onnxruntime"
             rapid_package.mkdir(parents=True)
             rapid_package.joinpath("__init__.py").write_text("", encoding="utf-8")
-            with mock.patch.object(ocr, "_rapidocr_local_root", return_value=str(rapid_root)):
+            # This fixture represents a legacy installation, independent of
+            # whether the developer's interpreter also has modern RapidOCR.
+            source_root = Path(__file__).resolve().parents[1]
+            with mock.patch.object(ocr, "_rapidocr_local_root", return_value=str(rapid_root)), \
+                 mock.patch("rapidocr_models.model_roots", return_value=[rapid_root / "models" / "ppocrv5"]), \
+                 mock.patch.object(ocr.sys, 'path', [str(source_root), str(source_root / 'src')]):
                 self.assertEqual(
                     ocr.installed_ocr_language_codes("RapidOCR", {}),
                     ["en", "zh"],
                 )
+                # The new package has per-script PP-OCRv5 assets. An importable
+                # backend alone must not advertise its upstream default model.
+                modern = rapid_package.parent / 'rapidocr'
+                modern.mkdir()
+                (modern / '__init__.py').write_text('', encoding='utf8')
+                self.assertEqual(ocr.installed_ocr_language_codes('RapidOCR', {}), [])
+                from rapidocr_models import MODEL_ASSETS
+                model_root = rapid_root / 'models' / 'ppocrv5'
+                model_root.mkdir(parents=True)
+                for relative, size, _sha in MODEL_ASSETS.values():
+                    with (model_root / Path(relative).name).open('wb') as output:
+                        output.truncate(size)
+                available = set(ocr.installed_ocr_language_codes('RapidOCR', {}))
+                self.assertTrue({'en','ru','ar','zh','de'} <= available)
+                self.assertNotIn('hi', available)
 
-    def test_frozen_build_exposes_rapidocr_bundled_in_worker(self):
+    def test_legacy_frozen_build_exposes_rapidocr_bundled_in_worker(self):
         with tempfile.TemporaryDirectory() as root:
             app_exe = Path(root, platform_support.executable_name("ClicknTranslate"))
             app_exe.write_bytes(b"app")
@@ -1166,7 +1197,10 @@ class TestScreenCaptureOverlayWindowing(unittest.TestCase):
             internal.mkdir()
             internal.joinpath(platform_support.executable_name("OcrWorker")).write_bytes(b"worker")
             with mock.patch.object(ocr.sys, "frozen", True, create=True):
-                with mock.patch.object(ocr.sys, "executable", str(app_exe)):
+                source_root = Path(__file__).resolve().parents[1]
+                with mock.patch.object(ocr.sys, "executable", str(app_exe)), \
+                     mock.patch("rapidocr_models.model_roots", return_value=[internal / "rapidocr_models"]), \
+                     mock.patch.object(ocr.sys, 'path', [str(source_root), str(source_root / 'src')]):
                     self.assertEqual(
                         ocr.installed_ocr_language_codes("RapidOCR", {}),
                         ["en", "zh"],
@@ -1321,7 +1355,7 @@ class TestAreaTranslateResultWindow(unittest.TestCase):
     class _Overlay:
         mode = "translate"
         _session_id = "test"
-        _handle_ocr_result_inner = ocr.ScreenCaptureOverlay._handle_ocr_result_inner
+        _present_area_translation = ocr.ScreenCaptureOverlay._present_area_translation
 
         def __init__(self):
             self.closed = False
@@ -1346,12 +1380,11 @@ class TestAreaTranslateResultWindow(unittest.TestCase):
             "result_window_hidden_modes": hidden_modes,
         }
         with mock.patch.object(ocr, "get_cached_ocr_config", return_value=config), \
-                mock.patch("translater.translate_text", return_value="Привет мир"), \
                 mock.patch.object(platform_support, "copy_text") as copy, \
                 mock.patch.object(main, "show_translation_dialog") as dialog, \
                 mock.patch.object(main, "save_copy_history") as copy_history, \
                 mock.patch.object(ocr, "save_translation_history") as translation_history:
-            overlay._handle_ocr_result_inner("Hello world")
+            overlay._present_area_translation("Hello world", "Привет мир", "en", "ru")
         return overlay, copy, dialog, copy_history, translation_history
 
     def test_listing_area_copies_instead_of_opening_the_window(self):

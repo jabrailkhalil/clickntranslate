@@ -100,7 +100,7 @@ class MainScreenSourceTest(unittest.TestCase):
         # Reserve a real gap below the language pickers within the fixed
         # 700x400 viewport, while retaining three readable lines of text.
         self.assertIn("self.main_composer.setMinimumHeight(74)", source)
-        self.assertIn("self.text_input.setMinimumHeight(66)", source)
+        self.assertIn("self.text_input.setMinimumHeight(50)", source)
         self.assertIn("self.main_result_view.setMinimumHeight(50)", source)
         self.assertIn("self.main_translation_status.setFixedHeight(14)", source)
 
@@ -258,7 +258,8 @@ class MainWindowGeometryTest(unittest.TestCase):
     def test_the_chat_composer_stays_compact(self):
         # A Telegram-style composer is deliberately shorter than the settings
         # panel below it, while still fitting two placeholder/text lines.
-        self.assertGreaterEqual(self.window.text_input.height(), 66)
+        self.assertGreaterEqual(self.window.text_input.height(), 50)
+        self.assertEqual(self.window.text_input.height(), self.window.main_result_view.height())
         self.assertGreaterEqual(self.window.main_composer.height(), 74)
         self.assertLess(self.window.main_composer.height(), self.window.main_shortcut_section.height())
 
@@ -546,8 +547,7 @@ class MainWindowGeometryTest(unittest.TestCase):
                     for info in panel.overlay._detached_buttons.values()
                 }
                 self.assertTrue({
-                    "ocr_engine_combo", "translator_combo",
-                    "copy_notification_checkbox",
+                    "translator_combo", "restore_clipboard_checkbox",
                     "close_result_on_outside_click_checkbox",
                 }.issubset(detached_keys))
                 self.assertNotIn("autostart_checkbox", detached_keys)
@@ -568,8 +568,8 @@ class MainWindowGeometryTest(unittest.TestCase):
                 self.assertTrue({
                     "game_source_combo",
                     "game_target_combo",
-                    "game_scan_interval_slider",
-                    "game_overlay_opacity_slider",
+                    "game_interval_controls",
+                    "game_opacity_controls",
                 }.issubset(detached_keys))
                 self.assertNotIn("autostart_checkbox", detached_keys)
                 self.assertNotIn("export_settings_btn", detached_keys)
@@ -625,7 +625,11 @@ class MainWindowGeometryTest(unittest.TestCase):
         text_bottom = text_top_left.y() + text.height() - 1
 
         self.assertGreaterEqual(button_left, text_right)
-        self.assertLessEqual(abs(button_bottom - text_bottom), 2)
+        self.assertAlmostEqual(button_bottom - text_bottom,
+                               self.window.main_translation_status.height(), delta=2)
+        copy = self.window.main_result_copy_button
+        copy_bottom = copy.mapTo(self.window.ui_root, copy.rect().bottomLeft()).y()
+        self.assertAlmostEqual(button_bottom, copy_bottom, delta=1)
 
     def test_only_the_right_expand_button_is_available_for_any_input_length(self):
         editor = self.window.text_input
@@ -993,7 +997,7 @@ class MainWindowGeometryTest(unittest.TestCase):
 
     def test_next_button_cannot_skip_multiple_cards_during_transition(self):
         self.window._guide_active = True
-        self.window._guide_step_index = main.GUIDE_TOUR_ORDER.index("shortcut_overview")
+        self.window._guide_step_index = main.ONBOARDING_ORDER.index("shortcut_ocr")
         self.window._show_guide_step()
         start = self.window._guide_step_index
 
@@ -1009,7 +1013,7 @@ class MainWindowGeometryTest(unittest.TestCase):
 
     def test_clicking_a_highlighted_control_also_locks_next_until_new_card(self):
         self.window._guide_active = True
-        self.window._guide_step_index = main.GUIDE_TOUR_ORDER.index("shortcut_overview")
+        self.window._guide_step_index = main.ONBOARDING_ORDER.index("shortcut_ocr")
         self.window._show_guide_step()
         start = self.window._guide_step_index
         action = self.window._guide_current_action()

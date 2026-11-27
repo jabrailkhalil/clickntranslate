@@ -76,6 +76,13 @@ def themed_html(value, dark, factor):
     return re.sub(r'(\d+(?:\.\d+)?)pt\b', lambda m: f'{float(m[1]) * factor:g}pt', value)
 
 
+def set_scalable_browser_html(browser, markup):
+    """Retain the author's CSS and paragraph direction across dialog restyling."""
+    browser.setHtml(markup)
+    document = browser.document()
+    document.setProperty('_cntAuthoredHtml', (document.revision(), markup))
+
+
 class DialogAppearance(QtCore.QObject):
     def __init__(self, app, percent=DEFAULT_SCALE, theme='Темная'):
         super().__init__(app)
@@ -115,6 +122,8 @@ class DialogAppearance(QtCore.QObject):
         event_type = event.type()
         if (self._busy or event_type not in (QtCore.QEvent.Polish, QtCore.QEvent.Show, QtCore.QEvent.StyleChange)
                 or not isinstance(watched, QtWidgets.QWidget)):
+            return False
+        if watched.property('_cntTransientChrome'):
             return False
         window = watched.window()
         if not self._eligible(window):
@@ -213,7 +222,10 @@ class DialogAppearance(QtCore.QObject):
             if state is None:
                 if window.layout() is not None:
                     window.layout().activate()
-                base_size = window.size().expandedTo(window.minimumSizeHint())
+                fixed = window.minimumSize() == window.maximumSize()
+                # A hidden page's sizeHint must not override an explicitly
+                # fixed dialog. Scrollable bodies own their overflow.
+                base_size = window.size() if fixed else window.size().expandedTo(window.minimumSizeHint())
                 if root_layout is not None and root_layout.hasHeightForWidth() and window.minimumHeight() != window.maximumHeight():
                     base_size.setHeight(max(base_size.height(), root_layout.totalHeightForWidth(base_size.width())))
                 state = {'size': base_size,
@@ -243,7 +255,8 @@ class DialogAppearance(QtCore.QObject):
             maximum_percent = min(MAX_SCALE, math.floor(fitting_factor * BASE_SCALE))
             factor = min(self.window_percent(window) / BASE_SCALE,
                          maximum_percent / BASE_SCALE if maximum_percent >= MIN_SCALE else fitting_factor)
-            widgets = [window] + [w for w in window.findChildren(QtWidgets.QWidget) if w.window() is window]
+            widgets = [window] + [w for w in window.findChildren(QtWidgets.QWidget)
+                                  if w.window() is window and not w.property('_cntTransientChrome')]
             # Snapshot before changing any parent font or stylesheet.
             for widget in widgets:
                 record = self._baseline(widget, state['widgets'])
@@ -251,7 +264,7 @@ class DialogAppearance(QtCore.QObject):
                     record = {'font': QtGui.QFont(widget.font()), 'minimum': widget.minimumSize(),
                               'maximum': widget.maximumSize(), 'style': widget.styleSheet(),
                               'last_style': widget.styleSheet(), 'geometry': widget.geometry()}
-                    if isinstance(widget, QtWidgets.QAbstractButton):
+                    if isinstance(widget, (QtWidgets.QAbstractButton, QtWidgets.QAbstractItemView)):
                         record['icon_size'] = widget.iconSize()
                     if isinstance(widget, QtWidgets.QSplitter):
                         record['handle_width'] = widget.handleWidth()
@@ -267,9 +280,19 @@ class DialogAppearance(QtCore.QObject):
                     if pixmap is not None and not pixmap.isNull() and pixmap.cacheKey() != record.get('last_pixmap_key'):
                         record['pixmap'] = QtGui.QPixmap(pixmap)
                 if isinstance(widget, QtWidgets.QTextBrowser):
-                    html = widget.toHtml()
-                    if html != record.get('last_html'):
-                        record['html'] = html
+                    document = widget.document()
+                    revision = document.revision()
+                    # A font or QSS change affects toHtml() without editing the document.
+                    if document is not record.get('document') or revision != record.get('revision'):
+                        source = document.property('_cntAuthoredHtml')
+                        if source and source[0] == revision:
+                            record['html'] = source[1]
+                        else:
+                            snapshot = document.clone()
+                            snapshot.setDefaultFont(record['font'])
+                            record['html'] = snapshot.toHtml()
+                        record['document'] = document
+                        record.pop('rendered_html', None)
                 elif isinstance(widget, QtWidgets.QLabel) and '<' in widget.text():
                     if widget.text() != record.get('last_html'):
                         record['html'] = widget.text()
@@ -286,8 +309,9 @@ class DialogAppearance(QtCore.QObject):
                 widget.setFont(font)
                 widget.setMinimumSize(record['minimum'] * factor)
                 maximum = record['maximum']
-                widget.setMaximumSize(*(16777215 if value == 16777215 else round(value * factor)
-                                        for value in (maximum.width(), maximum.height())))
+                widget.setMaximumSize(*(16777215 if value == 16777215 or (
+                    dimension == 1 and widget.property('wholeRowTable')) else round(value * factor)
+                    for dimension, value in enumerate((maximum.width(), maximum.height()))))
                 if 'icon_size' in record:
                     widget.setIconSize(record['icon_size'] * factor)
                 if 'handle_width' in record:
@@ -304,7 +328,7 @@ class DialogAppearance(QtCore.QObject):
                             position = widget.verticalScrollBar().value()
                             widget.setHtml(html)
                             widget.verticalScrollBar().setValue(position)
-                        record['last_html'] = widget.toHtml()
+                        record['revision'] = widget.document().revision()
                     else:
                         widget.setText(html)
                         record['last_html'] = html
@@ -463,7 +487,8 @@ def scale_native_controls(root, factor):
 def style_capture_controls(overlay, config, controls):
     """Scale only the controls; capture geometry always stays in screen units."""
     from button_styles import button_qss
-    from settings_window import DropDownCombo, modern_combo_style
+    from settings_window import DropDownCombo, compact_combo_style
+    from classic_style import classic_palette
     from capture_widgets import CaptureLanguageCombo
     from ui_scaling import desktop_control_scale
     controls = [widget for widget in controls if widget is not None]
@@ -479,6 +504,10 @@ def style_capture_controls(overlay, config, controls):
     # may wrap to a second row. Never shrink the full-screen capture surface.
     row_width = sum(112 if isinstance(w, QtWidgets.QComboBox) else 36
                     for w in controls if isinstance(w, (QtWidgets.QComboBox, QtWidgets.QToolButton)))
+    if hasattr(overlay, 'capture_toolbar'):
+        # The close button stays beside the language fields when memory actions
+        # wrap below. Reserve its width and the toolbar padding at high DPI.
+        row_width += 52
     screen = getattr(overlay, '_screen', None) or getattr(overlay, 'screen', None)
     screen = screen() if callable(screen) else screen
     screen = screen or QtWidgets.QApplication.primaryScreen()
@@ -490,13 +519,13 @@ def style_capture_controls(overlay, config, controls):
             widget.set_capture_theme(dark, config.get('interface_language', 'en'), factor)
             continue
         if isinstance(widget, QtWidgets.QComboBox):
-            style = modern_combo_style(dark, 14) + """
+            style = compact_combo_style(dark) + """
                 QComboBox { margin:0; padding:3px 20px 3px 7px; }
                 QComboBox::drop-down { width:18px; }
             """
             if isinstance(widget, DropDownCombo):
                 widget.setMaxVisibleItems(9)
-                widget.set_popup_background('#20212a' if dark else '#f1edf4')
+                widget.set_popup_background(classic_palette(dark)['field'])
             # Reserve the icon, the language code and the chevron separately.
             # The settings-field padding hid the code in these compact fields.
             widget.setFixedSize(round(max(112, widget.property('capture_base_size').width()) * factor), round(44 * factor))

@@ -128,7 +128,7 @@ class TestUpdateRepair(unittest.TestCase):
                         [powershell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
                          str(ROOT / "tools" / "build_update_repair.ps1"),
                          "-OutputPath", str(output), *arguments],
-                        capture_output=True, text=True, timeout=30,
+                        capture_output=True, encoding="oem", timeout=30,
                     )
                     self.assertNotEqual(result.returncode, 0)
                     self.assertIn(message, result.stderr)

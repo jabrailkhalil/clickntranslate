@@ -16,7 +16,15 @@ def default_output_paths(data_dir, source_file_name):
     base = _safe_base_name(source_file_name)
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     root = translations_dir(data_dir)
-    prefix = f"{base}_{stamp}"
+    initial_prefix = f"{base}_{stamp}"
+    prefix = initial_prefix
+    # Exports also save an automatic session. Two saves within one second
+    # must not silently replace the previous session for the same document.
+    number = 1
+    while any(os.path.lexists(os.path.join(root, prefix + extension))
+              for extension in ('.txt', '.md', '.json')):
+        number += 1
+        prefix = f"{initial_prefix}_{number}"
     return {
         "txt": os.path.join(root, prefix + ".txt"),
         "md": os.path.join(root, prefix + ".md"),

@@ -37,6 +37,40 @@ def window(app, tmp_path):
         app.processEvents()
 
 
+@pytest.mark.parametrize('language', main.INTERFACE_LANGUAGE_BY_CODE)
+def test_settings_and_faq_show_the_running_version(window, app, monkeypatch, language):
+    window.settings_button.click()
+    window.set_interface_language(language)
+    app.processEvents()
+    heading = window.title_bar
+    title = main.INTERFACE_TEXT[language]['title']
+    assert heading.text() == f'{title} · v{main.APP_VERSION}'
+    ink = heading.fontMetrics().boundingRect(heading.contentsRect(), int(heading.alignment()), heading.text())
+    for button in (window.flag_button, window.theme_button, window.document_button, window.help_button,
+                   window.settings_button, window.minimize_button, window.close_button):
+        assert not button.geometry().intersects(ink)
+    observed = []
+
+    def read_faq(dialog):
+        dialog.show()
+        app.processEvents()
+        label = dialog.findChild(QtWidgets.QLabel, 'helpVersionLabel')
+        if label is not None and label.isVisible():
+            observed.append(label.text())
+        dialog.close()
+        return QtWidgets.QDialog.Rejected
+
+    monkeypatch.setattr(main.CenteredFramelessDialog, 'exec_', read_faq)
+    window.help_button.click()
+    assert observed == [f'V{main.APP_VERSION}']
+    settings = window.settings_window
+    settings._on_update_check_result('{"status": "up_to_date", "latest_version": "1.8.2"}')
+    assert settings._update_progress.label.isVisible()
+    assert main.APP_VERSION in settings._update_progress.label.text()
+    window.settings_button.click()
+    assert heading.text() == title
+
+
 @pytest.mark.parametrize('dpi,dpr,expected', [(96, 1, 1), (144, 1, 1.5), (192, 1, 2), (96, 2, 1)])
 def test_desktop_controls_use_monitor_logical_dpi_not_double_dpr(dpi, dpr, expected):
     screen = SimpleNamespace(logicalDotsPerInch=lambda: dpi, devicePixelRatio=lambda: dpr)
@@ -112,12 +146,25 @@ def test_hover_and_menu_keep_reactions_running_and_capture_hides_pet(window, app
     helper = window._desktop_assistant
     anchor = helper.anchor
     before = anchor.grab().toImage()
-    anchor.enterEvent(QtCore.QEvent(QtCore.QEvent.Enter))
-    assert anchor.grab().toImage() == before
+    geometry = QtCore.QRect(anchor.geometry())
+    motion_key = anchor.motion.render_key()
+    right = QtCore.QPoint(anchor.width()-2, round(anchor.height()*.44))
+    with mock.patch.object(QtGui.QCursor, 'pos', return_value=anchor.mapToGlobal(right)):
+        QtWidgets.QApplication.sendEvent(anchor, QtCore.QEvent(QtCore.QEvent.Enter))
+    assert anchor._hover and anchor._gaze_angle == 90
+    left = QtCore.QPointF(2, anchor.height()*.44)
+    move = QtGui.QMouseEvent(QtCore.QEvent.MouseMove, left, QtCore.Qt.NoButton,
+                            QtCore.Qt.NoButton, QtCore.Qt.NoModifier)
+    QtWidgets.QApplication.sendEvent(anchor, move)
+    assert anchor._gaze_angle == 270
+    assert anchor.geometry() == geometry
+    assert anchor.grab().toImage().size() == before.size()
+    assert anchor.motion.render_key() == motion_key
     assert anchor._animation.isActive()
     helper.request_action('walk')
     assert anchor._animation.isActive()
     anchor.leaveEvent(QtCore.QEvent(QtCore.QEvent.Leave))
+    assert anchor._gaze_angle is None and anchor.geometry() == geometry
     assert anchor._animation.isActive()
     start = anchor.pos()
     anchor._advance(.25)
@@ -234,6 +281,7 @@ def test_dynamic_help_runs_only_the_explicit_action(window, choice):
 
 def test_clicking_empty_scaled_canvas_clears_number_selection_and_tab_arrow_focus(window, app):
     window.show_assistant_settings()
+    app.processEvents()
     page = window.settings_window.settings_assistant_page
     field = page.values['opacity']
     editor = field.lineEdit()
@@ -247,7 +295,8 @@ def test_clicking_empty_scaled_canvas_clears_number_selection_and_tab_arrow_focu
     assert field.value() == 77
     assert window.config['desktop_assistant_opacity'] == 77
     assert not editor.hasSelectedText() and not editor.hasFocus()
-    field.decrease.setFocus(QtCore.Qt.TabFocusReason)
+    from keyboard_navigation import focus_control
+    focus_control(field.decrease)
     assert field.decrease.property('keyboardFocus')
     QTest.mouseClick(controller.view.viewport(), QtCore.Qt.LeftButton, pos=blank)
     app.processEvents()

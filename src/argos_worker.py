@@ -50,6 +50,18 @@ def run_request(request, event_callback=None):
         if not translater._ensure_argos_available():
             raise RuntimeError(translater.argos_unavailable_reason())
         action = str(request.get("action") or "translate").lower()
+        if action == 'translate_chunks':
+            completed = 0
+            for piece in request['pieces']:
+                translater._check_translation_cancelled(cancel_callback)
+                result = translater._try_argos_translate_local(piece['text'], request['source_code'],
+                    request['target_code'], status_callback=status_callback, allow_install=False,
+                    cancel_callback=cancel_callback)
+                if not isinstance(result, str) or not result.strip():
+                    raise RuntimeError('Argos returned an empty document chunk')
+                emit_event({'type':'chunk', 'index':piece['index'], 'text':result})
+                completed += 1
+            return {'completed':completed, 'error':''}
         if action == "probe":
             pair_installed = translater._get_translation_object(
                 request.get("source_code", ""),
@@ -123,6 +135,9 @@ def main(argv=None):
     try:
         with open(argv[0], "r", encoding="utf-8") as request_file:
             request = json.load(request_file)
+        if request.get('portable_root'):
+            import portable_paths
+            portable_paths.portable_base_dir = lambda: request['portable_root']
 
         event_path = str(request.get("event_path") or "")
 

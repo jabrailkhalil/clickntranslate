@@ -5,10 +5,11 @@ columns and visible paragraph gaps remain separate translation blocks.
 """
 import math
 import re
-import unicodedata
 
 
-_LIST_START = re.compile(r'^\s*(?:[-*•●▪‣–—]|\d+[.)]|[A-Za-z][.)])\s+')
+# Bidi formatting can precede a visible marker without changing list identity.
+# Recognize the prefix without removing those controls from the source text.
+_LIST_START = re.compile(r'^[\s\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]*(?:[-*•●▪‣–—]|\d+[.)]|[A-Za-z][.)])\s+')
 _PARAGRAPH_BREAK = re.compile(r'\n[ \t]*\n+')
 
 
@@ -30,6 +31,7 @@ def _join(left, right):
 def merge_text_lines(text):
     """Fallback when boxes are unavailable; retain blank lines and list items."""
     text = str(text or '').replace('\r\n', '\n').replace('\r', '\n')
+    text = text.replace('\u2029', '\n\n').replace('\u2028', '\n')
     paragraphs = []
     for section in _PARAGRAPH_BREAK.split(text.strip()):
         current = ''
@@ -52,7 +54,7 @@ def boxes_from_items(items):
         try:
             xs, ys = [float(p[0]) for p in box], [float(p[1]) for p in box]
             rows.append((min(xs), min(ys), max(xs)-min(xs), max(ys)-min(ys), text))
-        except (TypeError, ValueError, IndexError):
+        except (TypeError, ValueError, OverflowError, IndexError):
             # Unknown geometry is kept as its own block, never dropped.
             rows.append((None, None, None, None, text))
     return rows
@@ -71,7 +73,7 @@ def _valid_rows(rows):
             if not all(map(math.isfinite, (x, y, w, h))) or w <= 0 or h <= 0:
                 raise ValueError('Invalid OCR bounds')
             valid.append((x, y, w, h, text))
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             unknown.append(text)
     return valid, unknown
 
@@ -84,32 +86,31 @@ def _union(rows, text):
 
 def _visual_rows(rows):
     """Join adjacent word fragments, leaving a column gutter untouched."""
-    groups = []
-    active = []
-    for row in sorted(rows, key=lambda r: (r[1], r[0])):
-        x, y, w, h, text = row
-        active = [entry for entry in active if entry[1][1]+entry[1][3]>=y]
-        for entry in reversed(active):
-            group, bounds = entry
-            left, top, width, height, _ = bounds
-            overlap = min(y+h, top+height)-max(y, top)
-            gap = max(0, max(left, x)-min(left+width, x+w))
-            if overlap >= .6*min(h, height) and gap <= .9*max(h, height):
-                group.append(row)
-                entry[1] = _union([bounds, row], '')
-                break
-        else:
-            group=[row]
-            groups.append(group)
-            active.append([group,row])
+    from ocr_text_layout import ocr_visual_lines, inline_reading_order
+    # Group baselines first, then traverse by x. Sorting by the tops of tilted
+    # word boxes used to leave two disconnected fragments when the bridging
+    # word arrived later, and the paragraph reader mistook them for columns.
+    items = [([[x,y],[x+w,y],[x+w,y+h],[x,y+h]], text, row)
+             for row in rows for x,y,w,h,text in (row,)]
+    groups=[]
+    for visual_line in ocr_visual_lines(items):
+        current=[]
+        right=None
+        previous_height=0
+        for item in visual_line:
+            row=item[2]
+            x,y,w,h,_text=row
+            if current and x-right > .9*max(h,previous_height):
+                groups.append(current)
+                current=[]
+            current.append(row)
+            right=max(right if right is not None else x,x+w)
+            previous_height=h
+        if current:
+            groups.append(current)
     result=[]
     for group in groups:
-        ordered=sorted(group, key=lambda r:r[0])
-        # Most engines return whole lines in logical order. Only the order of
-        # separately detected word boxes needs adjustment for RTL source text.
-        directions=[unicodedata.bidirectional(c) for r in ordered for c in r[4]]
-        if sum(d in {'R','AL'} for d in directions) > directions.count('L'):
-            ordered.reverse()
+        ordered = inline_reading_order(group, position=lambda row: row[0], text=lambda row: row[4])
         text=' '.join(r[4] for r in ordered)
         result.append(_union(group,text))
     return sorted(result,key=lambda r:(r[1],r[0]))
@@ -129,6 +130,10 @@ def _reading_order(blocks):
             groups[-1].append(block)
             edge=max(edge if edge is not None else end,end)
         if len(groups)>1:
+            if axis == 0:
+                from ocr_text_layout import is_rtl_text
+                if is_rtl_text(' '.join(block[4] for block in blocks)):
+                    groups.reverse()
             return [block for group in groups for block in _reading_order(group)]
     return sorted(blocks,key=lambda b:(b[1],b[0]))
 
@@ -184,12 +189,38 @@ def paragraph_text(rows):
 
 
 def tesseract_items(data):
-    """Keep word boxes so even PSM 6 cannot mix two distant columns into a row."""
+    """Retain native lines without bridging two distant PSM 6 columns.
+
+    Tesseract already knows which short Arabic words share a baseline. Treating
+    each word as an independent box can misread wide word spaces as columns.
+    Preserve that line identity and its logical word order, splitting only a
+    genuine gutter before passing the chunks to the paragraph reader.
+    """
     items=[]
+    lines={}
+    line_columns = ('page_num', 'block_num', 'par_num', 'line_num')
+    has_lines = all(len(data.get(name, [])) == len(data.get('text', [])) for name in line_columns)
     for i,value in enumerate(data.get('text', [])):
         text=str(value or '').strip()
         if not text:
             continue
         x,y,w,h=(float(data[name][i]) for name in ('left','top','width','height'))
-        items.append(([[x,y],[x+w,y],[x+w,y+h],[x,y+h]],text,0.0))
+        if has_lines:
+            key=tuple(data[name][i] for name in line_columns)
+            lines.setdefault(key, []).append((x,y,w,h,text,i))
+        else:
+            items.append(([[x,y],[x+w,y],[x+w,y+h],[x,y+h]],text,0.0))
+    for words in lines.values():
+        line_height=max(row[1]+row[3] for row in words)-min(row[1] for row in words)
+        chunks=[]
+        edge=None
+        for word in sorted(words, key=lambda row:row[0]):
+            if edge is None or word[0]-edge > 2*line_height:
+                chunks.append([])
+            chunks[-1].append(word)
+            edge=max(edge if edge is not None else word[0],word[0]+word[2])
+        for chunk in chunks:
+            text=' '.join(word[4] for word in sorted(chunk,key=lambda row:row[5]))
+            x,y,w,h,_text=_union(chunk,text)
+            items.append(([[x,y],[x+w,y],[x+w,y+h],[x,y+h]],text,0.0))
     return items

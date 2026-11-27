@@ -7,6 +7,7 @@ from PyQt5.QtTest import QTest
 
 import main
 from test_desktop_ux import app, window
+from test_ui_operations import wait_until
 
 
 def test_theme_clicked_signal_accepts_qt_checked_argument(window, app, monkeypatch):
@@ -16,6 +17,7 @@ def test_theme_clicked_signal_accepts_qt_checked_argument(window, app, monkeypat
     for expected in (('Светлая' if original == 'Темная' else 'Темная'), original):
         window.theme_button.click()
         app.processEvents()
+        wait_until(app, lambda: not window._ui_operation.active)
         assert not errors, [(kind.__name__, str(error)) for kind, error, _ in errors]
         assert window.current_theme == expected
     assert window.save_config.call_count == 2
@@ -36,6 +38,7 @@ def test_visible_theme_button_changes_both_palettes(window, app, monkeypatch, pe
         QTest.mouseClick(controller.view.viewport(), QtCore.Qt.LeftButton,
                          pos=controller.map_widget_to_view(window.theme_button))
         app.processEvents()
+        wait_until(app, lambda: not window._ui_operation.active)
         assert not errors, [(kind.__name__, str(error)) for kind, error, _ in errors]
         assert window.current_theme == expected
         assert window.updatesEnabled() and window.ui_root.updatesEnabled()

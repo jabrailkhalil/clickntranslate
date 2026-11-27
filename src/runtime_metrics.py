@@ -9,6 +9,18 @@ _SAMPLES = {}
 _LIMIT = 64
 
 
+def record(operation, elapsed_ms, failed=False):
+    """Record complete asynchronous jobs using the same bounded counters."""
+    with _LOCK:
+        if operation not in _SAMPLES and len(_SAMPLES) < 32:
+            _SAMPLES[operation] = (deque(maxlen=_LIMIT), [0, 0])
+        if operation in _SAMPLES:
+            values, totals = _SAMPLES[operation]
+            values.append(elapsed_ms)
+            totals[0] += 1
+            totals[1] += int(failed)
+
+
 def measure(operation):
     def decorate(function):
         @wraps(function)
@@ -22,14 +34,7 @@ def measure(operation):
                 raise
             finally:
                 elapsed = (time.perf_counter() - started) * 1000
-                with _LOCK:
-                    if operation not in _SAMPLES and len(_SAMPLES) < 32:
-                        _SAMPLES[operation] = (deque(maxlen=_LIMIT), [0, 0])
-                    if operation in _SAMPLES:
-                        values, totals = _SAMPLES[operation]
-                        values.append(elapsed)
-                        totals[0] += 1
-                        totals[1] += int(failed)
+                record(operation, elapsed, failed)
         return measured
     return decorate
 

@@ -83,9 +83,11 @@ jobs:
   draft:
     needs: [linux, macos]
     runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.draft.outputs.id }}
     steps:
       - uses: actions/checkout@v4
-      - name: Select the version's download table
+      - name: Select the version's release notes
         shell: bash
         run: |
           release_body="docs/RELEASE_${GITHUB_REF_NAME#v}.md"
@@ -97,6 +99,7 @@ jobs:
           merge-multiple: true
           path: release-assets
       - name: Create draft release
+        id: draft
         uses: softprops/action-gh-release@v2
         with:
           draft: true
@@ -108,3 +111,11 @@ jobs:
             release-assets/*.dmg
             release-assets/*.zip
             release-assets/*.sha256
+
+  download-table:
+    needs: draft
+    uses: ./.github/workflows/release-download-table.yml
+    with:
+      release_id: ${{ needs.draft.outputs.release_id }}
+    secrets:
+      VIRUSTOTAL_API_KEY: ${{ secrets.VIRUSTOTAL_API_KEY }}

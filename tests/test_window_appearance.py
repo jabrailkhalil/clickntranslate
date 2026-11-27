@@ -116,7 +116,8 @@ def test_open_dialogs_and_hardcoded_surfaces_follow_light_theme(appearance):
     appearance.refresh(theme='Светлая')
     appearance.app.processEvents()
     assert dialog.theme == 'Светлая'
-    assert '#ece7f0' in dialog.styleSheet()
+    from classic_style import classic_palette
+    assert classic_palette(False)['background'] in dialog.styleSheet()
     assert '#111216' not in legacy.styleSheet()
     assert '#ffffff' not in label.styleSheet()
     assert dialog.text_edit.palette().color(QtGui.QPalette.Text).lightness() < 100
@@ -250,7 +251,11 @@ def test_light_language_popup_has_a_visible_outline(appearance):
     image = popup.grab().toImage()
     edge = image.pixelColor(0, image.height() // 2)
     assert edge.lightness() < 175
-    assert 'border: 1px solid #897397' in popup.styleSheet()
+    # The shared popup paints its antialiased frame, rather than a QSS border.
+    for point in (QtCore.QPoint(0, image.height()//2), QtCore.QPoint(image.width()-1, image.height()//2),
+                  QtCore.QPoint(image.width()//2, 0), QtCore.QPoint(image.width()//2, image.height()-1)):
+        assert image.pixelColor(point).alpha() >= 240
+        assert image.pixelColor(point).name() == dialog.target_combo.popup_colors()['border']
     dialog.target_combo.hidePopup()
 
 
@@ -270,6 +275,66 @@ def test_help_html_keeps_its_font_size_across_theme_and_scale_changes(appearance
     cursor.movePosition(QtGui.QTextCursor.Start)
     cursor.movePosition(QtGui.QTextCursor.NextCharacter)
     assert cursor.charFormat().fontPointSize() == 14 * 80 / BASE_SCALE
+
+
+@pytest.mark.parametrize('lang,direction', [('en', QtCore.Qt.LeftToRight), ('ru', QtCore.Qt.LeftToRight),
+                                           ('ar', QtCore.Qt.RightToLeft)])
+def test_faq_scales_authored_paragraphs_once_and_preserves_their_direction(appearance, monkeypatch, lang, direction):
+    owner = QtWidgets.QWidget()
+    owner.current_interface_language = lang
+    owner.current_theme = 'Темная'
+    owner._complete_guide_step = lambda _step: None
+
+    def inspect(dialog):
+        browser = dialog.findChild(QtWidgets.QTextBrowser)
+        dialog.show()
+        for scale, theme in [(80, 'Светлая'), (100, 'Темная'), (160, 'Светлая'), (200, 'Темная')]:
+            appearance.refresh(scale, theme)
+            appearance.app.processEvents()
+            appearance.apply(dialog)
+            appearance.app.processEvents()
+            factor = dialog.property('ui_effective_scale')
+            intro = browser.document().begin()
+            heading = intro.next()
+            body_style = intro.begin().fragment().charFormat()
+            heading_style = heading.begin().fragment().charFormat()
+            assert body_style.font().pixelSize() == round(13 * factor)
+            assert body_style.font().pixelSize() < heading_style.font().pixelSize() <= round(18 * factor)
+            assert heading_style.fontWeight() > body_style.fontWeight()
+            assert intro.textDirection() == heading.textDirection() == direction
+            expected_alignment = QtCore.Qt.AlignRight if direction == QtCore.Qt.RightToLeft else QtCore.Qt.AlignLeft
+            assert intro.blockFormat().alignment() & expected_alignment
+            assert browser.document().documentLayout().blockBoundingRect(heading).bottom() < browser.viewport().height()
+        dialog.close()
+        return QtWidgets.QDialog.Rejected
+
+    monkeypatch.setattr(main.CenteredFramelessDialog, 'exec_', inspect)
+    main.DarkThemeApp.show_help_dialog(owner)
+
+
+def test_replacing_browser_document_content_keeps_new_link_and_original_text_scale(appearance):
+    dialog = QtWidgets.QDialog()
+    layout = QtWidgets.QVBoxLayout(dialog)
+    browser = QtWidgets.QTextBrowser(dialog)
+    browser.setStyleSheet('QTextBrowser { font-size: 13px; }')
+    browser.setHtml('<p>Original</p>')
+    layout.addWidget(browser)
+    dialog.show()
+    appearance.refresh(200)
+    appearance.app.processEvents()
+    url = 'https://example.org/help'
+    browser.setHtml(f'<p><a href="{url}">Updated help</a></p>')
+    for scale in (200, 80, 160):
+        appearance.refresh(scale)
+        appearance.app.processEvents()
+        block = browser.document().begin()
+        fragment = block.begin().fragment()
+        assert fragment.text() == 'Updated help'
+        assert fragment.charFormat().anchorHref() == url
+        browser.document().documentLayout().blockBoundingRect(block)
+        run = block.layout().glyphRuns(0, len(fragment.text()))[0]
+        assert run.rawFont().pixelSize() == round(13 * dialog.property('ui_effective_scale'))
+    dialog.close()
 
 
 def test_document_layout_and_private_qt_fonts_do_not_accumulate_scale(appearance):

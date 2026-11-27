@@ -33,6 +33,16 @@ def configure_qt_platform():
 def configure_interface_style():
     """Keep the custom canvas geometry independent of native Aqua insets."""
     app = QApplication.instance()
+    if app is not None and not getattr(app, '_cnt_script_fonts_ready', False):
+        # A minimal Linux installation may have only Latin fonts. Ship a small
+        # Hindi fallback so selecting the new locale never requires a download.
+        if not QFontDatabase().families(QFontDatabase.Devanagari):
+            from project_paths import resource_root
+            for name in ('NotoSansDevanagari-Regular.ttf', 'NotoSansDevanagari-Bold.ttf'):
+                path = resource_root() / 'icons' / 'fonts' / name
+                if path.is_file():
+                    QFontDatabase.addApplicationFont(str(path))
+        app._cnt_script_fonts_ready = True
     if sys.platform.startswith('linux') and app is not None and not getattr(app, '_cnt_font_alias_ready', False):
         # QSS names Segoe UI throughout the fixed canvas. Its generic Linux
         # fallback is substantially wider; use the installed Arial-compatible
@@ -172,11 +182,13 @@ class ScaleArrowButton(QToolButton):
     def paintEvent(self, event):
         option = QStyleOptionToolButton()
         self.initStyleOption(option)
+        option.direction = Qt.LeftToRight
         if not self.property('keyboardFocus'):
             option.state &= ~QStyle.State_HasFocus
         if not self.property('pointerHover'):
             option.state &= ~QStyle.State_MouseOver
         painter = QStylePainter(self)
+        painter.setLayoutDirection(Qt.LeftToRight)
         painter.drawComplexControl(QStyle.CC_ToolButton, option)
 
     def mouseDoubleClickEvent(self, event):
@@ -289,24 +301,14 @@ def center_window(window, owner=None, offset=None, available=None):
 
 def paint_scaled_icon(painter, button, option):
     """Request source pixels for the final size, not a stretched 24px preview."""
-    controller = getattr(native_window_parent(button), '_ui_scale_controller', None)
-    scale = controller.effective_percent / BASE_SCALE if controller is not None else 1.0
-    density = scale * button.devicePixelRatioF()
+    from icon_rendering import paint_icon
     size = button.iconSize()
-    requested = QSize(math.ceil(size.width() * density), math.ceil(size.height() * density))
     mode = QIcon.Disabled if not button.isEnabled() else (
         QIcon.Active if option.state & QStyle.State_MouseOver else QIcon.Normal)
     state = QIcon.On if button.isChecked() else QIcon.Off
-    pixmap = button.icon().pixmap(requested, mode, state)
-    if pixmap.isNull() and (mode != QIcon.Normal or state != QIcon.Off):
-        pixmap = button.icon().pixmap(requested, QIcon.Normal, QIcon.Off)
-    if pixmap.isNull():
-        return
-    pixmap.setDevicePixelRatio(1)
-    fit = min(size.width() / pixmap.width(), size.height() / pixmap.height())
-    width, height = pixmap.width() * fit, pixmap.height() * fit
-    target = QRectF((button.width() - width) / 2, (button.height() - height) / 2, width, height)
-    painter.drawPixmap(target, pixmap, QRectF(pixmap.rect()))
+    target = QRectF((button.width()-size.width())/2, (button.height()-size.height())/2,
+                    size.width(), size.height())
+    paint_icon(painter, button.icon(), target, mode, state)
 
 
 class ScaledIconButton(QPushButton):
@@ -394,21 +396,40 @@ class _ScaleView(QGraphicsView):
         self._hover_timer.setInterval(600)
         self._hover_timer.timeout.connect(self._show_control_hint)
         self.setMouseTracking(True)
+        self.viewport().setMouseTracking(True)
 
-    def _hint_target_at(self, position):
+    def _widget_at(self, position):
         scene_point = self.mapToScene(position)
         item = self.scene().itemAt(scene_point, self.transform()) if self.scene() is not None else None
         if not isinstance(item, QGraphicsProxyWidget) or item.widget() is None:
             return None
         root = item.widget()
-        widget = root.childAt(item.mapFromScene(scene_point).toPoint()) or root
+        return root.childAt(item.mapFromScene(scene_point).toPoint()) or root
+
+    def _hint_target_at(self, position):
+        widget = self._widget_at(position)
         while widget is not None:
             if widget.toolTip():
                 return widget
-            if widget is root:
-                break
             widget = widget.parentWidget()
         return None
+
+    def _sync_button_hover(self, position=None):
+        """Use the actual hit target when a proxy omits or reorders Enter/Leave."""
+        from PyQt5 import sip
+        from PyQt5.QtWidgets import QAbstractButton
+        from button_styles import set_pointer_hover
+        target = self._widget_at(position) if position is not None else None
+        while target is not None and not isinstance(target, QAbstractButton):
+            target = target.parentWidget()
+        if target is not None and (not target.isEnabled() or not target.isVisible()):
+            target = None
+        app = QApplication.instance()
+        previous = getattr(app, '_hovered_app_button', lambda: None)()
+        if previous is not None and not sip.isdeleted(previous) and previous is not target:
+            set_pointer_hover(previous, False)
+        if target is not None:
+            set_pointer_hover(target, True)
 
     def _cancel_control_hint(self):
         self._hover_timer.stop()
@@ -450,6 +471,7 @@ class _ScaleView(QGraphicsView):
 
     def hideEvent(self, event):
         self._cancel_control_hint()
+        self._sync_button_hover()
         super().hideEvent(event)
 
     def viewportEvent(self, event):
@@ -464,6 +486,8 @@ class _ScaleView(QGraphicsView):
                 return True
         if event.type() in (QEvent.Leave, QEvent.Hide, QEvent.MouseButtonPress):
             self._cancel_control_hint()
+            if event.type() in (QEvent.Leave, QEvent.Hide):
+                self._sync_button_hover()
         elif event.type() == QEvent.MouseMove:
             self._track_control_hint(event)
         if event.type() in (QEvent.MouseButtonPress, QEvent.MouseMove, QEvent.MouseButtonRelease):
@@ -473,7 +497,13 @@ class _ScaleView(QGraphicsView):
             try:
                 if event.type() == QEvent.MouseButtonRelease:
                     self.before_mouse_release.emit()
-                return super().viewportEvent(event)
+                result = super().viewportEvent(event)
+                if event.type() in (QEvent.MouseMove, QEvent.MouseButtonRelease):
+                    # Qt forwards these moves through the proxy after native
+                    # hover notifications. Resolve the final state once, with
+                    # the same coordinate mapping as the visible canvas.
+                    self._sync_button_hover(event.pos())
+                return result
             finally:
                 self.mouse_global_position = None
                 self.mouse_event_type = None
@@ -663,12 +693,13 @@ class MainWindowScaleController(QObject):
         return actual
 
     def apply_theme(self, stylesheet, background):
-        self.canvas.setStyleSheet(stylesheet)
+        from styled_dialogs import set_widget_stylesheet
+        set_widget_stylesheet(self.canvas, stylesheet)
         # The exposed backing surface must use the theme too, including the
         # newly exposed strips before Qt paints the resized canvas over them.
         color = QColor(background)
         # A palette alone is reset by Qt's stylesheet unpolish/polish cycle.
-        self.view.setStyleSheet(f'''
+        set_widget_stylesheet(self.view, f'''
             QGraphicsView#mainUiScaleView {{
                 border: 0; padding: 0; margin: 0; background-color: {color.name()};
             }}
@@ -679,7 +710,8 @@ class MainWindowScaleController(QObject):
             palette.setColor(QPalette.Window, color)
             if widget is not self.owner:
                 palette.setColor(QPalette.Base, color)
-            widget.setPalette(palette)
+            if widget.palette() != palette:
+                widget.setPalette(palette)
         self.view.viewport().setAutoFillBackground(True)
         self.view.setBackgroundBrush(color)
         self.scene.setBackgroundBrush(color)
@@ -691,13 +723,14 @@ class MainWindowScaleController(QObject):
         return self.view.mapFromScene(self.proxy.mapToScene(QPointF(local)))
 
 
-def combo_popup_geometry(anchor, desired, bounds, gap, margin=0):
+def combo_popup_geometry(anchor, desired, bounds, gap, margin=0, *, prefer_below=False):
     """Fit a list beside its field, in one coordinate system and on one screen."""
     bounds = bounds.adjusted(margin, margin, -margin, -margin)
     below = anchor.y() + anchor.height() + gap
     below_space = max(0, bounds.y() + bounds.height() - below)
     above_space = max(0, anchor.y() - gap - bounds.y())
-    open_below = desired.height() <= below_space or below_space >= above_space
+    open_below = (below_space >= min(desired.height(), 100) if prefer_below else
+                  desired.height() <= below_space or below_space >= above_space)
     room = below_space if open_below else above_space
     height = max(1, min(desired.height(), room or bounds.height()))
     width = max(1, min(desired.width(), bounds.width()))
@@ -707,13 +740,8 @@ def combo_popup_geometry(anchor, desired, bounds, gap, margin=0):
     return QRect(x, y, width, height)
 
 
-def position_embedded_combo_popup(combo, popup, gap, desired_size=None):
-    """Fit scene-rendered lists to the canvas; native popups use screen bounds.
-
-    Qt can embed a popup on Windows too. Its native handle does not mean it is
-    drawn there: WA_DontShowOnScreen marks the proxy-rendered surface. Using
-    desktop coordinates for that surface clips long rows at the canvas edge.
-    """
+def is_embedded_combo_popup(combo, popup):
+    """Use the actual rendering host, even when a bypass flag was requested."""
     root = combo.window()
     reference = getattr(root, '_ui_native_owner', None)
     proxy = popup.graphicsProxyWidget()
@@ -721,6 +749,20 @@ def position_embedded_combo_popup(combo, popup, gap, desired_size=None):
         return False
     if sys.platform != 'darwin' and not popup.testAttribute(Qt.WA_DontShowOnScreen):
         return False
+    return True
+
+
+def position_embedded_combo_popup(combo, popup, gap, desired_size=None):
+    """Fit scene-rendered lists to the canvas; native popups use screen bounds.
+
+    Qt can retain a popup proxy on Windows after BypassGraphicsProxyWidget.
+    Its native handle does not mean it is drawn there: the scene supplies its
+    scale and coordinates while WA_DontShowOnScreen remains set.
+    """
+    if not is_embedded_combo_popup(combo, popup):
+        return False
+    root = combo.window()
+    proxy = popup.graphicsProxyWidget()
     anchor = QRect(combo.mapTo(root, QPoint()), combo.size())
     geometry = combo_popup_geometry(anchor, desired_size or popup.size(), root.rect(), gap, margin=4)
     popup.resize(geometry.size())

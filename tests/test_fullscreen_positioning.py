@@ -21,6 +21,10 @@ def application():
 
 def test_right_click_closes_fullscreen_translation_and_releases_mode(application, monkeypatch):
     import mode_coordinator
+    from PyQt5 import QtGui
+    screenshot = QtGui.QPixmap(800, 600)
+    screenshot.fill(QtCore.Qt.black)
+    monkeypatch.setattr(ocr, 'grab_screen_pixmap', lambda *_args: screenshot)
     release = mock.Mock()
     monkeypatch.setattr(mode_coordinator, 'release_mode', release)
     monkeypatch.setattr(ocr, 'get_cached_ocr_config', lambda: {

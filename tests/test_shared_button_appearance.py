@@ -14,6 +14,7 @@ import main
 from button_styles import button_palette, button_qss
 from qt_layout_test_support import ensure_layout_fonts
 from styled_dialogs import StyledMessageBox
+from keyboard_navigation import focus_control
 
 
 @pytest.fixture
@@ -72,7 +73,9 @@ def test_mouse_click_clears_the_ring_but_tab_focus_remains_visible(app, dark, bu
         owner.show()
         app.processEvents()
         button.clearFocus()
-        button.setFocus(Qt.TabFocusReason)
+        # A TabFocusReason can also come from an automatic mouse-driven focus
+        # transfer. Enter keyboard navigation explicitly for this paint check.
+        focus_control(button)
         app.processEvents()
         assert button.property("keyboardFocus") is True
         focus = button_palette(dark)["focus"]
@@ -201,7 +204,7 @@ def test_blank_click_commits_number_draft_clears_selection_and_keyboard_arrow_fo
         assert field.value() == 77
         assert not editor.hasSelectedText()
         assert not editor.hasFocus() and not field.editor.hasFocus()
-        field.decrease.setFocus(Qt.TabFocusReason)
+        focus_control(field.decrease)
         app.processEvents()
         assert field.decrease.property('keyboardFocus')
         QTest.mouseClick(owner, Qt.LeftButton, pos=QPoint(250, 100))

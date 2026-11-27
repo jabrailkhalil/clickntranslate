@@ -23,6 +23,36 @@ TEXT = {
      'Modalità di selezione',
      "Seleziona il testo in un'altra app. Avvia la traduzione con la scorciatoia, un pulsante accanto "
      'alla selezione o automaticamente. Utilizza il traduttore selezionato e le lingue di selezione.'),
+
+    'ar': ('بعد التحديد:',
+     'استخدام الاختصار',
+     'إظهار زر ترجمة',
+     'الترجمة فورًا',
+     'وضع التحديد',
+     'حدد نصًا في تطبيق آخر. ابدأ الترجمة بالاختصار، أو بزر بجوار التحديد، أو تلقائيًا. يُستخدم '
+     'المترجم المختار ولغتا وضع التحديد.'),
+
+    'tr': ('Seçimden sonra:',
+     'Kısayolu kullan',
+     'Çeviri düğmesini göster',
+     'Hemen çevir',
+     'Seçim modu',
+     'Başka uygulamada metin seçin. Kısayolla, yanındaki düğmeyle veya otomatik çevirin. Seçili '
+     'çevirmen ve Seçim dillerini kullanır.'),
+    'hi': ('चयन के बाद:',
+     'शॉर्टकट इस्तेमाल करें',
+     'अनुवाद बटन दिखाएँ',
+     'तुरंत अनुवाद करें',
+     'चयन मोड',
+     'दूसरे ऐप में टेक्स्ट चुनें। शॉर्टकट, चयन के पास बटन या अपने आप अनुवाद शुरू करें। चुना अनुवादक और '
+     'चयन की भाषाएँ उपयोग होती हैं।'),
+    'id': ('Setelah memilih:',
+     'Gunakan pintasan',
+     'Tampilkan tombol terjemahkan',
+     'Terjemahkan langsung',
+     'Mode pilihan',
+     'Pilih teks di aplikasi lain. Mulai dengan pintasan, tombol di dekat pilihan, atau otomatis. '
+     'Memakai penerjemah dan bahasa Pilihan yang dipilih.'),
 }
 
 
@@ -43,7 +73,13 @@ class SelectionTriggerControl(QWidget):
         for text, code in zip(labels[1:4], ('hotkey', 'button', 'automatic')):
             self.combo.addItem(text, code)
         self.label.setBuddy(self.combo)
-        self.setToolTip(tooltip_text(labels[5]))
+        help_text = labels[5]
+        import platform_support
+        if platform_support.IS_WINDOWS:
+            from selection_safety_text import PASSIVE_SELECTION_HELP
+            help_text += '\n\n' + PASSIVE_SELECTION_HELP.get(
+                owner.current_interface_language, PASSIVE_SELECTION_HELP['en'])
+        self.setToolTip(tooltip_text(help_text))
         layout.addWidget(self.label)
         layout.addWidget(self.combo, 1)
         self.refresh()

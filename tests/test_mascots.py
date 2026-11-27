@@ -109,6 +109,8 @@ def test_character_choice_before_enable_and_after_custom_image(window, tmp_path)
 
 
 def test_stage_arrows_cycle_all_characters_wrap_and_accept_keyboard(window, app):
+    from keyboard_navigation import install_keyboard_navigation
+    install_keyboard_navigation(app)
     window.show_assistant_settings()
     page = window.settings_window.settings_assistant_page
     stage = page.mascot_preview

@@ -11,14 +11,22 @@ class _PackageDelegate(QtWidgets.QStyledItemDelegate):
 
 
 class PackageTable(QtWidgets.QTableWidget):
+    rows_fitted = QtCore.pyqtSignal()
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setItemDelegate(_PackageDelegate(self))
+        # An invalid/default icon size stays at a platform's tiny 16px even
+        # when native dialog fonts scale. DialogAppearance scales this base
+        # exactly once; a graphics proxy supplies its own scene transform.
+        self.setIconSize(QtCore.QSize(22, 22))
+        self.setProperty('wholeRowTable', True)
         self.setWordWrap(False)
         self.setTextElideMode(QtCore.Qt.ElideRight)
         self._fit_timer = QtCore.QTimer(self)
         self._fit_timer.setSingleShot(True)
         self._fit_timer.timeout.connect(self.fit_columns)
+        self.iconSizeChanged.connect(self._icon_size_changed)
         self.verticalScrollBar().rangeChanged.connect(self._schedule_fit)
         # Qt normally gives the bar the full table height, including the
         # stationary header. Reserve that header height in its own layout so
@@ -30,6 +38,10 @@ class PackageTable(QtWidgets.QTableWidget):
 
     def _schedule_fit(self, *_):
         self._fit_timer.start(0)
+
+    def _icon_size_changed(self, *_):
+        self.setMaximumHeight(16777215)
+        self._schedule_fit()
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -56,7 +68,7 @@ class PackageTable(QtWidgets.QTableWidget):
             self._scroll_header_gap.changeSize(
                 0, gap, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed)
             self.verticalScrollBar().parentWidget().layout().invalidate()
-        if self.columnCount() != 4:
+        if self.columnCount() not in (4, 5):
             return
         metrics = self.fontMetrics()
         padding = max(12, metrics.height())
@@ -65,7 +77,18 @@ class PackageTable(QtWidgets.QTableWidget):
         if checkbox:
             self.setColumnWidth(0, checkbox)
         available = max(60, self.viewport().width()-checkbox)
-        for column, fraction in ((2, .31), (3, .40)):
+        if self.columnCount() == 5:
+            size_width = max(74, metrics.horizontalAdvance('999.9 MB')+padding)
+            title = self.horizontalHeaderItem(4)
+            if title is not None:
+                size_width = max(size_width, header.fontMetrics().horizontalAdvance(title.text())+padding)
+            for row in range(self.rowCount()):
+                item = self.item(row, 4)
+                if item is not None:
+                    size_width = max(size_width, metrics.horizontalAdvance(item.text())+padding)
+            self.setColumnWidth(4, size_width)
+            available -= size_width
+        for column, fraction in ((2, .31), (3, .34)):
             title = self.horizontalHeaderItem(column)
             needed = header.fontMetrics().horizontalAdvance(title.text())+padding if title else 0
             for row in range(self.rowCount()):
@@ -81,4 +104,5 @@ class PackageTable(QtWidgets.QTableWidget):
             height = max(self.rowHeight(row) for row in range(self.rowCount()))
             for row in range(self.rowCount()):
                 self.setRowHeight(row, height)
+        self.rows_fitted.emit()
 

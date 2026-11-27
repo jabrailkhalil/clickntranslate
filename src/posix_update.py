@@ -55,19 +55,17 @@ def update_target(system=None):
 
 
 def pick_asset(assets, kind, machine=None):
+    from release_assets import release_distribution
+
     arch = architecture(machine)
-    arch_tokens = ('arm64', 'aarch64') if arch == 'arm64' else ('x86_64', 'amd64', 'x64')
     if arch not in ('arm64', 'x86_64'):
         return None
-    extension = {'macos': '.zip', 'appimage': '.appimage', 'linux-dir': '.tar.gz'}[kind]
-    platform_token = 'macos' if kind == 'macos' else 'linux'
+    system = 'macOS' if kind == 'macos' else 'Linux'
+    package_format = {'macos': 'App ZIP', 'appimage': 'AppImage', 'linux-dir': 'tar.gz'}[kind]
+    expected = system, package_format, 'ARM64' if arch == 'arm64' else 'x64'
     candidates = []
     for asset in assets:
-        name = str(asset.get('name') or '').lower()
-        compact = re.sub(r'[-_]', '', name)
-        if ('clickntranslate' in compact and platform_token in name and name.endswith(extension)
-                and any(re.search(r'(?:^|[-_])' + re.escape(token) + r'(?:[-_.]|$)', name) for token in arch_tokens)
-                and not any(word in name for word in ('debug', 'source', 'bootstrap'))
+        if (release_distribution(str(asset.get('name') or ''), allow_unversioned=True) == expected
                 and (asset.get('browser_download_url') or asset.get('url'))):
             candidates.append(asset)
     return sorted(candidates, key=lambda item: item['name'])[0] if candidates else None

@@ -11,14 +11,17 @@ import types
 import zipfile
 import zlib
 import hashlib
+import threading
+from contextlib import nullcontext
+from copy import deepcopy
 from languages import language_english_name, translator_api_code
 from translation_chunks import PROVIDER_BYTE_LIMITS, split_text, restore_boundary_whitespace
 from translation_availability import OfflineProviderUnavailable
 import platform_support
 import portable_paths
 
-# Optional Argos Translate (offline). main.py preloads its native runtime before
-# Qt on Windows; importing this module alone remains lightweight until preloaded.
+# Optional Argos Translate (offline). GUI/source imports stay lightweight;
+# native libraries and model initialization belong to demand-started workers.
 HAS_ARGOS = True
 arg_pkg = None
 arg_tr = None
@@ -182,17 +185,15 @@ def _ensure_argos_available():
 
 
 def preload_argos_runtime():
-    """Loads Argos' native runtime before Qt consumes Windows TLS slots."""
-    if _argos_worker_path():
-        return True
-    return _ensure_argos_available()
+    """Native models stay in demand-started workers, including source runs."""
+    return bool(_argos_worker_path())
 
 
 def argos_unavailable_reason():
     """Returns why the offline Argos runtime cannot be used, or '' when it can."""
+    if _argos_worker_path():
+        return ''
     if getattr(sys, "frozen", False) and not os.environ.get("CLICKNTRANSLATE_ARGOS_WORKER"):
-        if _argos_worker_path():
-            return ""
         return "Argos offline worker is missing from this build."
     if _ensure_argos_available():
         return ""
@@ -209,10 +210,40 @@ def get_portable_dir():
     return portable_paths.portable_base_dir()
 
 
+def _managed_argos_runtime():
+    if os.environ.get('CLICKNTRANSLATE_ARGOS_WORKER'):
+        return None
+    from component_runtime import managed_runtime
+    return managed_runtime('argos')
+
+
+def _argos_cache_identity(runtime):
+    # Reinstall UUIDs may change while the approved runtime/model bytes do not.
+    if not runtime:
+        return 'argos'
+    plan = json.dumps(runtime['receipt']['files'], sort_keys=True, separators=(',', ':'))
+    return 'argos:models-v1:' + hashlib.sha256(plan.encode('utf-8')).hexdigest()[:20]
+
+
 def _argos_worker_path():
     """Returns the packaged non-Qt Argos worker, or an empty string."""
-    if not getattr(sys, "frozen", False) or os.environ.get("CLICKNTRANSLATE_ARGOS_WORKER"):
-        return ""
+    if os.environ.get('CLICKNTRANSLATE_ARGOS_WORKER'):
+        return ''
+    runtime = _managed_argos_runtime()
+    if runtime:
+        return runtime['command'][0]
+    return _legacy_argos_worker_path()
+
+
+def _legacy_argos_worker_path():
+    if os.environ.get('CLICKNTRANSLATE_ARGOS_WORKER'):
+        return ''
+    if not getattr(sys, "frozen", False):
+        from importlib.util import find_spec
+        if find_spec('argostranslate') is None:
+            return ''
+        worker = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'argos_worker.py')
+        return worker if os.path.isfile(worker) else ''
     executable_dir = os.path.dirname(sys.executable)
     worker_name = platform_support.executable_name("ArgosWorker")
     for path in (
@@ -222,6 +253,13 @@ def _argos_worker_path():
         if os.path.isfile(path):
             return path
     return ""
+
+
+def _argos_context_worker_path(cache):
+    if 'argos' in getattr(cache, '_bound_identities', {}):
+        runtime = cache._argos_runtime
+        return runtime['command'][0] if runtime else cache._argos_legacy_worker_path
+    return _argos_worker_path()
 
 
 def argos_runtime_available():
@@ -330,6 +368,18 @@ def _find_hymt_runner_under(root_dir):
 
 def _get_hymt_runtime():
     global _hymt_runtime_cache
+    from component_runtime import managed_runtime
+    managed = managed_runtime('hymt')
+    if managed:
+        from component_hymt import runtime_info
+        from component_catalog import ComponentError
+        try:
+            return runtime_info(managed['folder'], managed['receipt'])
+        except ComponentError:
+            return {'root':str(managed['folder']), 'model':'', 'runner':''}
+    from component_hymt import legacy_disabled
+    if legacy_disabled():
+        return {'root':_local_hymt_dir(), 'model':'', 'runner':''}
     if _hymt_runtime_cache is not None:
         return _hymt_runtime_cache
     root_dir = _local_hymt_dir()
@@ -353,6 +403,8 @@ _HYMT_CHINESE_LANGUAGE_NAMES = {
     "es": "西班牙语", "it": "意大利语", "pt": "葡萄牙语", "pl": "波兰语",
     "uk": "乌克兰语", "tr": "土耳其语", "nl": "荷兰语", "zh": "中文",
     "ja": "日语", "ko": "韩语", "ar": "阿拉伯语", "hi": "印地语",
+
+    'id': '印尼语',
 }
 
 
@@ -437,6 +489,22 @@ def _clean_hymt_output(output, prompt):
 
 
 def hymt_translate(text, source_code, target_code, status_callback=None, *, cancel_callback=None, _cache=None, partial_callback=None):
+    from component_runtime import managed_runtime
+    managed = managed_runtime('hymt')
+    if managed:
+        from component_hymt import translate, cache_identity
+        from component_catalog import component_store_path
+        from component_store import ComponentStore
+        if _cache is not None:
+            _cache._bound_identities['hymt'] = cache_identity(managed['receipt'])
+        def check_cancel():
+            _check_translation_cancelled(cancel_callback)
+        with ComponentStore(component_store_path()).lease(managed['receipt']['generation']):
+            _emit_status(status_callback, HYMT_DISPLAY_NAME)
+            return _translate_chunks(text, 1000, lambda chunk: translate(
+                managed['folder'], managed['receipt'], chunk, source_code, target_code,
+                check_cancel=check_cancel), cache=_cache, engine='hymt',
+                cancel_callback=cancel_callback, partial_callback=partial_callback)
     # Bound each generation as well as its prompt; otherwise a long input can
     # silently hit the output-token cap and return an incomplete translation.
     return _translate_chunks(text, 1000, lambda chunk: _hymt_translate_chunk(
@@ -672,6 +740,8 @@ def _download_argos_package(
 
 def models_installed_ru_en():
     """Return True if both RU and EN language models are installed in Argos."""
+    if _managed_argos_runtime():
+        return {('ru','en'), ('en','ru')}.issubset(argos_installed_direct_pairs_fast())
     if not _ensure_argos_available():
         return False
     try:
@@ -689,6 +759,9 @@ def _installed_pairs():
 
 def _argos_package_data_dirs():
     """Return plausible Argos package roots without importing its native runtime."""
+    runtime = _managed_argos_runtime()
+    if runtime:
+        return [str(path) for path in (runtime['folder'] / 'models').glob('*') if path.is_dir()]
     _prepare_argos_environment()
     candidates = []
     if arg_pkg is not None:
@@ -918,6 +991,15 @@ def ensure_language_pair(
 
     Returns True when something was installed.
     """
+    if _managed_argos_runtime():
+        direct = argos_installed_direct_pairs_fast()
+        available = {(row['source_code'], row['target_code']) for row in argos_package_catalog()
+                     if row['available']}
+        plan = _plan_language_pair(source_code, target_code, available, direct)
+        if not plan:
+            return False
+        install_argos_packages(plan, status_callback, progress_callback, cancel_callback)
+        return True
     if not _ensure_argos_available():
         return False
     if _get_translation_object(source_code, target_code) is not None:
@@ -1022,8 +1104,33 @@ def _run_argos_worker_request(
     cancel_callback=None,
     timeout=1800,
     partial_callback=None,
+    chunk_callback=None,
+    _cache=None,
 ):
-    worker_path = _argos_worker_path()
+    # Use the same generation selected for cache lookup, even during an update.
+    bound = isinstance(_cache, _TranslationCache) and 'argos' in _cache._bound_identities
+    runtime = _cache._argos_runtime if bound else _managed_argos_runtime()
+    legacy_path = _cache._argos_legacy_worker_path if bound and runtime is None else None
+    if isinstance(_cache, _TranslationCache):
+        _cache._argos_runtime = runtime
+        if runtime is None and not bound:
+            legacy_path = _cache._argos_legacy_worker_path = _legacy_argos_worker_path()
+        _cache._bound_identities['argos'] = _argos_cache_identity(runtime)
+    from component_catalog import component_store_path
+    from component_store import ComponentStore
+    with (ComponentStore(component_store_path()).lease(runtime['receipt']['generation'])
+          if runtime else nullcontext()):
+        return _run_argos_worker_request_inner(request, status_callback, progress_callback,
+            cancel_callback, timeout, partial_callback, runtime,
+            **({'_worker_path': legacy_path} if legacy_path is not None else {}),
+            **({'chunk_callback':chunk_callback} if chunk_callback is not None else {}))
+
+
+def _run_argos_worker_request_inner(request, status_callback=None, progress_callback=None,
+                                    cancel_callback=None, timeout=1800, partial_callback=None, runtime=None,
+                                    chunk_callback=None, _worker_path=None):
+    worker_path = (runtime['command'][0] if runtime else
+                   _argos_worker_path() if _worker_path is None else _worker_path)
     if not worker_path:
         raise RuntimeError("Argos offline worker is missing from this build.")
 
@@ -1073,9 +1180,17 @@ def _run_argos_worker_request(
                 _check_translation_cancelled(cancel_callback)
                 partial_callback(str(event.get("text", "")),
                                  int(event.get("done", 0)), int(event.get("total", 0)))
+            elif event.get('type') == 'chunk' and chunk_callback:
+                _check_translation_cancelled(cancel_callback)
+                chunk_callback(event)
 
     try:
         request = dict(request or {})
+        request['portable_root'] = get_portable_dir()
+        if runtime:
+            from component_catalog import native_data_path
+            request['root_dir'] = native_data_path(runtime['folder'])
+            request['work_dir'] = request_dir
         request["event_path"] = event_path
         request["cancel_path"] = cancel_path
         with open(request_path, "w", encoding="utf-8") as request_file:
@@ -1090,8 +1205,12 @@ def _run_argos_worker_request(
         with open(stdout_path, "w", encoding="utf-8") as stdout_file, open(
             stderr_path, "w", encoding="utf-8", errors="replace"
         ) as stderr_file:
+            command = ([*runtime['command'], request_path] if runtime else
+                       [sys.executable, worker_path, request_path] if worker_path.endswith('.py') else
+                       [worker_path, request_path])
+            from component_runtime import worker_environment
             process = subprocess.Popen(
-                [worker_path, request_path],
+                command,
                 stdout=stdout_file,
                 stderr=stderr_file,
                 text=True,
@@ -1099,6 +1218,7 @@ def _run_argos_worker_request(
                 errors="replace",
                 startupinfo=startupinfo,
                 creationflags=creationflags,
+                env=worker_environment(managed=runtime is not None),
             )
             deadline = time.monotonic() + max(1, int(timeout))
             while process.poll() is None:
@@ -1108,7 +1228,7 @@ def _run_argos_worker_request(
                         with open(cancel_path, "w", encoding="utf-8") as cancel_file:
                             cancel_file.write("cancel\n")
                         cancel_sent_at = time.monotonic()
-                    elif time.monotonic() - cancel_sent_at > 10:
+                    elif time.monotonic() - cancel_sent_at > 1:
                         process.terminate()
                 if time.monotonic() > deadline:
                     process.kill()
@@ -1145,6 +1265,7 @@ def _run_argos_worker_request(
         if process is not None and process.poll() is None:
             try:
                 process.kill()
+                process.wait(timeout=10)
             except Exception:
                 pass
         shutil.rmtree(request_dir, ignore_errors=True)
@@ -1152,6 +1273,9 @@ def _run_argos_worker_request(
 
 def argos_package_catalog(refresh=False):
     """Return Argos direct packages without loading its native runtime in Qt."""
+    if _managed_argos_runtime():
+        from component_argos import catalog_rows
+        return catalog_rows(refresh=refresh)
     if _argos_worker_path():
         payload = _run_argos_worker_request(
             {"action": "catalog", "refresh": bool(refresh)},
@@ -1171,6 +1295,12 @@ def install_argos_packages(
 ):
     """Install selected direct Argos packages in-process or via ArgosWorker."""
     pairs = _normalize_argos_pairs(pairs)
+    if not pairs:
+        return []
+    from component_runtime import managed_install_supported
+    if _managed_argos_runtime() or (not os.environ.get('CLICKNTRANSLATE_ARGOS_WORKER') and managed_install_supported()):
+        _change_managed_argos(pairs, status_callback, progress_callback, cancel_callback)
+        return pairs
     if _argos_worker_path():
         payload = _run_argos_worker_request(
             {"action": "install_packages", "pairs": pairs},
@@ -1195,6 +1325,11 @@ def install_argos_packages(
 def uninstall_argos_packages(pairs, status_callback=None):
     """Uninstall selected direct Argos packages in-process or via ArgosWorker."""
     pairs = _normalize_argos_pairs(pairs)
+    if not pairs:
+        return []
+    if _managed_argos_runtime():
+        _change_managed_argos(pairs, status_callback, remove=True)
+        return pairs
     if _argos_worker_path():
         payload = _run_argos_worker_request(
             {"action": "uninstall_packages", "pairs": pairs},
@@ -1207,8 +1342,28 @@ def uninstall_argos_packages(pairs, status_callback=None):
     return _uninstall_argos_packages_local(pairs, status_callback=status_callback)
 
 
+def _change_managed_argos(pairs=(), status_callback=None, progress_callback=None,
+                           cancel_callback=None, *, remove=False):
+    from component_argos import install
+    from component_download import ComponentDownloader
+    def check_cancel():
+        _check_argos_install_cancelled(cancel_callback)
+    def progress(url, done, total):
+        match = re.search(r'translate-([a-z]{2,3})_([a-z]{2,3})-', url)
+        label = f'{match[1].upper()}→{match[2].upper()}' if match else 'Argos'
+        _emit_argos_progress(progress_callback, label, done, total)
+    result = install(ComponentDownloader(check_cancel, progress), pairs=() if remove else pairs,
+        remove_pairs=pairs if remove else (), legacy_pairs=argos_installed_direct_pairs_fast(),
+        check_cancel=check_cancel,
+        progress=lambda index, total: _emit_status(status_callback, f'Argos: {index + 1}/{total}'))
+    _invalidate_argos_cache()
+    return result
+
+
 def argos_pair_installed(source_code, target_code):
     """Return whether Argos can translate this pair without a download."""
+    if _managed_argos_runtime():
+        return source_code == target_code or (source_code, target_code) in argos_installed_translation_pairs_fast()
     if _argos_worker_path():
         payload = _run_argos_worker_request(
             {
@@ -1235,8 +1390,9 @@ def _try_argos_translate_worker(
     progress_callback=None,
     cancel_callback=None,
     partial_callback=None,
+    _cache=None,
 ):
-    worker_path = _argos_worker_path()
+    worker_path = _argos_context_worker_path(_cache)
     if not worker_path:
         return _try_argos_translate_local(
             text,
@@ -1270,6 +1426,7 @@ def _try_argos_translate_worker(
             progress_callback=progress_callback,
             cancel_callback=cancel_callback,
             partial_callback=report_partial if partial_callback else None,
+            **({'_cache': _cache} if _cache is not None else {}),
         )
         if payload.get("error"):
             error = str(payload["error"])
@@ -1316,8 +1473,9 @@ def _try_argos_translate(
     progress_callback=None,
     cancel_callback=None,
     partial_callback=None,
+    _cache=None,
 ):
-    if _argos_worker_path():
+    if _argos_context_worker_path(_cache):
         return _try_argos_translate_worker(
             text,
             source_code,
@@ -1327,6 +1485,7 @@ def _try_argos_translate(
             progress_callback=progress_callback,
             cancel_callback=cancel_callback,
             partial_callback=partial_callback,
+            **({'_cache': _cache} if _cache is not None else {}),
         )
     return _try_argos_translate_local(
         text,
@@ -1378,8 +1537,18 @@ class ProviderRateLimitError(RuntimeError):
     pass
 
 
+def _provider_status_code(error):
+    return getattr(error, 'status_code', None) or getattr(getattr(error, 'response', None), 'status_code', None)
+
+
 def _is_provider_rate_limit(error):
-    return isinstance(error, ProviderRateLimitError) or getattr(getattr(error, 'response', None), 'status_code', None) == 429
+    return isinstance(error, ProviderRateLimitError) or _provider_status_code(error) == 429
+
+
+def _blocks_remaining_requests(error):
+    # A rejected key, denied access or exhausted quota cannot be repaired by
+    # sending the next document paragraph through the same connection.
+    return _is_provider_rate_limit(error) or _provider_status_code(error) in {401, 403}
 
 
 def _check_translation_cancelled(callback):
@@ -1387,10 +1556,10 @@ def _check_translation_cancelled(callback):
         raise TranslationCancelledError('Translation canceled')
 
 
-def _libretranslate_server():
+def _libretranslate_server(config=None):
     key = os.environ.get('CLICKNTRANSLATE_LIBRETRANSLATE_API_KEY', '').strip()
     url = os.environ.get('CLICKNTRANSLATE_LIBRETRANSLATE_URL', '').strip().rstrip('/')
-    config = get_cached_translator_config()
+    config = get_cached_translator_config() if config is None else config
     if not url and config.get('api_providers', {}).get('libretranslate'):
         from api_providers import profile, credential
         item = profile('libretranslate', config)
@@ -1399,8 +1568,14 @@ def _libretranslate_server():
 
 
 class _TranslationCache:
-    def __init__(self, source, target):
+    def __init__(self, source, target, *, config=None):
         self.source, self.target = source, target
+        self.config = deepcopy(config if config is not None else get_cached_translator_config())
+        self._api_keys = {}
+        self._bound_identities = {}
+        self._argos_runtime = None
+        self._argos_legacy_worker_path = None
+        self._libre_connection = None
         try:
             from main import get_data_file
             self.data_dir = os.path.dirname(get_data_file('config.json'))
@@ -1408,25 +1583,66 @@ class _TranslationCache:
             self.data_dir = None
 
     @staticmethod
-    def _engine_key(engine, segment=False):
+    def _engine_key(engine, segment=False, *, config=None, api_key=None, libre_connection=None):
+        if engine == 'argos':
+            engine = _argos_cache_identity(_managed_argos_runtime())
         if engine in {'openai', 'openai-compatible', 'gemini', 'anthropic', 'deepl'}:
             from api_providers import cache_identity
-            engine = cache_identity(engine, get_cached_translator_config())
+            engine = cache_identity(engine, get_cached_translator_config() if config is None else config,
+                                    api_key=api_key)
         if engine == 'hymt':
             # Ignore translations produced with the old, duplicated template.
-            engine = 'hymt:prompt-v2'
+            from component_runtime import managed_runtime
+            managed = managed_runtime('hymt')
+            if managed:
+                from component_hymt import cache_identity
+                engine = cache_identity(managed['receipt'])
+            else:
+                engine = 'hymt:prompt-v2'
         if engine == 'libretranslate':
             # A custom LibreTranslate server may use different models.
-            url, key = _libretranslate_server()
+            url, key = libre_connection or _libretranslate_server(config)
             engine += ':' + hashlib.sha256((url + '\0' + key).encode('utf-8')).hexdigest()[:16]
         return ('segment-v2:' if segment else '') + engine
+
+    def connection_key(self, engine):
+        if engine not in self._api_keys:
+            from api_providers import credential
+            self._api_keys[engine] = credential(engine, self.config)
+        return self._api_keys[engine]
+
+    def _bound_engine_key(self, engine, segment=False):
+        if engine == 'argos':
+            if engine not in self._bound_identities:
+                self._argos_runtime = _managed_argos_runtime()
+                if self._argos_runtime is None:
+                    self._argos_legacy_worker_path = _legacy_argos_worker_path()
+                self._bound_identities[engine] = _argos_cache_identity(self._argos_runtime)
+            return ('segment-v2:' if segment else '') + self._bound_identities[engine]
+        if engine == 'libretranslate':
+            return self._engine_key(engine, segment, libre_connection=self.libre_connection())
+        if engine == 'hymt':
+            if engine not in self._bound_identities:
+                self._bound_identities[engine] = self._engine_key(engine)
+            return ('segment-v2:' if segment else '') + self._bound_identities[engine]
+        if engine not in {'openai', 'openai-compatible', 'gemini', 'anthropic', 'deepl'}:
+            return self._engine_key(engine, segment)
+        if engine not in self._bound_identities:
+            self._bound_identities[engine] = self._engine_key(engine, config=self.config,
+                                                            api_key=self.connection_key(engine))
+        return ('segment-v2:' if segment else '') + self._bound_identities[engine]
+
+    def libre_connection(self):
+        if self._libre_connection is None:
+            self._libre_connection = _libretranslate_server(self.config)
+        return self._libre_connection
 
     def get(self, text, engine, segment=False):
         if self.data_dir:
             try:
                 from cache_manager import get_cached_translation
                 result = get_cached_translation(self.data_dir, text, self.source, self.target,
-                    engine=self._engine_key(engine, segment), strict_engine=True)
+                    engine=self._bound_engine_key(engine, segment), strict_engine=True)
                 return result if isinstance(result, str) and result.strip() else None
             except Exception:
                 pass
@@ -1437,7 +1653,7 @@ class _TranslationCache:
             try:
                 from cache_manager import save_cached_translation
                 save_cached_translation(self.data_dir, text, self.source, self.target, result,
-                    engine=self._engine_key(engine, segment))
+                    engine=self._bound_engine_key(engine, segment))
             except Exception:
                 pass
 
@@ -1451,16 +1667,19 @@ def translate_text(
     progress_callback=None,
     cancel_callback=None,
     partial_callback=None,
+    _context=None,
 ):
     """Translate with the selected engine; failures never change providers."""
-    config = get_cached_translator_config()
+    config = _context.config if _context is not None else get_cached_translator_config()
     from provider_catalog import provider_id
     engine = provider_id(engine or config.get("translator_engine", "Google"))
     _check_translation_cancelled(cancel_callback)
+    if not text.strip():
+        return text
     print(f"Using translator: {engine.upper()}")
 
     # Check translation cache first
-    cache = _TranslationCache(source_code, target_code)
+    cache = _context or _TranslationCache(source_code, target_code, config=config)
     cached = cache.get(text, engine)
     if cached:
         print(f"Using cached translation ({len(text)} chars)")
@@ -1491,9 +1710,11 @@ def translate_text(
     if engine in {'openai', 'openai-compatible', 'gemini', 'anthropic', 'deepl'}:
         from api_providers import translate, ProviderError, display_error
         try:
-            result = translate(engine, text, source_code, target_code, config, cancel_callback)
+            result = translate(engine, text, source_code, target_code, cache.config, cancel_callback,
+                               api_key=cache.connection_key(engine))
         except ProviderError as error:
-            raise ProviderError(display_error(error, config.get('interface_language', 'en'))) from None
+            raise ProviderError(display_error(error, config.get('interface_language', 'en')),
+                                status_code=error.status_code) from None
         return _cache_and_return(result)
 
     if engine in online_engines:
@@ -1504,7 +1725,7 @@ def translate_text(
         return _cache_and_return(result, engine)
 
     if engine == "argos":
-        if not argos_runtime_available():
+        if not getattr(cache, '_argos_runtime', None) and not argos_runtime_available():
             raise OfflineProviderUnavailable('argos', source_code, target_code,
                                              argos_unavailable_reason(), component='runtime')
         # Packages are large, so only download them when the caller provides the
@@ -1519,6 +1740,7 @@ def translate_text(
             progress_callback=progress_callback,
             cancel_callback=cancel_callback,
             partial_callback=partial_callback,
+            _cache=cache,
         )
         if argos_result:
             return _cache_and_return(argos_result)
@@ -1655,9 +1877,19 @@ def _mymemory_translate_chunk(text, source_code, target_code):
     r = session.get(url, params=params, timeout=10)
     r.raise_for_status()
     data = r.json()
-    if data.get('responseStatus') == 200:
+    if not isinstance(data, dict):
+        raise RuntimeError('MyMemory returned an invalid response')
+    raw_status = data.get('responseStatus')
+    status = raw_status if type(raw_status) is int else None
+    if type(raw_status) is float and raw_status.is_integer():
+        status = int(raw_status)
+    if isinstance(raw_status, str) and re.fullmatch(r'[0-9]{3}', raw_status.strip()):
+        status = int(raw_status)
+    if status == 200:
         return _validated_translation(data['responseData']['translatedText'], 'MyMemory')
-    raise Exception(f"MyMemory error: {data.get('responseDetails', 'Unknown error')}")
+    error = RuntimeError(f"MyMemory error: {data.get('responseDetails', 'Unknown error')}")
+    error.status_code = status
+    raise error
 
 def _server_error_detail(response):
     """Server-provided error text, so dead or key-gated instances explain themselves."""
@@ -1724,7 +1956,8 @@ def _lingva_translate_chunk(text, source_code, target_code, *, cancel_callback=N
     raise Exception(f"Lingva translate failed: {last_error}")
 
 def libretranslate(text, source_code, target_code, *, cancel_callback=None, _cache=None, partial_callback=None):
-    return _translate_chunks(text, PROVIDER_BYTE_LIMITS['libretranslate'], lambda chunk: _libretranslate_chunk(chunk, source_code, target_code),
+    connection = _cache.libre_connection() if _cache is not None else _libretranslate_server()
+    return _translate_chunks(text, PROVIDER_BYTE_LIMITS['libretranslate'], lambda chunk: _libretranslate_chunk(chunk, source_code, target_code, connection=connection),
         cache=_cache, engine='libretranslate', cancel_callback=cancel_callback, partial_callback=partial_callback)
 
 
@@ -1732,20 +1965,20 @@ class _BatchNotSupportedError(RuntimeError):
     pass
 
 
-def _libretranslate_chunk(text, source_code, target_code):
-    return _libretranslate_request(text, source_code, target_code)
+def _libretranslate_chunk(text, source_code, target_code, *, connection=None):
+    return _libretranslate_request(text, source_code, target_code, connection=connection)
 
 
-def _libretranslate_batch(texts, source_code, target_code):
-    return _libretranslate_request(list(texts), source_code, target_code)
+def _libretranslate_batch(texts, source_code, target_code, *, connection=None):
+    return _libretranslate_request(list(texts), source_code, target_code, connection=connection)
 
 
-def _libretranslate_request(text, source_code, target_code):
+def _libretranslate_request(text, source_code, target_code, *, connection=None):
     """LibreTranslate - открытый переводчик (публичные серверы)."""
     # The managed service requires a key; retrying it anonymously only masks
     # the public server's actual error. A configured key goes to one selected
     # server, never to a different public instance during a fallback.
-    server, api_key = _libretranslate_server()
+    server, api_key = connection or _libretranslate_server()
     instances = [server]
     session = _get_http_session()
     last_error = None
@@ -1782,12 +2015,99 @@ def _libretranslate_request(text, source_code, target_code):
                 raise _BatchNotSupportedError(last_error)
             if r.status_code == 429:
                 raise ProviderRateLimitError(last_error)
-        except (_BatchNotSupportedError, ProviderRateLimitError):
+            if r.status_code in (401, 403):
+                raise requests.HTTPError(last_error, response=r)
+        except (_BatchNotSupportedError, ProviderRateLimitError, requests.HTTPError):
             raise
         except Exception as e:
             last_error = f"{base_url}: {e}"
             continue
     raise Exception(f"LibreTranslate failed: {last_error}")
+
+def _argos_document_worker_supported():
+    runtime = _managed_argos_runtime()
+    if runtime:
+        try:
+            with open(os.path.join(str(runtime['folder']), 'runtime', 'COMPONENT.json'), encoding='utf-8') as source:
+                return json.load(source).get('argos_document_protocol') == 1
+        except (OSError, ValueError):
+            return False
+    return bool(_argos_worker_path())
+
+
+def _iter_argos_document(texts, source, target, cache, status_callback, cancel_callback):
+    """One model lifetime per document; bounded delivery, no resident idle model."""
+    import queue
+    cached = {i:cache.get(text, 'argos') if text.strip() else text for i,text in enumerate(texts)}
+    pending = [dict(index=i, text=text) for i,text in enumerate(texts) if cached[i] is None]
+    if not pending:
+        for i in range(len(texts)):
+            _check_translation_cancelled(cancel_callback)
+            yield i, cached[i], ''
+        return
+    delivery = queue.Queue(maxsize=2)
+    stopped = threading.Event()
+
+    def cancelled():
+        return stopped.is_set() or bool(cancel_callback and cancel_callback())
+
+    def put(value):
+        while True:
+            _check_translation_cancelled(cancelled)
+            try:
+                delivery.put(value, timeout=.05)
+                return
+            except queue.Full:
+                pass
+
+    def work():
+        try:
+            payload = _run_argos_worker_request({'action':'translate_chunks', 'pieces':pending,
+                'source_code':source, 'target_code':target, 'allow_install':False},
+                status_callback=status_callback, cancel_callback=cancelled, chunk_callback=put,
+                _cache=cache)
+            error = payload.get('error', '')
+            if not error and payload.get('completed') != len(pending):
+                error = 'Incomplete Argos document response'
+            put(RuntimeError(error or 'Unexpected end of Argos document'))
+        except Exception as error:
+            if not cancelled():
+                put(error)
+
+    _check_translation_cancelled(cancel_callback)
+    producer = threading.Thread(target=work, name='Argos-document', daemon=True)
+    producer.start()
+    error = None
+    try:
+        for i, original in enumerate(texts):
+            _check_translation_cancelled(cancelled)
+            if cached[i] is not None:
+                yield i, cached[i], ''
+                continue
+            if error is None:
+                while True:
+                    _check_translation_cancelled(cancelled)
+                    try:
+                        result = delivery.get(timeout=.05)
+                        break
+                    except queue.Empty:
+                        if not producer.is_alive():
+                            result = RuntimeError('Argos document worker exited')
+                            break
+                if isinstance(result, Exception):
+                    error = str(result)
+                elif result.get('index') != i or not isinstance(result.get('text'), str) or not result['text'].strip():
+                    error = 'Invalid Argos document chunk mapping'
+            if error is not None:
+                yield i, '', error
+            else:
+                translated = restore_boundary_whitespace(original, result['text'])
+                cache.save(original, translated, 'argos')
+                yield i, translated, ''
+    finally:
+        stopped.set()
+        producer.join(timeout=3)
+
 
 def iter_translate_texts(texts, source_code, target_code, *, engine=None,
                          status_callback=None, cancel_callback=None):
@@ -1797,18 +2117,23 @@ def iter_translate_texts(texts, source_code, target_code, *, engine=None,
     to four planned pieces in one request. Every request and cache lookup stays
     with the selected engine, including after a provider failure.
     """
+    _check_translation_cancelled(cancel_callback)
     config = get_cached_translator_config()
-    engine = (engine or config.get('translator_engine', 'Google')).lower()
+    from provider_catalog import provider_id
+    engine = provider_id(engine or config.get('translator_engine', 'Google'))
     texts = list(texts)
-    cache = _TranslationCache(source_code, target_code)
+    cache = _TranslationCache(source_code, target_code, config=config)
+    if engine == 'argos' and _argos_document_worker_supported():
+        yield from _iter_argos_document(texts, source_code, target_code, cache, status_callback, cancel_callback)
+        return
     batch_size = 4 if engine == 'libretranslate' else 1
     offset = 0
-    rate_limit_error = ''
+    blocked_error = ''
     while offset < len(texts):
         _check_translation_cancelled(cancel_callback)
-        if rate_limit_error:
+        if blocked_error:
             cached = cache.get(texts[offset], engine) if texts[offset].strip() else texts[offset]
-            yield offset, cached or '', '' if cached else rate_limit_error
+            yield offset, cached or '', '' if cached is not None else blocked_error
             offset += 1
             continue
         group = texts[offset:offset + batch_size]
@@ -1816,15 +2141,15 @@ def iter_translate_texts(texts, source_code, target_code, *, engine=None,
             text = group[0]
             try:
                 result = translate_text(text, source_code, target_code, engine=engine,
-                    status_callback=status_callback, cancel_callback=cancel_callback)
+                    status_callback=status_callback, cancel_callback=cancel_callback, _context=cache)
                 error = ''
             except TranslationCancelledError:
                 raise
             except Exception as exc:
                 _check_translation_cancelled(cancel_callback)
                 result, error = '', str(exc)
-                if _is_provider_rate_limit(exc):
-                    rate_limit_error = error
+                if _blocks_remaining_requests(exc):
+                    blocked_error = error
             yield offset, result, error
             offset += 1
             continue
@@ -1840,9 +2165,11 @@ def iter_translate_texts(texts, source_code, target_code, *, engine=None,
         try:
             _check_translation_cancelled(cancel_callback)
             if len(pending) > 1:
-                values = _libretranslate_batch([group[i].strip() for i in pending], source_code, target_code)
+                values = _libretranslate_batch([group[i].strip() for i in pending], source_code, target_code,
+                                              connection=cache.libre_connection())
             elif pending:
-                values = [_libretranslate_chunk(group[pending[0]].strip(), source_code, target_code)]
+                values = [_libretranslate_chunk(group[pending[0]].strip(), source_code, target_code,
+                                               connection=cache.libre_connection())]
             else:
                 values = []
             for index, value in zip(pending, values):
@@ -1857,8 +2184,8 @@ def iter_translate_texts(texts, source_code, target_code, *, engine=None,
         except TranslationCancelledError:
             raise
         except Exception as exc:
-            if _is_provider_rate_limit(exc):
-                rate_limit_error = str(exc)
+            if _blocks_remaining_requests(exc):
+                blocked_error = str(exc)
             for index in pending:
                 _check_translation_cancelled(cancel_callback)
                 results[index] = ('', str(exc))
