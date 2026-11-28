@@ -322,6 +322,8 @@ def dropdown_screenshots(main, app, window, report_path, screenshots):
                 viewport = window._ui_scale_controller.view.viewport()
                 QTest.mouseClick(viewport, QtCore.Qt.LeftButton,
                                  pos=viewport.mapFromGlobal(widget_global_rect(combo).center()))
+            elif '-welcome-' in name:
+                QTest.mouseClick(combo, QtCore.Qt.LeftButton)
             else:
                 combo.showPopup()
             QTest.qWait(100)
@@ -395,12 +397,18 @@ def dropdown_screenshots(main, app, window, report_path, screenshots):
                          lang='ru', theme=window.current_theme, source_text='Hello!',
                          source_lang='en', target_lang='ru')
             document = main.DocumentTranslationDialog(window)
+            welcome = main.WelcomeDialog(window)
             for name, dialog, keys in (
                 ('result', result, ('source_combo', 'target_combo')),
                 ('document', document, ('source_combo', 'target_combo', 'provider_combo')),
+                ('welcome', welcome, ('flag_button',)),
             ):
                 dialog.show()
                 app.processEvents()
+                if name == 'welcome':
+                    bounds = dialog.screen().availableGeometry()
+                    dialog.move(bounds.center().x() - dialog.width() // 2, bounds.bottom() - dialog.height() + 1)
+                    app.processEvents()
                 for key in keys:
                     inspect(getattr(dialog, key), prefix + '-' + name + '-' + key, percent, actual)
                 dialog.close()
@@ -744,7 +752,6 @@ def run(main, report_path):
 
     with tempfile.TemporaryDirectory(prefix="cnt-macos-smoke-") as temporary:
         with (mock.patch.object(macos_desktop, "user_data_dir", return_value=temporary),
-              mock.patch.object(main, "WelcomeDialog"),
               mock.patch.object(main, "HotkeyListenerThread"),
               mock.patch.object(main.DarkThemeApp, "_maybe_check_updates_on_launch"),
               mock.patch.object(main.DarkThemeApp, "_maybe_show_startup_news"),
@@ -752,7 +759,8 @@ def run(main, report_path):
             main.invalidate_config_cache()
             app = main._ensure_startup_application()
             app._mac_reopen_handler = macos_desktop.install_dock_reopen_handler(app, lambda: None)
-            window = main.DarkThemeApp()
+            with mock.patch.object(main, "WelcomeDialog"):
+                window = main.DarkThemeApp()
             shadow_results = shadow_mode_check(main, app, window)
             window.show()
             for _ in range(5):

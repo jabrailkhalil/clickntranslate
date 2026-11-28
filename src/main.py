@@ -8282,6 +8282,19 @@ class TranslationResultDialog(QDialog):
         self._drag_position = None
         super().mouseReleaseEvent(event)
 
+class WelcomeLanguageCombo(DropDownCombo):
+    ALIGN_POPUP_TO_TRAILING_EDGE = True
+
+    def _paint_combo(self, painter, option):
+        from icon_rendering import paint_icon
+        option.subControls = QtWidgets.QStyle.SC_ComboBoxFrame
+        painter.drawComplexControl(QtWidgets.QStyle.CC_ComboBox, option)
+        scale = float(self.window().property('ui_effective_scale') or 1)
+        icon_rect = QtWidgets.QStyle.alignedRect(self.layoutDirection(), Qt.AlignCenter,
+                                                 option.iconSize * scale, self.rect())
+        paint_icon(painter, option.currentIcon, icon_rect)
+
+
 class WelcomeDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -8410,14 +8423,18 @@ class WelcomeDialog(QDialog):
         top_row.addWidget(app_name)
         top_row.addStretch()
 
-        self.flag_button = QPushButton()
+        self.flag_button = WelcomeLanguageCombo()
         self.flag_button.setObjectName("welcomeLang")
-        self.flag_button.setIcon(load_icon(resource_path(get_interface_language_option(self.lang)["icon"])))
+        for option in INTERFACE_LANGUAGE_OPTIONS:
+            self.flag_button.addItem(load_icon(resource_path(option["icon"])), option["name"], option["code"])
+        self.flag_button.setCurrentIndex(self.flag_button.findData(self.lang))
         self.flag_button.setIconSize(QSize(20, 20))
         self.flag_button.setFixedSize(36, 32)
+        self.flag_button.setStyleSheet("QComboBox#welcomeLang { font-size:14px; }")
+        self.flag_button.set_popup_background(colors['field'])
         self.flag_button.setAccessibleName(ui_text(self.lang, "choose_interface_language"))
         self.flag_button.setToolTip(tooltip_text(ui_text(self.lang, "choose_interface_language")))
-        self.flag_button.clicked.connect(self.show_language_menu)
+        self.flag_button.currentIndexChanged.connect(lambda index: self.set_language(self.flag_button.itemData(index)))
         top_row.addWidget(self.flag_button)
 
         close_x = QPushButton("×")
@@ -8592,54 +8609,6 @@ class WelcomeDialog(QDialog):
         codes = [option["code"] for option in INTERFACE_LANGUAGE_OPTIONS]
         index = codes.index(self.lang) if self.lang in codes else 0
         self.set_language(codes[(index + 1) % len(codes)])
-
-    def show_language_menu(self):
-        menu = QMenu(self)
-        self._language_menu = menu
-        menu.setWindowFlags(menu.windowFlags() | Qt.FramelessWindowHint | Qt.NoDropShadowWindowHint)
-        from rounded_windows import clip_rounded_window
-        clip_rounded_window(menu, menu, 8)
-        from classic_style import classic_palette
-        colors = classic_palette(getattr(self.parent, 'current_theme', DEFAULT_CONFIG['theme']) != 'Светлая')
-        menu.setStyleSheet(f"""
-            QMenu {{
-                background-color: {colors['field']};
-                color: {colors['text']};
-                border: 1px solid {colors['border']};
-                border-radius: 7px;
-                padding: 5px;
-            }}
-            QMenu::item {{
-                padding: 7px 18px 7px 10px;
-                border-radius: 4px;
-                font-size: 14px;
-                font-weight: 400;
-            }}
-            QMenu::item:selected {{
-                background-color: {colors['selected']};
-            }}
-            QMenu::indicator {{
-                width: 0px;
-            }}
-        """)
-        for option in INTERFACE_LANGUAGE_OPTIONS:
-            selected = option["code"] == self.lang
-            action = menu.addAction(load_icon(resource_path(option["icon"])), ("• " if selected else "  ") + option["name"])
-            action.triggered.connect(lambda _checked=False, code=option["code"]: self.set_language(code))
-        menu.ensurePolished()
-        size = menu.sizeHint()
-        anchor = widget_global_point(self.flag_button, self.flag_button.rect().bottomRight())
-        screen = QApplication.screenAt(anchor) or QApplication.primaryScreen()
-        bounds = screen.availableGeometry()
-        x = max(bounds.left(), min(anchor.x()-size.width()+1, bounds.right()-size.width()+1))
-        y = anchor.y()+6
-        if y+size.height() > bounds.bottom()+1:
-            y = widget_global_point(self.flag_button).y()-size.height()-6
-        y = max(bounds.top(), min(y, bounds.bottom()-size.height()+1))
-        menu.aboutToHide.connect(menu.deleteLater)
-        position = QtCore.QPoint(x, y)
-        prepare_native_popup(menu, position)
-        menu.popup(position)
 
     def set_language(self, language_code):
         self.lang = normalize_interface_language(language_code)

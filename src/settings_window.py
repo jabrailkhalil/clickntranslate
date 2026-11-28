@@ -428,6 +428,7 @@ class DropDownCombo(QComboBox):
     """
 
     POPUP_GAP = 3
+    ALIGN_POPUP_TO_TRAILING_EDGE = False
     GROUP_HEADER_ROLE = Qt.UserRole + 100
     aboutToShowPopup = QtCore.pyqtSignal()
 
@@ -906,13 +907,14 @@ class DropDownCombo(QComboBox):
             desired = stable_search_popup_size(self, desired)
             popup.setMinimumSize(0, 0)
             anchor = widget_global_rect(self)
+            align_right = self.ALIGN_POPUP_TO_TRAILING_EDGE and self.layoutDirection() == Qt.LeftToRight
             embedded = position_embedded_combo_popup(self, popup, self.POPUP_GAP, desired,
-                                                     minimum_height=self._popup_minimum_height)
+                                                     minimum_height=self._popup_minimum_height, align_right=align_right)
             if not embedded:
                 available = self._available_screen_rect()
                 popup.setGeometry(combo_popup_geometry(
                     anchor, desired, available, self.POPUP_GAP,
-                    prefer_below=True, minimum_height=self._popup_minimum_height))
+                    prefer_below=True, minimum_height=self._popup_minimum_height, align_right=align_right))
             search = getattr(self, '_language_search', None)
             if search is not None and not search.isHidden():
                 proxy = popup.graphicsProxyWidget() if embedded else None

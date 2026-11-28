@@ -207,29 +207,50 @@ def test_preview_reference_hover_does_not_leave_mouse_focus_highlight(app, owner
 
 
 @pytest.mark.parametrize('theme', ['Светлая', 'Темная'])
-def test_welcome_language_menu_is_complete_rounded_and_anchored(app, owner, theme):
+@pytest.mark.parametrize('language', ['en', 'ar'])
+def test_welcome_language_menu_is_complete_rounded_and_anchored(app, owner, theme, language):
     from window_appearance import install_window_appearance
+    from ui_scaling import widget_global_rect
     appearance = install_window_appearance(app, 100, theme)
+    owner.current_interface_language = language
+    owner.current_theme = theme
     dialog = main.WelcomeDialog(owner)
     try:
         dialog.show()
         app.processEvents()
-        dialog.show_language_menu()
+        bounds = dialog.screen().availableGeometry()
+        dialog.move(bounds.center().x() - dialog.width() // 2, bounds.bottom() - dialog.height() + 1)
+        combo = dialog.flag_button
+        QTest.mouseClick(combo, QtCore.Qt.LeftButton)
         app.processEvents()
-        menu = dialog._language_menu
-        assert len(menu.actions()) == len(main.INTERFACE_LANGUAGE_OPTIONS)
-        assert app.primaryScreen().availableGeometry().contains(menu.geometry())
-        assert not menu.mask().contains(QtCore.QPoint(0, 0))
-        for action in menu.actions():
-            rect = menu.actionGeometry(action)
-            assert menu.rect().contains(rect) and not rect.isEmpty()
-        anchor = dialog.flag_button.mapToGlobal(dialog.flag_button.rect().bottomRight())
-        assert abs(menu.geometry().right()-anchor.x()) <= 1
+        view = combo.view()
+        menu = view.window()
+        assert menu.isVisible() and menu.property('clickntranslateRoundedPopup')
+        assert [combo.itemData(i) for i in range(combo.count())] == [o['code'] for o in main.INTERFACE_LANGUAGE_OPTIONS]
+        rect = widget_global_rect(menu)
+        anchor = widget_global_rect(combo)
+        assert bounds.contains(rect)
+        assert rect.top() == anchor.bottom() + 1 + combo.POPUP_GAP
+        if language == 'ar':
+            assert rect.left() == anchor.left()
+        else:
+            assert rect.right() == anchor.right()
+        view.scrollToBottom()
+        app.processEvents()
+        last = combo.model().index(combo.count() - 1, combo.modelColumn())
+        assert view.viewport().rect().contains(view.visualRect(last))
         image = dialog.telegram_btn.icon().pixmap(24, 24).toImage()
         values = [image.pixelColor(x,y).lightness() for x in range(image.width())
                   for y in range(image.height()) if image.pixelColor(x,y).alpha() > 240]
         assert bool(sum(values)/len(values) < 140) == (theme == 'Светлая')
-        menu.close()
+        QTest.keyClick(view, QtCore.Qt.Key_Escape)
+        assert not menu.isVisible() and dialog.isVisible()
+        combo.showPopup()
+        search = combo._language_search
+        QTest.keyClicks(search, 'fr')
+        QTest.keyClick(search, QtCore.Qt.Key_Return)
+        app.processEvents()
+        assert dialog.lang == dialog.flag_button.currentData() == owner.config['interface_language'] == 'fr'
     finally:
         dialog.close()
         dialog.deleteLater()

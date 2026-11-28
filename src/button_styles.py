@@ -310,7 +310,7 @@ def standard_buttons(dark, *, compact=False):
         rules.append(button_qss(dark, role, f'QPushButton[buttonRole="{role}"]', compact=compact))
     for widget_type, names, role in (
         ("QPushButton", ("welcomeClose", "guideClose"), "close"),
-        ("QPushButton", ("welcomeLang",), "quiet"),
+        ("QComboBox", ("welcomeLang",), "quiet"),
         ("QToolButton", ("translationResultTitleClose", "docWindowClose", "helpTitleClose",
                          "hotkeyLanguageClose", "languageManagerTitleClose", "styledMessageClose"), "close"),
         ("QToolButton", ("translationResultSwap", "docLanguageSwap", "hotkeyLanguageSwap",

@@ -56,8 +56,7 @@ def _row_code(combo, row):
 def stable_search_popup_size(combo, desired):
     """Keep row/flag columns stable, while height follows the search results.
 
-    DropDownCombo pins the first placement separately, so shrinking an
-    above-field menu does not move the search box or flip it below its field.
+    DropDownCombo keeps the search box at its opening position as rows disappear.
     """
     search = getattr(combo, '_language_search', None)
     if search is None or search.isHidden():
