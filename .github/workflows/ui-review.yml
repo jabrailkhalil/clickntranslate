@@ -13,13 +13,17 @@ on:
         description: Verify screen capture and clipboard on two isolated Sway outputs
         type: boolean
         default: false
+      session_stability:
+        description: Repeat navigation on native desktops and measure idle resources
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
   native:
-    if: inputs.native_desktop
+    if: inputs.native_desktop || inputs.session_stability
     strategy:
       fail-fast: false
       matrix:
@@ -95,6 +99,13 @@ jobs:
       - name: Verify companion selection and replacement in native Windows fields
         if: ${{ !cancelled() && runner.os == 'Windows' && steps.deps.outcome == 'success' }}
         run: python tools/qa_windows_selection_target.py --output build/ui-native/selection-target/report.json
+      - name: Repeat localized settings, language search and idle resource checks
+        if: ${{ !cancelled() && inputs.session_stability && steps.deps.outcome == 'success' }}
+        run: |
+          prefix=()
+          if [[ "$RUNNER_OS" == "Linux" ]]; then prefix=(xvfb-run -a -s '-screen 0 1920x1200x24'); fi
+          "${prefix[@]}" python tools/run_regression_tests.py --qt-platform "$QT_QPA_PLATFORM" \
+            --output build/ui-native/soak --basetemp build/ui-native/soak/cases tests/acceptance_desktop_session.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -110,6 +121,9 @@ jobs:
             build/ui-native/frozen-frame/cases/**/*.png
             build/ui-native/selection-target/
             build/ui-native/dynamic-region/
+            build/ui-native/soak/results.xml
+            build/ui-native/soak/cases/**/session.json
+            build/ui-native/soak/cases/**/home-*.png
           if-no-files-found: warn
           retention-days: 7
 
@@ -145,7 +159,7 @@ jobs:
           retention-days: 7
 
   source:
-    if: '!inputs.native_desktop && !inputs.wayland'
+    if: '!inputs.native_desktop && !inputs.wayland && !inputs.session_stability'
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
@@ -164,7 +178,7 @@ jobs:
           if-no-files-found: error
 
   test:
-    if: '!inputs.native_desktop && !inputs.wayland'
+    if: '!inputs.native_desktop && !inputs.wayland && !inputs.session_stability'
     timeout-minutes: 15
     strategy:
       fail-fast: false
