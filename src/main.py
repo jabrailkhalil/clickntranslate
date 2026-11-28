@@ -1315,7 +1315,7 @@ def get_data_file(filename):
         ensure_json_file(file_path, {})
     return file_path
 
-def _save_copy_history_sync(text):
+def _save_copy_history_sync(text, *, submitted=None):
     """Синхронная запись в историю копирований (выполняется в отдельном потоке)."""
     try:
         config = get_cached_config()
@@ -1328,7 +1328,7 @@ def _save_copy_history_sync(text):
     try:
         history_file = get_data_file("copy_history.json")
         from history_storage import append_record
-        append_record(history_file, record, deduplicate_field="text")
+        append_record(history_file, record, deduplicate_field="text", submitted=submitted)
     except Exception as error:
         # Refuse to replace an unreadable history; it may still be recoverable.
         logging.error("Copy history save refused; existing data preserved (%s)", type(error).__name__)
@@ -1345,8 +1345,11 @@ def notify_copy_completed(config=None):
 
 def save_copy_history(text):
     """Асинхронно сохранить текст в историю копирований (не блокирует UI)."""
-    notify_copy_completed()
-    threading.Thread(target=_save_copy_history_sync, args=(text,), daemon=True).start()
+    config = get_cached_config()
+    notify_copy_completed(config)
+    if config.get('copy_history', True):
+        from history_storage import queue_write
+        queue_write(_save_copy_history_sync, text)
 
 
 def notify_copy_failed(config=None):

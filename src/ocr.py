@@ -2542,7 +2542,7 @@ def ocr_dim_strength(config=None):
         value = 60
     return max(0, min(80, value))
 
-def _save_translation_history_sync(original_text, translated_text, language):
+def _save_translation_history_sync(original_text, translated_text, language, *, submitted=None):
     """Синхронная запись в историю переводов (выполняется в отдельном потоке)."""
     try:
         config = get_cached_ocr_config()
@@ -2558,14 +2558,15 @@ def _save_translation_history_sync(original_text, translated_text, language):
             "language": language,
             "original": original_text,
             "translated": translated_text
-        })
+        }, submitted=submitted)
     except Exception as error:
         logging.error("Translation history save refused; existing data preserved (%s)", type(error).__name__)
 
 def save_translation_history(original_text, translated_text, language):
     """Асинхронно сохранить перевод в историю (не блокирует UI)."""
-    import threading
-    threading.Thread(target=_save_translation_history_sync, args=(original_text, translated_text, language), daemon=True).start()
+    if get_cached_ocr_config().get('history', True):
+        from history_storage import queue_write
+        queue_write(_save_translation_history_sync, original_text, translated_text, language)
 
 async def run_ocr_with_engine(bitmap, engine):
     debug_log("run_ocr_with_engine called")

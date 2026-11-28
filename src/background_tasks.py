@@ -4,7 +4,8 @@ import threading
 
 
 class IdleExecutor:
-    def __init__(self, workers=16, pending=32, idle_seconds=10, cleanup=None):
+    def __init__(self, workers=16, pending=32, idle_seconds=10, cleanup=None, *,
+                 thread_name='Translation-network', daemon=True):
         self._jobs = deque()
         self._lock = threading.Lock()
         self._ready = threading.Condition(self._lock)
@@ -15,6 +16,8 @@ class IdleExecutor:
         self._maximum = workers
         self._idle = idle_seconds
         self._cleanup = cleanup
+        self._thread_name = thread_name
+        self._daemon = daemon
 
     def submit(self, task):
         # Finish a worker launch or its rollback before another submitter can
@@ -40,10 +43,10 @@ class IdleExecutor:
             # Do not call an external thread factory while holding the queue
             # state lock (also permits deterministic executors in tests).
             try:
-                threading.Thread(target=self._run, name='Translation-network', daemon=True).start()
+                threading.Thread(target=self._run, name=self._thread_name, daemon=self._daemon).start()
             except Exception:
                 import logging
-                logging.exception('Could not start background translation worker')
+                logging.exception('Could not start %s worker', self._thread_name)
                 with self._ready:
                     self._workers -= 1
                     try:
@@ -71,7 +74,7 @@ class IdleExecutor:
                     # kill a reserved worker and strand other accepted jobs.
                     # This handler is inside the worker, not the GUI thread.
                     import logging
-                    logging.exception('Background translation failed')
+                    logging.exception('%s worker failed', self._thread_name)
                 finally:
                     with self._lock:
                         self._outstanding -= 1

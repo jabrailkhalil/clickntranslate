@@ -13999,7 +13999,7 @@ class SettingsWindow(QWidget):
     @staticmethod
     def _write_history_records(history_file, records):
         from history_storage import update_records
-        update_records(history_file, lambda _current: records)
+        update_records(history_file, lambda _current: records, discard_older=True)
 
     def _delete_history_record(self, copy_mode, record_index, record_snapshot):
         try:
@@ -18426,7 +18426,7 @@ finally {
             for fname in ("translation_history.json", "copy_history.json"):
                 try:
                     path = get_data_file(fname)
-                    update_records(path, lambda _current: [])
+                    update_records(path, lambda _current: [], discard_older=True)
                 except Exception:
                     pass
 

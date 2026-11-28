@@ -102,17 +102,11 @@ def test_copy_notification_dispatch_respects_setting_and_uses_thread_safe_signal
 
 
 def test_every_recorded_copy_runs_the_optional_notification_hook():
-    fake_thread = mock.Mock()
-    with mock.patch.object(main, "notify_copy_completed") as notify, \
-            mock.patch.object(
-                main.threading, "Thread", return_value=fake_thread
-            ) as thread_class:
+    config = {'copy_history': True}
+    with mock.patch.object(main, 'get_cached_config', return_value=config), \
+            mock.patch.object(main, "notify_copy_completed") as notify, \
+            mock.patch('history_storage.queue_write') as enqueue:
         main.save_copy_history("copied text")
 
-    notify.assert_called_once_with()
-    thread_class.assert_called_once_with(
-        target=main._save_copy_history_sync,
-        args=("copied text",),
-        daemon=True,
-    )
-    fake_thread.start.assert_called_once_with()
+    notify.assert_called_once_with(config)
+    enqueue.assert_called_once_with(main._save_copy_history_sync, "copied text")
