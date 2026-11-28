@@ -13,6 +13,7 @@
     <string name="refine_disabled">Désactivé</string>
     <string name="refine_download_failed">Échec du téléchargement. Vérifie la connexion et réessaie.</string>
     <string name="refine_download_pair">Télécharger ces langues et traduire hors ligne</string>
+    <string name="offline_use_installed_pair">Utiliser ces langues hors ligne</string>
     <string name="refine_downloaded">Téléchargé</string>
     <string name="refine_downloading">Téléchargement des packs linguistiques…</string>
     <string name="refine_enabled">Activé</string>

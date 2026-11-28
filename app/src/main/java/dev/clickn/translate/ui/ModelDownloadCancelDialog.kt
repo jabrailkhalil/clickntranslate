@@ -6,14 +6,18 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.res.stringResource
 import dev.clickn.translate.R
 import dev.clickn.translate.download.ModelDownloadCancelConfirmation
 
 @Composable
 internal fun ModelDownloadCancelButton(requestKey: String, onCancel: () -> Unit) {
-    val confirmation = remember(requestKey) { ModelDownloadCancelConfirmation() }
+    val confirmation = rememberSaveable(requestKey, saver = Saver<ModelDownloadCancelConfirmation, String>(
+        save = { it.request.value },
+        restore = { key -> ModelDownloadCancelConfirmation().apply { if (key == requestKey) show(key) } },
+    )) { ModelDownloadCancelConfirmation() }
     val pending by confirmation.request.collectAsState()
     TextButton(onClick = { confirmation.show(requestKey) }) {
         Text(stringResource(R.string.model_download_cancel))

@@ -13,6 +13,7 @@
     <string name="refine_disabled">Deaktiviert</string>
     <string name="refine_download_failed">Download fehlgeschlagen. Prüfe die Verbindung und versuche es erneut.</string>
     <string name="refine_download_pair">Sprachpaar laden und offline verwenden</string>
+    <string name="offline_use_installed_pair">Diese Sprachen offline verwenden</string>
     <string name="refine_downloaded">Heruntergeladen</string>
     <string name="refine_downloading">Sprachpakete werden heruntergeladen…</string>
     <string name="refine_enabled">Aktiviert</string>

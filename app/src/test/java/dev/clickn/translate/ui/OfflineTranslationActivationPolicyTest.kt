@@ -21,11 +21,19 @@ class OfflineTranslationActivationPolicyTest {
     private val captured = TranslationSelectionSnapshot(initial, revision = 17)
     private val requested = initial.copy(translatorEngine = TranslatorEngine.GOOGLE_ML_KIT, targetLang = "fr")
 
+    @Test fun installedPairActivatesWithoutSchedulingAnyNetworkWork() = runTest {
+        var selected: Settings? = null
+        OfflineTranslationActivationPolicy.downloadAndActivate(captured, requested,
+            alreadyInstalled = { true }, download = { fail("An installed pair must work without connectivity") },
+            activate = { snapshot, pair -> assertEquals(captured, snapshot); selected = pair })
+        assertEquals(requested, selected)
+    }
+
     @Test fun completedDownloadPassesTheOriginalSnapshotAndRequestedPairToAtomicActivation() = runTest {
         val download = CompletableDeferred<Unit>()
         val events = mutableListOf<String>()
         val operation = launch {
-            OfflineTranslationActivationPolicy.downloadAndActivate(captured, requested, {
+            OfflineTranslationActivationPolicy.downloadAndActivate(captured, requested, { false }, {
                 download.await()
                 events += "downloaded"
             }, { snapshot, pair ->
@@ -45,7 +53,7 @@ class OfflineTranslationActivationPolicyTest {
         val download = CompletableDeferred<Unit>()
         var activations = 0
         val operation = launch {
-            OfflineTranslationActivationPolicy.downloadAndActivate(captured, requested, {
+            OfflineTranslationActivationPolicy.downloadAndActivate(captured, requested, { false }, {
                 download.await()
             }, { _, _ -> activations++ })
         }
@@ -61,7 +69,7 @@ class OfflineTranslationActivationPolicyTest {
         var activations = 0
         val operation = async {
             runCatching {
-                OfflineTranslationActivationPolicy.downloadAndActivate(captured, requested, {
+                OfflineTranslationActivationPolicy.downloadAndActivate(captured, requested, { false }, {
                     download.await()
                     throw IOException("Owned model download failure")
                 }, { _, _ -> activations++ })
@@ -76,7 +84,7 @@ class OfflineTranslationActivationPolicyTest {
     @Test fun cancellationAtTheDownloadCompletionBoundaryStillPreventsActivation() = runTest {
         var activations = 0
         val operation = launch {
-            OfflineTranslationActivationPolicy.downloadAndActivate(captured, requested, {
+            OfflineTranslationActivationPolicy.downloadAndActivate(captured, requested, { false }, {
                 currentCoroutineContext().cancel()
             }, { _, _ -> activations++ })
         }

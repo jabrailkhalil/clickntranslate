@@ -62,6 +62,7 @@ for orientation in portrait landscape; do
   fi
 done
 run_tests home-overlay-denial -e class dev.clickn.translate.ui.HomeOverlayPermissionIntegrationTest -e homeOverlayDenial true || failure=1
+run_tests offline-download-recovery -e class dev.clickn.translate.ui.OfflineDownloadRecoveryIntegrationTest -e offlineRecovery true || failure=1
 # These tests exercise the enabled features, including Android's contextual action toolbar.
 # The fresh-install journey above runs with the normal initial permissions.
 adb -s "$serial" shell cmd appops set dev.clickn.translate.debug SYSTEM_ALERT_WINDOW allow

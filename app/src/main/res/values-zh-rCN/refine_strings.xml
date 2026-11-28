@@ -13,6 +13,7 @@
     <string name="refine_disabled">已关闭</string>
     <string name="refine_download_failed">下载失败，请检查网络后重试。</string>
     <string name="refine_download_pair">下载语言并启用离线翻译</string>
+    <string name="offline_use_installed_pair">离线使用这些语言</string>
     <string name="refine_downloaded">已下载</string>
     <string name="refine_downloading">正在下载语言包…</string>
     <string name="refine_enabled">已启用</string>

@@ -254,10 +254,10 @@ class MobileViewModel @Inject constructor(
         }
     }
     fun downloadOfflinePair(s: Settings) {
-        if (_offlineBusy.value) return
         val baseline = selectionSnapshots.value ?: return
+        if (!_offlineBusy.compareAndSet(false, true)) return
+        _offlineError.value = false
         offlineJob = viewModelScope.launch {
-            _offlineBusy.value = true; _offlineError.value = false
             try {
                 val pair = mobileMlKitPair(s)
                 val spec = dev.clickn.translate.download.ModelDownloadSpec.mlKitTranslation(pair.sourceLang, pair.targetLang)
@@ -265,15 +265,23 @@ class MobileViewModel @Inject constructor(
                 OfflineTranslationActivationPolicy.downloadAndActivate(
                     baseline = baseline,
                     requestedPair = pair,
+                    alreadyInstalled = { translator.areMlKitLanguagePairModelsDownloaded(pair.sourceLang, pair.targetLang) },
                     download = { modelDownloads.enqueueAndAwait(listOf(spec), {}) },
                     activate = repo::updateTranslationSelectionIfUnchanged,
                 )
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { _offlineError.value = true }
-            finally { offlineSpec = null; _offlineBusy.value = false; refreshModels(repo.get()) }
+            finally { offlineSpec = null; _offlineBusy.value = false; settings.value?.let(::refreshModels) }
         }
     }
     fun cancelOfflineDownload() { offlineSpec?.let(modelDownloads::cancel); offlineJob?.cancel() }
+
+    fun cancelOfflineDownload(work: androidx.work.WorkInfo) {
+        modelDownloads.cancel(work.id)
+        if (offlineSpec?.let { dev.clickn.translate.download.ModelDownloadWorkPolicy.specTag(it) in work.tags } == true) {
+            offlineJob?.cancel()
+        }
+    }
 
     fun update(transform: (Settings) -> Settings) = viewModelScope.launch { repo.update(transform) }
 

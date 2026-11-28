@@ -10,10 +10,11 @@ internal object OfflineTranslationActivationPolicy {
     suspend fun downloadAndActivate(
         baseline: TranslationSelectionSnapshot,
         requestedPair: Settings,
+        alreadyInstalled: suspend () -> Boolean,
         download: suspend () -> Unit,
         activate: suspend (TranslationSelectionSnapshot, Settings) -> Unit,
     ) {
-        download()
+        if (!alreadyInstalled()) download()
         currentCoroutineContext().ensureActive()
         // The repository compares this original revision in the same transaction as activation.
         activate(baseline, requestedPair)

@@ -13,6 +13,7 @@
     <string name="refine_disabled">Disabled</string>
     <string name="refine_download_failed">Download failed. Check your connection and try again.</string>
     <string name="refine_download_pair">Download this pair and use offline</string>
+    <string name="offline_use_installed_pair">Use these languages offline</string>
     <string name="refine_downloaded">Downloaded</string>
     <string name="refine_downloading">Downloading language packs…</string>
     <string name="refine_enabled">Enabled</string>

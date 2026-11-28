@@ -10,12 +10,18 @@ import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.clickn.translate.R
 import dev.clickn.translate.data.Settings
 import dev.clickn.translate.data.TranslatorEngine
 import dev.clickn.translate.data.chineseToolsRelevant
+import dev.clickn.translate.data.languageDisplayName
+import dev.clickn.translate.download.ModelDownloadType
+import dev.clickn.translate.download.ModelDownloadWorkPolicy
+import dev.clickn.translate.download.ModelDownloadWorker
+import androidx.work.WorkInfo
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.saveable.rememberSaveable
 import dev.clickn.translate.llm.LlmModelKind
@@ -34,7 +40,15 @@ internal fun OfflineLibrarySheet(settings: Settings, viewModel: MobileViewModel,
     val busy by viewModel.offlineBusy.collectAsState()
     val error by viewModel.offlineError.collectAsState()
     val tesseract by viewModel.tesseractModelState.collectAsState()
-    val queued by viewModel.modelDownloadWorkInfos.collectAsState(initial = emptyList())
+    val workSnapshot by viewModel.modelDownloadWorkInfos.collectAsState(initial = null)
+    val queued = workSnapshot.orEmpty()
+    val pairWork = remember(queued) {
+        queued.filterNot { it.state.isFinished }.mapNotNull { work ->
+            val pairs = ModelDownloadWorkPolicy.specsFromTags(work.tags)
+                .filter { it.type == ModelDownloadType.ML_KIT_TRANSLATION }.map { it.mlKitLanguages() }
+            if (pairs.isEmpty()) null else work to pairs
+        }
+    }
     val tesseractSpec = dev.clickn.translate.download.ModelDownloadSpec.tesseractArabic()
     val tesseractWork = queued.filter { !it.state.isFinished &&
         dev.clickn.translate.download.ModelDownloadWorkPolicy.specTag(tesseractSpec) in it.tags }
@@ -49,8 +63,9 @@ internal fun OfflineLibrarySheet(settings: Settings, viewModel: MobileViewModel,
     val pair = initial.copy(sourceLang = source, targetLang = target)
     val languages = remember(locale) { MlKitLanguagePolicy.supportedLanguageTags.map { MlKitLanguagePolicy.resolveTarget(it) }.distinct().sortedBy { Locale.forLanguageTag(it).getDisplayLanguage(locale) } }
     val downloaded = models.downloadedLanguages + "en"
+    val pairInstalled = MlKitLanguagePolicy.requiredDownloadLanguages(source, target).all { it in downloaded }
     val installedLanguages = languages.filter { it in downloaded }
-    LazyColumn(Modifier.fillMaxWidth(), contentPadding = PaddingValues(24.dp, 0.dp, 24.dp, 32.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    LazyColumn(Modifier.fillMaxWidth().testTag("offline-library"), contentPadding = PaddingValues(24.dp, 0.dp, 24.dp, 32.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { Text(stringResource(R.string.refine_offline), style = MaterialTheme.typography.headlineSmall) }
         item { Text(stringResource(R.string.refine_models_body), style = MaterialTheme.typography.bodyMedium) }
         item { Text(stringResource(R.string.refine_light_engine), style = MaterialTheme.typography.titleMedium) }
@@ -58,12 +73,32 @@ internal fun OfflineLibrarySheet(settings: Settings, viewModel: MobileViewModel,
         item { LanguagePair(pair, { languagePicker = "source" }, { languagePicker = "target" }, {
             val oldSource = source; source = target; target = oldSource
         }) }
-        item { Button(onClick = { viewModel.downloadOfflinePair(pair) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.refine_download_pair)) } }
-        if (busy) item {
-            Text(stringResource(R.string.refine_downloading)); LinearProgressIndicator(Modifier.fillMaxWidth())
+        item { Button(onClick = { viewModel.downloadOfflinePair(pair) }, enabled = workSnapshot != null && !busy && pairWork.isEmpty(),
+            modifier = Modifier.fillMaxWidth().testTag("offline-pair-apply")) {
+            Text(stringResource(if (pairInstalled) R.string.offline_use_installed_pair else R.string.refine_download_pair))
+        } }
+        if (busy && pairWork.isEmpty()) item {
+            Text(stringResource(R.string.model_download_waiting)); LinearProgressIndicator(Modifier.fillMaxWidth())
             TextButton(onClick = viewModel::cancelOfflineDownload) { Text(stringResource(R.string.mobile_cancel)) }
         }
-        if (error) item { Text(stringResource(R.string.refine_download_failed), color = MaterialTheme.colorScheme.error) }
+        items(pairWork, key = { "translation:${it.first.id}" }) { (work, languages) ->
+            val pairs = languages.joinToString { (from, to) ->
+                "${languageDisplayName(from, locale)} → ${languageDisplayName(to, locale)}"
+            }
+            val status = work.progress.getString(ModelDownloadWorker.KEY_STATUS).orEmpty().ifBlank {
+                stringResource(if (work.state == WorkInfo.State.RUNNING) R.string.refine_downloading else R.string.gallery_status_queued)
+            }
+            Box(Modifier.testTag("translation-download-${work.id}")) {
+                ModelDownloadProgressCard(
+                    requestKey = work.id.toString(), status = "$pairs · $status",
+                    downloaded = work.progress.getLong(ModelDownloadWorker.KEY_DOWNLOADED, 0),
+                    total = work.progress.getLong(ModelDownloadWorker.KEY_TOTAL, -1),
+                    active = work.state == WorkInfo.State.RUNNING && work.progress.getBoolean(ModelDownloadWorker.KEY_ACTIVE, true),
+                    onCancel = { viewModel.cancelOfflineDownload(work) },
+                )
+            }
+        }
+        if (error && !busy && pairWork.isEmpty()) item { Text(stringResource(R.string.refine_download_failed), color = MaterialTheme.colorScheme.error) }
         item { HorizontalDivider(); Text(stringResource(R.string.refine_offline_ocr), style = MaterialTheme.typography.titleMedium) }
         item { Text(stringResource(R.string.refine_offline_ocr_body)) }
         item { Text(stringResource(R.string.mobile_arabic_ocr), style = MaterialTheme.typography.titleMedium) }

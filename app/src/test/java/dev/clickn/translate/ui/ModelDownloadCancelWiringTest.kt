@@ -24,7 +24,7 @@ class ModelDownloadCancelWiringTest {
             "dismiss leaves download alone" to dialog.contains("onDismissRequest = onDismiss"),
             "negative dismisses" to dialog.contains("TextButton(onClick = onDismiss)"),
             "positive confirms" to dialog.contains("TextButton(onClick = onConfirm)"),
-            "per request state" to dialog.contains("remember(requestKey)"),
+            "saved confirmation belongs to its request" to dialog.contains("rememberSaveable(requestKey,"),
             "consume before cancellation" to dialog.contains("if (confirmation.consume(requestKey)) onCancel()"),
             "work UUID passed to card" to screen.contains("requestKey = download.id.toString()"),
             "reordered jobs retain their own dialog" to screen.contains("androidx.compose.runtime.key(download.id)"),

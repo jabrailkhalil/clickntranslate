@@ -110,6 +110,7 @@ object ModelDownloadWorkPolicy {
     const val WORK_TAG = "model-download"
     const val MAX_ATTEMPTS = 3
     private const val OWNER_TAG_PREFIX = "$WORK_TAG-owner:"
+    private const val SPEC_TAG_PREFIX = "$WORK_TAG-spec:"
 
     fun uniqueWorkName(specs: List<ModelDownloadSpec>): String =
         "$WORK_TAG:${specs.joinToString(",") { it.encode() }}"
@@ -118,7 +119,11 @@ object ModelDownloadWorkPolicy {
         specs.joinToString(",") { it.encode() }
 
     fun ownerTag(presetId: String): String = "$OWNER_TAG_PREFIX$presetId"
-    fun specTag(spec: ModelDownloadSpec): String = "$WORK_TAG-spec:${spec.encode()}"
+    fun specTag(spec: ModelDownloadSpec): String = "$SPEC_TAG_PREFIX${spec.encode()}"
+
+    fun specsFromTags(tags: Set<String>): List<ModelDownloadSpec> = tags.mapNotNull { tag ->
+        if (tag.startsWith(SPEC_TAG_PREFIX)) ModelDownloadSpec.decode(tag.removePrefix(SPEC_TAG_PREFIX)) else null
+    }
 
     fun ownerPresetId(tags: Set<String>): String? = tags.asSequence()
         .filter { it.startsWith(OWNER_TAG_PREFIX) }

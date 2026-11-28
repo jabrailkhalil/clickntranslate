@@ -13,6 +13,7 @@
     <string name="refine_disabled">Выключено</string>
     <string name="refine_download_failed">Не удалось скачать. Проверь интернет и повтори попытку.</string>
     <string name="refine_download_pair">Скачать языки и включить офлайн-перевод</string>
+    <string name="offline_use_installed_pair">Использовать эти языки офлайн</string>
     <string name="refine_downloaded">Скачано</string>
     <string name="refine_downloading">Скачиваем языковые пакеты…</string>
     <string name="refine_enabled">Включено</string>

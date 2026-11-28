@@ -427,7 +427,7 @@ fun SettingsScreen(
                     info.progress.getStringArray(
                         dev.clickn.translate.download.ModelDownloadWorker.KEY_SPECS
                     ).orEmpty()
-                ).orEmpty(),
+                ).orEmpty().ifEmpty { ModelDownloadWorkPolicy.specsFromTags(info.tags) },
                 status = info.progress.getString(
                     dev.clickn.translate.download.ModelDownloadWorker.KEY_STATUS
                 ).orEmpty(),
@@ -10113,7 +10113,7 @@ private fun TranslationPresetSection(
 }
 
 @Composable
-private fun ModelDownloadProgressCard(
+internal fun ModelDownloadProgressCard(
     requestKey: String,
     status: String,
     downloaded: Long,
