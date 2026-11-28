@@ -55,8 +55,13 @@ def test_first_open_uses_the_final_size_when_layout_settles(app):
 
 @pytest.mark.parametrize('percent', (80, 100, 137))
 def test_main_and_hotkey_language_search_shrinks_without_moving_input(window, app, percent, tmp_path):
+    # The shared fixture uses a large virtual desktop. Give the real popup
+    # room for several rows so filtering actually exercises a size change.
+    bounds = app.primaryScreen().availableGeometry()
+    window._ui_scale_controller.available_geometry.return_value = bounds
     window.set_ui_scale_percent(percent)
     window.show_main_screen()
+    window.move(bounds.topLeft() + QtCore.QPoint(4, 4))
     settle(app)
     for name in ('source_lang', 'target_lang', 'hotkey_source_combo', 'hotkey_target_combo'):
         combo = getattr(window, name)
@@ -106,11 +111,12 @@ def test_main_and_hotkey_language_search_shrinks_without_moving_input(window, ap
             settle(app)
 
 
-def test_standalone_search_at_bottom_keeps_above_anchor_and_keyboard_selection(app):
-    owner = QtWidgets.QWidget()
+@pytest.mark.parametrize('bottom_margin', [0, 140], ids=['one-row-at-edge', 'room-below'])
+def test_standalone_search_near_bottom_preserves_downward_anchor_and_keyboard_selection(app, bottom_margin):
+    owner = QtWidgets.QWidget(None, QtCore.Qt.FramelessWindowHint)
     owner.resize(260, 150)
     bounds = app.primaryScreen().availableGeometry()
-    owner.move(bounds.left() + 20, bounds.bottom() - owner.height() - 20)
+    owner.move(bounds.left() + 20, bounds.bottom() + 1 - owner.height() - bottom_margin)
     combo = DropDownCombo(owner)
     combo.setGeometry(10, 105, 220, 32)
     for language in LANGUAGES:
@@ -121,14 +127,23 @@ def test_standalone_search_at_bottom_keeps_above_anchor_and_keyboard_selection(a
         combo.showPopup()
         settle(app)
         initial = popup_rect(combo)
-        anchor = combo.mapToGlobal(QtCore.QPoint())
-        assert initial.bottom() < anchor.y()
+        field_bottom = combo.mapToGlobal(QtCore.QPoint(0, combo.height())).y()
+        available = bounds.bottom() + 1 - field_bottom - combo.POPUP_GAP
+        minimum = combo._popup_minimum_height
+        assert bounds.contains(initial)
+        if available >= minimum:
+            assert initial.top() == field_bottom + combo.POPUP_GAP
+        else:
+            assert initial.height() == minimum and initial.bottom() == bounds.bottom()
         search = combo._language_search
         search.setText('Vietnamese')
         settle(app)
         assert popup_rect(combo).topLeft() == initial.topLeft()
         assert popup_rect(combo).width() == initial.width()
-        assert popup_rect(combo).height() < initial.height()
+        if initial.height() > minimum:
+            assert popup_rect(combo).height() < initial.height()
+        else:
+            assert popup_rect(combo).height() <= initial.height()
         QTest.keyClick(search, QtCore.Qt.Key_Return)
         settle(app)
         assert combo.currentData() == 'vi'
