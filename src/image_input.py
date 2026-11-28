@@ -323,6 +323,8 @@ def load_image(payload):
 
 
 def recognize_image(payload, config, source, target, cancelled):
+    if cancelled():
+        return '', None
     image = load_image(payload)
     if cancelled():
         return '', None
