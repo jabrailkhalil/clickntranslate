@@ -60,7 +60,7 @@ import dev.clickn.translate.capture.CaptureStartPreference
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.update
 
 internal enum class MobileTab(val title: Int, val icon: ImageVector) {
     SCREEN(R.string.mobile_nav_screen, Icons.Outlined.CropFree),
@@ -94,7 +94,7 @@ fun MobileShell(
     var sheet by rememberSaveable { mutableStateOf("") }
     var iconRevision by remember { mutableIntStateOf(0) }
     val iconChoice = remember(iconRevision) { BrandIconPrefs.read(context) }
-    var provider by remember { mutableStateOf<TranslatorEngine?>(null) }
+    val provider by viewModel.providerEditor.collectAsState()
     var confirmClear by remember { mutableStateOf(false) }
     var historyEntryId by rememberSaveable { mutableStateOf<Long?>(null) }
     val modelState by viewModel.modelState.collectAsState()
@@ -171,7 +171,7 @@ fun MobileShell(
     }
     fun preflight(current: Settings, screen: Boolean): Boolean {
         if (current.sourceLang == "auto" && current.translatorEngine in setOf(TranslatorEngine.MYMEMORY, TranslatorEngine.GOOGLE_ML_KIT)) { sheet = "source"; return false }
-        if (translationNeedsConfiguration(current)) { provider = current.translatorEngine; return false }
+        if (translationNeedsConfiguration(current)) { viewModel.openProvider(current, current.translatorEngine); return false }
         if (modelState.checking) return false
         if (current.translatorEngine in offlineTranslationEngines && modelState.translationReady != true) { sheet = "offline"; return false }
         if (screen && modelState.ocrReady != true) { onAdvancedSection("ocr"); return false }
@@ -274,7 +274,7 @@ fun MobileShell(
                         sheet = ""
                     })
                 "services" -> ServicesSheet(current.translatorEngine, current.targetLang) {
-                    provider = it; sheet = ""; viewModel.clearConnection()
+                    viewModel.openProvider(current, it); sheet = ""
                 }
                 "appearance" -> AppearanceSheet()
                 "language" -> InterfaceLanguageSheet { sheet = "" }
@@ -288,10 +288,10 @@ fun MobileShell(
             }
         }
     }
-    provider?.let { selected ->
-        ProviderSheet(current ?: Settings(), selected, viewModel,
-            onDismiss = { provider = null; viewModel.clearConnection() }, onAdvanced = {
-                provider = null; viewModel.clearConnection(); onAdvanced()
+    provider?.let { editor ->
+        ProviderSheet(editor, viewModel,
+            onDismiss = viewModel::closeProvider, onAdvanced = {
+                viewModel.closeProvider(); onAdvanced()
             })
     }
     explanation?.let { (body, action) ->
@@ -506,7 +506,7 @@ internal fun SettingsHub(settings: Settings, onProvider: () -> Unit, onAppearanc
     val context = LocalContext.current
     val capture by CaptureStartPreference.mode.collectAsState()
     fun browse(url: String) { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
-    LazyColumn(contentPadding = PaddingValues(24.dp, 4.dp, 24.dp, 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    LazyColumn(Modifier.testTag("settings-hub"), contentPadding = PaddingValues(24.dp, 4.dp, 24.dp, 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { readiness() }
         item { SettingsRow(Icons.Outlined.Download, stringResource(R.string.refine_offline), stringResource(R.string.refine_offline_body), onOffline) }
         item { SettingsRow(Icons.Outlined.Image, stringResource(R.string.refine_icon), stringResource(R.string.refine_brand_logo), onIcon) }
@@ -608,7 +608,7 @@ internal fun ServicesSheet(selected: TranslatorEngine, targetLang: String = defa
     val available = TranslatorEngine.entries.filter { android.os.Build.VERSION.SDK_INT >= 33 || it !in setOf(TranslatorEngine.LOCAL_SAKURA, TranslatorEngine.LOCAL_HY_MT2) }.toSet()
     val visible = if (showAll || chineseToolsRelevant(targetLang, locale)) available
         else available - (specializedTranslationEngines - selected)
-    LazyColumn(Modifier.fillMaxWidth().fillMaxHeight(.8f), contentPadding = PaddingValues(24.dp, 0.dp, 24.dp, 24.dp)) {
+    LazyColumn(Modifier.fillMaxWidth().fillMaxHeight(.8f).testTag("translation-services"), contentPadding = PaddingValues(24.dp, 0.dp, 24.dp, 24.dp)) {
         item { Text(stringResource(R.string.mobile_select_service), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold) }
         listOf(R.string.mobile_free_online to free, R.string.mobile_api_services to (visible - free - offline), R.string.mobile_offline to (offline intersect visible)).forEach { (label, engines) ->
             item { Text(stringResource(label), Modifier.padding(top = 24.dp, bottom = 8.dp), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary) }
@@ -631,13 +631,16 @@ private data class ProviderField(val label: String, val secret: Boolean = false,
     val read: (Settings) -> String, val write: (Settings, String) -> Settings)
 
 @Composable
-internal fun ProviderSheet(current: Settings, engine: TranslatorEngine, viewModel: MobileViewModel,
+internal fun ProviderSheet(editor: ProviderEditSession, viewModel: MobileViewModel,
     onDismiss: () -> Unit, onAdvanced: () -> Unit) {
-    var draft by remember(engine) { mutableStateOf(if (engine == TranslatorEngine.GOOGLE_ML_KIT) mobileMlKitPair(current) else current.copy(translatorEngine = engine)) }
-    var savePending by remember(engine) { mutableStateOf(false) }
+    val draft by editor.draft.collectAsState()
+    val engine = draft.translatorEngine
+    val pending by editor.pending.collectAsState()
     val saveStatus by viewModel.providerSaveState.collectAsState()
-    val saving = savePending || saveStatus == ProviderSaveStatus.SAVING
-    val saveScope = rememberCoroutineScope()
+    val saving = pending != null || saveStatus == ProviderSaveStatus.SAVING
+    LaunchedEffect(pending) {
+        pending?.let { request -> editor.finish(request) { advance -> if (advance) onAdvanced() else onDismiss() } }
+    }
     val testing by viewModel.testing.collectAsState()
     val connection by viewModel.connection.collectAsState()
     val server = stringResource(R.string.mobile_server)
@@ -663,30 +666,26 @@ internal fun ProviderSheet(current: Settings, engine: TranslatorEngine, viewMode
         else -> true
     }
     val local = engine in setOf(TranslatorEngine.GOOGLE_ML_KIT, TranslatorEngine.LOCAL_SAKURA, TranslatorEngine.LOCAL_HY_MT2)
-    fun saveAndConfirm(onSaved: () -> Unit) {
-        if (savePending || viewModel.providerSaveState.value == ProviderSaveStatus.SAVING) return
-        savePending = true
-        val saved = draft
-        val commit = viewModel.saveProvider { existing ->
-            fields.fold(if (engine == TranslatorEngine.GOOGLE_ML_KIT) mobileMlKitPair(existing) else existing.copy(translatorEngine = engine)) { s, field ->
-                field.write(s, field.read(saved))
-            }.let { if (engine == TranslatorEngine.DEEPL) it.copy(deeplPro = saved.deeplPro) else it }
-        }
-        saveScope.launch {
-            try { confirmProviderSave(commit, onSaved) }
-            finally { savePending = false }
+    fun saveAndConfirm(openAdvanced: Boolean) {
+        editor.submit(openAdvanced) {
+            val saved = editor.draft.value
+            viewModel.saveProvider { existing ->
+                fields.fold(if (engine == TranslatorEngine.GOOGLE_ML_KIT) mobileMlKitPair(existing) else existing.copy(translatorEngine = engine)) { s, field ->
+                    field.write(s, field.read(saved))
+                }.let { if (engine == TranslatorEngine.DEEPL) it.copy(deeplPro = saved.deeplPro) else it }
+            }
         }
     }
-    val canDismiss by rememberUpdatedState({ !savePending && viewModel.providerSaveState.value != ProviderSaveStatus.SAVING })
+    val canDismiss by rememberUpdatedState({ editor.pending.value == null && viewModel.providerSaveState.value != ProviderSaveStatus.SAVING })
     val sheetState = rememberModalBottomSheetState(confirmValueChange = { value -> value != SheetValue.Hidden || canDismiss() })
     ModalBottomSheet(onDismissRequest = { if (canDismiss()) onDismiss() }, sheetState = sheetState) {
-        LazyColumn(Modifier.fillMaxWidth().heightIn(max = 600.dp).imePadding(), contentPadding = PaddingValues(24.dp, 0.dp, 24.dp, 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        LazyColumn(Modifier.fillMaxWidth().heightIn(max = 600.dp).imePadding().testTag("provider-form"), contentPadding = PaddingValues(24.dp, 0.dp, 24.dp, 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             item { Text(providerName(engine), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold) }
             if (fields.isEmpty()) item { Text(stringResource(if (local) R.string.mobile_models_body else R.string.mobile_no_key), color = MaterialTheme.colorScheme.onSurfaceVariant) }
             if (engine == TranslatorEngine.MYMEMORY) item { Text(stringResource(R.string.mobile_explicit_source), style = MaterialTheme.typography.bodyMedium) }
             items(fields) { field ->
                 var visible by remember { mutableStateOf(false) }
-                OutlinedTextField(field.read(draft), { draft = field.write(draft, it); viewModel.clearConnection() }, Modifier.fillMaxWidth(), enabled = !saving,
+                OutlinedTextField(field.read(draft), { value -> editor.draft.update { field.write(it, value) }; viewModel.clearConnection() }, Modifier.fillMaxWidth(), enabled = !saving,
                     label = { Text(field.label) }, isError = field.label == server && !validConfig, singleLine = true, shape = MaterialTheme.shapes.small,
                     visualTransformation = if (field.secret && !visible) PasswordVisualTransformation() else VisualTransformation.None,
                     trailingIcon = if (field.secret) ({ IconButton(onClick = { visible = !visible }, enabled = !saving) {
@@ -696,7 +695,7 @@ internal fun ProviderSheet(current: Settings, engine: TranslatorEngine, viewMode
             }
             if (engine == TranslatorEngine.DEEPL) item {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text("DeepL API Pro", Modifier.weight(1f)); Switch(draft.deeplPro, { draft = draft.copy(deeplPro = it); viewModel.clearConnection() }, enabled = !saving)
+                    Text("DeepL API Pro", Modifier.weight(1f)); Switch(draft.deeplPro, { value -> editor.draft.update { it.copy(deeplPro = value) }; viewModel.clearConnection() }, enabled = !saving)
                 }
             }
             item { connection?.let { Text(stringResource(if (it.success) R.string.mobile_test_ok else R.string.mobile_error),
@@ -709,7 +708,7 @@ internal fun ProviderSheet(current: Settings, engine: TranslatorEngine, viewMode
                     if (testing) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
                     else Text(stringResource(R.string.mobile_test))
                 }
-                Button(onClick = { saveAndConfirm(onDismiss) }, enabled = !saving && !testing && validConfig,
+                Button(onClick = { saveAndConfirm(openAdvanced = false) }, enabled = !saving && !testing && validConfig,
                     modifier = Modifier.weight(1f).heightIn(min = 52.dp).testTag("provider-save")) {
                     if (saving) {
                         CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
@@ -722,7 +721,7 @@ internal fun ProviderSheet(current: Settings, engine: TranslatorEngine, viewMode
                     }))
                 }
             } }
-            item { TextButton(onClick = { saveAndConfirm(onAdvanced) }, enabled = !saving && !testing,
+            item { TextButton(onClick = { saveAndConfirm(openAdvanced = true) }, enabled = !saving && !testing,
                 modifier = Modifier.fillMaxWidth().testTag("provider-advanced")) {
                 Text(stringResource(if (local) R.string.mobile_manage_models else R.string.mobile_advanced))
             } }

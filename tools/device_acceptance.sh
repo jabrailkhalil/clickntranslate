@@ -51,6 +51,12 @@ PY
 # Retain independent results even if one scenario fails.
 failure=0
 python3 tools/mobile_onboarding_smoke.py --serial "$serial" --output "$report/onboarding" || failure=1
+run_tests provider-rotation -e class dev.clickn.translate.ui.ProviderEditorRotationIntegrationTest -e providerRotation true || failure=1
+for orientation in portrait landscape; do
+  if adb -s "$serial" shell run-as dev.clickn.translate.debug test -f "files/qa-provider-rotation/$orientation.png"; then
+    adb -s "$serial" exec-out run-as dev.clickn.translate.debug cat "files/qa-provider-rotation/$orientation.png" > "$report/provider-$orientation.png"
+  fi
+done
 # These tests exercise the enabled features, including Android's contextual action toolbar.
 # The fresh-install journey above runs with the normal initial permissions.
 adb -s "$serial" shell cmd appops set dev.clickn.translate.debug SYSTEM_ALERT_WINDOW allow

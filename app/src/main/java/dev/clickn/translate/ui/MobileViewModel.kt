@@ -8,6 +8,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.clickn.translate.capture.CaptureStartMode
 import dev.clickn.translate.capture.CaptureStartPreference
 import dev.clickn.translate.data.Settings
+import dev.clickn.translate.data.TranslatorEngine
 import dev.clickn.translate.data.SettingsRepository
 import dev.clickn.translate.history.TextHistoryEntry
 import dev.clickn.translate.history.TextHistoryIssue
@@ -280,6 +281,21 @@ class MobileViewModel @Inject constructor(
 
     private val providerSaves = ProviderSaveCoordinator(viewModelScope)
     internal val providerSaveState = providerSaves.status
+    private val _providerEditor = MutableStateFlow<ProviderEditSession?>(null)
+    internal val providerEditor = _providerEditor.asStateFlow()
+
+    internal fun openProvider(current: Settings, engine: TranslatorEngine) {
+        providerSaves.clearFailure()
+        clearConnection()
+        val initial = if (engine == TranslatorEngine.GOOGLE_ML_KIT) mobileMlKitPair(current)
+            else current.copy(translatorEngine = engine)
+        _providerEditor.value = ProviderEditSession(initial)
+    }
+
+    internal fun closeProvider() {
+        _providerEditor.value = null
+        clearConnection()
+    }
 
     internal fun saveProvider(transform: (Settings) -> Settings) = providerSaves.save {
         repo.selectTranslation(transform)

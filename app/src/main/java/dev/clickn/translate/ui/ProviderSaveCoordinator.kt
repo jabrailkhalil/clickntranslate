@@ -1,5 +1,6 @@
 package dev.clickn.translate.ui
 
+import dev.clickn.translate.data.Settings
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -12,12 +13,35 @@ import kotlinx.coroutines.flow.asStateFlow
 
 internal enum class ProviderSaveStatus { IDLE, SAVING, FAILED }
 
+/** The activity's ViewModel retains the form across rotation. Draft credentials stay in memory. */
+internal class ProviderEditSession(initial: Settings) {
+    val draft = MutableStateFlow(initial)
+    private val submission = MutableStateFlow<Submission?>(null)
+    val pending = submission.asStateFlow()
+
+    class Submission(val commit: Deferred<Boolean>, val openAdvanced: Boolean)
+
+    fun submit(openAdvanced: Boolean, persist: () -> Deferred<Boolean>) {
+        if (submission.value == null) submission.value = Submission(persist(), openAdvanced)
+    }
+
+    suspend fun finish(request: Submission, onSaved: (Boolean) -> Unit) {
+        val saved = request.commit.await()
+        currentCoroutineContext().ensureActive()
+        if (submission.compareAndSet(request, null) && saved) onSaved(request.openAdvanced)
+    }
+}
+
 /** The owner is the ViewModel, so a dismissed/recreated UI cannot cancel a durable commit. */
 internal class ProviderSaveCoordinator(private val owner: CoroutineScope) {
     private val lock = Any()
     private val mutableStatus = MutableStateFlow(ProviderSaveStatus.IDLE)
     val status = mutableStatus.asStateFlow()
     private var active: Deferred<Boolean>? = null
+
+    fun clearFailure() {
+        mutableStatus.compareAndSet(ProviderSaveStatus.FAILED, ProviderSaveStatus.IDLE)
+    }
 
     fun save(persist: suspend () -> Unit): Deferred<Boolean> = synchronized(lock) {
         active?.takeUnless { it.isCompleted }?.let { return@synchronized it }
@@ -48,12 +72,4 @@ internal class ProviderSaveCoordinator(private val owner: CoroutineScope) {
         operation.start()
         operation
     }
-}
-
-/** Confirmation belongs to the waiting UI, separately from the ViewModel-owned write. */
-internal suspend fun confirmProviderSave(commit: Deferred<Boolean>, confirm: () -> Unit): Boolean {
-    if (!commit.await()) return false
-    currentCoroutineContext().ensureActive()
-    confirm()
-    return true
 }
