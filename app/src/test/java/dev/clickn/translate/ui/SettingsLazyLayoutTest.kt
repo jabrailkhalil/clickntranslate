@@ -479,7 +479,7 @@ class SettingsLazyLayoutTest {
         val topBarStart = source.indexOf("topBar = {")
         val topBarEnd = source.indexOf("floatingActionButton = {", topBarStart)
         val presetStart = source.indexOf("private fun TranslationPresetSection(")
-        val presetEnd = source.indexOf("private fun ModelDownloadProgressCard(", presetStart)
+        val presetEnd = source.indexOf("\n}\n", presetStart)
         assertTrue("settings top bar block", topBarStart >= 0 && topBarEnd > topBarStart)
         assertTrue("translation preset block", presetStart >= 0 && presetEnd > presetStart)
 

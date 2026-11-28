@@ -3437,8 +3437,11 @@ fun SettingsScreen(
                         ModelDownloadProgressCard(
                             textOnly = textOnly,
                             requestKey = download.id.toString(),
-                            status = download.status
-                                .ifBlank { context.getString(R.string.model_download_waiting) },
+                            status = download.status.ifBlank {
+                                val models = download.specs.joinToString { modelDownloadSpecDisplayName(context, it) }
+                                listOf(models, context.getString(R.string.model_download_waiting))
+                                    .filter(String::isNotBlank).joinToString("\n")
+                            },
                             downloaded = download.downloaded,
                             total = download.total,
                             active = download.active,

@@ -90,7 +90,7 @@ internal fun OfflineLibrarySheet(settings: Settings, viewModel: MobileViewModel,
             }
             Box(Modifier.testTag("translation-download-${work.id}")) {
                 ModelDownloadProgressCard(
-                    requestKey = work.id.toString(), status = "$pairs · $status",
+                    requestKey = work.id.toString(), status = "$pairs\n$status",
                     downloaded = work.progress.getLong(ModelDownloadWorker.KEY_DOWNLOADED, 0),
                     total = work.progress.getLong(ModelDownloadWorker.KEY_TOTAL, -1),
                     active = work.state == WorkInfo.State.RUNNING && work.progress.getBoolean(ModelDownloadWorker.KEY_ACTIVE, true),

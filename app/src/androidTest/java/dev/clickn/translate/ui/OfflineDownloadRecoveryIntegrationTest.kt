@@ -1,5 +1,6 @@
 package dev.clickn.translate.ui
 
+import android.content.Intent
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.test.core.app.ActivityScenario
@@ -40,6 +41,20 @@ class OfflineDownloadRecoveryIntegrationTest {
         val download = hasTestTag("offline-pair-apply")
         val cancel = hasText(strings.getString(R.string.model_download_cancel)) and hasClickAction() and hasAnyAncestor(row)
         val ok = hasText(strings.getString(R.string.model_download_cancel_confirm_ok)) and hasClickAction()
+        fun checkGlobalSettings(expectPair: Boolean) {
+            val intent = Intent(app, MainActivity::class.java)
+                .putExtra(MainActivity.EXTRA_START_ROUTE, MainActivity.ROUTE_SETTINGS)
+            ActivityScenario.launch<MainActivity>(intent).use {
+                val header = hasText(strings.getString(R.string.model_download_in_app_title))
+                val expected = if (expectPair) 2 else 1
+                compose.waitUntil(20_000) { compose.onAllNodes(header).fetchSemanticsNodes().size == expected }
+                repeat(expected) { index -> compose.onAllNodes(header)[index].assertIsDisplayed() }
+                val pairName = compose.onNode(hasText("fr→de", substring = true))
+                if (expectPair) pairName.assertIsDisplayed() else pairName.assertDoesNotExist()
+                compose.onNode(hasText(strings.getString(R.string.settings_ocr_chip_tesseract_arabic), substring = true)
+                    and hasText(strings.getString(R.string.model_download_waiting), substring = true)).assertIsDisplayed()
+            }
+        }
         fun openLibrary() {
             val tab = hasText(strings.getString(R.string.mobile_nav_settings)) and hasClickAction()
             compose.waitUntil(20_000) { compose.onAllNodes(tab).fetchSemanticsNodes().isNotEmpty() }
@@ -54,6 +69,7 @@ class OfflineDownloadRecoveryIntegrationTest {
         }
         try {
             scheduler.enqueue(listOf(pair, unrelated)).result.get(10, TimeUnit.SECONDS)
+            checkGlobalSettings(expectPair = true)
             ActivityScenario.launch(MainActivity::class.java).use { openLibrary() }
             assertEquals(WorkInfo.State.ENQUEUED, scheduler.getWorkInfoById(pair.id).get(10, TimeUnit.SECONDS)?.state)
             ActivityScenario.launch(MainActivity::class.java).use { home ->
@@ -71,6 +87,7 @@ class OfflineDownloadRecoveryIntegrationTest {
                 compose.onNodeWithTag("offline-library").performScrollToNode(download)
                 compose.onNode(download).assertIsEnabled()
             }
+            checkGlobalSettings(expectPair = false)
         } finally {
             scheduler.cancelWorkById(pair.id).result.get(10, TimeUnit.SECONDS)
             scheduler.cancelWorkById(unrelated.id).result.get(10, TimeUnit.SECONDS)
