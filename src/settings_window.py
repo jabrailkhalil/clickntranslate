@@ -14092,7 +14092,7 @@ class SettingsWindow(QWidget):
     def _history_batch_added(self, pager, copy_mode):
         if not pager.current():
             return
-        controls = [button for card in pager.cards for button in card.findChildren(QtWidgets.QAbstractButton)]
+        controls = [pager._last_button] if pager._last_button is not None else []
         shell = getattr(self, 'secondary_view_shell', None)
         prefix = 'copy_history' if copy_mode else 'history'
         for suffix in ('clear_button', 'back_button'):

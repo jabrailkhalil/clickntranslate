@@ -54,21 +54,27 @@ class HistoryCardPager(QtCore.QObject):
         if self.layout.count() and self.layout.itemAt(self.layout.count()-1).spacerItem():
             self.layout.takeAt(self.layout.count()-1)
         stop = max(-1, self._next-self.BATCH_SIZE)
+        last_button = self._last_button
         while self._next > stop:
             index = self._next
             card = self._create_card(self.records[index], index)
             self.cards.append(card)
             card.show()
+            for button in card.findChildren(QtWidgets.QAbstractButton):
+                if last_button is not None:
+                    QtWidgets.QWidget.setTabOrder(last_button, button)
+                last_button = button
             self._next -= 1
         self.layout.addStretch(1)
         self.layout.activate()
         content = self.scroll.widget()
         content.resize(content.width(), max(content.height(), self.layout.minimumSize().height()))
         self.layout.activate()
-        buttons = [button for card in self.cards for button in card.findChildren(QtWidgets.QAbstractButton)]
-        self._last_button = buttons[-1] if buttons else None
-        if self._last_button is not None:
-            self._last_button.installEventFilter(self)
+        if last_button is not self._last_button:
+            if self._last_button is not None:
+                self._last_button.removeEventFilter(self)
+            self._last_button = last_button
+            last_button.installEventFilter(self)
         self._batch_added(self)
         self.schedule()
 

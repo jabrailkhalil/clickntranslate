@@ -63,6 +63,28 @@ def test_first_open_is_bounded_and_scrolling_reaches_every_record(history, app):
     assert json.loads(path.read_text(encoding='utf-8')) == records
 
 
+def test_appending_a_page_only_links_new_actions_to_the_existing_tab_order(history, monkeypatch):
+    settings, prefix, _path, _records, _show = history
+    pager = pager_for(settings, prefix)
+    original = QtWidgets.QWidget.setTabOrder
+    calls = []
+
+    def observe(first, second):
+        calls.append((first, second))
+        original(first, second)
+
+    monkeypatch.setattr(QtWidgets.QWidget, 'setTabOrder', staticmethod(observe))
+    for _ in range(4):
+        previous = len(pager.cards)
+        calls.clear()
+        pager.append_batch()
+        additions = [button for card in pager.cards[previous:]
+                     for button in card.findChildren(QtWidgets.QAbstractButton)]
+        assert additions
+        assert len(calls) <= len(additions) + 2
+        assert pager._last_button is additions[-1]
+
+
 def test_old_queued_batch_cannot_reappear_after_leaving_and_reopening(history, app):
     settings,prefix,_path,_records,show=history
     old=pager_for(settings,prefix)
