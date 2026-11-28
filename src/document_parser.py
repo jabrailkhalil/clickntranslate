@@ -211,8 +211,9 @@ def _read_rtf_file(path):
     skip_fallback = 0
     ignored = in_font_table = False
     font = default_font = None
-    optional_font_table = False
+    optional_destination = False
     font_encodings = {}
+    alternate_starts = {}
 
     def flush_bytes():
         if pending_bytes:
@@ -246,10 +247,11 @@ def _read_rtf_file(path):
         flush_bytes()
         if brace:
             skip_fallback = 0
-            optional_font_table = False
+            optional_destination = False
             if brace == "{":
                 stack.append((encoding, unicode_fallback, ignored, in_font_table, font, default_font))
             elif stack:
+                alternate_starts.pop(len(stack), None)
                 was_font_table = in_font_table
                 encoding, unicode_fallback, ignored, in_font_table, font, default_font = stack.pop()
                 if was_font_table and not in_font_table:
@@ -260,18 +262,24 @@ def _read_rtf_file(path):
             continue
         if symbol:
             if symbol == "*":
-                optional_font_table = not ignored
+                optional_destination = not ignored
                 ignored = True
                 in_font_table = False
             elif not ignored:
                 output.append({"~": "\u00a0", "_": "‑", "-": "\u00ad"}.get(symbol, symbol))
             continue
         number = int(parameter) if parameter is not None else None
-        allow_font_table = optional_font_table
-        optional_font_table = False
+        visible_optional = optional_destination
+        optional_destination = False
         if word == "bin" and number is not None:
             position += max(0, number)  # Binary objects can contain braces/backslashes.
-        elif word == "fonttbl" and (not ignored or allow_font_table):
+        elif word == "upr" and not ignored:
+            # Keep the ANSI version until this group's Unicode copy appears.
+            alternate_starts[len(stack)] = len(output)
+        elif word == "ud" and visible_optional and len(stack) - 1 in alternate_starts:
+            del output[alternate_starts.pop(len(stack) - 1):]
+            ignored = False
+        elif word == "fonttbl" and (not ignored or visible_optional):
             ignored = in_font_table = True
         elif ignored and not in_font_table:
             continue

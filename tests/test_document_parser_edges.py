@@ -139,3 +139,19 @@ def test_docx_chooses_a_single_readable_textbox_representation(tmp_path, readabl
         archive.writestr('word/document.xml', xml)
     caption = 'Current caption' if readable_choice else 'Legacy caption'
     assert parse_document(path).text == 'Total\n\n' + caption + '\n\nTotal'
+
+
+def test_rtf_uses_the_unicode_field_result_instead_of_its_ansi_compatibility_copy(tmp_path):
+    path = tmp_path / 'arabic-reference.rtf'
+    path.write_bytes(
+        rb'{\rtf1\ansi\ansicpg1252 Before {\field{\*\fldinst REF cities}'
+        rb'{\upr{\fldrslt City ???}{\*\ud{\fldrslt City \u1576?\u1594?\u1583?\u1575?\u1583?}}}} after}')
+    assert parse_document(path).text == 'Before City بغداد after'
+
+
+def test_rtf_unicode_alternatives_stay_inside_their_own_destination(tmp_path):
+    path = tmp_path / 'nested-references.rtf'
+    path.write_bytes(
+        rb'{\rtf1\ansi Prefix {\upr{outer ANSI}{\*\ud{Outer {\upr{inner ANSI}{\*\ud \u945?}} end}}} '
+        rb'{\upr{kept ANSI}}{\*\metadata {\upr{discarded ANSI}{\*\ud hidden}}}{\*\ud hidden} tail}')
+    assert parse_document(path).text == 'Prefix Outer α end kept ANSI tail'
