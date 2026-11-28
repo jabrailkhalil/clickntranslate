@@ -116,6 +116,13 @@ jobs:
           prefix=()
           if [[ "$RUNNER_OS" == "Linux" ]]; then prefix=(xvfb-run -a -s '-screen 0 1920x1200x24'); fi
           "${prefix[@]}" python src/main.py --candidate-smoke-test build/ui-native/widgets/report.json
+      - name: Verify replacement targets in two native Cocoa fields when Accessibility is available
+        if: ${{ !cancelled() && runner.os == 'macOS' && steps.deps.outcome == 'success' }}
+        run: python tools/qa_macos_selection_target.py --output build/ui-native/selection-target/report.json
+      - name: Verify companion selection and replacement in native Windows fields
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.deps.outcome == 'success' }}
+        shell: pwsh
+        run: python -X faulthandler tools/qa_windows_selection_target.py --output build/ui-native/selection-target/report.json
       - name: Exercise language lists, package actions and fixed dialog layout
         if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
         run: |
@@ -143,13 +150,6 @@ jobs:
         run: |
           CNT_QA_OUTPUT="$PWD/build/ui-native/dynamic-region" xvfb-run -a -s '-screen 0 1280x800x24' \
             python tools/qa_linux_dynamic_output.py
-      - name: Verify replacement targets in two native Cocoa fields when Accessibility is available
-        if: ${{ !cancelled() && runner.os == 'macOS' && steps.deps.outcome == 'success' }}
-        run: python tools/qa_macos_selection_target.py --output build/ui-native/selection-target/report.json
-      - name: Verify companion selection and replacement in native Windows fields
-        if: ${{ !cancelled() && runner.os == 'Windows' && steps.deps.outcome == 'success' }}
-        shell: pwsh
-        run: python -X faulthandler tools/qa_windows_selection_target.py --output build/ui-native/selection-target/report.json
       - name: Repeat localized settings, language search and idle resource checks
         if: ${{ !cancelled() && inputs.session_stability && steps.deps.outcome == 'success' }}
         run: |
