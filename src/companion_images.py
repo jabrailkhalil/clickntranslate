@@ -7,36 +7,57 @@ import tempfile
 EXTENSIONS = {'.png', '.jpg', '.jpeg', '.webp', '.bmp'}
 
 
+def _filesystem_path(path):
+    path = Path(path)
+    if os.name == 'nt':
+        absolute = os.path.abspath(path)
+        # A portable install can live in a deep directory even when the
+        # Windows machine has not enabled long paths in its registry.
+        if not absolute.startswith('\\\\?\\') and len(absolute.encode('utf-16-le', 'surrogatepass')) >= 248 * 2:
+            return Path('\\\\?\\UNC\\' + absolute[2:] if absolute.startswith('\\\\') else '\\\\?\\' + absolute)
+    return path
+
+
 def gallery_dir():
     from portable_paths import portable_base_dir
-    return Path(portable_base_dir()) / 'data' / 'companion-images'
+    return _filesystem_path(Path(portable_base_dir()) / 'data' / 'companion-images')
+
+
+def _in_gallery(path):
+    try:
+        return _filesystem_path(path.parent).samefile(gallery_dir())
+    except FileNotFoundError:
+        return False
 
 
 def image_reference(filename):
     path = Path(filename)
-    if path.parent.resolve() == gallery_dir().resolve():
+    if _in_gallery(path):
         return 'data/companion-images/' + path.name
     return str(filename)
 
 
 def resolve_image(filename):
+    if filename == '':
+        return ''
     path = Path(filename)
     if not path.is_absolute() and len(path.parts) == 3 and path.parts[:2] == ('data', 'companion-images'):
-        return str(gallery_dir() / path.name)
-    return str(filename)
+        path = gallery_dir() / path.name
+    return str(_filesystem_path(path))
 
 
 def images():
     root = gallery_dir()
     if not root.is_dir():
         return []
-    return sorted((p for p in root.iterdir() if p.is_file() and not p.is_symlink()
+    entries = (_filesystem_path(entry) for entry in root.iterdir())
+    return sorted((p for p in entries if p.is_file() and not p.is_symlink()
                    and p.suffix.lower() in EXTENSIONS), key=lambda p: p.name.casefold())
 
 
 def import_image(filename):
     from assistant_art import load_custom_art, MAX_IMAGE_BYTES
-    source = Path(filename)
+    source = _filesystem_path(filename)
     load_custom_art(str(source))
     # Enforce the bound on the actual read too (the file may have changed).
     with source.open('rb') as stream:
@@ -50,7 +71,12 @@ def import_image(filename):
     existing = next((p for p in images() if p.name.startswith(digest + '-')), None)
     if existing is not None:
         return str(existing)
-    destination = root / (digest + '-' + source.stem[:100] + source.suffix.lower())
+    suffix = source.suffix.lower()
+    # The SHA prefix is part of the 255-byte component limit on portable
+    # filesystems. CJK characters and emoji can each take several bytes.
+    name_budget = 255 - len((digest + '-' + suffix).encode('utf-8'))
+    stem = source.stem[:100].encode('utf-8')[:name_budget].decode('utf-8', errors='ignore')
+    destination = _filesystem_path(root / (digest + '-' + stem + suffix))
     fd, staging = tempfile.mkstemp(prefix='.image-', dir=root)
     try:
         with os.fdopen(fd, 'wb') as stream:
@@ -71,7 +97,7 @@ def display_name(filename):
 def remove_image(filename):
     path = Path(resolve_image(filename))
     # Legacy paths outside the library are references, never deletion targets.
-    if not path.is_symlink() and path.parent.resolve() == gallery_dir().resolve():
+    if not path.is_symlink() and _in_gallery(path):
         path.unlink(missing_ok=True)
     from assistant_art import _read_custom_pixmap
     _read_custom_pixmap.cache_clear()

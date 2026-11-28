@@ -93,6 +93,32 @@ def test_gallery_copies_deduplicates_and_never_deletes_original(window, tmp_path
     assert not Path(saved).exists() and source.exists()
 
 
+@pytest.mark.parametrize('stem', [
+    pytest.param('山' * 78, id='cjk'),
+    pytest.param('🌸' * 55, id='emoji'),
+    pytest.param('🌸' * 97, id='long-ntfs-name', marks=pytest.mark.skipif(
+        os.name != 'nt', reason='The source itself exceeds 255 UTF-8 bytes on POSIX')),
+])
+def test_gallery_publishes_long_names_that_fit_portable_filesystems(app, tmp_path, monkeypatch, stem):
+    source = tmp_path / (stem + '.PNG')
+    make_image(source)
+    monkeypatch.setattr(companion_images, 'gallery_dir', lambda: tmp_path / 'gallery')
+    saved = Path(companion_images.import_image(source))
+    assert len(saved.name.encode('utf-8')) <= 255
+    assert saved.suffix == '.png'
+    shown = Path(companion_images.display_name(saved)).stem
+    assert shown and stem.startswith(shown)
+    assert saved.read_bytes() == Path(companion_images.resolve_image(source)).read_bytes()
+    assert companion_images.import_image(source) == str(saved)
+    assert companion_images.images() == [saved]
+    reference = companion_images.image_reference(saved)
+    assert reference == 'data/companion-images/' + saved.name
+    assert Path(companion_images.resolve_image(reference)) == saved
+    companion_images.remove_image(reference)
+    assert not saved.exists()
+    assert Path(companion_images.resolve_image(source)).is_file()
+
+
 def test_gallery_moves_with_the_portable_application(window, tmp_path):
     from assistant_art import load_custom_art
     from assistant_settings import assistant_preferences
