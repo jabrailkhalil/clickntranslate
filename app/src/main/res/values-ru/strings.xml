@@ -1087,6 +1087,7 @@
     <string name="ocr_lang_chn_eng">Китайский + английский</string>
     <string name="ocr_lang_zh_rare">Китайский и редкие иероглифы</string>
     <string name="ocr_lang_mix">Несколько языков, автоматически</string>
+    <string name="lang_kn">Каннада</string>
     <string name="lang_th">Тайский</string>
     <string name="lang_vi">Вьетнамский</string>
     <string name="ocr_lang_issue_title">Выбранное распознавание может не подойти</string>

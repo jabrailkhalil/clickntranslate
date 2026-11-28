@@ -1104,6 +1104,7 @@
     <string name="ocr_lang_chn_eng">中英文</string>
     <string name="ocr_lang_zh_rare">中英 + 生僻字</string>
     <string name="ocr_lang_mix">多语种自动混排</string>
+    <string name="lang_kn">卡纳达语</string>
     <string name="lang_th">泰语</string>
     <string name="lang_vi">越南语</string>
     <!-- 源语言切换时联动 OCR：当前引擎不支持新源语言时弹出 -->

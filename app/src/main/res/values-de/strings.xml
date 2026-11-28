@@ -1087,7 +1087,8 @@
     <string name="ocr_lang_chn_eng">Chinesisch + Englisch</string>
     <string name="ocr_lang_zh_rare">Chinesisch + seltene Zeichen</string>
     <string name="ocr_lang_mix">Gemischt mehrsprachig (auto)</string>
-    <string name="lang_th">Thailändische</string>
+    <string name="lang_kn">Kannada</string>
+    <string name="lang_th">Thailändisch</string>
     <string name="lang_vi">Vietnamesisch</string>
     <string name="ocr_lang_issue_title">OCR Motor kann dies nicht erkennen</string>
     <string name="ocr_lang_issue_msg">Quelle Sprache ist \"%1$s\"; der Strom OCR Motor kann es nicht gut erkennen.\nUmschalten auf \"%2$s\".</string>

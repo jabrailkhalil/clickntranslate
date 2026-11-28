@@ -1087,7 +1087,8 @@
     <string name="ocr_lang_chn_eng">Chino + Inglés</string>
     <string name="ocr_lang_zh_rare">Chino + caracteres raros</string>
     <string name="ocr_lang_mix">Multilingüe mixto (auto)</string>
-    <string name="lang_th">Tailandia</string>
+    <string name="lang_kn">Canarés</string>
+    <string name="lang_th">Tailandés</string>
     <string name="lang_vi">Vietnamita</string>
     <string name="ocr_lang_issue_title">OCR motor no puede reconocer esto</string>
     <string name="ocr_lang_issue_msg">El lenguaje fuente es \"%1$s\"; la corriente actual OCR el motor puede no reconocerlo bien.\nRecomendar cambiar a \"%2$s\".</string>

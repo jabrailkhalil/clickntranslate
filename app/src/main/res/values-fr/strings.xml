@@ -1087,8 +1087,9 @@
     <string name="ocr_lang_chn_eng">Chinois + anglais</string>
     <string name="ocr_lang_zh_rare">Chinois + caractères rares</string>
     <string name="ocr_lang_mix">Polyglotte mixte (auto)</string>
+    <string name="lang_kn">Kannada</string>
     <string name="lang_th">Thaï</string>
-    <string name="lang_vi">Vietnamiens</string>
+    <string name="lang_vi">Vietnamien</string>
     <string name="ocr_lang_issue_title">OCR  moteur peut ne pas reconnaître cela</string>
     <string name="ocr_lang_issue_msg">La langue source est \"%1$s\"; l \' actuel OCR  moteur peut ne pas bien le reconnaître.\n Recommander de passer à \"%2$s\".</string>
     <string name="ocr_lang_issue_msg_tune">La langue source est \"%1$s\"; l \' actuel \"%2$s\" Le langage de reconnaissance du moteur est \"%3$s\", qui peut ne pas le reconnaître bien.\n Recommander \"%4$s\" — appuyez sur \"Appliquer\" pour ajuster (le moteur ne changera pas).</string>

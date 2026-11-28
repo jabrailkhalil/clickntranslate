@@ -1,6 +1,7 @@
 // Modified for Click'n'Translate on October 3, 2026.
 package dev.clickn.translate.translate
 
+import dev.clickn.translate.data.Languages
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -17,6 +18,15 @@ class MlKitLanguagePolicyTest {
         )
 
         assertEquals(expected, MlKitLanguagePolicy.supportedLanguageTags)
+    }
+
+    @Test
+    fun everyDownloadableLanguageCanBeChosenFromTheSharedLanguageList() {
+        val selectableModels = Languages.ALL.map { it.code }
+            .filter(MlKitLanguagePolicy::isSupportedLanguageTag)
+            .map(MlKitLanguagePolicy::resolveTarget).toSet()
+
+        assertEquals(MlKitLanguagePolicy.supportedLanguageTags, selectableModels)
     }
 
     @Test

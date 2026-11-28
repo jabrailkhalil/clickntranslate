@@ -137,8 +137,7 @@ internal fun OfflineLibrarySheet(settings: Settings, viewModel: MobileViewModel,
     if (languagePicker.isNotEmpty()) ModalBottomSheet(onDismissRequest = { languagePicker = "" }) {
         val isSource = languagePicker == "source"
         val selected = if (isSource) source else target
-        LanguageSheet(isSource, if (selected == "zh") "zh-CN" else selected, allowAuto = false,
-            allowedCodes = MlKitLanguagePolicy.supportedLanguageTags) { code ->
+        LanguageSheet(isSource, selected, allowAuto = false, mlKitOnly = true) { code ->
             val canonical = MlKitLanguagePolicy.resolveTarget(code)
             if (isSource) {
                 if (canonical == target) target = source

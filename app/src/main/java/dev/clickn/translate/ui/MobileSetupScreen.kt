@@ -167,7 +167,7 @@ fun MobileSetupScreen(onFinished: () -> Unit, onAdvanced: (String) -> Unit, firs
                 val current = settings ?: Settings()
                 LanguageSheet(source, if (source) current.sourceLang else current.targetLang,
                     allowAuto = current.translatorEngine !in setOf(TranslatorEngine.MYMEMORY, TranslatorEngine.GOOGLE_ML_KIT),
-                    allowedCodes = if (current.translatorEngine == TranslatorEngine.GOOGLE_ML_KIT) dev.clickn.translate.translate.MlKitLanguagePolicy.supportedLanguageTags else null) { code ->
+                    mlKitOnly = current.translatorEngine == TranslatorEngine.GOOGLE_ML_KIT) { code ->
                     pairEdited = true
                     viewModel.selectTranslation { mobileLanguagePair(it, source, code) }
                     sheet = ""

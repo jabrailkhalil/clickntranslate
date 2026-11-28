@@ -58,6 +58,7 @@ import dev.clickn.translate.translate.providerBaseUrl
 import dev.clickn.translate.capture.CaptureStartMode
 import dev.clickn.translate.capture.CaptureStartPreference
 import java.text.DateFormat
+import java.text.Collator
 import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.flow.update
@@ -266,7 +267,7 @@ fun MobileShell(
                 "source", "target" -> LanguageSheet(
                     isSource = sheet == "source", selected = if (sheet == "source") current.sourceLang else current.targetLang,
                     allowAuto = current.translatorEngine !in setOf(TranslatorEngine.MYMEMORY, TranslatorEngine.GOOGLE_ML_KIT),
-                    allowedCodes = if (current.translatorEngine == TranslatorEngine.GOOGLE_ML_KIT) MlKitLanguagePolicy.supportedLanguageTags else null,
+                    mlKitOnly = current.translatorEngine == TranslatorEngine.GOOGLE_ML_KIT,
                     onSelect = { code ->
                         val source = sheet == "source"
                         viewModel.resetTranslation()
@@ -392,8 +393,12 @@ private fun LanguageCell(label: Int, code: String, onClick: () -> Unit, modifier
 }
 
 @Composable
-internal fun languageName(code: String): String = if (code == "auto") stringResource(R.string.mobile_auto)
-    else Locale.forLanguageTag(code).getDisplayName(LocalContext.current.resources.configuration.locales[0]).replaceFirstChar { it.titlecase() }
+internal fun languageName(code: String): String = mobileLanguageName(
+    code, LocalContext.current.resources.configuration.locales[0], stringResource(R.string.mobile_auto))
+
+private fun mobileLanguageName(code: String, locale: Locale, autoLabel: String): String =
+    if (code == Languages.AUTO.code) autoLabel
+    else languageDisplayName(code, locale).replaceFirstChar { it.titlecase(locale) }
 
 @Composable
 private fun SectionLabel(id: Int) { Text(stringResource(id), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold) }
@@ -505,7 +510,7 @@ internal fun SettingsHub(settings: Settings, onProvider: () -> Unit, onAppearanc
     updater: dev.clickn.translate.update.UpdateViewModel? = null, readiness: @Composable () -> Unit = {}) {
     val context = LocalContext.current
     val capture by CaptureStartPreference.mode.collectAsState()
-    fun browse(url: String) { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+    fun browse(url: String) = openExternalBrowser(context, url)
     LazyColumn(Modifier.testTag("settings-hub"), contentPadding = PaddingValues(24.dp, 4.dp, 24.dp, 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { readiness() }
         item { SettingsRow(Icons.Outlined.Download, stringResource(R.string.refine_offline), stringResource(R.string.refine_offline_body), onOffline) }
@@ -537,9 +542,7 @@ internal fun SettingsHub(settings: Settings, onProvider: () -> Unit, onAppearanc
             SettingsRow(Icons.Outlined.SystemUpdate, stringResource(if (AppBrand.updatesEnabled) R.string.update_btn_check else R.string.brand_downloads_label),
                 subtitle, {
                     if (AppBrand.updatesEnabled && updater != null) updater.check()
-                    else runCatching { browse(dev.clickn.translate.update.UpdateChecker.RELEASE_PAGE_URL) }.onFailure {
-                        android.widget.Toast.makeText(context, R.string.setup_settings_unavailable, android.widget.Toast.LENGTH_SHORT).show()
-                    }
+                    else browse(dev.clickn.translate.update.UpdateChecker.RELEASE_PAGE_URL)
                 })
         }
         item { SettingsRow(Icons.Outlined.Public, stringResource(R.string.mobile_website), "clickn.dev", { browse(AppBrand.WEBSITE_URL) }) }
@@ -563,21 +566,39 @@ private fun SettingsRow(icon: ImageVector, title: String, subtitle: String, onCl
 }
 
 @Composable
-internal fun LanguageSheet(isSource: Boolean, selected: String, allowAuto: Boolean = true, allowedCodes: Set<String>? = null, onSelect: (String) -> Unit) {
-    var query by remember { mutableStateOf("") }
+internal fun LanguageSheet(isSource: Boolean, selected: String, allowAuto: Boolean = true, mlKitOnly: Boolean = false, onSelect: (String) -> Unit) {
+    var query by rememberSaveable(isSource) { mutableStateOf("") }
     val locale = LocalContext.current.resources.configuration.locales[0]
+    val autoLabel = stringResource(R.string.mobile_auto)
+    val options = remember(isSource, allowAuto, mlKitOnly, autoLabel, locale) {
+        val collator = Collator.getInstance(locale)
+        Languages.ALL.filter { language ->
+            (language != Languages.AUTO || isSource && allowAuto) &&
+                (!mlKitOnly || MlKitLanguagePolicy.isSupportedLanguageTag(language.code))
+        }.map { it.code to mobileLanguageName(it.code, locale, autoLabel) }
+            .sortedWith(compareBy<Pair<String, String>> { it.first != Languages.AUTO.code }.thenBy(collator) { it.second })
+    }
+    val search = query.trim()
+    val matches = remember(options, search) {
+        if (search.isEmpty()) options
+        else options.filter { (code, label) -> code.contains(search, true) || label.contains(search, true) }
+    }
+    val selectedCode = if (mlKitOnly) when (selected) {
+        "zh" -> Languages.ZH_CN.code
+        "no" -> "nb"
+        else -> selected
+    } else selected
     Column(Modifier.fillMaxWidth().fillMaxHeight(.8f).padding(horizontal = 24.dp)) {
         Text(stringResource(if (isSource) R.string.mobile_source else R.string.mobile_target), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth().padding(vertical = 16.dp), singleLine = true,
+            label = { Text(stringResource(R.string.lang_picker_search_placeholder)) },
             leadingIcon = { Icon(Icons.Outlined.Search, null) }, shape = MaterialTheme.shapes.small)
-        val choices = Languages.ALL.filter { (isSource && allowAuto || it.code != "auto") &&
-            (allowedCodes == null || it.code.substringBefore('-') in allowedCodes) &&
-            (query.isBlank() || it.code.contains(query, true) || Locale.forLanguageTag(it.code).getDisplayName(locale).contains(query, true)) }
-            .sortedBy { if (it.code == "auto") "" else Locale.forLanguageTag(it.code).getDisplayName(locale) }
-        LazyColumn { items(choices, key = { it.code }) { language ->
-            ListItem(headlineContent = { Text(languageName(language.code)) }, supportingContent = { Text(language.code) },
-                trailingContent = { if (selected == language.code) Icon(Icons.Outlined.Check, null, tint = MaterialTheme.colorScheme.primary) },
-                modifier = Modifier.clickable { onSelect(language.code) })
+        if (matches.isEmpty()) Text(stringResource(R.string.lang_picker_no_match), style = MaterialTheme.typography.bodyMedium)
+        LazyColumn(Modifier.selectableGroup()) { items(matches, key = { it.first }) { (code, label) ->
+            val checked = code == selectedCode
+            ListItem(headlineContent = { Text(label) }, supportingContent = { Text(code) },
+                trailingContent = { if (checked) Icon(Icons.Outlined.Check, null, tint = MaterialTheme.colorScheme.primary) },
+                modifier = Modifier.selectable(checked, role = Role.RadioButton) { onSelect(code) })
         } }
     }
 }

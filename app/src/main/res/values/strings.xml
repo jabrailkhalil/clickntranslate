@@ -1105,6 +1105,7 @@
     <string name="ocr_lang_chn_eng">Chinese + English</string>
     <string name="ocr_lang_zh_rare">Chinese + rare characters</string>
     <string name="ocr_lang_mix">Mixed multilingual (auto)</string>
+    <string name="lang_kn">Kannada</string>
     <string name="lang_th">Thai</string>
     <string name="lang_vi">Vietnamese</string>
     <!-- Source-language → OCR engine linkage prompt -->
