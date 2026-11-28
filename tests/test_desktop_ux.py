@@ -38,13 +38,14 @@ def window(app, tmp_path):
 
 
 @pytest.mark.parametrize('language', main.INTERFACE_LANGUAGE_BY_CODE)
-def test_settings_and_faq_show_the_running_version(window, app, monkeypatch, language):
+def test_only_faq_displays_the_version_in_its_heading(window, app, monkeypatch, language):
     window.settings_button.click()
     window.set_interface_language(language)
     app.processEvents()
     heading = window.title_bar
     title = main.INTERFACE_TEXT[language]['title']
-    assert heading.text() == f'{title} · v{main.APP_VERSION}'
+    assert heading.text() == title
+    assert window.windowTitle() == main.APP_WINDOW_TITLE
     ink = heading.fontMetrics().boundingRect(heading.contentsRect(), int(heading.alignment()), heading.text())
     for button in (window.flag_button, window.theme_button, window.document_button, window.help_button,
                    window.settings_button, window.minimize_button, window.close_button):

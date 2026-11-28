@@ -165,9 +165,9 @@ def test_factory_config_keeps_mutable_settings_independent(monkeypatch, factory,
 
 
 @pytest.mark.parametrize('language', main.INTERFACE_LANGUAGE_BY_CODE)
-def test_intro_is_short_localized_and_has_current_version(language):
+def test_intro_lists_localized_features_without_a_version_label(language):
     text = main.welcome_text(language)
-    assert main.APP_VERSION in text['body']
+    assert main.APP_VERSION not in str(text)
     assert '000' not in str(text)
     assert len(text['features']) == 5
     assert all(point.strip() and len(point) < 100 for point in text['features'])

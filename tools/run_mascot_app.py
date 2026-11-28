@@ -72,7 +72,6 @@ def run():
     app.setQuitOnLastWindowClosed(True)
     window = MascotApp()
     main._main_window_ref = window
-    window.setWindowTitle(f"Click'n'Translate {main.APP_VERSION} — Python · Pets v18")
     window._sync_desktop_assistant()
     window.show()
     if '--main' in sys.argv:

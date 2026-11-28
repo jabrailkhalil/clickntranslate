@@ -3202,7 +3202,7 @@ def clipboard_copy_icon(theme_name):
 WELCOME_TEXT = {'en': {'window': 'News',
         'eyebrow': 'What’s new',
         'title': "Welcome to Click'n'Translate!",
-        'body': 'New in version {version}:',
+        'body': 'In this update',
         'telegram': 'Open Telegram',
         'github': 'Star the project on GitHub',
         'support': 'Thank you for your support! Find us on Telegram and GitHub.',
@@ -3218,7 +3218,7 @@ WELCOME_TEXT = {'en': {'window': 'News',
  'ru': {'window': 'Новости',
         'eyebrow': 'Что нового',
         'title': "Добро пожаловать в Click'n'Translate!",
-        'body': 'Новое в версии {version}:',
+        'body': 'В этом обновлении',
         'telegram': 'Открыть Telegram',
         'github': 'Поставить звезду проекту на GitHub',
         'support': 'Спасибо за поддержку! Мы есть в Telegram и на GitHub.',
@@ -3234,7 +3234,7 @@ WELCOME_TEXT = {'en': {'window': 'News',
  'es': {'window': 'Noticias',
         'eyebrow': 'Novedades',
         'title': "¡Bienvenido a Click'n'Translate!",
-        'body': 'Nuevo en la versión {version}:',
+        'body': 'En esta actualización',
         'telegram': 'Abrir Telegram',
         'github': 'Dar una estrella al proyecto en GitHub',
         'support': '¡Gracias por tu apoyo! Estamos en Telegram y GitHub.',
@@ -3250,7 +3250,7 @@ WELCOME_TEXT = {'en': {'window': 'News',
  'de': {'window': 'Neuigkeiten',
         'eyebrow': 'Was ist neu?',
         'title': "Willkommen bei Click'n'Translate!",
-        'body': 'Neu in Version {version}:',
+        'body': 'Neu in diesem Update',
         'telegram': 'Telegram öffnen',
         'github': 'Dem Projekt auf GitHub einen Stern geben',
         'support': 'Danke für eure Unterstützung! Ihr findet uns auf Telegram und GitHub.',
@@ -3266,7 +3266,7 @@ WELCOME_TEXT = {'en': {'window': 'News',
  'fr': {'window': 'Actualités',
         'eyebrow': 'Nouveautés',
         'title': "Bienvenue dans Click'n'Translate !",
-        'body': 'Nouveau dans la version {version} :',
+        'body': 'Dans cette mise à jour',
         'telegram': 'Ouvrir Telegram',
         'github': 'Mettre une étoile au projet sur GitHub',
         'support': 'Merci pour votre soutien ! Retrouvez-nous sur Telegram et GitHub.',
@@ -3282,7 +3282,7 @@ WELCOME_TEXT = {'en': {'window': 'News',
  'zh': {'window': '更新',
         'eyebrow': '更新内容',
         'title': "欢迎使用 Click'n'Translate！",
-        'body': '{version} 版新增：',
+        'body': '本次更新',
         'telegram': '打开 Telegram',
         'github': '在 GitHub 上为项目点亮星标',
         'support': '感谢你的支持！欢迎在 Telegram 和 GitHub 上关注我们。',
@@ -3298,7 +3298,7 @@ WELCOME_TEXT = {'en': {'window': 'News',
  'pt': {'window': 'Notícias',
         'eyebrow': 'Novidades',
         'title': "Bem-vindo ao Click'n'Translate!",
-        'body': 'Novidades da versão {version}:',
+        'body': 'Nesta atualização',
         'telegram': 'Abra Telegram',
         'github': 'Dê uma estrela ao projeto no GitHub',
         'support': 'Obrigado pelo apoio! Estamos no Telegram e no GitHub.',
@@ -3314,7 +3314,7 @@ WELCOME_TEXT = {'en': {'window': 'News',
  'it': {'window': 'Novità',
         'eyebrow': 'Novità',
         'title': "Benvenuto in Click'n'Translate!",
-        'body': 'Novità della versione {version}:',
+        'body': 'In questo aggiornamento',
         'telegram': 'Apri Telegram',
         'github': 'Aggiungi una stella al progetto su GitHub',
         'support': 'Grazie per il sostegno! Ci trovi su Telegram e GitHub.',
@@ -3330,7 +3330,7 @@ WELCOME_TEXT = {'en': {'window': 'News',
  'ar': {'window': 'الأخبار',
         'eyebrow': 'ما الجديد',
         'title': "مرحبًا بك في Click'n'Translate!",
-        'body': 'الجديد في الإصدار {version}:',
+        'body': 'في هذا التحديث',
         'telegram': 'فتح Telegram',
         'github': 'أضف نجمة للمشروع على GitHub',
         'support': 'شكرًا لدعمكم! تجدوننا على Telegram وGitHub.',
@@ -3346,7 +3346,7 @@ WELCOME_TEXT = {'en': {'window': 'News',
  'tr': {'window': 'Yenilikler',
         'eyebrow': 'Yenilikler',
         'title': "Click'n'Translate'e hoş geldiniz!",
-        'body': '{version} sürümündeki yenilikler:',
+        'body': 'Bu güncellemedeki yenilikler',
         'telegram': "Telegram'ı aç",
         'github': "GitHub'da projeye yıldız verin",
         'support': 'Desteğiniz için teşekkürler! Bizi Telegram ve GitHub’da bulabilirsiniz.',
@@ -3362,7 +3362,7 @@ WELCOME_TEXT = {'en': {'window': 'News',
  'hi': {'window': 'नया क्या है',
         'eyebrow': 'नया क्या है',
         'title': "Click'n'Translate में आपका स्वागत है!",
-        'body': 'संस्करण {version} में नया:',
+        'body': 'इस अपडेट में नया',
         'telegram': 'Telegram खोलें',
         'github': 'GitHub पर प्रोजेक्ट को स्टार दें',
         'support': 'आपके समर्थन के लिए धन्यवाद! हम Telegram और GitHub पर हैं।',
@@ -3378,7 +3378,7 @@ WELCOME_TEXT = {'en': {'window': 'News',
  'id': {'window': 'Berita',
         'eyebrow': 'Yang baru',
         'title': "Selamat datang di Click'n'Translate!",
-        'body': 'Baru di versi {version}:',
+        'body': 'Dalam pembaruan ini',
         'telegram': 'Buka Telegram',
         'github': 'Beri bintang proyek di GitHub',
         'support': 'Terima kasih atas dukungannya! Temukan kami di Telegram dan GitHub.',
@@ -3396,14 +3396,13 @@ WELCOME_TEXT = {'en': {'window': 'News',
 def welcome_text(lang):
     return {
         **WELCOME_TEXT.get(lang, WELCOME_TEXT["en"]),
-        "body": WELCOME_TEXT.get(lang, WELCOME_TEXT["en"])["body"].format(version=APP_VERSION),
         "guide": GUIDE_SETUP_INTRO.get(lang, GUIDE_SETUP_INTRO["en"])[2],
     }
 
 
 STARTUP_NEWS_TEXT = {
     language: {
-        "window": copy["window"] + " · V{version}",
+        "window": copy["window"],
         "title": copy["eyebrow"],
         "intro": copy["body"],
         "continue": {'en': 'Got it', 'ru': 'Понятно', 'es': 'Entendido', 'de': 'Verstanden', 'fr': 'Compris', 'zh': '知道了',
@@ -3421,20 +3420,18 @@ STARTUP_NEWS_TEXT = {
 }
 
 
-def startup_news_text(lang, version=APP_VERSION):
-    copy = STARTUP_NEWS_TEXT.get(lang, STARTUP_NEWS_TEXT["en"])
-    return {**copy, "intro": copy["intro"].format(version=version)}
+def startup_news_text(lang):
+    return dict(STARTUP_NEWS_TEXT.get(lang, STARTUP_NEWS_TEXT["en"]))
 
 
-def startup_news_html(lang, version=APP_VERSION):
+def startup_news_html(lang):
     from html import escape
-    text = startup_news_text(lang, version)
+    text = startup_news_text(lang)
     features = ''.join(f'<li>{escape(point)}</li>' for point in welcome_text(lang)['features'])
     return (
         f"<div style='line-height:1.35'>"
         f"<div style='font-size:18px;font-weight:800'>{escape(text['title'])}</div>"
         f"<p>{escape(text['intro'])}</p><ul>{features}</ul>"
-        f"<div style='font-size:11px'>Click'n'Translate · V{escape(str(version))}</div>"
         f"</div>"
     )
 
@@ -8354,11 +8351,6 @@ class WelcomeDialog(QDialog):
                 font-size: 14px;
                 font-weight: 400;
             }}
-            QLabel#welcomeVersion {{
-                color: {colors['muted']};
-                font-size: 12px;
-                font-weight: 400;
-            }}
             QLabel#welcomeFeature, QLabel#welcomeFeatureBullet {{
                 color: {colors['text']};
                 background: transparent;
@@ -8412,15 +8404,9 @@ class WelcomeDialog(QDialog):
         logo.setAlignment(Qt.AlignCenter)
         top_row.addWidget(logo)
 
-        title_stack = QVBoxLayout()
-        title_stack.setSpacing(0)
         app_name = QLabel("Click'n'Translate")
         app_name.setStyleSheet(f"font-size:16px; font-weight:600; color:{colors['text']};")
-        version = QLabel(f"v{APP_VERSION}")
-        version.setObjectName("welcomeVersion")
-        title_stack.addWidget(app_name)
-        title_stack.addWidget(version)
-        top_row.addLayout(title_stack)
+        top_row.addWidget(app_name)
         top_row.addStretch()
 
         self.flag_button = QPushButton()
@@ -14256,10 +14242,7 @@ class DarkThemeApp(QMainWindow):
         self.flag_button.setAccessibleName(label)
 
     def _refresh_title_bar(self):
-        title = INTERFACE_TEXT[self.current_interface_language]["title"]
-        if self.settings_window is not None:
-            title = f"{title} · v{APP_VERSION}"
-        self.title_bar.setText(title)
+        self.title_bar.setText(INTERFACE_TEXT[self.current_interface_language]["title"])
 
     def refresh_interface_language_ui(self):
         lang = self.current_interface_language
@@ -14934,7 +14917,6 @@ class DarkThemeApp(QMainWindow):
         self.main_layout.setContentsMargins(14, 48, 14, 14)
         self.main_layout.setSpacing(8)
         self.settings_window = None
-        self._refresh_title_bar()
         self.set_settings_button_to_settings()
         if reuse:
             for widget in cached:
@@ -15603,7 +15585,6 @@ class DarkThemeApp(QMainWindow):
             elif getattr(settings, "_ui_theme", None) != self.current_theme:
                 settings.apply_theme()
         self.settings_window = settings
-        self._refresh_title_bar()
         self.main_layout.addWidget(self.settings_window)
         # Settings is a destination, not a remembered document position.  A
         # fresh visit always opens on the compact general page.

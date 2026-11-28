@@ -55,22 +55,23 @@ class _NewsOwner(QtWidgets.QWidget):
 def test_startup_news_is_localized_and_explains_user_benefits():
     from html import escape
     for language in main.INTERFACE_LANGUAGE_BY_CODE:
-        text = main.startup_news_text(language, "9.9.9")
+        text = main.startup_news_text(language)
         assert 'changes' not in text and 'promise' not in text
-        assert "9.9.9" in text["intro"]
+        assert main.APP_VERSION not in str(text)
         assert len(text['intro']) < 190
         assert text["continue"]
         assert '000' not in str(text)
-        html = main.startup_news_html(language, "9.9.9")
-        assert "9.9.9" in html
+        html = main.startup_news_html(language)
+        assert main.APP_VERSION not in html
         assert escape(text["title"]) in html
         assert escape(text['intro']) in html
         assert html.count('<li>') == 5
         assert all(escape(point) in html for point in main.welcome_text(language)['features'])
 
 
-def test_startup_news_escapes_the_supplied_version():
-    html = main.startup_news_html('en', '<img src=x>')
+def test_startup_news_escapes_localized_content(monkeypatch):
+    monkeypatch.setitem(main.STARTUP_NEWS_TEXT['en'], 'intro', '<img src=x>')
+    html = main.startup_news_html('en')
     assert '<img' not in html
     assert '&lt;img src=x&gt;' in html
 
@@ -88,6 +89,7 @@ def test_startup_news_is_shown_once_per_announcement_and_remembered():
     assert dialog.isVisible()
     assert isinstance(dialog, main.WelcomeDialog)
     assert dialog.windowTitle() == main.welcome_text('ru')['window']
+    assert all(main.APP_VERSION not in label.text() for label in dialog.findChildren(QtWidgets.QLabel))
     assert dialog.findChild(QtWidgets.QLabel, 'welcomeBody').text() == main.welcome_text('ru')['body']
     assert not dialog.telegram_btn.icon().isNull()
     assert not dialog.github_btn.icon().isNull()
