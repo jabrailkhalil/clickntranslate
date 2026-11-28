@@ -198,12 +198,20 @@ def exercise(report, directory, exchange):
             dialogs = main._live_translation_result_dialogs()
             assert len(dialogs) == 1 and dialogs[0].isVisible()
             assert dialogs[0].grab().save(str(directory / 'translation.png'))
-            dialogs[0].close()
-            QTest.qWait(100)
 
-            command('first')
+            result_hwnd = int(dialogs[0].winId())
+            wait_until(lambda: main._windows_foreground_window() == result_hwnd,
+                       'The translation result did not become the active window')
+            assert not command('state')['active']
             command('clear-events')
+            delay = True
             press_panel_button(menu, 'replace')
+            wait_until(entered.is_set, 'Replace from the active result did not reach its source')
+            restored = report['source_restored_from_result'] = command('state')
+            assert restored['active'] and restored['firstFocused'] and restored['selected'][0] == SAMPLE, restored
+            assert main._windows_foreground_window() == top and current_editor() == left
+            assert dialogs[0].isVisible() and menu.isVisible()
+            resume.set()
             wait_until(lambda: len(finished) == 2, 'The replacement did not complete')
             replaced = report['replacement'] = command('state')
             assert finished[-1] and requests == [SAMPLE, SAMPLE]
@@ -211,6 +219,8 @@ def exercise(report, directory, exchange):
             assert action_keys(replaced) == [('First', 'C'), ('First', 'C'), ('First', 'V')], replaced
             assert all(e['key'] in ('LeftCtrl', 'RightCtrl', 'C', 'V') for e in replaced['keys']), replaced
             assert menu.isVisible() and pyperclip.paste() == CLIPBOARD
+            dialogs[0].close()
+            QTest.qWait(100)
 
             original = command('reset-first')
             second = command('second')
@@ -219,7 +229,8 @@ def exercise(report, directory, exchange):
             assert left != right and left.window == right.window
             report['uia'] = dict(first=left.runtime_id, second=right.runtime_id, window=top)
             command('clear-events')
-            delay = True
+            entered.clear()
+            resume.clear()
             press_panel_button(menu, 'replace')
             wait_until(entered.is_set, 'The second field never reached the provider')
             # Preserve the same spelling in a different editor within this top-level window.
