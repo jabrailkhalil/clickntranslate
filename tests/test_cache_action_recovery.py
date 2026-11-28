@@ -41,9 +41,9 @@ def context(app, tmp_path, monkeypatch):
     monkeypatch.setattr(ocr, 'close_ocr_diagnostics_logging', Mock())
     monkeypatch.setattr(ocr, 'reopen_ocr_diagnostics_logging', Mock())
     for module, name, value in ((ocr, '_OCR_ENGINE_CACHE', {}), (ocr, '_OVERLAY_POOL', {}),
-                                (ocr, '_ocr_config_cache', {}), (ocr, '_ocr_config_mtime', 1),
+                                (ocr, '_ocr_config_cache', {}), (ocr, '_ocr_config_revision', 1),
                                 (translater, '_translator_config_cache', {}),
-                                (translater, '_translator_config_mtime', 1),
+                                (translater, '_translator_config_revision', 1),
                                 (translater, '_argos_languages_cache', None),
                                 (translater, '_argos_translations_cache', {}),
                                 (translater, '_http_session', None)):

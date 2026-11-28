@@ -16230,7 +16230,7 @@ finally {
             if hasattr(ocr, "ScreenCaptureOverlay"):
                 ocr.ScreenCaptureOverlay._tesseract_cmd_cache = None
             ocr._ocr_config_cache = None
-            ocr._ocr_config_mtime = 0
+            ocr._ocr_config_revision = None
         except Exception:
             pass
 
@@ -16240,7 +16240,7 @@ finally {
             if hasattr(ocr, "reset_rapidocr_runtime_cache"):
                 ocr.reset_rapidocr_runtime_cache(clear_modules=clear_modules)
             ocr._ocr_config_cache = None
-            ocr._ocr_config_mtime = 0
+            ocr._ocr_config_revision = None
         except Exception:
             pass
 
@@ -16250,7 +16250,7 @@ finally {
             if hasattr(ocr, "reset_easyocr_runtime_cache"):
                 ocr.reset_easyocr_runtime_cache(clear_modules=clear_modules)
             ocr._ocr_config_cache = None
-            ocr._ocr_config_mtime = 0
+            ocr._ocr_config_revision = None
         except Exception:
             pass
 
@@ -16531,7 +16531,7 @@ finally {
             if hasattr(translater, "_hymt_runtime_cache"):
                 translater._hymt_runtime_cache = None
             translater._translator_config_cache = None
-            translater._translator_config_mtime = 0
+            translater._translator_config_revision = None
         except Exception:
             pass
 
@@ -18393,14 +18393,14 @@ finally {
         try:
             import ocr
             ocr._ocr_config_cache = None
-            ocr._ocr_config_mtime = 0
+            ocr._ocr_config_revision = None
         except Exception:
             pass
 
         try:
             import translater
             translater._translator_config_cache = None
-            translater._translator_config_mtime = 0
+            translater._translator_config_revision = None
             translater._argos_languages_cache = None
             translater._argos_translations_cache.clear()
             if hasattr(translater, "_hymt_runtime_cache"):

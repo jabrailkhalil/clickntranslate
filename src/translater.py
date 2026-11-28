@@ -13,6 +13,7 @@ import zlib
 import hashlib
 import threading
 from contextlib import nullcontext
+from atomic_storage import read_cached_settings
 from copy import deepcopy
 from languages import language_english_name, translator_api_code
 from translation_chunks import PROVIDER_BYTE_LIMITS, split_text, restore_boundary_whitespace
@@ -267,13 +268,13 @@ def argos_runtime_available():
 
 def get_data_file(filename):
     data_dir = os.path.join(get_portable_dir(), "data")
-    if not os.path.exists(data_dir):
-        os.makedirs(data_dir)
+    if not os.path.isdir(data_dir):
+        os.makedirs(data_dir, exist_ok=True)
     return os.path.join(data_dir, filename)
 
 # --- Кэширование конфигурации ---
 _translator_config_cache = None
-_translator_config_mtime = 0
+_translator_config_revision = None
 
 HYMT_MODEL_FILE = "HY-MT1.5-1.8B-Q4_K_M.gguf"
 HYMT_ENGINE_KEY = "hymt"
@@ -282,17 +283,9 @@ _hymt_runtime_cache = None
 
 def get_cached_translator_config():
     """Возвращает закэшированную конфигурацию переводчика."""
-    global _translator_config_cache, _translator_config_mtime
-    config_path = get_data_file("config.json")
-    try:
-        mtime = os.path.getmtime(config_path)
-        if _translator_config_cache is None or mtime > _translator_config_mtime:
-            with open(config_path, "r", encoding="utf-8") as f:
-                _translator_config_cache = json.load(f)
-            _translator_config_mtime = mtime
-    except Exception:
-        if _translator_config_cache is None:
-            _translator_config_cache = {}
+    global _translator_config_cache, _translator_config_revision
+    _translator_config_cache, _translator_config_revision = read_cached_settings(
+        get_data_file("config.json"), _translator_config_cache, _translator_config_revision, default=dict)
     return _translator_config_cache
 
 # --- Кэширование языков и объектов перевода Argos ---

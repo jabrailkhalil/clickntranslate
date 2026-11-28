@@ -7,6 +7,29 @@ import tempfile
 import time
 
 
+def read_cached_settings(path, cached, revision, *, default, prepare=None):
+    """Reuse a valid configuration only while the same underlying file is current."""
+    path = os.fspath(path)
+    try:
+        stat = os.stat(path)
+        stamp = (path, stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns)
+        if cached is not None and stamp == revision:
+            return cached, revision
+        with open(path, 'r', encoding='utf-8-sig') as stream:
+            values = json.load(stream)
+        if not isinstance(values, dict):
+            raise ValueError('Settings must be a JSON object')
+        return (prepare(values) if prepare is not None else values), stamp
+    except FileNotFoundError:
+        pass
+    except (OSError, ValueError, TypeError, RecursionError):
+        # A transient invalid edit may retain the last valid settings for this
+        # profile. Never reuse another portable directory's provider or API URL.
+        if revision and revision[0] == path and cached is not None:
+            return cached, revision
+    return default(), None
+
+
 def _replace_complete_file(source, target, *, overwrite=True):
     move = os.replace if overwrite else os.rename
     for attempt in range(8):

@@ -734,8 +734,8 @@ def get_portable_dir():
 
 def get_data_file(filename):
     data_dir = os.path.join(get_portable_dir(), "data")
-    if not os.path.exists(data_dir):
-        os.makedirs(data_dir)
+    if not os.path.isdir(data_dir):
+        os.makedirs(data_dir, exist_ok=True)
     return os.path.join(data_dir, filename)
 
 def _new_ocr_session_id(mode):
@@ -2437,11 +2437,10 @@ def _find_translate_pair_index(combo, source_code, target_code=None):
     return -1
 
 def _write_ocr_config_updates(updates):
-    global _ocr_config_cache, _ocr_config_mtime
     config_path = get_data_file("config.json")
     try:
         try:
-            with open(config_path, 'r', encoding='utf-8') as f:
+            with open(config_path, 'r', encoding='utf-8-sig') as f:
                 config = json.load(f)
         except FileNotFoundError:
             config = {}
@@ -2453,11 +2452,7 @@ def _write_ocr_config_updates(updates):
         config.update(updates)
         from atomic_storage import write_json
         write_json(config_path, config, indent=4)
-        _ocr_config_cache = config
-        try:
-            _ocr_config_mtime = os.path.getmtime(config_path)
-        except Exception:
-            _ocr_config_mtime = 0
+        invalidate_ocr_config_cache()
         # Keep the live main window in sync. Otherwise a later save from the
         # settings screen can overwrite a language pair that the OCR/fullscreen
         # overlay has already persisted to disk.
@@ -2497,36 +2492,31 @@ def _remove_auto_mode_from_config(config):
 
 # --- Кэширование конфигурации ---
 _ocr_config_cache = None
-_ocr_config_mtime = 0
+_ocr_config_revision = None
 
 
 def invalidate_ocr_config_cache():
     """Force the next OCR action to read settings freshly from disk."""
-    global _ocr_config_cache, _ocr_config_mtime
+    global _ocr_config_cache, _ocr_config_revision
     _ocr_config_cache = None
-    _ocr_config_mtime = 0
+    _ocr_config_revision = None
 
 def get_cached_ocr_config():
     """Возвращает закэшированную конфигурацию OCR."""
-    global _ocr_config_cache, _ocr_config_mtime
+    global _ocr_config_cache, _ocr_config_revision
     config_path = get_data_file("config.json")
-    try:
-        mtime = os.path.getmtime(config_path)
-        if _ocr_config_cache is None or mtime > _ocr_config_mtime:
-            with open(config_path, "r", encoding="utf-8") as f:
-                _ocr_config_cache = json.load(f)
-            auto_updates = _remove_auto_mode_from_config(_ocr_config_cache)
-            if auto_updates:
-                try:
-                    with open(config_path, "w", encoding="utf-8") as f:
-                        json.dump(_ocr_config_cache, f, ensure_ascii=False, indent=4)
-                    mtime = os.path.getmtime(config_path)
-                except Exception as e:
-                    logging.warning(f"Failed to remove AUTO OCR config values: {e}")
-            _ocr_config_mtime = mtime
-    except Exception:
-        if _ocr_config_cache is None:
-            _ocr_config_cache = {}
+    from atomic_storage import read_cached_settings, write_json
+
+    def prepare(values):
+        if _remove_auto_mode_from_config(values):
+            try:
+                write_json(config_path, values, indent=4)
+            except OSError as error:
+                logging.warning("Failed to remove AUTO OCR config values: %s", error)
+        return values
+
+    _ocr_config_cache, _ocr_config_revision = read_cached_settings(
+        config_path, _ocr_config_cache, _ocr_config_revision, default=dict, prepare=prepare)
     return _ocr_config_cache
 
 def load_ocr_config():

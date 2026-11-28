@@ -36,7 +36,7 @@ def memory_context(window, capture, tmp_path, monkeypatch):
     monkeypatch.setattr(ocr, 'get_data_file', lambda name: str(tmp_path / name))
     monkeypatch.setattr(ocr, '_write_ocr_config_updates', _REAL_OCR_CONFIG_WRITE)
     monkeypatch.setattr(ocr, '_ocr_config_cache', None)
-    monkeypatch.setattr(ocr, '_ocr_config_mtime', 0)
+    monkeypatch.setattr(ocr, '_ocr_config_revision', 0)
     monkeypatch.setattr(main, '_main_window_ref', window)
     save = mock.Mock(side_effect=lambda **_kwargs: write_json(path, config, indent=2))
     monkeypatch.setattr(window, 'save_config', save)

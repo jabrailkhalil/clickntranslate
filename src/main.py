@@ -145,7 +145,7 @@ from project_paths import resource_root
 from document_parser import DocumentParseError, parse_document
 from document_parser import SUPPORTED_EXTENSIONS
 from document_storage import default_output_paths, load_session, save_session, save_text, translations_dir
-from atomic_storage import write_json
+from atomic_storage import read_cached_settings, write_json
 from document_translation import TranslationChunkResult, translate_document_text
 from languages import (
     LANGUAGES as APP_LANGUAGES,
@@ -871,29 +871,21 @@ def _read_autostart_command():
 
 # --- Глобальный кэш конфигурации ---
 _config_cache = None
-_config_mtime = 0
+_config_revision = None
 
 def get_cached_config():
     """Возвращает закэшированную конфигурацию, перечитывая только при изменении файла."""
-    global _config_cache, _config_mtime
-    config_path = get_data_file("config.json")
-    try:
-        mtime = os.path.getmtime(config_path)
-        if _config_cache is None or mtime > _config_mtime:
-            with open(config_path, "r", encoding="utf-8-sig") as f:
-                loaded_config = json.load(f)
-            _config_cache, _missing_keys = merge_config_defaults(loaded_config)
-            _config_mtime = mtime
-    except Exception:
-        if _config_cache is None:
-            _config_cache = DEFAULT_CONFIG.copy()
+    global _config_cache, _config_revision
+    _config_cache, _config_revision = read_cached_settings(
+        get_data_file("config.json"), _config_cache, _config_revision, default=DEFAULT_CONFIG.copy,
+        prepare=lambda values: merge_config_defaults(values)[0])
     return _config_cache
 
 def invalidate_config_cache():
     """Сбрасывает кэш конфигурации после записи."""
-    global _config_cache, _config_mtime
+    global _config_cache, _config_revision
     _config_cache = None
-    _config_mtime = 0
+    _config_revision = None
 
 # --- Константы для RegisterHotKey ---
 WM_HOTKEY = 0x0312
