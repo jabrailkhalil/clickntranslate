@@ -13452,18 +13452,24 @@ class DarkThemeApp(QMainWindow):
                         if not expected_target_is_active():
                             return
                     from clipboard_preservation import ClipboardPreservation
+                    snapshot_sequence = _clipboard_sequence_number()
                     clipboard_preservation = ClipboardPreservation(
                         pyperclip.paste, platform_support.copy_text, _clipboard_sequence_number)
                     # Clear clipboard, then Ctrl+C to capture selection
                     if not capture_target_is_active():
+                        return
+                    if snapshot_sequence is not None and _clipboard_sequence_number() != snapshot_sequence:
                         return
                     if platform_support.copy_text("") is False:
                         # A busy clipboard must never make an unrelated old
                         # value look like newly captured selected text.
                         notify_copy_failed(self.config)
                         return
-                    clipboard_preservation.claim("")
+                    if not clipboard_preservation.claim(""):
+                        return
                     cleared_sequence = _clipboard_sequence_number()
+                    if cleared_sequence is not None and not clipboard_preservation.owns_text(""):
+                        return
 
                     def ready_to_copy():
                         return (capture_target_is_active() and (cleared_sequence is None

@@ -135,6 +135,13 @@ def test_lost_focus_after_copy_never_translates_another_window(capture, monkeypa
 def test_retry_checks_the_target_before_reading_again(capture, monkeypatch):
     owner = SelectionRequest()
     capture.copy_shortcut.side_effect = lambda: capture.clipboard.copy('')
+    read_foregrounds = []
+
+    def read():
+        read_foregrounds.append(capture.foreground)
+        return capture.clipboard.paste()
+
+    capture.read.side_effect = read
 
     def sleep(seconds):
         if seconds == .3:
@@ -143,8 +150,7 @@ def test_retry_checks_the_target_before_reading_again(capture, monkeypatch):
     monkeypatch.setattr(main.time, 'sleep', sleep)
     owner.launch_translate_selection(expected_target=42)
     assert_focus_rejected(owner, capture)
-    # The initial snapshot and first empty copy are the only reads.
-    assert capture.read.call_count == 2
+    assert read_foregrounds and set(read_foregrounds) == {42}
     assert capture.clipboard.text == 'Clipboard before selection'
 
 
@@ -480,3 +486,34 @@ def test_external_copy_wins_over_a_later_cancelled_capture(capture, monkeypatch,
     assert generations == [clipboard.sequence] and clipboard.text == new_value
     capture.provider.assert_not_called()
     assert owner.finished == [False]
+
+
+@pytest.mark.parametrize('system', ['windows', 'macos'])
+@pytest.mark.parametrize('when', ['snapshot', 'clear'])
+def test_a_copy_made_while_preparing_capture_is_never_replaced_by_the_source(capture, monkeypatch, system, when):
+    owner = SelectionRequest()
+    target = setup_fake_mac(capture, monkeypatch)[0] if system == 'macos' else 42
+    clipboard = capture.clipboard
+    external = 'A different application copied this'
+    generations = []
+
+    def read():
+        value = clipboard.paste()
+        if when == 'snapshot' and not generations:
+            clipboard.copy(external)
+            generations.append(clipboard.sequence)
+        return value
+
+    def copy(text):
+        clipboard.copy(text)
+        if when == 'clear' and text == '' and not generations:
+            clipboard.copy(external)
+            generations.append(clipboard.sequence)
+        return True
+
+    capture.read.side_effect = read
+    capture.copy.side_effect = copy
+    owner.launch_translate_selection(expected_target=target)
+    assert generations == [clipboard.sequence] and clipboard.text == external
+    capture.copy_shortcut.assert_not_called()
+    capture.provider.assert_not_called()
