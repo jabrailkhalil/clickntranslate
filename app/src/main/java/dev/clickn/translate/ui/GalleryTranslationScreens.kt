@@ -2,6 +2,7 @@
 package dev.clickn.translate.ui
 
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.net.Uri
 import android.text.format.DateUtils
 import androidx.activity.compose.BackHandler
@@ -94,6 +95,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -126,11 +128,14 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
+import androidx.lifecycle.viewModelScope
 import dev.clickn.translate.R
 import dev.clickn.translate.data.Languages
 import dev.clickn.translate.data.OcrEngineKind
 import dev.clickn.translate.data.Settings
 import dev.clickn.translate.data.SettingsRepository
+import dev.clickn.translate.data.SecureSettingsUnavailableException
 import dev.clickn.translate.data.TranslationPreset
 import dev.clickn.translate.data.TranslationPresetCatalog
 import dev.clickn.translate.data.TranslatorEngine
@@ -156,12 +161,43 @@ import java.text.DateFormat
 import java.util.Date
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import kotlin.math.floor
 
-private data class GallerySubmission(val uris: List<String>, val settings: Settings)
+internal class GallerySubmission(val uris: List<String>, val settings: Settings)
+
+/** The reviewed settings may contain credentials, so retain them only in the ViewModel. */
+internal class GalleryImportSession(
+    private val owner: CoroutineScope,
+    private val create: suspend (GallerySubmission) -> String,
+) {
+    var pendingSubmission by mutableStateOf<GallerySubmission?>(null)
+    var preparation by mutableStateOf<Deferred<String>?>(null)
+        private set
+
+    fun start(submission: GallerySubmission) {
+        if (preparation != null) return
+        pendingSubmission = null
+        preparation = owner.async { create(submission) }
+    }
+
+    fun consume(request: Deferred<String>): Boolean {
+        if (preparation !== request) return false
+        preparation = null
+        return true
+    }
+
+    fun close() {
+        pendingSubmission = null
+        preparation?.cancel()
+        preparation = null
+    }
+}
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -175,11 +211,12 @@ fun GalleryTranslationConfirmScreen(
 ) {
     val settings by viewModel.settings.collectAsState(initial = null)
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var creating by remember { mutableStateOf(false) }
+    val importSession = viewModel.importSession
+    val preparation = importSession.preparation
+    val creating = preparation != null
+    val currentOnCreated by rememberUpdatedState(onCreated)
     var errorMessage by remember { mutableStateOf("") }
     var previewIndex by rememberSaveable { mutableStateOf<Int?>(null) }
-    var pendingSubmission by remember { mutableStateOf<GallerySubmission?>(null) }
     var showPresetSwitcher by rememberSaveable { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val picker = rememberLauncherForActivityResult(
@@ -196,23 +233,34 @@ fun GalleryTranslationConfirmScreen(
             )
         }
     }
-    // Leaving the screen cancels the composition-owned import and its repository cleanup.
-    BackHandler(onBack = onBack)
+    val activity = LocalViewModelStoreOwner.current as? Activity
+    DisposableEffect(importSession, activity) {
+        onDispose { if (activity?.isChangingConfigurations != true) importSession.close() }
+    }
+    fun leave() {
+        importSession.close()
+        onBack()
+    }
+    BackHandler(onBack = ::leave)
     fun startSubmission(submission: GallerySubmission) {
-        if (creating) return
-        creating = true
         errorMessage = ""
-        scope.launch {
-            try {
-                onCreated(viewModel.createAndEnqueue(submission.uris, submission.settings))
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (error: Exception) {
-                errorMessage = error.message ?: error.javaClass.simpleName
-            } finally {
-                creating = false
+        importSession.start(submission)
+    }
+    LaunchedEffect(preparation) {
+        val request = preparation ?: return@LaunchedEffect
+        val taskId = try {
+            request.await()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            if (importSession.consume(request)) {
+                errorMessage = if (error is SecureSettingsUnavailableException) {
+                    context.getString(R.string.settings_secure_storage_unavailable)
+                } else error.message ?: error.javaClass.simpleName
             }
+            return@LaunchedEffect
         }
+        if (importSession.consume(request)) currentOnCreated(taskId)
     }
     previewIndex?.let { initialPage ->
         GalleryImagePreviewDialog(
@@ -231,9 +279,9 @@ fun GalleryTranslationConfirmScreen(
             onDismiss = { previewIndex = null },
         )
     }
-    pendingSubmission?.let { submission ->
+    importSession.pendingSubmission?.let { submission ->
         CatalystAlertDialog(
-            onDismissRequest = { pendingSubmission = null },
+            onDismissRequest = { importSession.pendingSubmission = null },
             title = {
                 Text(stringResource(R.string.gallery_confirm_create_dialog_title))
             },
@@ -253,7 +301,6 @@ fun GalleryTranslationConfirmScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        pendingSubmission = null
                         startSubmission(submission)
                     }
                 ) {
@@ -261,7 +308,7 @@ fun GalleryTranslationConfirmScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { pendingSubmission = null }) {
+                TextButton(onClick = { importSession.pendingSubmission = null }) {
                     Text(stringResource(android.R.string.cancel))
                 }
             },
@@ -274,7 +321,7 @@ fun GalleryTranslationConfirmScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.gallery_confirm_title)) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = ::leave) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 },
@@ -499,7 +546,7 @@ fun GalleryTranslationConfirmScreen(
                     val current = settings ?: return@Button
                     val submission = GallerySubmission(selectedUris.toList(), current)
                     if (submission.uris.size >= GalleryTranslationWorkPolicy.FOREGROUND_IMAGE_THRESHOLD) {
-                        pendingSubmission = submission
+                        importSession.pendingSubmission = submission
                     } else {
                         startSubmission(submission)
                     }
@@ -2098,6 +2145,9 @@ class GalleryTranslationViewModel @Inject constructor(
     val settings = settingsRepository.settings
     val tasks = repository.observeTasks()
     val exportRecovery = exportReceipts.status
+    internal val importSession = GalleryImportSession(viewModelScope) { submission ->
+        createAndEnqueue(submission.uris, submission.settings)
+    }
 
     suspend fun checkExportRecovery() = exportReceipts.recoverPending()
 

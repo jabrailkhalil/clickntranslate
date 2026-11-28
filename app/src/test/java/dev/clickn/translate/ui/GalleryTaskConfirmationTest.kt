@@ -46,7 +46,8 @@ class GalleryTaskConfirmationTest {
             Case(
                 "submission binds the reviewed image list and settings snapshot",
                 createScreen.contains("GallerySubmission(selectedUris.toList(), current)") &&
-                    createScreen.contains("viewModel.createAndEnqueue(submission.uris, submission.settings)"),
+                    createScreen.contains("importSession.start(submission)") &&
+                    screen.contains("createAndEnqueue(submission.uris, submission.settings)"),
             ),
             Case(
                 "create message includes selected image count",
