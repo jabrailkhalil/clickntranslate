@@ -6579,6 +6579,7 @@ class OcrLanguageManagerDialog(QDialog):
     _package_sizes_ready = QtCore.pyqtSignal(object)
     _update_plan_ready = QtCore.pyqtSignal(str, object, int)
     _engine_states_ready = QtCore.pyqtSignal(object)
+    _argos_result_ready = QtCore.pyqtSignal(str, object)
 
     def __init__(self, owner):
         super().__init__(native_window_parent(owner))
@@ -6606,12 +6607,15 @@ class OcrLanguageManagerDialog(QDialog):
         self._argos_catalog_error = ""
         self._argos_catalog_loading = True
         self._argos_catalog_request_active = False
+        self._argos_refresh_pending = None
         self._windows_tags_cache = None
         self._windows_capabilities_cache = None
         self._windows_ready_codes_cache = None
         self._easyocr_status_cache = None
         self._rapidocr_status_cache = None
         self._runtime_probe_active = False
+        self._runtime_probe_pending = False
+        self._runtime_probe_start_error = ''
         self._package_sizes = None
         self._package_sizes_error = ''
         self._catalog_read_lock = threading.Lock()
@@ -6871,6 +6875,7 @@ class OcrLanguageManagerDialog(QDialog):
         self.ocr_tabs.tabBar().setElideMode(Qt.ElideRight)
         self.translation_tabs.tabBar().setUsesScrollButtons(False)
         self._runtime_probe_ready.connect(self._on_runtime_probe_ready)
+        self._argos_result_ready.connect(self._on_argos_catalog_ready)
         self._package_sizes_ready.connect(self._on_package_sizes_ready)
         self._update_plan_ready.connect(self._on_update_plan_ready)
         self._engine_states_ready.connect(self._on_engine_states_ready)
@@ -7682,17 +7687,34 @@ class OcrLanguageManagerDialog(QDialog):
     def _start_runtime_probe(self):
         """Refresh slow OCR capabilities without delaying the dialog itself."""
         if self._runtime_probe_active:
+            self._runtime_probe_pending = True
             return
+        self._initial_probe_timer.stop()
+        if self._runtime_probe_start_error and self.task_status_label.text() == self._runtime_probe_start_error:
+            self.task_status_label.clear()
+            self.task_status_label.hide()
+        self._runtime_probe_start_error = ''
         self._runtime_probe_active = True
-        threading.Thread(target=self._runtime_probe_worker, daemon=True).start()
+        try:
+            threading.Thread(target=self._runtime_probe_worker, daemon=True).start()
+        except Exception as error:
+            self._runtime_probe_active = False
+            self._runtime_probe_start_error = language_manager_text(self.lang, 'load_error') + str(error)
+            self._show_task_status(self._runtime_probe_start_error, kind='failed')
+            self.refresh_all()
 
     def _runtime_probe_worker(self):
         # A local receipt lookup must also work when metadata is unreachable.
         from engine_center import installed_states
         try:
-            self._engine_states_ready.emit(installed_states())
-        except RuntimeError:
-            return
+            states = installed_states()
+        except Exception:
+            logging.debug('Could not inspect component receipts', exc_info=True)
+        else:
+            try:
+                self._engine_states_ready.emit(states)
+            except RuntimeError:
+                return
         windows_payload = {
             "windows_tags": [],
             "windows_capabilities": None,
@@ -7755,6 +7777,11 @@ class OcrLanguageManagerDialog(QDialog):
             return
         if payload.get("complete"):
             self._runtime_probe_active = False
+        if self._runtime_probe_pending:
+            if not self._runtime_probe_active:
+                self._runtime_probe_pending = False
+                self._start_runtime_probe()
+            return
         if "windows_tags" in payload:
             self._windows_tags_cache = list(payload.get("windows_tags") or [])
             capabilities = payload.get("windows_capabilities")
@@ -8228,6 +8255,9 @@ class OcrLanguageManagerDialog(QDialog):
         return language_manager_text(self.lang, "engine_missing", engine=engine_name)
 
     def _status_checking(self):
+        if getattr(self, '_runtime_probe_start_error', ''):
+            from engine_center import text as center_text
+            return center_text(self.lang, 'unchecked')
         return language_manager_text(self.lang, "checking")
 
     def _available_windows_tags(self):
@@ -8679,21 +8709,22 @@ class OcrLanguageManagerDialog(QDialog):
 
     def _start_argos_catalog_refresh(self, refresh):
         if self._argos_catalog_request_active:
+            self._argos_refresh_pending = bool(self._argos_refresh_pending or refresh)
             return
+        self._initial_catalog_timer.stop()
         self._argos_catalog_request_active = True
         self._argos_catalog_loading = True
         self._argos_catalog_error = ""
         if self.argos_table is not None:
             self._refresh_engine_table(self.argos_table)
-        threading.Thread(
-            target=self._load_argos_catalog_worker,
-            args=(bool(refresh),),
-            daemon=True,
-        ).start()
+        try:
+            threading.Thread(target=self._load_argos_catalog_worker, args=(bool(refresh),), daemon=True).start()
+        except Exception as error:
+            self._on_argos_catalog_ready(str(error))
 
     def _load_argos_catalog_worker(self, refresh):
         error = ""
-        packages = []
+        packages = None
         try:
             import translater
             if refresh and managed_install_supported():
@@ -8723,20 +8754,21 @@ class OcrLanguageManagerDialog(QDialog):
                     packages = translater.argos_package_catalog(refresh=False)
                 except Exception:
                     pass
-        self._argos_catalog = list(packages or [])
         try:
-            QMetaObject.invokeMethod(
-                self,
-                "_on_argos_catalog_ready",
-                Qt.QueuedConnection,
-                QtCore.Q_ARG(str, str(error)),
-            )
+            self._argos_result_ready.emit(str(error), packages)
         except RuntimeError:
             pass
 
-    @QtCore.pyqtSlot(str)
-    def _on_argos_catalog_ready(self, error):
+    @QtCore.pyqtSlot(str, object)
+    def _on_argos_catalog_ready(self, error, packages=None):
         self._argos_catalog_request_active = False
+        pending = self._argos_refresh_pending
+        self._argos_refresh_pending = None
+        if pending is not None:
+            self._start_argos_catalog_refresh(pending)
+            return
+        if packages is not None:
+            self._argos_catalog = list(packages)
         self._argos_catalog_loading = False
         self._argos_catalog_error = str(error or "")
         if self.argos_table is not None:

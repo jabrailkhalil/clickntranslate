@@ -36,6 +36,16 @@ class PackageTable(QtWidgets.QTableWidget):
         self.verticalScrollBar().parentWidget().layout().insertSpacerItem(0, self._scroll_header_gap)
         self.horizontalHeader().geometriesChanged.connect(self._schedule_fit)
 
+    def selectRow(self, row):
+        if not self.isRightToLeft():
+            return super().selectRow(row)
+        # Qt 5 may find no column at the visual edge of a mirrored viewport.
+        # Address the logical row even when a dialog is still being laid out.
+        index = self.model().index(row, 1 if self.isColumnHidden(0) else 0)
+        if index.isValid():
+            selection = self.selectionModel()
+            selection.setCurrentIndex(index, selection.ClearAndSelect | selection.Rows)
+
     def _schedule_fit(self, *_):
         self._fit_timer.start(0)
 

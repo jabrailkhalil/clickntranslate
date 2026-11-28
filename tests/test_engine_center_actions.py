@@ -55,9 +55,11 @@ def test_language_buttons_require_the_matching_selection(center):
     assert all(button.toolTip().strip() for button in buttons.values())
 
 
-def test_installed_checkmark_can_receive_row_selection_without_requesting_a_download(center):
+@pytest.mark.parametrize('direction', [QtCore.Qt.LeftToRight, QtCore.Qt.RightToLeft])
+def test_installed_checkmark_can_receive_row_selection_without_requesting_a_download(center, direction):
     dialog, _, _ = center
     table = dialog.easyocr_table
+    dialog.setLayoutDirection(direction)
     dialog._set_language_rows(table, _rows())
     mark = table.item(0, 0)
     assert mark.flags() & QtCore.Qt.ItemIsSelectable
@@ -135,6 +137,101 @@ def test_catalog_refresh_keeps_user_choice_after_following_argos_install_link(ce
     table.selectRow(1)
     dialog._on_argos_catalog_ready('')
     assert dialog._highlighted_codes(table) == ['en->de']
+
+
+def test_rtl_argos_link_and_mouse_click_act_on_the_visible_language_pair(center, tmp_path):
+    from PyQt5.QtTest import QTest
+    dialog, _, _ = center
+    table = dialog.argos_table
+    app = QtWidgets.QApplication.instance()
+    dialog.setLayoutDirection(QtCore.Qt.RightToLeft)
+    dialog._argos_catalog = [dict(source_code='en', target_code=t, installed=True) for t in ('ru', 'de', 'fr')]
+    # Following an install link selects the row even before the first window paint.
+    dialog.focus_translation_engine('argos', 'en', 'de')
+    dialog._on_argos_catalog_ready('')
+    dialog.show()
+    app.processEvents()
+    assert table.isVisible() and dialog._highlighted_installed_codes(table) == ['en->de']
+    target = next(table.item(i, 1) for i in range(table.rowCount())
+                  if table.item(i, 0).data(QtCore.Qt.UserRole) == 'en->fr')
+    rect = table.visualItemRect(target)
+    assert table.viewport().rect().contains(rect.center())
+    QTest.mouseClick(table.viewport(), QtCore.Qt.LeftButton, pos=rect.center())
+    assert dialog._highlighted_installed_codes(table) == ['en->fr']
+    assert not dialog._selected_codes(table)
+    assert dialog.grab().save(str(tmp_path / 'argos-rtl-selection.png'))
+
+
+def test_a_runtime_refresh_during_the_current_probe_runs_once_more(center):
+    dialog, _, _ = center
+    with (mock.patch('settings_window.threading.Thread') as thread,
+          mock.patch.object(dialog, '_start_argos_catalog_refresh')):
+        dialog._start_runtime_probe()
+        dialog._on_runtime_probe_ready({'windows_tags': ['en-US'], 'windows_ready_codes': ['en']})
+        dialog.refresh_catalog()
+        dialog.refresh_catalog()
+        assert thread.call_count == 1
+        dialog._on_runtime_probe_ready({'rapidocr': (False, 'old result'), 'complete': True})
+        assert thread.call_count == 2 and dialog._runtime_probe_active
+        dialog._on_runtime_probe_ready({'windows_tags': ['fr-FR'], 'windows_ready_codes': ['fr']})
+        dialog._on_runtime_probe_ready({'rapidocr': (True, ''), 'complete': True})
+        assert dialog._windows_tags_cache == ['fr-FR'] and dialog._rapidocr_status_cache == (True, '')
+        assert not dialog._runtime_probe_active
+
+
+def test_an_argos_download_catalog_refresh_is_not_lost_behind_a_local_refresh(center):
+    dialog, _, _ = center
+    with mock.patch('settings_window.threading.Thread') as thread:
+        dialog._start_argos_catalog_refresh(False)
+        for fetch in (False, True, False):
+            dialog._start_argos_catalog_refresh(fetch)
+        assert thread.call_count == 1
+        dialog._on_argos_catalog_ready('')
+        assert thread.call_count == 2 and thread.call_args.kwargs['args'] == (True,)
+        assert dialog._argos_catalog_request_active
+        dialog._on_argos_catalog_ready('')
+        assert not dialog._argos_catalog_loading
+
+
+@pytest.mark.parametrize('engine_probe', [True, False])
+def test_engine_center_can_retry_when_the_os_rejects_a_probe_thread(center, engine_probe):
+    dialog, _, _ = center
+    dialog._argos_catalog = [dict(source_code='en', target_code='ru', installed=True)]
+    start = dialog._start_runtime_probe if engine_probe else lambda: dialog._start_argos_catalog_refresh(True)
+    with mock.patch('settings_window.threading.Thread', side_effect=RuntimeError('no worker available')):
+        start()
+    assert not dialog._runtime_probe_active and not dialog._argos_catalog_request_active
+    if engine_probe:
+        assert dialog._status_checking() == text('en', 'unchecked')
+        assert 'no worker available' in dialog.task_status_label.toolTip()
+    else:
+        assert dialog._argos_catalog_error and dialog._argos_catalog[0]['installed']
+    with mock.patch('settings_window.threading.Thread') as thread:
+        start()
+        thread.return_value.start.assert_called_once()
+
+
+def test_failed_receipt_lookup_does_not_strand_the_rest_of_the_engine_inventory():
+    from types import SimpleNamespace
+    owner = SimpleNamespace(_easyocr_runtime_installed=lambda: True, _rapidocr_runtime_status=lambda: (True, ''))
+    probe = SimpleNamespace(owner=owner, _engine_states_ready=mock.Mock(), _emit_runtime_probe_payload=mock.Mock(),
+                            _available_windows_tags=lambda: [], _windows_ocr_capability_catalog=lambda: {})
+    with mock.patch('engine_center.installed_states', side_effect=RuntimeError('storage path unavailable')):
+        OcrLanguageManagerDialog._runtime_probe_worker(probe)
+    probe._emit_runtime_probe_payload.assert_any_call({'rapidocr': (True, ''), 'complete': True})
+
+
+def test_unreadable_argos_catalog_preserves_the_last_known_directions(center, monkeypatch):
+    import settings_window
+    dialog, _, _ = center
+    directions = [dict(source_code='en', target_code='ru', installed=True)]
+    dialog._argos_catalog = directions.copy()
+    monkeypatch.setattr(settings_window, 'managed_install_supported', lambda: False)
+    with mock.patch('translater.argos_package_catalog', side_effect=OSError('unavailable test catalog')):
+        dialog._load_argos_catalog_worker(True)
+    assert dialog._argos_catalog == directions and dialog._argos_catalog_error
+    dialog._on_argos_catalog_ready('', [])
+    assert dialog._argos_catalog == [] and not dialog._argos_catalog_error
 
 
 def test_refreshing_packages_discards_the_previous_update_offer(center):
