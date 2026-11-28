@@ -108,26 +108,35 @@ def test_direct_routing_is_published_together_and_the_failed_selection_can_retry
     state.page.usage.setCurrentIndex(state.page.usage.findData('direct'))
     assert state.page.save_profile()
     before, old_bytes = copy.deepcopy(state.owner.config), state.path.read_bytes()
+    state.page.model.setText('model-to-select')
+    state.page.key.setText('rotated-synthetic-key')
     replace = atomic_storage.os.replace
     attempts = []
 
     def refuse_routing(source, target):
-        attempts.append(source)
-        # select_profile first republishes the connection, then its routing.
-        if len(attempts) > 1:
+        with open(source, encoding='utf-8') as stream:
+            candidate = json.load(stream)
+        attempts.append(candidate)
+        if candidate['ocr_engine'] == 'OpenAI API':
             raise OSError(errno.ENOSPC, 'synthetic routing publication failure')
         return replace(source, target)
 
     with monkeypatch.context() as fault:
         fault.setattr(atomic_storage.os, 'replace', refuse_routing)
         state.page.select_profile()
+    assert len(attempts) == 1
+    assert attempts[0]['api_providers']['openai']['model'] == 'model-to-select'
     assert state.owner.config == before
     assert state.path.read_bytes() == old_bytes
+    assert state.stored[state.account] == 'new-synthetic-key'
+    assert state.page.key.text() == 'rotated-synthetic-key'
     state.adapter._set_translator_combo_silently.assert_not_called()
     state.adapter._set_ocr_combo_silently.assert_not_called()
     state.page.select_profile()
     saved = json.loads(state.path.read_text(encoding='utf-8'))
     assert saved['translator_engine'] == 'openai' and saved['ocr_engine'] == 'OpenAI API'
+    assert saved['api_providers']['openai']['model'] == 'model-to-select'
+    assert state.stored[state.account] == 'rotated-synthetic-key'
     state.adapter._set_translator_combo_silently.assert_called_once_with('openai')
     state.adapter._set_ocr_combo_silently.assert_called_once_with('OpenAI API')
 

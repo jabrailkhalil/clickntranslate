@@ -389,6 +389,7 @@ class ProviderSettingsPage(QWidget):
         self.app = settings.parent if not callable(settings.parent) else settings.parent()
         self.lang = self.app.current_interface_language
         self.drafts, self.active = {}, None
+        self._key_hint = None
         self.setObjectName('apiConnectionsPage')
         tr = lambda key: provider_text(self.lang, key)
         outer = QVBoxLayout(self)
@@ -499,7 +500,8 @@ class ProviderSettingsPage(QWidget):
         self.model.textChanged.connect(self._refresh_routing_preview)
         self.save.setToolTip(tooltip_text(routing_text(self.lang, 5)))
         self.save.setAccessibleDescription(routing_text(self.lang, 5))
-        self.address.textChanged.connect(lambda text: self.address.setToolTip(tooltip_text(text)))
+        self.address.textChanged.connect(self._address_changed)
+        self.address.editingFinished.connect(self._refresh_key_hint)
         self.apply_theme()
         self.load_profile()
 
@@ -512,6 +514,8 @@ class ProviderSettingsPage(QWidget):
         dark = self.app.current_theme != 'Светлая'
         colors = classic_palette(dark)
         field, text, border, muted = (colors[key] for key in ('field', 'text', 'border', 'muted'))
+        if not dark:
+            muted = QColor(muted).darker(115).name()
         set_widget_stylesheet(self, f"""
             QWidget#apiConnectionsPage {{ background:{colors['background']}; border:none; }}
             QWidget#apiConnectionsContent, QScrollArea {{ background:transparent; border:none; }}
@@ -528,6 +532,7 @@ class ProviderSettingsPage(QWidget):
             combo.ensurePolished()
             combo.setFixedHeight(28)
         for field_widget in (self.address, self.key, self.model):
+            field_widget.setProperty('ui_placeholder_color', QColor(muted))
             palette = field_widget.palette()
             palette.setColor(QPalette.PlaceholderText, QColor(muted))
             field_widget.setPalette(palette)
@@ -552,6 +557,31 @@ class ProviderSettingsPage(QWidget):
         self.status.setText(text)
         self.status.setVisible(bool(text))
 
+    def _address_changed(self, text):
+        from styled_dialogs import tooltip_text
+        self.address.setToolTip(tooltip_text(text.strip() or provider_text(self.lang, 'address')))
+        if getattr(self, '_loading_profile', False):
+            return
+        self._display_key_hint()
+
+    def _display_key_hint(self):
+        endpoint = self.address.text().strip().rstrip('/')
+        saved = self._key_hint == (self.active, endpoint)
+        self.key.setPlaceholderText(provider_text(self.lang, 'stored' if saved else 'empty'))
+
+    def _refresh_key_hint(self):
+        from provider_secrets import get_key
+        # A typed address is not a vault account until the edit is complete.
+        self._key_hint = None
+        try:
+            endpoint = validate_url(self.address.text().strip())
+        except ProviderError:
+            pass
+        else:
+            if get_key(self.active, endpoint):
+                self._key_hint = (self.active, endpoint)
+        self._display_key_hint()
+
     def _refresh_routing_preview(self, *_args):
         if not self.active or getattr(self, '_loading_profile', False):
             return
@@ -574,7 +604,6 @@ class ProviderSettingsPage(QWidget):
         self.usage.setAccessibleDescription(self.note.text() + '\n\n' + provider_text(self.lang, 'help') + '\n\n' + text)
 
     def load_profile(self, *_args):
-        from provider_secrets import get_key
         self._loading_profile = True
         if self.active:
             self.drafts[self.active] = self._capture()
@@ -586,7 +615,7 @@ class ProviderSettingsPage(QWidget):
         self.model.setText(item['model'])
         self.model.setEnabled(spec.protocol not in {'deepl', 'libre'})
         self.key.setText(item.get('key', ''))
-        self.key.setPlaceholderText(provider_text(self.lang, 'stored' if get_key(self.active, item['url']) else 'empty'))
+        self._refresh_key_hint()
         self.usage.clear()
         for index, code in ((1, 'text'), (2, 'ocr'), (3, 'direct')):
             if index == 1 or spec.vision:
@@ -621,68 +650,57 @@ class ProviderSettingsPage(QWidget):
                 complete(key)
         return True
 
-    def save_profile(self):
-        from provider_secrets import set_key, get_key
+    def save_profile(self, *, select=False):
+        from api_providers import VISION_ENGINES, display_error, validate
+        from provider_secrets import set_key
         spec, item = BY_KEY[self.active], self._capture()
-        item['url'] = item['url'].strip()
         item['model'] = item['model'].strip()
+        key = item.pop('key')
+        profiles = dict(self.app.config.get('api_providers', {}))
+        profiles[self.active] = item
+        values = {'api_providers': profiles}
         try:
-            validate_url(item['url'])
+            item['url'] = validate_url(item['url'].strip())
             if self.active == 'deepl' and item['url'] not in {'https://api-free.deepl.com/v2', 'https://api.deepl.com/v2'}:
                 raise ProviderError('DeepL API accepts only the official Free or Pro address.')
             if spec.protocol not in {'deepl', 'libre'} and not item['model']:
                 raise ProviderError(connection_text(self.lang, 8))
+            if select:
+                validate(self.active, values, api_key=key or None)
         except ProviderError as error:
-            from api_providers import display_error
             self._set_status(str(error) if str(error) == connection_text(self.lang, 8)
                              else display_error(error, self.lang))
             return False
-        from api_providers import VISION_ENGINES
         if VISION_ENGINES.get(self.app.config.get('ocr_engine')) == self.active and not item['vision']:
             self._set_status(routing_text(self.lang, 6))
             return False
-        key = item.pop('key')
-        profiles = dict(self.app.config.get('api_providers', {}))
-        profiles[self.active] = item
-        if not self._save_preferences({'api_providers': profiles}):
+        usage = self.usage.currentData()
+        if select and usage in ('text', 'direct'):
+            values['translator_engine'] = self.active
+        if select and usage in ('ocr', 'direct'):
+            values['ocr_engine'] = next(name for name, provider in VISION_ENGINES.items() if provider == self.active)
+        if not self._save_preferences(values):
             return False
         persisted = set_key(self.active, item['url'], key) if key else True
         self.settings._refresh_ready_engine_choices()
-        refresh_provider_routing(self.settings)
-        self.key.clear()
-        self.key.setPlaceholderText(provider_text(self.lang, 'stored' if get_key(self.active, item['url']) else 'empty'))
-        self.drafts[self.active] = item
-        self._set_status(provider_text(self.lang, 'saved' if persisted else 'session'))
-        return True
-
-    def select_profile(self):
-        if not self.save_profile():
-            return
-        from api_providers import VISION_ENGINES, validate
-        try:
-            validate(self.active, self.app.config)
-        except ProviderError as error:
-            from api_providers import display_error
-            self._set_status(display_error(error, self.lang))
-            return
-        status = self.status.text()
-        usage = self.usage.currentData()
-        values = {}
-        if usage in ('text', 'direct'):
-            values['translator_engine'] = self.active
-        if usage in ('ocr', 'direct'):
-            engine = next(name for name, key in VISION_ENGINES.items() if key == self.active)
-            values['ocr_engine'] = engine
-        if not self._save_preferences(values):
-            return
         if 'translator_engine' in values:
             self.settings._set_translator_combo_silently(self.active)
         if 'ocr_engine' in values:
-            self.settings._set_ocr_combo_silently(engine)
+            self.settings._set_ocr_combo_silently(values['ocr_engine'])
         refresh_provider_routing(self.settings)
         self._refresh_routing_preview()
-        selected = routing_text(self.lang, 4) if usage == 'ocr' else connection_text(self.lang, 7 if usage == 'direct' else 6)
-        self._set_status(selected + ' ' + status)
+        self.key.clear()
+        self._refresh_key_hint()
+        self.drafts[self.active] = item
+        status = provider_text(self.lang, 'saved' if persisted else 'session')
+        if select:
+            selected = routing_text(self.lang, 4) if usage == 'ocr' else connection_text(self.lang, 7 if usage == 'direct' else 6)
+            status = selected + ' ' + status
+        self._set_status(status)
+        return True
+
+    def select_profile(self):
+        return self.save_profile(select=True)
 
     def delete_key(self):
         from provider_secrets import set_key
@@ -693,6 +711,7 @@ class ProviderSettingsPage(QWidget):
         persisted = set_key(self.active, saved_url, '')
         self.key.clear()
         self.drafts.pop(self.active, None)
-        self.key.setPlaceholderText(provider_text(self.lang, 'empty'))
+        self._key_hint = None
+        self._display_key_hint()
         self.settings._refresh_ready_engine_choices()
         self._set_status(_DELETE_STATUS.get(self.lang, _DELETE_STATUS['en'])[0 if persisted else 1])

@@ -85,6 +85,63 @@ def custom_profile(state):
     return provider, a, b
 
 
+def test_key_hint_follows_the_committed_address_without_reading_the_vault_while_typing(profile_editor):
+    state = profile_editor
+    provider, saved, other = custom_profile(state)
+    empty = providers.provider_text('en', 'empty')
+    stored = providers.provider_text('en', 'stored')
+    assert state.page.key.placeholderText() == stored
+    with mock.patch.object(secrets, 'get_key', wraps=secrets.get_key) as read:
+        state.page.address.setText('https://empty.test/v1')
+        assert state.page.key.placeholderText() == empty
+        state.page.address.setText(saved + '/')
+        assert state.page.key.placeholderText() == stored
+        state.page.address.setText(other)
+        assert state.page.key.placeholderText() == empty
+        read.assert_not_called()
+        state.page.address.editingFinished.emit()
+        assert state.page.key.placeholderText() == stored
+        read.assert_called_once_with(provider, other)
+        read.reset_mock()
+        state.page.address.setText('invalid')
+        state.page.address.editingFinished.emit()
+        assert state.page.key.placeholderText() == empty
+        read.assert_not_called()
+    assert state.owner.config['api_providers'][provider]['url'] == saved
+
+
+def test_failed_selection_of_another_address_preserves_the_working_active_connection(profile_editor):
+    state = profile_editor
+    provider, saved, _other = custom_profile(state)
+    state.owner.config['translator_engine'] = provider
+    state.owner.save_config()
+    before, previous_file = copy.deepcopy(state.owner.config), state.path.read_bytes()
+    state.page.address.setText('https://missing-key.test/v1')
+    state.page.model.setText('new-model')
+    state.page.use.click()
+    assert state.page.status.text() == api.display_error(api.ProviderError('Add an API key'), 'en')
+    assert state.owner.config == before and state.path.read_bytes() == previous_file
+    assert api.validate(provider, state.owner.config)['url'] == saved
+    assert state.page.address.text() == 'https://missing-key.test/v1'
+    state.adapter._refresh_ready_engine_choices.assert_not_called()
+    state.page.key.setText('synthetic-new-key')
+    state.page.use.click()
+    assert api.validate(provider, state.owner.config)['url'] == 'https://missing-key.test/v1'
+    assert secrets.get_key(provider, saved) == 'synthetic-a'
+
+
+@pytest.mark.parametrize('endpoint', ('https://api-free.deepl.com/v2', 'https://api.deepl.com/v2'))
+def test_official_deepl_address_with_trailing_slash_can_be_saved_and_selected(profile_editor, endpoint):
+    state = profile_editor
+    state.page.service.setCurrentIndex(state.page.service.findData('deepl'))
+    state.page.address.setText('  ' + endpoint + '/  ')
+    state.page.key.setText('synthetic-deepl')
+    state.page.use.click()
+    assert state.owner.config['translator_engine'] == 'deepl'
+    assert state.owner.config['api_providers']['deepl']['url'] == endpoint
+    assert api.credential('deepl', state.owner.config) == 'synthetic-deepl'
+
+
 @pytest.mark.parametrize('draft', ['https://draft.test/v1', '', 'not-an-address'], ids=['different', 'empty', 'invalid'])
 def test_changed_address_refuses_delete_before_any_key_or_draft_mutation(profile_editor, monkeypatch, draft):
     state = profile_editor

@@ -344,6 +344,12 @@ class DialogAppearance(QtCore.QObject):
                                      (QtGui.QPalette.WindowText, '#f1edf5' if dark else '#302837'),
                                      (QtGui.QPalette.ButtonText, '#f1edf5' if dark else '#302837')):
                     palette.setColor(role, QtGui.QColor(colour))
+                if isinstance(widget, QtWidgets.QLineEdit):
+                    # Repolishing a Qt 5 stylesheet restores a half-transparent
+                    # default, even when the form supplied an opaque hint.
+                    hint = widget.property('ui_placeholder_color')
+                    if isinstance(hint, QtGui.QColor):
+                        palette.setColor(QtGui.QPalette.PlaceholderText, hint)
                 widget.setPalette(palette)
                 if widget.parentWidget() is window and window.layout() is None:
                     geometry = record['geometry']

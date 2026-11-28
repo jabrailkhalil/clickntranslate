@@ -87,6 +87,42 @@ def test_invalid_connection_does_not_change_the_active_engines(page):
     assert owner.config['ocr_engine'] == platform_support.default_ocr_engine()
 
 
+@pytest.mark.parametrize('locale', tuple(main.INTERFACE_LANGUAGE_BY_CODE))
+def test_connection_errors_name_the_current_engine_center_and_api_tab(locale):
+    from engine_center import text as center_text
+
+    direction = '←' if locale == 'ar' else '→'
+    destination = f"{center_text(locale, 'title')} {direction} API"
+    for error in ('unavailable service', 'Add an API key', 'Set the model', 'Enable image input'):
+        assert destination in api_providers.display_error(api_providers.ProviderError(error), locale)
+
+
+@pytest.mark.parametrize('theme', ('Темная', 'Светлая'))
+def test_key_placeholder_keeps_its_readable_colour_when_the_dialog_rescales(page, app, theme):
+    from PyQt5.QtGui import QColor, QPalette
+    from classic_style import classic_palette
+    from window_appearance import install_window_appearance
+
+    editor, owner, _ = page
+    owner.current_theme = theme
+    editor.apply_theme()
+    appearance = install_window_appearance(app, 160, theme)
+    appearance.apply(owner.settings_window._language_manager_dialog)
+    app.processEvents()
+
+    def luminance(colour):
+        rgb = colour.getRgbF()[:3]
+        channels = [v / 12.92 if v <= .04045 else ((v + .055) / 1.055) ** 2.4 for v in rgb]
+        return sum(v * weight for v, weight in zip(channels, (.2126, .7152, .0722)))
+
+    background = QColor(classic_palette(theme != 'Светлая')['field'])
+    for field in (editor.address, editor.key, editor.model):
+        foreground = field.palette().color(QPalette.PlaceholderText)
+        assert foreground.alpha() == 255
+        lo, hi = sorted((luminance(background), luminance(foreground)))
+        assert (hi + .05) / (lo + .05) >= 4.5
+
+
 def test_preview_updates_from_model_and_usage_without_saving_or_using_the_key(page):
     editor, owner, store = page
     before = dict(owner.config)
