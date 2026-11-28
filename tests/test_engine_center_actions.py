@@ -35,6 +35,100 @@ def _rows():
                                                   ('fr', 'French', 'Missing', False)]]
 
 
+def test_withdrawn_engine_clears_stale_download_sizes_and_keeps_local_removal(center, monkeypatch):
+    from package_presentation import text as package_text
+    from test_package_presentation import platform_size_catalog
+
+    dialog, _, _ = center
+    monkeypatch.setattr('settings_window.managed_install_supported', lambda: True)
+    table = dialog.easyocr_table
+    dialog._set_language_rows(table, _rows())
+    available = dict(platform_size_catalog(), revision=1)
+    dialog._on_package_sizes_ready(available)
+    mark = table.item(1, 0)
+    mark.setCheckState(QtCore.Qt.Checked)
+    buttons = {b.property('packageAction'): b for b in table._package_action_buttons}
+    assert buttons['install'].isEnabled()
+    assert 'MB' in buttons['install'].text()
+    table.selectRow(0)
+    dialog._on_package_sizes_ready(dict(available, revision=2, bundles=[]))
+    assert not buttons['install'].isEnabled()
+    assert 'MB' not in buttons['install'].text()
+    assert not table._pending_package_codes
+    assert mark.checkState() == QtCore.Qt.Unchecked
+    assert not mark.flags() & QtCore.Qt.ItemIsEnabled
+    assert table.item(1, 4).text() == '—'
+    assert buttons['remove'].isEnabled()
+    assert table.item(0, 3).text() == 'Installed'
+    dialog._set_engine_missing_state(table, True, 'EasyOCR')
+    missing_install = table._package_missing_install_button
+    assert not missing_install.isEnabled()
+    assert 'MB' not in missing_install.text()
+    assert package_text(dialog.lang, 'unavailable') in table._package_missing_body.text()
+    dialog._set_package_actions_busy(True)
+    dialog._on_package_sizes_ready(dict(available, revision=3))
+    assert not missing_install.isEnabled()
+    dialog._set_package_actions_busy(False)
+    assert missing_install.isEnabled()
+    assert mark.flags() & QtCore.Qt.ItemIsEnabled
+    assert mark.checkState() == QtCore.Qt.Unchecked
+    assert 'MB' in table.item(1, 4).text()
+    assert package_text(dialog.lang, 'unavailable') not in table._package_missing_body.text()
+
+
+def test_unmanaged_language_installer_stays_available_without_a_signed_bundle(center, monkeypatch):
+    dialog, _, _ = center
+    monkeypatch.setattr('settings_window.managed_install_supported', lambda: False)
+    table = dialog.easyocr_table
+    dialog._set_language_rows(table, _rows())
+    dialog._on_package_sizes_ready(dict(bundles=[], artifacts={}, revision=1))
+    mark = table.item(1, 0)
+    mark.setCheckState(QtCore.Qt.Checked)
+    button = next(b for b in table._package_action_buttons if b.property('packageAction') == 'install')
+    assert button.isEnabled()
+    assert dialog._selected_codes(table) == ['fr']
+
+
+def test_size_feedback_distinguishes_unreachable_metadata_from_a_withdrawn_engine(center, monkeypatch):
+    from test_package_presentation import platform_size_catalog
+
+    dialog, _, _ = center
+    monkeypatch.setattr('settings_window.managed_install_supported', lambda: True)
+    table = dialog.easyocr_table
+    label = table._package_size_label
+    offline_error = 'The catalog is offline <test> & retry'
+    dialog._on_package_sizes_ready(offline_error)
+    assert 'catalog' in label.text().lower()
+    assert '&lt;test&gt;' in label.toolTip()
+    assert '&lt;test&gt;' in table._package_missing_body.toolTip()
+    assert table._package_missing_install_button.isEnabled()
+    if dialog.windows_table is not None:
+        assert 'catalog' not in dialog.windows_table._package_size_label.text().lower()
+    valid = dict(platform_size_catalog(), revision=1)
+    dialog._on_package_sizes_ready(valid)
+    assert 'MB' in label.text() and 'catalog' not in label.text().lower()
+    dialog._on_package_sizes_ready(offline_error)
+    assert 'MB' in label.text() and 'last' in label.text().lower()
+    dialog._on_package_sizes_ready(valid)
+    assert 'last' not in label.text().lower() and '&lt;test&gt;' not in label.toolTip()
+
+
+def test_argos_pair_failure_does_not_mark_other_engines_metadata_as_offline(center, monkeypatch, tmp_path):
+    from component_catalog import ComponentError
+    from test_package_presentation import platform_size_catalog
+
+    dialog, _, _ = center
+    monkeypatch.setenv('CLICKNTRANSLATE_COMPONENTS_DIR', str(tmp_path))
+    monkeypatch.setattr('settings_window.managed_install_supported', lambda: True)
+    with (mock.patch.object(dialog, '_refresh_catalog', return_value=dict(platform_size_catalog(), revision=1)),
+          mock.patch('component_argos.catalog_rows', side_effect=ComponentError('no_compatible_update')),
+          mock.patch('translater.argos_package_catalog', return_value=[])):
+        dialog._load_argos_catalog_worker(refresh=True)
+    assert dialog._argos_catalog_error
+    assert not dialog._package_sizes_error
+    assert 'MB' in dialog.easyocr_table._package_size_label.text()
+
+
 def test_language_buttons_require_the_matching_selection(center):
     dialog, _, _ = center
     table = dialog.easyocr_table

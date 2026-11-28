@@ -42,6 +42,46 @@ def platform_size_catalog():
     return catalog
 
 
+@pytest.mark.parametrize(('lang', 'theme'), [('en', 'Темная'), ('ar', 'Светлая')])
+def test_missing_engine_shows_the_catalog_state_in_the_card(lang, theme, tmp_path, monkeypatch):
+    parent = _AppParent()
+    parent.current_interface_language, parent.current_theme = lang, theme
+    owner = _ManagerOwner(parent)
+    monkeypatch.setattr('settings_window.managed_install_supported', lambda: True)
+    with (mock.patch.object(OcrLanguageManagerDialog, '_start_runtime_probe'),
+          mock.patch.object(OcrLanguageManagerDialog, '_start_argos_catalog_refresh')):
+        dialog = OcrLanguageManagerDialog(owner)
+        dialog._initial_probe_timer.stop()
+        dialog._initial_catalog_timer.stop()
+        try:
+            dialog.setLayoutDirection(QtCore.Qt.RightToLeft if lang == 'ar' else QtCore.Qt.LeftToRight)
+            table = dialog.easyocr_table
+            dialog._easyocr_status_cache = (False, '')
+            dialog.ocr_tabs.setCurrentWidget(table.parentWidget())
+            dialog._populate_easyocr_table(table)
+            dialog.show()
+            app = QtWidgets.QApplication.instance()
+            app.processEvents()
+            bar = dialog.tabs.tabBar()
+            original_top = bar.mapTo(dialog, QtCore.QPoint()).y()
+            cases = [('catalog_failed', 'Network fixture', True),
+                     ('unavailable', dict(bundles=[], artifacts={}, revision=1), False)]
+            for state, catalog, enabled in cases:
+                dialog._on_package_sizes_ready(catalog)
+                app.processEvents()
+                body, install = table._package_missing_body, table._package_missing_install_button
+                assert body.isVisible() and body.text() == text(lang, state)
+                assert install.isVisible() and install.isEnabled() == enabled
+                assert body.parentWidget().rect().contains(body.geometry())
+                assert not body.geometry().intersects(install.geometry())
+                assert bar.mapTo(dialog, QtCore.QPoint()).y() == original_top
+                assert dialog.grab().save(str(tmp_path / f'engine-{lang}-{state}.png'))
+        finally:
+            dialog.close()
+            owner.close()
+            parent.close()
+
+
 @pytest.mark.parametrize('lang', tuple(TEXT))
 @pytest.mark.parametrize('dark', (True, False))
 def test_category_tabs_switch_visible_providers_without_committing_a_selection(active_dropdown, lang, dark, tmp_path):

@@ -130,6 +130,15 @@ def test_empty_tooltip_markup_never_becomes_a_blank_grey_bubble(app,empty):
     button.deleteLater()
 
 
+def test_short_dynamic_tooltip_displays_literal_markup_and_keeps_compact_width(app):
+    from styled_dialogs import _tooltip_plain_text
+    value = 'AT&T <b>ملف</b>'
+    tip = tooltip_text(value)
+    assert '&lt;b&gt;' in tip and '&amp;' in tip and 'width:' not in tip
+    assert _tooltip_plain_text(tip) == value
+    assert _tooltip_plain_text(tooltip_text(tip)) == value
+
+
 @pytest.mark.parametrize('locale',['en','ru','es','de','fr','zh','pt','it','ar','tr','hi','id'])
 @pytest.mark.parametrize('dark',[True,False])
 @pytest.mark.parametrize('factor',[1.,1.25,2.])

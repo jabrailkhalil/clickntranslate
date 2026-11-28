@@ -108,11 +108,13 @@ def tooltip_text(text, width: int = TOOLTIP_WRAP_WIDTH) -> str:
     value = str(text or "")
     if not tooltip_has_text(value):
         return ""
-    if len(value) <= TOOLTIP_WRAP_THRESHOLD and "\n" not in value:
-        return value
+    if value.startswith('<qt>') and value.endswith('</qt>'):
+        value = _tooltip_plain_text(value)
     import html as _html
 
     escaped = _html.escape(value).replace("\n", "<br>")
+    if len(value) <= TOOLTIP_WRAP_THRESHOLD and "\n" not in value:
+        return f'<qt>{escaped}</qt>' if '<' in value or '&' in value else value
     return f'<qt><div style="width:{int(width)}px">{escaped}</div></qt>'
 
 

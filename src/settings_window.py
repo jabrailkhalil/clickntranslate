@@ -7576,6 +7576,7 @@ class OcrLanguageManagerDialog(QDialog):
         table._package_missing_frame = missing_frame
         table._package_missing_title = missing_title
         table._package_missing_body = missing_body
+        table._package_default_missing_body = missing_body.text()
         table._package_missing_install_button = missing_install_button
         table._package_missing_engine = str(missing_engine or "")
         table._package_target_tabs = target_tabs
@@ -7601,9 +7602,14 @@ class OcrLanguageManagerDialog(QDialog):
                       and bool(table.item(row, 0).flags() & Qt.ItemIsEnabled)
                       for row in range(table.rowCount()))
         removable = bool(self._highlighted_installed_codes(table))
+        busy = self._packages_busy() or getattr(self, '_package_actions_busy', False)
+        available = not getattr(table, '_package_download_unavailable', False)
+        missing_install = getattr(table, '_package_missing_install_button', None)
+        if missing_install is not None:
+            missing_install.setEnabled(available and not busy)
         for button in getattr(table, '_package_action_buttons', ()):
             install = button.property('packageAction') == 'install'
-            button.setEnabled(not self._packages_busy() and (pending if install else removable))
+            button.setEnabled(not busy and (pending and available if install else removable))
             button.setToolTip(tooltip_text(center_text(self.lang, 'install_hint' if install else 'remove_hint')))
 
     def _set_engine_missing_state(self, table, missing, engine_name=""):
@@ -7997,6 +8003,16 @@ class OcrLanguageManagerDialog(QDialog):
             return
         engine = table._package_engine
         sizes = self._package_sizes
+        unavailable = (sizes is not None and engine not in ('windows', 'apple vision')
+                       and engine not in sizes.bundles and managed_install_supported())
+        table._package_download_unavailable = unavailable
+        managed_table = engine not in ('windows', 'apple vision')
+        catalog_error = self._package_sizes_error if managed_table else ''
+        catalog_notice = (package_text(self.lang, 'cached_sizes' if sizes is not None else 'catalog_failed')
+                          if catalog_error else '')
+        body = package_text(self.lang, 'unavailable') if unavailable else table._package_default_missing_body
+        table._package_missing_body.setText(catalog_notice if catalog_notice and not unavailable else body)
+        table._package_missing_body.setToolTip(tooltip_text(catalog_error or table._package_default_note))
         pending_codes = set()
         selected = set()
         label.setVisible(not getattr(table, '_package_is_missing', False))
@@ -8005,7 +8021,30 @@ class OcrLanguageManagerDialog(QDialog):
         elif sizes is None:
             summary = package_text(self.lang, 'unknown')
         elif engine not in sizes.bundles:
-            summary = package_text(self.lang, 'unavailable')
+            summary = package_text(self.lang, 'unavailable' if unavailable else 'unknown')
+            if unavailable:
+                table._pending_package_codes.clear()
+                blocker = QtCore.QSignalBlocker(table)
+                for row in range(table.rowCount()):
+                    check = table.item(row, 0)
+                    size_item = table.item(row, 4)
+                    if check is None or size_item is None:
+                        continue
+                    size_item.setText('—')
+                    size_item.setToolTip(tooltip_text(summary))
+                    if check.data(Qt.UserRole) and not check.data(Qt.UserRole + 1):
+                        if check.data(Qt.CheckStateRole) is not None:
+                            check.setCheckState(Qt.Unchecked)
+                        check.setFlags(check.flags() & ~Qt.ItemIsEnabled)
+                        table.item(row, 3).setText(summary)
+                del blocker
+                missing_install = table._package_missing_install_button
+                missing_install.setText(language_manager_text(self.lang, 'install_engine'))
+                missing_install.setToolTip(tooltip_text(summary))
+                for button in table._package_action_buttons:
+                    if button.property('packageAction') == 'install':
+                        button.setText(str(button.property('packageBaseText')))
+                        button.setAccessibleName(button.text())
         else:
             runtime, base_models = sizes.split_base(engine)
             blocker = QtCore.QSignalBlocker(table)
@@ -8083,10 +8122,14 @@ class OcrLanguageManagerDialog(QDialog):
                     button.setText(base_text)
                 if action != 'update' and isinstance(button, QWidget):
                     button.setAccessibleName(button.text())
+        if catalog_notice:
+            summary = (summary + '\n' + catalog_notice) if sizes is not None else catalog_notice
         table._package_summary = summary
+        table._package_summary_hint = catalog_error or package_text(self.lang, 'size_help')
         status = getattr(table, '_package_update_status', '')
         label.setText(summary + ('\n' + status if status else ''))
-        label.setToolTip(tooltip_text(package_text(self.lang, 'size_help')))
+        label.setToolTip(tooltip_text(table._package_summary_hint))
+        label.setAccessibleDescription(table._package_summary_hint)
         table._schedule_fit()
 
     def _set_update_button_caption(self, button):
@@ -8116,7 +8159,7 @@ class OcrLanguageManagerDialog(QDialog):
             table._package_update_status = ''
             label = table._package_size_label
             label.setText(getattr(table, '_package_summary', ''))
-            label.setToolTip(tooltip_text(package_text(self.lang, 'size_help')))
+            label.setToolTip(tooltip_text(getattr(table, '_package_summary_hint', package_text(self.lang, 'size_help'))))
         button.setProperty('packageUpdatePlan', None)
         button.setProperty('packageUpdateChecking', False)
         button.setEnabled(not self._packages_busy())
@@ -8727,9 +8770,11 @@ class OcrLanguageManagerDialog(QDialog):
     def _load_argos_catalog_worker(self, refresh):
         error = ""
         packages = None
+        catalog = None
+        load_sizes = refresh and managed_install_supported()
         try:
             import translater
-            if refresh and managed_install_supported():
+            if load_sizes:
                 from component_catalog import component_store_path
                 from component_store import ComponentStore
                 from component_argos import catalog_rows
@@ -8747,10 +8792,11 @@ class OcrLanguageManagerDialog(QDialog):
             from component_catalog import ComponentError
             from component_texts import error_text
             error = error_text(self.lang, exc) if isinstance(exc, ComponentError) else str(exc)
-            try:
-                self._package_sizes_ready.emit(error)
-            except RuntimeError:
-                pass
+            if load_sizes and catalog is None:
+                try:
+                    self._package_sizes_ready.emit(error)
+                except RuntimeError:
+                    pass
             if refresh:
                 try:
                     packages = translater.argos_package_catalog(refresh=False)

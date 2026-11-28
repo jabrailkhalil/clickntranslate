@@ -19,6 +19,15 @@ KEYS = ('title', 'intro', 'size', 'engine', 'models', 'total', 'unknown', 'inclu
 
 
 EXTRA_TEXT = {
+    'catalog_failed': dict(zip(TEXT, ('Package catalog unavailable', 'Каталог пакетов недоступен',
+        'Catálogo de paquetes no disponible', 'Paketkatalog nicht verfügbar', 'Catalogue de paquets indisponible',
+        '软件包目录不可用', 'Catálogo de pacotes indisponível', 'Catalogo dei pacchetti non disponibile',
+        'دليل الحزم غير متاح', 'Paket kataloğuna erişilemiyor', 'पैकेज सूची उपलब्ध नहीं है', 'Katalog paket tidak tersedia'))),
+    'cached_sizes': dict(zip(TEXT, ('Sizes from the last verified catalog', 'Размеры из последнего проверенного каталога',
+        'Tamaños del último catálogo verificado', 'Größen aus dem zuletzt geprüften Katalog',
+        'Tailles du dernier catalogue vérifié', '大小来自上次验证的软件包目录', 'Tamanhos do último catálogo verificado',
+        'Dimensioni dall’ultimo catalogo verificato', 'الأحجام من آخر دليل حزم تم التحقق منه',
+        'Boyutlar son doğrulanan katalogdan', 'आकार पिछली सत्यापित सूची से हैं', 'Ukuran dari katalog terakhir yang terverifikasi'))),
     'unsupported': dict(zip(TEXT, ('Not available for this engine', 'Нет пакета для этого движка', 'No disponible para este motor',
         'Für diese Engine nicht verfügbar', 'Indisponible pour ce moteur', '此引擎暂无语言包',
         'Indisponível para este motor', 'Non disponibile per questo motore', 'غير متاح لهذا المحرك',
