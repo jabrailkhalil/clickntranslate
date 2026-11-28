@@ -210,7 +210,6 @@ def test_translation_footer_matches_general_button_rows(window):
 
 def test_api_theme_switch_refreshes_form_and_popups(window):
     from provider_settings import show_provider_settings
-    from classic_style import classic_palette
     from PyQt5.QtGui import QPalette
     window.show_settings()
     settings=window.settings_window
@@ -218,7 +217,9 @@ def test_api_theme_switch_refreshes_form_and_popups(window):
          mock.patch.object(settings_window.OcrLanguageManagerDialog, '_start_runtime_probe'), \
          mock.patch.object(settings_window.OcrLanguageManagerDialog, '_start_argos_catalog_refresh'):
         page=show_provider_settings(settings)
-        for theme, field in (('Светлая','#e9e4ed'), ('Темная','#17181d'), ('Светлая','#e9e4ed')):
+        light = ('Светлая', '#e9e4ed', '#675f6f')
+        dark = ('Темная', '#17181d', '#9b92a6')
+        for theme, field, hint in (light, dark, light):
             if window.current_theme != theme:
                 window.toggle_theme()
             QApplication.processEvents()
@@ -227,7 +228,7 @@ def test_api_theme_switch_refreshes_form_and_popups(window):
                 assert field in combo.styleSheet()
                 assert combo.popup_colors()['surface'] == field
             for editor in (page.address, page.key, page.model):
-                assert editor.palette().color(QPalette.PlaceholderText).name() == classic_palette(theme != 'Светлая')['muted']
+                assert editor.palette().color(QPalette.PlaceholderText).name() == hint
         settings._language_manager_dialog.close()
 
 

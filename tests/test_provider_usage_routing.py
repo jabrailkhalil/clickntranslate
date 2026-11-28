@@ -12,6 +12,7 @@ import provider_secrets
 import settings_window
 from provider_settings import show_provider_settings, routing_text
 from test_desktop_ux import app, window
+from test_window_appearance import appearance
 
 
 @pytest.fixture
@@ -98,15 +99,14 @@ def test_connection_errors_name_the_current_engine_center_and_api_tab(locale):
 
 
 @pytest.mark.parametrize('theme', ('Темная', 'Светлая'))
-def test_key_placeholder_keeps_its_readable_colour_when_the_dialog_rescales(page, app, theme):
+def test_key_placeholder_keeps_its_readable_colour_when_the_dialog_rescales(appearance, page, app, theme):
     from PyQt5.QtGui import QColor, QPalette
     from classic_style import classic_palette
-    from window_appearance import install_window_appearance
 
     editor, owner, _ = page
     owner.current_theme = theme
     editor.apply_theme()
-    appearance = install_window_appearance(app, 160, theme)
+    appearance.refresh(160, theme)
     appearance.apply(owner.settings_window._language_manager_dialog)
     app.processEvents()
 
