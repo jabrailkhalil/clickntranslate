@@ -44,49 +44,39 @@ def platform_size_catalog():
 
 @pytest.mark.parametrize('lang', tuple(TEXT))
 @pytest.mark.parametrize('dark', (True, False))
-def test_category_tabs_switch_visible_providers_without_committing_a_selection(lang, dark, tmp_path):
+def test_category_tabs_switch_visible_providers_without_committing_a_selection(active_dropdown, lang, dark, tmp_path):
     app = QtWidgets.QApplication.instance()
-    host = QtWidgets.QWidget()
-    host.resize(360, 340)
-    combo = DropDownCombo(host)
-    combo.setGeometry(15, 10, 260, 32)
+    combo = active_dropdown
     combo.set_popup_background('#17181d' if dark else '#e9e4ed')
     combo.setLayoutDirection(QtCore.Qt.RightToLeft if lang == 'ar' else QtCore.Qt.LeftToRight)
     _populate_grouped_translator_combo(combo, lang)
     combo.setCurrentIndex(combo.findData('google'))
     selected = combo.currentIndex()
-    host.show()
-    try:
-        combo.showPopup()
+    combo.showPopup()
+    app.processEvents()
+    bar = combo._provider_category_bar
+    assert [bar.tabData(i) for i in range(bar.count())] == ['online', 'offline', 'api']
+    assert bar.tabData(bar.currentIndex()) == 'online'
+    for category in range(bar.count()):
+        QtTest.QTest.mouseClick(bar, QtCore.Qt.LeftButton, pos=bar.tabRect(category).center())
         app.processEvents()
-        bar = combo._provider_category_bar
-        assert [bar.tabData(i) for i in range(bar.count())] == ['online', 'offline', 'api']
-        assert bar.tabData(bar.currentIndex()) == 'online'
-        for category in range(bar.count()):
-            QtTest.QTest.mouseClick(bar, QtCore.Qt.LeftButton, pos=bar.tabRect(category).center())
-            app.processEvents()
-            assert combo.view().window().isVisible()
-            assert combo.currentIndex() == selected
-            visible = [i for i in range(combo.count()) if not combo.view().isRowHidden(i)]
-            assert visible and all(combo.itemData(i, CATEGORY_ROLE) == bar.tabData(category) for i in visible)
-            assert all(not combo.itemData(i, combo.GROUP_HEADER_ROLE) for i in visible)
-            assert combo.view().window().rect().contains(bar.geometry())
-            for i in range(bar.count()):
-                assert bar.fontMetrics().horizontalAdvance(bar.tabText(i)) + 12 <= bar.tabRect(i).width()
-        QtTest.QTest.keyClick(combo.view(), QtCore.Qt.Key_Left)
-        app.processEvents()
-        assert bar.currentIndex() != 2
-        combo.hidePopup()
+        assert combo.view().window().isVisible()
         assert combo.currentIndex() == selected
-        combo.showPopup()
-        app.processEvents()
-        assert bar.tabData(bar.currentIndex()) == 'online'
-        assert combo.view().window().grab().save(str(tmp_path / f'picker-{lang}-{dark}.png'))
-    finally:
-        combo.hidePopup()
-        host.close()
-        host.deleteLater()
-        app.processEvents()
+        visible = [i for i in range(combo.count()) if not combo.view().isRowHidden(i)]
+        assert visible and all(combo.itemData(i, CATEGORY_ROLE) == bar.tabData(category) for i in visible)
+        assert all(not combo.itemData(i, combo.GROUP_HEADER_ROLE) for i in visible)
+        assert combo.view().window().rect().contains(bar.geometry())
+        for i in range(bar.count()):
+            assert bar.fontMetrics().horizontalAdvance(bar.tabText(i)) + 12 <= bar.tabRect(i).width()
+    QtTest.QTest.keyClick(combo.view(), QtCore.Qt.Key_Left)
+    app.processEvents()
+    assert bar.currentIndex() != 2
+    combo.hidePopup()
+    assert combo.currentIndex() == selected
+    combo.showPopup()
+    app.processEvents()
+    assert bar.tabData(bar.currentIndex()) == 'online'
+    assert combo.view().window().grab().save(str(tmp_path / f'picker-{lang}-{dark}.png'))
 
 
 def test_ocr_picker_has_only_supported_categories():

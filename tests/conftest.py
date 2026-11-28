@@ -10,6 +10,34 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 
 
+@pytest.fixture
+def active_dropdown():
+    """A field in an exposed window, as it would be when clicked by a user."""
+    from PyQt5 import QtCore, QtWidgets
+    from PyQt5.QtTest import QTest
+    from settings_window import DropDownCombo
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    host = QtWidgets.QWidget()
+    host.resize(360, 340)
+    combo = DropDownCombo(host)
+    combo.setGeometry(15, 10, 260, 32)
+    try:
+        host.show()
+        host.activateWindow()
+        if app.platformName() == 'windows':
+            # The native activation from the previous test's window can
+            # otherwise arrive after showPopup and dismiss the new list.
+            assert QTest.qWaitForWindowActive(host, 3000)
+        app.processEvents()
+        yield combo
+    finally:
+        combo.hidePopup()
+        host.close()
+        host.deleteLater()
+        app.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)
+        app.processEvents()
+
+
 @pytest.fixture(autouse=True)
 def isolated_clipboard(monkeypatch):
     """Exercise copying without replacing text while the user is working."""

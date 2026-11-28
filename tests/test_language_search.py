@@ -1,5 +1,6 @@
 """Long language catalogs stay searchable, bounded, and index-stable."""
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QInputMethodEvent
 from PyQt5.QtTest import QTest
 from PyQt5.QtWidgets import QApplication
 import pytest
@@ -53,92 +54,83 @@ def test_engine_popup_does_not_gain_language_search():
     ('AR', 'ar'), ('francais', 'fr'), ('espanol', 'es'), ('turkce', 'tr'),
     ('العَرَبِيَّة', 'ar'), ('auto', 'auto'), ('Detect language', 'auto'),
 ])
-def test_typing_a_language_and_confirming_selects_the_intended_option(codes_in_model, query, expected):
+def test_typing_a_language_and_confirming_selects_the_intended_option(active_dropdown, codes_in_model, query, expected):
     from languages import language_display_name
 
-    app = QApplication.instance() or QApplication([])
-    combo = DropDownCombo()
+    app = QApplication.instance()
+    combo = active_dropdown
     combo.interface_language = 'ru'
     codes = ['auto', *(language.code for language in LANGUAGES)]
     for code in codes:
         combo.addItem(language_display_name(code, 'ru'), code if codes_in_model else None)
-    combo.show()
-    try:
-        combo.setCurrentIndex(codes.index('zh'))
-        combo.showPopup()
-        app.processEvents()
-        search = combo._language_search
-        search.setText(query)
-        app.processEvents()
-        visible = [codes[i] for i in range(combo.count()) if not combo.view().isRowHidden(i)]
-        assert visible == [expected]
-        QTest.keyClick(search, Qt.Key_Return)
-        assert not combo.view().window().isVisible()
-        assert combo.currentText() == language_display_name(expected, 'ru')
-    finally:
-        combo.hidePopup()
-        combo.close()
-        combo.deleteLater()
+    combo.setCurrentIndex(codes.index('zh'))
+    combo.showPopup()
+    app.processEvents()
+    search = combo._language_search
+    assert search.isVisible() and search.hasFocus()
+    if query.isascii():
+        QTest.keyClicks(search, query)
+    else:
+        composition = QInputMethodEvent()
+        composition.setCommitString(query)
+        QApplication.sendEvent(search, composition)
+    app.processEvents()
+    visible = [codes[i] for i in range(combo.count()) if not combo.view().isRowHidden(i)]
+    assert visible == [expected]
+    assert combo.view().window().isVisible()
+    QTest.keyClick(search, Qt.Key_Return)
+    assert not combo.view().window().isVisible()
+    assert combo.currentText() == language_display_name(expected, 'ru')
 
 
-def test_open_language_menu_adapts_to_deferred_catalog_and_refilters_changed_rows():
-    app = QApplication.instance() or QApplication([])
-    combo = DropDownCombo()
+def test_open_language_menu_adapts_to_deferred_catalog_and_refilters_changed_rows(active_dropdown):
+    app = QApplication.instance()
+    combo = active_dropdown
     combo.addItem('English', 'en')
-    combo.show()
-    try:
-        combo.showPopup()
-        app.processEvents()
-        popup = combo.view().window()
-        assert not hasattr(combo, '_language_search')
-        for language in LANGUAGES[1:]:
-            combo.addItem(language.english_name, language.code)
-        QTest.qWait(20)
-        assert popup.isVisible() and combo._language_search.isVisible()
-        search = combo._language_search
-        search.setText('Vietnamese')
-        hidden_code_row = combo.findData('ru')
-        matching_row = combo.findData('vi')
-        combo.setItemText(hidden_code_row, 'Updated option')
-        combo.addItem('Extra choice', 'custom')
-        QTest.qWait(20)
-        assert [r for r in range(combo.count()) if not combo.view().isRowHidden(r)] == [matching_row]
-        combo.removeItem(matching_row)
-        QTest.qWait(20)
-        assert search.text() == 'Vietnamese' and combo._language_empty.isVisible()
-        assert all(combo.view().isRowHidden(r) for r in range(combo.count()))
-        combo.addItem('Vietnamese', 'vi')
-        QTest.qWait(20)
-        assert search.text() == 'Vietnamese' and not combo._language_empty.isVisible()
-        assert not combo.view().isRowHidden(combo.findData('vi'))
-        search.clear()
-        combo.clear()
-        combo.addItem('Russian', 'ru')
-        QTest.qWait(20)
-        assert popup.isVisible() and not search.isVisible()
-        assert not combo.view().isRowHidden(0)
-    finally:
-        combo.hidePopup()
-        combo.close()
-        combo.deleteLater()
+    combo.showPopup()
+    app.processEvents()
+    popup = combo.view().window()
+    assert popup.isVisible()
+    assert not hasattr(combo, '_language_search')
+    for language in LANGUAGES[1:]:
+        combo.addItem(language.english_name, language.code)
+    QTest.qWait(20)
+    assert popup.isVisible() and combo._language_search.isVisible()
+    search = combo._language_search
+    search.setText('Vietnamese')
+    hidden_code_row = combo.findData('ru')
+    matching_row = combo.findData('vi')
+    combo.setItemText(hidden_code_row, 'Updated option')
+    combo.addItem('Extra choice', 'custom')
+    QTest.qWait(20)
+    assert [r for r in range(combo.count()) if not combo.view().isRowHidden(r)] == [matching_row]
+    combo.removeItem(matching_row)
+    QTest.qWait(20)
+    assert search.text() == 'Vietnamese' and combo._language_empty.isVisible()
+    assert all(combo.view().isRowHidden(r) for r in range(combo.count()))
+    combo.addItem('Vietnamese', 'vi')
+    QTest.qWait(20)
+    assert search.text() == 'Vietnamese' and not combo._language_empty.isVisible()
+    assert not combo.view().isRowHidden(combo.findData('vi'))
+    search.clear()
+    combo.clear()
+    combo.addItem('Russian', 'ru')
+    QTest.qWait(20)
+    assert popup.isVisible() and not search.isVisible()
+    assert not combo.view().isRowHidden(0)
 
 
-def test_exact_code_of_an_unavailable_language_cannot_select_a_different_language():
-    app = QApplication.instance() or QApplication([])
-    combo = DropDownCombo()
+def test_exact_code_of_an_unavailable_language_cannot_select_a_different_language(active_dropdown):
+    app = QApplication.instance()
+    combo = active_dropdown
     for language in LANGUAGES:
         if language.code != 'ar':
             combo.addItem(language.english_name, language.code)
-    combo.show()
-    try:
-        combo.setCurrentIndex(combo.findData('ru'))
-        combo.showPopup()
-        app.processEvents()
-        combo._language_search.setText('ar')
-        QTest.keyClick(combo._language_search, Qt.Key_Return)
-        assert combo._language_empty.isVisible()
-        assert combo.view().window().isVisible() and combo.currentData() == 'ru'
-    finally:
-        combo.hidePopup()
-        combo.close()
-        combo.deleteLater()
+    combo.setCurrentIndex(combo.findData('ru'))
+    combo.showPopup()
+    app.processEvents()
+    assert combo._language_search.isVisible()
+    combo._language_search.setText('ar')
+    QTest.keyClick(combo._language_search, Qt.Key_Return)
+    assert combo._language_empty.isVisible()
+    assert combo.view().window().isVisible() and combo.currentData() == 'ru'

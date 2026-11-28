@@ -189,10 +189,20 @@ def _check_popup_host_scaling(window, app, directory, report):
                         search.setText('no-such-language')
                         app.processEvents()
                         assert combo._language_empty.isVisible() and combo._language_empty.text() == empty_text
+                        previous = combo.currentData() or language_code_for_option_text(combo.currentText())
+                        choice = 'de' if previous == 'vi' else 'vi'
+                        search.setText(choice)
+                        app.processEvents()
+                        assert search.isVisible()
+                        for kind in (QtCore.QEvent.KeyPress, QtCore.QEvent.KeyRelease):
+                            event = QtGui.QKeyEvent(kind, QtCore.Qt.Key_Return, QtCore.Qt.NoModifier)
+                            app.sendEvent(search, event)
+                        selected = combo.currentData() or language_code_for_option_text(combo.currentText())
+                        assert selected == choice and not popup.isVisible(), (locale, location, choice, selected)
                     finally:
                         combo.hidePopup()
     window.set_ui_scale_percent(previous_percent)
-    report['checks']['popup_host_scaling'] = 'retained proxy; main/dynamic, en/ar, 135%, localized search, results and empty state'
+    report['checks']['popup_host_scaling'] = 'retained proxy; main/dynamic, en/ar, 135%, localized search, empty state and Enter selection'
 
 
 def run(main, report_path):
