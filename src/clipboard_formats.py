@@ -1,6 +1,7 @@
 """Keep the native representations of a clipboard item across a temporary text copy."""
 
 from concurrent.futures import Future, TimeoutError
+from functools import cache
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 
@@ -37,23 +38,39 @@ def capture_cocoa_items(board):
             value = item.dataForType_(kind)
             if value is None:
                 raise ValueError('Pasteboard representation unavailable')
-            remaining = _remaining_bytes(remaining, value.length())
+            remaining = _remaining_bytes(remaining, len(value))
             representations.append((str(kind), bytes(value)))
         items.append(representations)
     return items
 
 
+@cache
+def _cocoa_writer_class():
+    import objc
+    from Foundation import NSObject
+
+    class CNTSelectionPasteboardWriter(NSObject, protocols=[objc.protocolNamed('NSPasteboardWriting')]):
+        def writableTypesForPasteboard_(self, _board):
+            return list(self.representations)
+
+        def pasteboardPropertyListForType_(self, kind):
+            return self.representations[str(kind)]
+
+        def writingOptionsForType_pasteboard_(self, _kind, _board):
+            # The backup already owns each byte. Write it now so another app
+            # can paste it even after the translator has exited.
+            return 0
+
+    return CNTSelectionPasteboardWriter
+
+
 def restore_cocoa_items(board, records, still_owned):
-    from AppKit import NSPasteboardItem
     from Foundation import NSData
 
     items = []
     for record in records:
-        item = NSPasteboardItem.alloc().init()
-        for kind, value in record:
-            data = NSData.dataWithBytes_length_(value, len(value))
-            if not item.setData_forType_(data, kind):
-                return False
+        item = _cocoa_writer_class().alloc().init()
+        item.representations = {kind: NSData.dataWithBytes_length_(value, len(value)) for kind, value in record}
         items.append(item)
     if not still_owned():
         return False

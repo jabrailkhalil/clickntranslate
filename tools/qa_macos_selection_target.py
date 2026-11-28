@@ -43,24 +43,45 @@ def write_private_office(board, label):
         items.append(item)
     board.clearContents()
     assert board.writeObjects_(items)
-    return int(board.changeCount())
+    return items
+
+
+def observed_office_items(board):
+    return [{str(kind): bytes(item.dataForType_(kind)) for kind in item.types()}
+            for item in board.pasteboardItems()]
 
 
 def pasteboard_writer(pipe, name):
     from AppKit import NSPasteboard
+    from Foundation import NSDate, NSRunLoop
+    import objc
 
     board = NSPasteboard.pasteboardWithName_(name)
+    runloop = NSRunLoop.currentRunLoop()
+    offered_items = None
     try:
-        while (text := pipe.recv()) is not None:
-            if isinstance(text, tuple):
-                pipe.send(write_private_office(board, text[1]))
-            else:
-                pipe.send(write_private_text(board, text))
+        while True:
+            with objc.autorelease_pool():
+                if pipe.poll(.015):
+                    text = pipe.recv()
+                    if text is None:
+                        break
+                    if isinstance(text, tuple) and text[0] == 'observe':
+                        pipe.send(observed_office_items(board))
+                    elif isinstance(text, tuple):
+                        offered_items = write_private_office(board, text[1])
+                        pipe.send(int(board.changeCount()))
+                    else:
+                        offered_items = None
+                        pipe.send(write_private_text(board, text))
+                # NSPasteboardItem may promise data to its receiver. The source
+                # must keep both its items and its Cocoa run loop alive to serve it.
+                runloop.runUntilDate_(NSDate.dateWithTimeIntervalSinceNow_(.015))
     finally:
         pipe.close()
 
 
-def exercise_private_clipboard():
+def exercise_private_clipboard(report):
     """Test real Cocoa change counts and an independent writer without AX or the general pasteboard."""
     from AppKit import NSPasteboard, NSPasteboardTypeString
     from clipboard_formats import capture_cocoa_items, restore_cocoa_items
@@ -73,6 +94,7 @@ def exercise_private_clipboard():
     process = context.Process(target=pasteboard_writer, args=(child, str(board.name())))
     process.start()
     child.close()
+    report.update(status='running', private_board=True, reader_pid=os.getpid(), external_writer_pid=process.pid)
 
     def publish(text):
         control.send(text)
@@ -87,6 +109,7 @@ def exercise_private_clipboard():
         return True
 
     records = []
+    report['cases'] = records
     try:
         for timing in ('stable', 'before_read', 'during_validation'):
             values = (SAMPLE,) if timing == 'stable' else (SAMPLE, 'A newer external copy')
@@ -116,17 +139,16 @@ def exercise_private_clipboard():
                                     source_sequence=source_sequence, foreign_sequence=newer,
                                     final_sequence=final_sequence))
         rich_results = []
+        report['office'] = rich_results
         formats = SimpleNamespace(capture=lambda: capture_cocoa_items(board),
                                   restore=lambda data, owned: restore_cocoa_items(board, data, owned))
 
-        def observed_items():
-            return [{str(kind): bytes(item.dataForType_(kind)) for kind in item.types()}
-                    for item in board.pasteboardItems()]
-
         for scenario in ('restore_original', 'restore_newer_before_replacement', 'cancel_after_newer'):
             label = 'Original spreadsheet'
+            report['stage'] = scenario + ': external publication'
             publish(('office', label))
-            baseline = observed_items()
+            baseline = observed_office_items(board)
+            report['stage'] = scenario + ': capture'
             guard = ClipboardPreservation(read, copy, lambda: int(board.changeCount()), formats=formats)
             copy('Temporarily selected source')
             assert guard.claim('Temporarily selected source')
@@ -134,24 +156,27 @@ def exercise_private_clipboard():
             if scenario != 'restore_original':
                 label = 'Newer spreadsheet'
                 other = publish(('office', label))
-                baseline = observed_items()
+                baseline = observed_office_items(board)
             if scenario == 'restore_newer_before_replacement':
                 assert guard.preserve_current_if_changed()
                 copy('Translated result')
                 assert guard.claim('Translated result')
+            report['stage'] = scenario + ': restore'
             restored = guard.restore()
             assert restored == (scenario != 'cancel_after_newer')
             if not restored:
                 assert int(board.changeCount()) == other
-            items = observed_items()
+            # Read the restored data from the external process as well. The
+            # restoring process does not pump AppKit while waiting for its reply.
+            report['stage'] = scenario + ': external read'
+            items = publish(('observe',))
             expected = office_records(label)
             assert items == baseline and len(items) == len(expected)
             for item, record in zip(items, expected):
                 assert all(item[kind] == value for kind, value in record.items())
             rich_results.append(dict(scenario=scenario, item_count=len(items), formats=sorted(expected[0]),
                                      restored=restored, final_sequence=int(board.changeCount())))
-        return dict(status='passed', private_board=True, reader_pid=os.getpid(),
-                    external_writer_pid=process.pid, cases=records, office=rich_results)
+        report.update(status='passed', stage='complete')
     finally:
         if process.is_alive():
             control.send(None)
@@ -224,7 +249,8 @@ def wait_target(desktop, pid, previous=None):
 def exercise(report):
     import ApplicationServices
     sys.path.insert(0, str(SOURCE))
-    report['private_clipboard'] = exercise_private_clipboard()
+    report['private_clipboard'] = {}
+    exercise_private_clipboard(report['private_clipboard'])
     if not ApplicationServices.AXIsProcessTrusted():
         report.update(status='skipped', reason='Accessibility is not granted to this Python process')
         return
