@@ -1,11 +1,12 @@
 """Fullscreen replacements keep OCR coordinates, including scaled captures."""
 import os
+import threading
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 from types import SimpleNamespace
 from unittest import mock
 
 import pytest
-from PyQt5 import QtCore, QtWidgets
+from PyQt5 import QtCore, QtWidgets, sip
 import ocr
 import translater
 from qt_layout_test_support import ensure_layout_fonts
@@ -17,6 +18,115 @@ def application():
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     ensure_layout_fonts(app)
     yield app
+
+
+@pytest.fixture
+def controlled_overlay(application, monkeypatch):
+    from PyQt5 import QtGui
+    pixels = QtGui.QPixmap(160, 90)
+    pixels.fill(QtCore.Qt.white)
+    monkeypatch.setattr(ocr, 'grab_screen_pixmap', lambda *_: pixels)
+    monkeypatch.setattr(ocr, 'installed_ocr_language_codes', lambda **_: ['en', 'ru'])
+    monkeypatch.setattr(ocr, 'get_cached_ocr_config', lambda: dict(
+        interface_language='en', translator_engine='Google',
+        fullscreen_translate_from='en', fullscreen_translate_to='ru'))
+    monkeypatch.setattr(ocr, '_write_ocr_config_updates', mock.Mock())
+    monkeypatch.setattr(ocr, 'notify_current_activity', mock.Mock())
+    monkeypatch.setattr(ocr, 'save_translation_history', mock.Mock())
+    with mock.patch.object(QtCore.QTimer, 'singleShot'):
+        overlay = ocr.FullScreenTranslateOverlay()
+    yield overlay
+    if not sip.isdeleted(overlay):
+        overlay.close()
+        application.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)
+
+
+def test_switching_language_discards_old_fullscreen_results_before_debounce(controlled_overlay, monkeypatch):
+    overlay = controlled_overlay
+    start = mock.Mock()
+    monkeypatch.setattr(overlay, '_start_ocr', start)
+    overlay._restart_translation_from_controls()
+    old_id = overlay._translation_run_id
+    stale = [(QtCore.QRectF(10, 15, 80, 20), 'Source', 'Old translation')]
+    overlay.target_lang_combo.setCurrentIndex(overlay.target_lang_combo.findData('es'))
+    overlay.target_lang_combo.setCurrentIndex(overlay.target_lang_combo.findData('de'))
+    assert overlay._rerun_timer.isActive() and start.call_count == 1
+    overlay._translation_result_ready.emit(old_id, stale, '')
+    assert not overlay.translated_blocks and overlay.loading
+    ocr.save_translation_history.assert_not_called()
+
+    overlay._rerun_timer.stop()
+    overlay._rerun_timer.timeout.emit()
+    assert start.call_count == 2
+    assert start.call_args.args == (overlay._translation_run_id, 'en', 'de')
+
+
+def test_failed_fullscreen_worker_admission_allows_next_language(controlled_overlay, monkeypatch):
+    overlay = controlled_overlay
+
+    class Worker(QtCore.QObject):
+        result_ready = QtCore.pyqtSignal(object)
+        finished = QtCore.pyqtSignal()
+
+    failed, current = Worker(), Worker()
+    failed.start = mock.Mock(side_effect=RuntimeError('worker unavailable'))
+    failed.requestInterruption = mock.Mock()
+    current.start = mock.Mock()
+    current.requestInterruption = mock.Mock()
+    monkeypatch.setattr(ocr, 'create_position_ocr_worker', mock.Mock(side_effect=[failed, current]))
+    overlay._restart_translation_from_controls()
+    assert not overlay.loading and overlay.error_message
+    overlay.target_lang_combo.setCurrentIndex(overlay.target_lang_combo.findData('de'))
+    overlay._rerun_timer.stop()
+    overlay._rerun_timer.timeout.emit()
+    current.start.assert_called_once_with()
+    assert overlay._ocr_workers == {current}
+    current.finished.emit()
+
+
+def test_failed_windows_bitmap_conversion_completes_with_an_initialization_error(monkeypatch):
+    from PyQt5 import QtGui
+    image = QtGui.QImage(32, 16, QtGui.QImage.Format_RGB32)
+    image.fill(QtCore.Qt.white)
+    monkeypatch.setattr(ocr, '_position_ocr_bitmap', lambda *_: None)
+    monkeypatch.setattr(ocr, 'get_cached_ocr_config', lambda: {'interface_language': 'en'})
+    worker = ocr.FullScreenOCRWorker(image, 'en', engine='windows')
+    delivered = []
+    worker.result_ready.connect(delivered.append)
+    worker.run()
+    assert delivered == [[]]
+    assert worker.error_message == ocr.ocr_ui_text('en', 'ocr_init_failed')
+
+
+def test_fullscreen_provider_finishing_after_close_exits_without_touching_the_deleted_overlay(
+        application, controlled_overlay, monkeypatch):
+    overlay = controlled_overlay
+    entered, release = threading.Event(), threading.Event()
+    errors = []
+
+    def translate(*args, **kwargs):
+        entered.set()
+        assert release.wait(3)
+        return 'Late answer'
+
+    def run():
+        try:
+            overlay._translate_all(overlay._translation_run_id, [(0, 0, 40, 20, 'Source')], 'en', 'ru')
+        except Exception as exc:
+            errors.append(exc)
+
+    monkeypatch.setattr(translater, 'translate_text', translate)
+    thread = threading.Thread(target=run)
+    thread.start()
+    try:
+        assert entered.wait(3)
+        overlay.close()
+        application.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)
+        assert sip.isdeleted(overlay)
+    finally:
+        release.set()
+        thread.join(3)
+    assert not thread.is_alive() and not errors
 
 
 def test_right_click_closes_fullscreen_translation_and_releases_mode(application, monkeypatch):

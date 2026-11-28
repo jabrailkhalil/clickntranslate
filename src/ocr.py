@@ -6546,7 +6546,12 @@ class FullScreenOCRWorker(QtCore.QThread):
                 return
             if isinstance(self.bitmap, QtGui.QImage):
                 self.bitmap = _position_ocr_bitmap(self.bitmap, self.engine)
-                if self.bitmap is None or self._is_cancelled():
+                if self._is_cancelled():
+                    return
+                if self.bitmap is None:
+                    language = get_cached_ocr_config().get('interface_language', 'en')
+                    self.error_message = ocr_ui_text(language, 'ocr_init_failed')
+                    self.result_ready.emit([])
                     return
             if self.engine != "windows":
                 from api_providers import VISION_ENGINES, recognize_regions
@@ -6643,7 +6648,7 @@ class FullScreenTranslateOverlay(QWidget):
         self._rerun_timer = QtCore.QTimer(self)
         self._rerun_timer.setSingleShot(True)
         self._rerun_timer.setInterval(180)
-        self._rerun_timer.timeout.connect(self._restart_translation_from_controls)
+        self._rerun_timer.timeout.connect(self._start_pending_fullscreen_ocr)
 
         # Read config
         config = get_cached_ocr_config()
@@ -6778,8 +6783,7 @@ class FullScreenTranslateOverlay(QWidget):
 
     def _on_fullscreen_target_changed(self):
         self._update_fullscreen_swap_enabled()
-        if self._persist_fullscreen_pair():
-            self._rerun_timer.start()
+        self._restart_translation_from_controls(debounce=True)
 
     def _update_fullscreen_swap_enabled(self):
         source = self.lang_combo.currentData()
@@ -6828,21 +6832,29 @@ class FullScreenTranslateOverlay(QWidget):
             })
         return bool(valid)
 
-    def _restart_translation_from_controls(self):
-        """Immediately rerun OCR and translation for the selected direction."""
+    def _restart_translation_from_controls(self, *, debounce=False):
+        # Detach the old result immediately. Only starting the new OCR is
+        # debounced while the user moves through several language choices.
+        self._translation_run_id += 1
+        self._pending_translation_pair = None
+        self.translated_blocks.clear()
+        for worker in list(self._ocr_workers):
+            try:
+                worker.requestInterruption()
+            except RuntimeError:
+                pass
         if not self._persist_fullscreen_pair():
+            self._rerun_timer.stop()
+            key = 'no_installed_languages' if self.lang_combo.currentData() is None else 'no_installed_translation_pairs'
+            self._fail_translation(self._translation_run_id, key)
             return
         self.src_lang = _combo_data_to_ocr_language(self.lang_combo.currentData(), "en")
         self.tgt_lang = _normalize_app_language_code(
             self.target_lang_combo.currentData(),
             default_target_for_source(self.src_lang),
         )
-        if self.src_lang == self.tgt_lang:
-            return
         self.ocr_language = self.src_lang
-        self._translation_run_id += 1
         self.loading = True
-        self.translated_blocks.clear()
         self.error_message = None
         self.update()
 
@@ -6851,21 +6863,13 @@ class FullScreenTranslateOverlay(QWidget):
         # and let the currently running native call finish; its result is already
         # invalidated by translation_run_id and will be ignored.
         self._pending_translation_pair = (self.src_lang, self.tgt_lang)
-        if self._ocr_workers:
-            logging.info(
-                f"FullScreenOverlay: queued latest OCR pair "
-                f"({self.src_lang}->{self.tgt_lang}); waiting for the active worker"
-            )
-            for worker in list(self._ocr_workers):
-                try:
-                    worker.requestInterruption()
-                except RuntimeError:
-                    pass
-            return
-        self._start_pending_fullscreen_ocr()
+        if debounce:
+            self._rerun_timer.start()
+        else:
+            self._start_pending_fullscreen_ocr()
 
     def _start_pending_fullscreen_ocr(self):
-        if self._ocr_workers or not self._pending_translation_pair:
+        if self._ocr_workers or not self._pending_translation_pair or self._rerun_timer.isActive():
             return
         source_code, target_code = self._pending_translation_pair
         self._pending_translation_pair = None
@@ -6903,10 +6907,16 @@ class FullScreenTranslateOverlay(QWidget):
         worker.translation_target_code = target_code
         self.ocr_worker = worker
         self._ocr_workers.add(worker)
-        worker.result_ready.connect(self._on_fullscreen_ocr_result)
-        worker.finished.connect(self._release_finished_ocr_worker)
-        worker.finished.connect(worker.deleteLater)
-        worker.start()
+        try:
+            worker.result_ready.connect(self._on_fullscreen_ocr_result)
+            worker.finished.connect(self._release_finished_ocr_worker)
+            worker.finished.connect(worker.deleteLater)
+            worker.start()
+        except Exception:
+            self._ocr_workers.discard(worker)
+            self.ocr_worker = None
+            worker.deleteLater()
+            raise
 
     @QtCore.pyqtSlot(object)
     def _on_fullscreen_ocr_result(self, lines):
@@ -6957,6 +6967,8 @@ class FullScreenTranslateOverlay(QWidget):
             self._fail_translation(run_id, "translation_failed")
 
     def _translate_all(self, run_id, lines_data, source_code, target_code):
+        if run_id != self._translation_run_id:
+            return
         blocks = []
         error_message = ""
         try:
@@ -6999,7 +7011,12 @@ class FullScreenTranslateOverlay(QWidget):
         except Exception as e:
             error_message = str(e)
 
-        self._translation_result_ready.emit(run_id, blocks, error_message)
+        if run_id == self._translation_run_id:
+            try:
+                self._translation_result_ready.emit(run_id, blocks, error_message)
+            except RuntimeError:
+                # Closing the overlay can delete the Qt receiver between the check and emit.
+                pass
 
     @QtCore.pyqtSlot(int, object, str)
     def _apply_translation_result(self, run_id, blocks, error_message):
