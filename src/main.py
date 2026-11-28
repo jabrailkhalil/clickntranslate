@@ -3420,11 +3420,12 @@ STARTUP_NEWS_TEXT = {
 }
 
 
-def startup_news_text(lang):
+def startup_news_text(lang, version=None):
+    """Accept the old version argument for callers using this presentation helper."""
     return dict(STARTUP_NEWS_TEXT.get(lang, STARTUP_NEWS_TEXT["en"]))
 
 
-def startup_news_html(lang):
+def startup_news_html(lang, version=None):
     from html import escape
     text = startup_news_text(lang)
     features = ''.join(f'<li>{escape(point)}</li>' for point in welcome_text(lang)['features'])

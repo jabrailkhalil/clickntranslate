@@ -76,6 +76,11 @@ def test_startup_news_escapes_localized_content(monkeypatch):
     assert '&lt;img src=x&gt;' in html
 
 
+def test_legacy_news_callers_cannot_add_a_version_to_the_ui():
+    assert main.startup_news_text('en', version='9.9.9') == main.startup_news_text('en')
+    assert main.startup_news_html('ru', '9.9.9') == main.startup_news_html('ru')
+
+
 def test_startup_news_is_shown_once_per_announcement_and_remembered():
     app = _app()
     owner = _NewsOwner()
