@@ -877,7 +877,9 @@ class DropDownCombo(QComboBox):
         # At the physical screen edge the search bar and one complete item
         # still have to fit. The remaining items are reached by scrolling.
         self._popup_minimum_height = chrome + max(heights, default=0)
-        scrollbar = view.verticalScrollBar().sizeHint().width() if len(heights)>visible else 0
+        # Even a short list needs a scrollbar when the display edge limits
+        # its height. Leave enough width for the longest row in either state.
+        scrollbar = view.verticalScrollBar().sizeHint().width() if len(heights) > 1 else 0
         from combo_popup import popup_scale
         search = getattr(self, '_language_search', None)
         search_width = round(240*popup_scale(self)) if search is not None and not search.isHidden() else 0

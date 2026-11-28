@@ -63,6 +63,22 @@ def test_live_model_grows_without_reopening_or_changing_selection(picker):
     assert combo.view().viewport().rect().contains(combo.view().visualRect(last).center())
 
 
+def test_short_list_leaves_room_for_a_scrollbar_when_the_display_truncates_its_height(picker):
+    _, _, combo = picker
+    combo.addItems(['Small', 'Long item which determines this popup width', 'Last'])
+    anchor = combo.mapToGlobal(QtCore.QPoint(0, combo.height()))
+    available = QtCore.QRect(anchor.x() - 10, anchor.y() - 200, 680, 240)
+    combo._available_screen_rect = lambda: available
+    combo.showPopup()
+    QTest.qWait(35)
+    view = combo.view()
+    assert view.verticalScrollBar().isVisible()
+    for row in range(combo.count()):
+        index = combo.model().index(row, 0)
+        view.scrollTo(index)
+        assert view.viewport().rect().contains(view.visualRect(index))
+
+
 @pytest.mark.parametrize('offset', [QtCore.QPoint(0, 0), QtCore.QPoint(260, 0), QtCore.QPoint(130, 100)])
 def test_popup_fits_a_small_available_area_and_all_rows_remain_reachable(picker, offset):
     app, owner, combo = picker

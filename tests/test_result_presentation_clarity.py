@@ -34,11 +34,13 @@ def test_result_menu_explains_checked_and_unchecked_destinations(window, app, lo
     assert control.checked_modes() == before
     for scale in (80, 125, 200):
         window.set_ui_scale_percent(scale)
+        window.move(app.primaryScreen().availableGeometry().topLeft())
         control.showPopup()
         for _ in range(4): app.processEvents()
         view = control.view()
         for row in range(control.count()):
             index = control.model().index(row, 0)
+            view.scrollTo(index)
             rectangle = view.visualRect(index)
             assert rectangle.height() > 0
             assert view.viewport().rect().contains(rectangle.adjusted(1, 0, -1, 0)), (locale, scale, row, rectangle)
