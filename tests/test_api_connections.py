@@ -174,6 +174,7 @@ def test_fullscreen_direct_result_does_not_run_text_translation(config):
     from ocr import FullScreenTranslateOverlay
     class Owner(QObject):
         _translation_result_ready=pyqtSignal(int,object,str)
+        _translation_run_id=1
         _ocr_scale_x=_ocr_scale_y=1
     owner=Owner()
     delivered=[]

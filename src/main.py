@@ -7432,7 +7432,7 @@ class TranslationResultDialog(QDialog):
         self._engine_override = True
         self._invalidate_request()
         self.set_window_engine(key)
-        self._start_retranslate()
+        self._start_retranslate(validate_selected_engine=True)
 
     def _reflow_engine_header(self, available_width=None):
         factor = float(self.property('ui_effective_scale') or 1)
@@ -7837,7 +7837,7 @@ class TranslationResultDialog(QDialog):
         self._update_actions()
         self._start_retranslate()
 
-    def _start_retranslate(self):
+    def _start_retranslate(self, *, validate_selected_engine=False):
         if self._closed or self._retranslating or self.image_importer.busy:
             return
         # Finish an input-method composition before taking the editable draft.
@@ -7853,12 +7853,11 @@ class TranslationResultDialog(QDialog):
             self._translate_edited_result = False
         self._remember_language_pair()
         self._update_actions()
-        if not self.source_text.strip():
-            self._set_status(self.text["source_placeholder"])
-            return
         from translation_availability import missing_provider
         engine = self.engine_combo.currentData() or self.window_engine
-        issue = missing_provider(engine, self.source_code, self.target_code)
+        has_source = bool(self.source_text.strip())
+        issue = (missing_provider(engine, self.source_code, self.target_code)
+                 if has_source or validate_selected_engine else None)
         if issue is not None:
             self._set_status(issue.message(self.lang), provider_issue=issue)
             chosen = _resolve_translation_provider(self, engine, self.source_code, self.target_code, self.lang)
@@ -7866,6 +7865,9 @@ class TranslationResultDialog(QDialog):
                 return
             self._engine_override = True
             self.set_window_engine(provider_display_name(chosen, self.lang))
+        if not has_source:
+            self._set_status(self.text["source_placeholder"])
+            return
         self._request_id += 1
         request_id = self._request_id
         cancelled = threading.Event()
