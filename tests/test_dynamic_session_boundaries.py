@@ -85,6 +85,23 @@ def start_ocr(overlay, fullscreen):
     return (set(overlay._workers) - previous).pop()
 
 
+def test_fullscreen_ocr_failure_is_distinct_from_a_later_blank_frame(live_overlays):
+    overlay = live_overlays(fullscreen=True)
+    failed = start_ocr(overlay, True)
+    failed.error_message = 'The fixture recognizer could not read the image'
+    failed.result_ready.emit([])
+    failed.finished.emit()
+    assert not overlay._ocr_busy
+    assert overlay._status_is_error
+    assert overlay._status == game_mode.game_text(overlay.language, 'ocr_error')
+
+    recovered = start_ocr(overlay, True)
+    recovered.result_ready.emit([])
+    recovered.finished.emit()
+    assert not overlay._status_is_error
+    assert overlay._status == game_mode.game_text(overlay.language, 'waiting')
+
+
 def deliver_queued(worker, value):
     def emit():
         worker.result_ready.emit(value)

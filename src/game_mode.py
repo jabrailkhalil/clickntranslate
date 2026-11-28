@@ -2064,9 +2064,12 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
         # of them made the empty full-screen overlay flash. Once translations
         # exist, keep them stable and repaint only for results or real states.
         if key in {"scanning", "translating", "waiting", "no_text"}:
-            if not self._blocks and not self._status:
+            was_error = self._status_is_error
+            if was_error or (not self._blocks and not self._status):
                 self._status = game_text(self.language, "waiting")
             self._status_is_error = False
+            if was_error:
+                self.update()
             return
         self._status = game_text(self.language, key)
         self._status_is_error = bool(error)
@@ -2219,7 +2222,10 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
                 self._blocks = []
                 self._last_layout_signature = ()
                 self.update()
-            self._set_status("no_text")
+            if getattr(self._active_ocr_worker, 'error_message', ''):
+                self._set_status('ocr_error', error=True)
+            else:
+                self._set_status("no_text")
             if self._empty_ocr_frames == 1:
                 self._settle_timer.start()
             return
