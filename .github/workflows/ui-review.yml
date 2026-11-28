@@ -78,6 +78,9 @@ jobs:
         run: |
           xvfb-run -a -s '-screen 0 1280x800x24' dbus-run-session -- \
             python tools/qa_linux_shadow_launch.py --output build/ui-native/shadow-login
+      - name: Verify replacement targets in two native Cocoa fields when Accessibility is available
+        if: ${{ !cancelled() && runner.os == 'macOS' && steps.deps.outcome == 'success' }}
+        run: python tools/qa_macos_selection_target.py --output build/ui-native/selection-target/report.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -88,6 +91,7 @@ jobs:
             build/ui-native/checks/run.json
             build/ui-native/tmp/**/*.png
             build/ui-native/shadow-login/
+            build/ui-native/selection-target/
           if-no-files-found: warn
           retention-days: 7
 
