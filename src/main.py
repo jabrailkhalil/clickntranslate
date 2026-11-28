@@ -1285,18 +1285,27 @@ def replace_selected_text_in_foreground(original_text, translated_text,
         from windows_selection import wait_for_modifier_release
         if not wait_for_modifier_release():
             return False, "modifiers_held"
-    if not same_editor():
-        return False, "focus_changed"
-    if not clipboard_preservation.owns_text(translated_text):
-        return False, "clipboard_changed"
+
+    paste_refusal = "focus_changed"
+
+    def can_paste():
+        nonlocal paste_refusal
+        # A delayed clipboard read can move focus; a delayed UIA/AX query can
+        # outlast a newer clipboard write. Check the generation across both.
+        if clipboard_preservation.owns_text(translated_text):
+            focused = same_editor()
+            if clipboard_preservation.owns_clipboard():
+                return focused
+        paste_refusal = "clipboard_changed"
+        return False
+
     if platform_support.IS_MAC:
         from macos_desktop import send_edit_shortcut
-        if not send_edit_shortcut("v", validate_target=lambda: (
-                same_editor() and clipboard_preservation.owns_text(translated_text))):
-            if not clipboard_preservation.owns_text(translated_text):
-                return False, "clipboard_changed"
-            return False, "focus_changed"
+        if not send_edit_shortcut("v", validate_target=can_paste):
+            return False, paste_refusal
     else:
+        if not can_paste():
+            return False, paste_refusal
         simulate_paste()
     return True, "replaced"
 

@@ -152,3 +152,51 @@ def test_replacement_does_not_translate_another_field_which_published_its_clipbo
     capture.provider.assert_not_called()
     main.simulate_paste.assert_not_called()
     assert owner.finished == [False]
+
+
+@pytest.mark.parametrize('new_copy', [False, True])
+def test_field_switch_while_reading_the_final_clipboard_payload_never_redirects_paste(
+        capture, editable_editor, monkeypatch, new_copy):
+    original = editable_editor.return_value
+    current = [original]
+    second = windows_selection.WindowsEditTarget(original.window, original.process_id, (42, 9))
+    editable_editor.side_effect = lambda _window: current[0]
+    clipboard = capture.clipboard
+
+    def delayed_read():
+        value = clipboard.paste()
+        if value == 'Translated selection':
+            current[0] = second
+            if new_copy:
+                clipboard.copy('User copy from second editor')
+        return value
+
+    capture.read.side_effect = delayed_read
+    paste = mock.Mock()
+    monkeypatch.setattr(main, 'simulate_paste', paste)
+    owner = SelectionRequest()
+    owner.launch_translate_replace_selection(expected_target=42)
+    assert current[0] == second
+    paste.assert_not_called()
+    assert clipboard.text == ('User copy from second editor' if new_copy else 'Translated selection')
+
+
+def test_switch_and_new_copy_during_final_focus_verification_preserve_the_user_clipboard(
+        capture, editable_editor, monkeypatch):
+    original = editable_editor.return_value
+    second = windows_selection.WindowsEditTarget(original.window, original.process_id, (42, 9))
+
+    def verify(_window):
+        if capture.clipboard.text == 'Translated selection':
+            capture.clipboard.copy('User copy from second editor')
+            return second
+        return original
+
+    editable_editor.side_effect = verify
+    paste = mock.Mock()
+    monkeypatch.setattr(main, 'simulate_paste', paste)
+    owner = SelectionRequest()
+    owner.launch_translate_replace_selection(expected_target=42)
+    paste.assert_not_called()
+    assert capture.clipboard.text == 'User copy from second editor'
+    assert len(owner.shown_dialogs) == 1 and owner.shown_dialogs[0][0] == 'Translated selection'
