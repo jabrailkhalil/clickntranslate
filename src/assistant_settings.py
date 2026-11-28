@@ -84,7 +84,7 @@ class AssistantActionsDialog(CenteredFramelessDialog):
         from styled_dialogs import install_accent_controls, tooltip_text
         from ui_scaling import interface_scale_factor
         from window_appearance import scale_native_controls
-        from keyboard_navigation import install_keyboard_navigation
+        from keyboard_navigation import ActionScrollArea, install_keyboard_navigation
         from classic_style import classic_palette
         self.language = owner.current_interface_language
         tr = lambda key: assistant_text(self.language, key)
@@ -117,7 +117,7 @@ class AssistantActionsDialog(CenteredFramelessDialog):
         description = QtWidgets.QLabel(tr('menu_buttons_hint'))
         description.setWordWrap(True)
         panel.addWidget(description)
-        self.scroll = QtWidgets.QScrollArea()
+        self.scroll = ActionScrollArea()
         self.scroll.setWidgetResizable(True)
         self.scroll.setFrameShape(QtWidgets.QFrame.NoFrame)
         self.scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)

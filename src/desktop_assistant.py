@@ -379,7 +379,8 @@ class AssistantMenu(QtWidgets.QFrame):
             f'border:0; font-size:12px; }} QLabel[statusError="true"] {{ color:{colors["danger"]}; }}')
         self.activity_label.setTextFormat(QtCore.Qt.PlainText)
         self.activity_label.setAccessibleName(assistant_text(language, 'panel_status'))
-        self.scroll = QtWidgets.QScrollArea()
+        from keyboard_navigation import ActionScrollArea, install_keyboard_navigation
+        self.scroll = ActionScrollArea()
         self.scroll.setWidgetResizable(True)
         self.scroll.setFrameShape(QtWidgets.QFrame.NoFrame)
         self.scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
@@ -437,7 +438,6 @@ class AssistantMenu(QtWidgets.QFrame):
         self.set_activity('idle')
         from window_appearance import scale_native_controls
         scale_native_controls(self, factor)
-        from keyboard_navigation import install_keyboard_navigation
         install_keyboard_navigation()
 
     def enterEvent(self, event):

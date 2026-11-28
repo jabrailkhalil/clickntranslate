@@ -152,6 +152,37 @@ def _scroll_area(widget):
     return None
 
 
+class ActionScrollArea(QtWidgets.QScrollArea):
+    """Page through a grid of actions while keeping the active button in view."""
+
+    def keyPressEvent(self, event):
+        key = event.key()
+        bar = self.verticalScrollBar()
+        button = self.focusWidget()
+        if (key not in (QtCore.Qt.Key_PageUp, QtCore.Qt.Key_PageDown)
+                or event.modifiers() or not bar.maximum() or not isinstance(button, QtWidgets.QAbstractButton)):
+            return super().keyPressEvent(event)
+        viewport = self.viewport()
+        anchor = button.mapTo(viewport, button.rect().center())
+        previous = bar.value()
+        super().keyPressEvent(event)
+        if bar.value() == previous:
+            anchor.setY(0 if key == QtCore.Qt.Key_PageUp else viewport.height() - 1)
+        choices = []
+        for candidate in self.widget().findChildren(QtWidgets.QAbstractButton):
+            if not candidate.isEnabled() or not candidate.isVisibleTo(viewport):
+                continue
+            rect = QtCore.QRect(candidate.mapTo(viewport, QtCore.QPoint()), candidate.size())
+            if rect.intersects(viewport.rect()):
+                column_distance = max(0, rect.left() - anchor.x(), anchor.x() - rect.right())
+                rank = (not viewport.rect().contains(rect), column_distance, abs(rect.center().y() - anchor.y()))
+                choices.append((rank, candidate))
+        # A sparse list may have an empty page. Enter should never activate a
+        # button left offscreen by a keyboard command.
+        focus_control(min(choices, key=lambda item: item[0])[1] if choices else self)
+        event.accept()
+
+
 def spatial_target(root, current, key):
     """Find the closest control in the requested visual direction."""
     controls = tab_stops(root)
@@ -269,13 +300,18 @@ class KeyboardNavigation(QtCore.QObject):
             return
         self._focus_style(widget, True)
         ring = getattr(root, '_keyboard_focus_ring', None)
+        # Let the viewport clip the cue as its content scrolls. An overlay on
+        # the outer window would stay on top of unrelated rows and the footer.
+        overlay_parent = widget if _scroll_area(widget) is not None else root
         if ring is None or sip.isdeleted(ring):
-            ring = root._keyboard_focus_ring = _FocusRing(root)
-        geometry = QtCore.QRect(widget.mapTo(root, QtCore.QPoint()), widget.size())
+            ring = root._keyboard_focus_ring = _FocusRing(overlay_parent)
+        elif ring.parentWidget() is not overlay_parent:
+            ring.setParent(overlay_parent)
+        geometry = QtCore.QRect(widget.mapTo(overlay_parent, QtCore.QPoint()), widget.size())
         # One inset cue fits square tabs, rounded controls and joined buttons
         # without drawing over their outer frame or neighbouring controls.
         geometry.adjust(3, 3, -3, -3)
-        ring.setGeometry(geometry.intersected(root.rect()))
+        ring.setGeometry(geometry.intersected(overlay_parent.rect()))
         ring.show()
         ring.raise_()
         self._focused, self._ring = weakref.ref(widget), weakref.ref(ring)
@@ -575,7 +611,9 @@ class KeyboardNavigation(QtCore.QObject):
                         checkbox.click()
                         return True
         if self.keyboard:
-            self._show_ring(focus)
+            # An unhandled key can bubble from a button to its scroll area.
+            # Scrolling does not transfer input focus to the enclosing area.
+            self._show_ring(root.focusWidget() or focus)
         return False
 
 

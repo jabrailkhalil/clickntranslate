@@ -4,6 +4,7 @@ from unittest import mock
 
 import pytest
 from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtTest import QTest
 
 from assistant_art import MASCOTS
 from assistant_motion import PetMotion, paint_pet
@@ -11,6 +12,74 @@ from assistant_settings import ASSISTANT_ACTIONS, LEGACY_DEFAULT_ACTIONS, normal
 from assistant_text import ASSISTANT_TEXT, assistant_action_text
 from desktop_assistant import AssistantMenu, FOREGROUND_ACTIONS
 from test_desktop_assistant import app, companion, windows_selection_platform
+
+
+@pytest.mark.parametrize('locale', ('en', 'ar'))
+def test_scrolling_a_short_menu_clips_the_focus_cue_to_its_action(app, locale):
+    from keyboard_navigation import focus_control
+    menu = AssistantMenu(locale, True, factor=1.5, keyboard=True)
+    try:
+        menu.open_beside(QtCore.QRect(92, 95, 80, 84), QtCore.QRect(0, 0, 540, 268))
+        app.processEvents()
+        button = menu.buttons['open']
+        focus_control(button)
+        app.processEvents()
+        ring = menu._keyboard_focus_ring
+
+        def cue_is_painted():
+            outlined = menu.grab().toImage()
+            ring.hide()
+            plain = menu.grab().toImage()
+            ring.show()
+            return outlined != plain
+
+        assert cue_is_painted()
+        bar = menu.scroll.verticalScrollBar()
+        bar.setValue(bar.maximum())
+        app.processEvents()
+        assert menu.focusWidget() is button
+        viewport = menu.scroll.viewport()
+        assert button.mapTo(viewport, button.rect().bottomLeft()).y() < 0
+        assert not cue_is_painted()
+        bar.setValue(0)
+        app.processEvents()
+        assert menu.scroll.verticalScrollBar().value() == 0
+        assert cue_is_painted()
+    finally:
+        menu.close()
+        menu.deleteLater()
+
+
+@pytest.mark.parametrize('locale', ('en', 'ar'))
+def test_page_keys_keep_enter_on_a_visible_action_in_the_same_column(app, locale):
+    from keyboard_navigation import focus_control
+    menu = AssistantMenu(locale, True, factor=1.5, keyboard=True)
+    triggered = []
+    menu.action_requested.connect(triggered.append)
+    try:
+        menu.open_beside(QtCore.QRect(92, 95, 80, 84), QtCore.QRect(0, 0, 540, 268))
+        app.processEvents()
+        button = menu.buttons['area']
+        focus_control(button)
+        viewport = menu.scroll.viewport()
+        column_x = button.mapTo(viewport, button.rect().center()).x()
+        for key in (QtCore.Qt.Key_PageDown, QtCore.Qt.Key_PageUp):
+            QTest.keyClick(button, key)
+            app.processEvents()
+            chosen = menu.focusWidget()
+            assert chosen is not button
+            row = QtCore.QRect(chosen.mapTo(viewport, QtCore.QPoint()), chosen.size())
+            assert viewport.rect().contains(row)
+            assert row.contains(QtCore.QPoint(column_x, row.center().y()))
+            assert app._keyboard_navigation._focused() is chosen
+            action = next(action for action, control in menu.buttons.items() if control is chosen)
+            QTest.keyClick(chosen, QtCore.Qt.Key_Return)
+            assert triggered == [action]
+            triggered.clear()
+            button = chosen
+    finally:
+        menu.close()
+        menu.deleteLater()
 
 
 def render(mascot, action='idle', time=0., state_time=0., gaze=None):
