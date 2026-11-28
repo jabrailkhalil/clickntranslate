@@ -20,10 +20,14 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+import org.robolectric.annotation.LooperMode
 import org.robolectric.shadows.ShadowToast
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [35], application = ClickTranslateApp::class, qualifiers = "ru-rRU")
+@Config(sdk = [35], application = ClickTranslateApp::class, qualifiers = "ru-rRU-w360dp-h800dp")
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@LooperMode(LooperMode.Mode.PAUSED)
 class SettingsHubLinksRuntimeTest {
     @get:Rule val compose = createComposeRule()
 

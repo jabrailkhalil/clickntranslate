@@ -19,9 +19,11 @@ adb -s "$serial" install -r app/build/outputs/apk/androidTest/debug/app-debug-an
 
 run_tests() {
   local name=$1
+  local started_at=$SECONDS
   shift
   adb -s "$serial" shell am instrument -w -r "$@" \
     dev.clickn.translate.debug.test/androidx.test.runner.AndroidJUnitRunner > "$report/$name.log"
+  printf '\nQA_WALL_SECONDS=%d\n' "$((SECONDS - started_at))" >> "$report/$name.log"
   python3 - "$name" "$report" <<'PY'
 import json
 import os
@@ -63,6 +65,9 @@ for orientation in portrait landscape landscape-ime; do
 done
 run_tests home-overlay-denial -e class dev.clickn.translate.ui.HomeOverlayPermissionIntegrationTest -e homeOverlayDenial true || failure=1
 run_tests offline-download-recovery -e class dev.clickn.translate.ui.OfflineDownloadRecoveryIntegrationTest -e offlineRecovery true || failure=1
+if adb -s "$serial" shell run-as dev.clickn.translate.debug test -f files/qa-offline-queued-pair.png; then
+  adb -s "$serial" exec-out run-as dev.clickn.translate.debug cat files/qa-offline-queued-pair.png > "$report/offline-queued-pair.png"
+fi
 run_tests shared-preview -e class dev.clickn.translate.ui.SharedPhotoPreviewIntegrationTest -e sharedPreview true || failure=1
 if adb -s "$serial" shell run-as dev.clickn.translate.debug test -f files/qa-shared-preview-landscape.png; then
   adb -s "$serial" exec-out run-as dev.clickn.translate.debug cat files/qa-shared-preview-landscape.png > "$report/shared-preview-landscape.png"

@@ -19,12 +19,24 @@ def read(path):
 
 
 def instrumentation_seconds(content):
-    # JUnit's NumberFormat adds grouping after999s. Captured diagnostic dumps can
-    # also contain an earlier '*Time:' field; only the final full footer is ours.
-    elapsed = re.findall(r"^Time: ((?:\d{1,3}(?:,\d{3})*|\d+)(?:\.\d+)?)\s*$", content, re.MULTILINE)
+    # Android JUnit formats seconds using the test process's effective locale.
+    elapsed = re.findall(r"^Time: ([^\r\n]+)", content, re.MULTILINE)
     if not elapsed:
         raise ValueError("Missing JUnit elapsed-time footer")
-    return float(elapsed[-1].replace(",", ""))
+    raw = elapsed[-1].strip().replace("\u202f", " ").replace("\u00a0", " ")
+    candidates = set()
+    for decimal, group in ((".", ","), (",", "."), (",", " "), ("٫", "٬")):
+        whole = rf"(?:\d{{1,3}}(?:{re.escape(group)}\d{{3}})+|\d+)"
+        if re.fullmatch(rf"{whole}(?:{re.escape(decimal)}\d+)?", raw):
+            candidates.add(float(raw.replace(group, "").replace(decimal, ".")))
+    if not candidates:
+        raise ValueError(f"Invalid JUnit elapsed time: {raw!r}")
+    wall = re.search(r"^QA_WALL_SECONDS=(\d+)\s*$", content, re.MULTILINE)
+    if wall:
+        return min(candidates, key=lambda seconds: abs(seconds - int(wall[1])))
+    # Older logs do not record wall time; a lone separator usually marks the
+    # fractional part (e.g. the Russian update-dialog footer "3,908").
+    return min(candidates)
 
 
 def instrumentation(path):

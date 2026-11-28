@@ -273,7 +273,10 @@ fun MobileShell(
     }
     val current = settings
     if (current != null && sheet.isNotEmpty()) {
-        ModalBottomSheet(onDismissRequest = { sheet = "" }) {
+        // The library contains pending transfers below its controls. Give its scrollable
+        // list the visible viewport as soon as the user opens it, including on rotation.
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = sheet == "offline")
+        ModalBottomSheet(onDismissRequest = { sheet = "" }, sheetState = sheetState) {
             when (sheet) {
                 "source", "target" -> LanguageSheet(
                     isSource = sheet == "source", selected = if (sheet == "source") current.sourceLang else current.targetLang,

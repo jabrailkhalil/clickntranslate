@@ -6,6 +6,7 @@ import android.os.SystemClock
 import android.provider.Settings
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
+import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -72,7 +73,11 @@ class HomeOverlayPermissionIntegrationTest {
 
                 waitFor("System overlay settings opened") { isSettings() }
                 shell("input keyevent KEYCODE_BACK")
-                waitFor("Denial returned to the app") { isHome() }
+                // The transparent capture-request Activity has the same package as home.
+                // Its permission result and the subsequent model refresh must finish first.
+                waitFor("Denial returned to the visible home screen") {
+                    home.state == Lifecycle.State.RESUMED && isHome() && compose.onNode(start).isDisplayed()
+                }
                 compose.onNode(start).assertIsDisplayed()
                 assertFalse(Settings.canDrawOverlays(app))
                 val completedStarts = monitor.hits
@@ -83,7 +88,9 @@ class HomeOverlayPermissionIntegrationTest {
                 waitFor("Separate visit to Settings") { isSettings() }
                 shell("$appOp set $permission allow")
                 shell("input keyevent KEYCODE_BACK")
-                waitFor("New grant handed back to the home screen") { isHome() && Settings.canDrawOverlays(app) }
+                waitFor("New grant handed back to the home screen") {
+                    home.state == Lifecycle.State.RESUMED && isHome() && Settings.canDrawOverlays(app)
+                }
                 compose.waitUntil(20_000) { compose.onAllNodesWithText(strings.getString(R.string.mobile_ready)).fetchSemanticsNodes().isNotEmpty() }
                 assertEquals("An old start reappeared after an unrelated grant", completedStarts, monitor.hits)
                 assertFalse(CaptureServiceState.running.value)
@@ -92,7 +99,9 @@ class HomeOverlayPermissionIntegrationTest {
                 waitFor("A new tap requests capture") { monitor.hits == completedStarts + 1 }
                 waitFor("MediaProjection asks for consent") { ui.rootInActiveWindow?.packageName == "com.android.systemui" }
                 shell("input keyevent KEYCODE_BACK")
-                waitFor("Declining screen capture returns home") { isHome() }
+                waitFor("Declining screen capture returns home") {
+                    home.state == Lifecycle.State.RESUMED && isHome() && compose.onNode(start).isDisplayed()
+                }
                 assertFalse(CaptureServiceState.running.value)
             }
         } finally {

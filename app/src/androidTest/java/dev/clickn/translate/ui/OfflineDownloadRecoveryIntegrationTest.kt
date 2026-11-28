@@ -1,6 +1,7 @@
 package dev.clickn.translate.ui
 
 import android.content.Intent
+import android.graphics.Bitmap
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.test.core.app.ActivityScenario
@@ -15,6 +16,7 @@ import dev.clickn.translate.data.AppLocalePrefs
 import dev.clickn.translate.download.ModelDownloadSpec
 import dev.clickn.translate.download.ModelDownloadWorkPolicy
 import dev.clickn.translate.download.ModelDownloadWorker
+import java.io.File
 import java.util.concurrent.TimeUnit
 import org.junit.Assert.*
 import org.junit.Assume.assumeTrue
@@ -28,7 +30,8 @@ class OfflineDownloadRecoveryIntegrationTest {
 
     @Test fun coldLibraryAndRotationRecoverTheQueuedPairAndCancelOnlyItsWorkId() {
         assumeTrue(InstrumentationRegistry.getArguments().getString("offlineRecovery") == "true")
-        val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val app = instrumentation.targetContext.applicationContext
         val strings = AppLocalePrefs.wrap(app)
         val scheduler = WorkManager.getInstance(app)
         fun pending(spec: ModelDownloadSpec) = OneTimeWorkRequestBuilder<ModelDownloadWorker>()
@@ -66,6 +69,8 @@ class OfflineDownloadRecoveryIntegrationTest {
             compose.onNode(download).assertIsNotEnabled()
             compose.onNodeWithTag("offline-library").performScrollToNode(row)
             compose.onNode(row).assertIsDisplayed()
+            compose.onNodeWithTag("offline-library").performScrollToNode(cancel)
+            compose.onNode(cancel).assertIsDisplayed()
         }
         try {
             scheduler.enqueue(listOf(pair, unrelated)).result.get(10, TimeUnit.SECONDS)
@@ -74,11 +79,17 @@ class OfflineDownloadRecoveryIntegrationTest {
             assertEquals(WorkInfo.State.ENQUEUED, scheduler.getWorkInfoById(pair.id).get(10, TimeUnit.SECONDS)?.state)
             ActivityScenario.launch(MainActivity::class.java).use { home ->
                 openLibrary()
-                compose.onNode(cancel).performClick()
+                val screen = requireNotNull(instrumentation.uiAutomation.takeScreenshot())
+                try {
+                    File(app.filesDir, "qa-offline-queued-pair.png").outputStream().use { stream ->
+                        assertTrue(screen.compress(Bitmap.CompressFormat.PNG, 100, stream))
+                    }
+                } finally { screen.recycle() }
+                compose.onNode(cancel).performTouchInput { click() }
                 compose.onNode(ok).assertIsDisplayed()
                 home.recreate()
                 compose.waitUntil(15_000) { compose.onAllNodes(ok).fetchSemanticsNodes().isNotEmpty() }
-                compose.onNode(ok).assertIsDisplayed().performClick()
+                compose.onNode(ok).assertIsDisplayed().performTouchInput { click() }
                 compose.waitUntil(10_000) {
                     scheduler.getWorkInfoById(pair.id).get(2, TimeUnit.SECONDS)?.state == WorkInfo.State.CANCELLED
                 }
