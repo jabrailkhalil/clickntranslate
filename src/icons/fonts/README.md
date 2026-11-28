@@ -49,8 +49,8 @@ are pinned to the same upstream revision.
 
 | Face | Upstream SHA-256 | Bundled SHA-256 |
 | --- | --- | --- |
-| Regular | `2c76254f6fc379fddfce0a7e84fb5385bb135d3e399294f6eeb6680d0365b74b` | `07e586f705783d020bf153144fb9343f94f684934cd2b1cffcb119fdfb554cf2` |
-| Bold | `b5f0d1a190a7f9b43c310a8850630af12553df32c4c050543f9059732d9b4c0a` | `d575c29d2b36c2a34c8c10a7f0dee23ccb604079de16c5185520b25a83639608` |
+| Regular | `2c76254f6fc379fddfce0a7e84fb5385bb135d3e399294f6eeb6680d0365b74b` | `e13166f1b4bec206a3c0552429030f925cd5f7772647f301d2cfbcbf0b858f98` |
+| Bold | `b5f0d1a190a7f9b43c310a8850630af12553df32c4c050543f9059732d9b4c0a` | `467906d8cf04d67dc20b9f7d68909326689664d62dc2a119fc736879cad28999` |
 
 To regenerate the faces, place both original OTFs in the same directory and
 run `python tools/build_chinese_ui_font.py <source-directory>` with
