@@ -5,7 +5,7 @@ import re
 from unittest import mock
 
 import pytest
-from PyQt5 import QtGui, QtWidgets
+from PyQt5 import QtCore, QtGui, QtTest, QtWidgets
 
 import main
 import settings_window
@@ -85,6 +85,12 @@ def test_invalid_hotkeys_and_manual_engine_hints_use_selected_language(window, a
     settings = window.settings_window
     settings.show_hotkeys_screen()
     field = settings.copy_hotkey_input
+    line = field.findChild(QtWidgets.QLineEdit)
+    assert line.accessibleName() == settings.hotkey_labels[0].text()
+    assert line.accessibleDescription() == settings._hotkey_edit_hint()
+    with QtCore.QSignalBlocker(field):
+        field.clear()
+        assert line.placeholderText() == settings_window.settings_text(lang, 'hotkey_record_prompt')
     for windows in (True, False):
         with (mock.patch.object(field, 'hotkeyText', return_value='Ctrl+K, Ctrl+C'),
               mock.patch.object(settings_window.platform_support, 'IS_WINDOWS', windows)):
@@ -103,6 +109,52 @@ def test_invalid_hotkeys_and_manual_engine_hints_use_selected_language(window, a
         assert actual.startswith(expected_template.split('{model}')[0])
         assert settings_window.HYMT_MODEL_FILE in actual
         assert '{' not in actual
+
+
+@pytest.mark.parametrize('lang', tuple(settings_window.SETTINGS_TEXT))
+def test_empty_hotkey_editor_localizes_its_prompt_and_rejects_ime_text(app, lang):
+    host = QtWidgets.QWidget()
+    layout = QtWidgets.QVBoxLayout(host)
+    field = settings_window.ClearableKeySequenceEdit()
+    other = QtWidgets.QPushButton('Next')
+    layout.addWidget(field)
+    layout.addWidget(other)
+    prompt = settings_window.settings_text(lang, 'hotkey_record_prompt')
+    action = settings_window.settings_text(lang, 'copy_hotkey_label').rstrip(':')
+    hint = settings_window.settings_text(lang, 'remove_hotkey')
+    field.set_recording_labels(action, hint, prompt)
+    line = field.findChild(QtWidgets.QLineEdit)
+    try:
+        host.show()
+        field.setFocus()
+        app.processEvents()
+        assert line.accessibleName() == field.accessibleName() == action
+        assert line.accessibleDescription() == field.accessibleDescription() == hint
+        assert line.placeholderText() == prompt
+        if lang != 'en':
+            assert prompt != settings_window.settings_text('en', 'hotkey_record_prompt')
+
+        composed = QtGui.QInputMethodEvent()
+        composed.setCommitString('مثال')
+        app.sendEvent(line, composed)
+        assert line.text() == field.hotkeyText() == ''
+
+        QtTest.QTest.keyClick(field, QtCore.Qt.Key_G, QtCore.Qt.ControlModifier)
+        assert field.hotkeyText() == 'Ctrl+G'
+        other.setFocus(QtCore.Qt.TabFocusReason)
+        app.processEvents()
+        field.clear()
+        assert line.text() == field.hotkeyText() == ''
+        assert line.placeholderText() == prompt
+
+        field.setHotkeyText('Shift, Shift')
+        assert line.text() == 'Shift → Shift'
+        QtTest.QTest.keyClick(field, QtCore.Qt.Key_Escape)
+        assert line.text() == field.hotkeyText() == ''
+        assert line.placeholderText() == prompt
+    finally:
+        host.close()
+        host.deleteLater()
 
 
 def test_document_language_change_refreshes_close_minimize_and_swap_hints(window, app):

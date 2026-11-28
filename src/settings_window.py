@@ -2446,6 +2446,7 @@ SETTINGS_TEXT = {
         "save": "Save",
         "back": "Back",
         "remove_hotkey": "Press ESC to remove hotkey",
+        "hotkey_record_prompt": "Press a shortcut",
         "invalid_hotkey_format": "Use a single key combination. Double-tap shortcuts are available on Windows.",
         "history_view": "View translation history",
         "start_minimized": "Start in shadow mode",
@@ -2585,6 +2586,7 @@ SETTINGS_TEXT = {
         "save": "Сохранить",
         "back": "Назад",
         "remove_hotkey": "Нажмите ESC для удаления горячей клавиши",
+        "hotkey_record_prompt": "Нажмите сочетание клавиш",
         "invalid_hotkey_format": "Используйте одно сочетание клавиш. Двойное нажатие одной клавиши доступно в Windows.",
         "history_view": "Посмотреть историю переводов",
         "start_minimized": "Запускать в режиме тени",
@@ -2722,6 +2724,7 @@ SETTINGS_TEXT = {
         "save": "Guardar",
         "back": "Volver",
         "remove_hotkey": "Pulsa ESC para quitar el atajo",
+        "hotkey_record_prompt": "Pulsa una combinación de teclas",
         "invalid_hotkey_format": "Usa una sola combinación de teclas. Los atajos de doble pulsación están disponibles en Windows.",
         "history_view": "Ver historial de traducciones",
         "start_minimized": "Iniciar en modo sombra",
@@ -2859,6 +2862,7 @@ SETTINGS_TEXT = {
         "save": "Speichern",
         "back": "Zurück",
         "remove_hotkey": "ESC drücken, um das Tastenkürzel zu entfernen",
+        "hotkey_record_prompt": "Tastenkürzel drücken",
         "invalid_hotkey_format": "Verwenden Sie eine einzelne Tastenkombination. Doppeltipp-Tastenkürzel sind unter Windows verfügbar.",
         "history_view": "Übersetzungsverlauf anzeigen",
         "start_minimized": "Im Schattenmodus starten",
@@ -2996,6 +3000,7 @@ SETTINGS_TEXT = {
         "save": "Enregistrer",
         "back": "Retour",
         "remove_hotkey": "Appuyez sur ESC pour supprimer le raccourci",
+        "hotkey_record_prompt": "Appuyez sur un raccourci",
         "invalid_hotkey_format": "Utilisez une seule combinaison de touches. Les raccourcis par double appui sont disponibles sous Windows.",
         "history_view": "Voir l'historique des traductions",
         "start_minimized": "Démarrer en mode ombre",
@@ -3133,6 +3138,7 @@ SETTINGS_TEXT = {
         "save": "保存",
         "back": "返回",
         "remove_hotkey": "按 ESC 删除快捷键",
+        "hotkey_record_prompt": "按下快捷键",
         "invalid_hotkey_format": "请使用单个组合键。Windows 支持连续按两次同一按键的快捷方式。",
         "history_view": "查看翻译历史",
         "start_minimized": "以阴影模式启动",
@@ -3283,6 +3289,7 @@ SETTINGS_TEXT = {
      'save': 'Salvar',
      'back': 'Voltar',
      'remove_hotkey': 'Pressione ESC para remover o atalho',
+     'hotkey_record_prompt': 'Pressione um atalho',
      'invalid_hotkey_format': 'Use uma única combinação de teclas. Atalhos de toque duplo estão '
                               'disponíveis em Windows.',
      'history_view': 'Ver histórico de tradução',
@@ -3443,6 +3450,7 @@ SETTINGS_TEXT = {
      'save': 'Salva',
      'back': 'Indietro',
      'remove_hotkey': 'Premere ESC per rimuovere la scorciatoia',
+     'hotkey_record_prompt': 'Premi una combinazione di tasti',
      'invalid_hotkey_format': "Utilizza un'unica combinazione di tasti. Le scorciatoie con doppio "
                               'tocco sono disponibili su Windows.',
      'history_view': 'Visualizza la cronologia delle traduzioni',
@@ -3601,6 +3609,7 @@ SETTINGS_TEXT = {
      'save': 'حفظ',
      'back': 'رجوع',
      'remove_hotkey': 'اضغط ESC لإزالة الاختصار',
+     'hotkey_record_prompt': 'اضغط اختصار لوحة المفاتيح',
      'invalid_hotkey_format': 'استخدم مجموعة مفاتيح واحدة. تتوفر اختصارات الضغط المزدوج في Windows.',
      'history_view': 'عرض سجل الترجمات',
      'start_minimized': 'البدء بالوضع المصغر',
@@ -3751,6 +3760,7 @@ SETTINGS_TEXT = {
      'save': 'Kaydet',
      'back': 'Geri',
      'remove_hotkey': "Kısayolu silmek için ESC'ye basın",
+     'hotkey_record_prompt': 'Kısayol tuşlarına basın',
      'invalid_hotkey_format': "Tek bir tuş birleşimi kullanın. Çift basış kısayolları Windows'ta "
                               'kullanılabilir.',
      'history_view': 'Çeviri geçmişini görüntüle',
@@ -3903,6 +3913,7 @@ SETTINGS_TEXT = {
      'save': 'सहेजें',
      'back': 'वापस',
      'remove_hotkey': 'शॉर्टकट हटाने के लिए ESC दबाएँ',
+     'hotkey_record_prompt': 'शॉर्टकट कुंजियाँ दबाएँ',
      'invalid_hotkey_format': 'एक कुंजी जोड़ी इस्तेमाल करें। दो बार दबाने वाले शॉर्टकट Windows पर हैं।',
      'history_view': 'अनुवाद इतिहास देखें',
      'start_minimized': 'छाया मोड में शुरू करें',
@@ -4053,6 +4064,7 @@ SETTINGS_TEXT = {
      'save': 'Simpan',
      'back': 'Kembali',
      'remove_hotkey': 'Tekan ESC untuk menghapus pintasan',
+     'hotkey_record_prompt': 'Tekan kombinasi tombol',
      'invalid_hotkey_format': 'Gunakan satu kombinasi tombol. Pintasan ketuk dua kali tersedia di '
                               'Windows.',
      'history_view': 'Lihat riwayat terjemahan',
@@ -5288,10 +5300,23 @@ class ClearableKeySequenceEdit(QKeySequenceEdit):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setLayoutDirection(Qt.LeftToRight)
+        # Qt records keys on this widget. Its child line edit only displays
+        # the result; accepting pasted or composed text there fakes a shortcut.
+        self._editor = self.findChild(QLineEdit)
+        self._editor.setReadOnly(True)
+        self._record_prompt = self._editor.placeholderText()
         self._double_text = ''
         self._tap_down = set()
         self._tap_candidate = None
         self._tap_previous = None
+        self.editingFinished.connect(self._refresh_display)
+
+    def set_recording_labels(self, action, hint, prompt):
+        for widget in (self, self._editor):
+            widget.setAccessibleName(action)
+            widget.setAccessibleDescription(hint)
+        self._record_prompt = prompt
+        self._refresh_display()
 
     def hotkeyText(self):
         return self._double_text or self._normalize_hotkey(
@@ -5301,25 +5326,27 @@ class ClearableKeySequenceEdit(QKeySequenceEdit):
         from double_tap_hotkeys import canonical_double_tap
         self._double_text = canonical_double_tap(text) or ''
         super().setKeySequence(QKeySequence() if self._double_text else QKeySequence(text))
-        self._show_double_tap()
+        self._refresh_display()
 
-    def _show_double_tap(self):
+    def _refresh_display(self):
+        # QKeySequenceEdit restores Qt's default English prompt after clearing
+        # or finishing a sequence, including its deferred recording timeout.
+        self._editor.setPlaceholderText(self._record_prompt)
         if self._double_text:
-            editor = self.findChild(QLineEdit)
-            if editor is not None:
-                editor.setText(self._double_text.replace(', ', ' → '))
+            self._editor.setText(self._double_text.replace(', ', ' → '))
 
     def clear(self):
         self._double_text = ''
         self._tap_candidate = self._tap_previous = None
         self._tap_down.clear()
         super().clear()
+        self._refresh_display()
 
     def focusOutEvent(self, event):
         self._tap_candidate = self._tap_previous = None
         self._tap_down.clear()
         super().focusOutEvent(event)
-        self._show_double_tap()
+        self._refresh_display()
 
     def keyPressEvent(self, event):
         if event.isAutoRepeat():
@@ -13383,8 +13410,8 @@ class SettingsWindow(QWidget):
             label.setToolTip(tooltip_text(help_text))
             if not key_input.toolTip():
                 key_input.setToolTip(tooltip_text(help_text))
-            key_input.setAccessibleName(label_text.rstrip(':'))
-            key_input.setAccessibleDescription(self._hotkey_edit_hint())
+            key_input.set_recording_labels(label_text.rstrip(':'), self._hotkey_edit_hint(),
+                                          settings_text(lang, 'hotkey_record_prompt'))
             key_input.setObjectName("secondaryHotkeyInput")
             key_input.setFixedHeight(27)
             key_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
