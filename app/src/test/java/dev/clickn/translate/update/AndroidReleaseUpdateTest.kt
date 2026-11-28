@@ -3,6 +3,7 @@ package dev.clickn.translate.update
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.security.MessageDigest
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.json.Json
 import org.junit.Assert.*
 import org.junit.Test
@@ -18,6 +19,22 @@ class AndroidReleaseUpdateTest {
     private fun release(tag: String, vararg assets: GitHubAsset) = GitHubRelease(tag, assets = assets.toList())
     private fun select(r: GitHubRelease, current: String = "1.8.1", code: Long = 6, abi: List<String> = arm) =
         ReleasePolicy.select(r, abi, current, code)
+
+    @Test fun onlyOneTapCanClaimTheApkFromTheVisibleReleaseOffer() {
+        val apk = select(release("v1.8.3", asset("v1.8.3", "arm64")))!!
+        val offer = UpdateViewModel.State.Loaded(UpdateInfo("1.8.1", apk.version, apk))
+        val visible = MutableStateFlow<UpdateViewModel.State>(offer)
+        assertFalse(visible.claimUpdateDownload(apk.copy(sha256 = "f".repeat(64))))
+        assertSame(offer, visible.value)
+        assertTrue(visible.claimUpdateDownload(apk))
+        assertEquals(UpdateViewModel.State.Downloading(apk, 0), visible.value)
+        assertFalse("Repeated tap before the work id is registered", visible.claimUpdateDownload(apk))
+        for (state in listOf(UpdateViewModel.State.Checking, UpdateViewModel.State.Idle, UpdateViewModel.State.Ready(apk))) {
+            visible.value = state
+            assertFalse("Obsolete button callback in $state", visible.claimUpdateDownload(apk))
+            assertSame(state, visible.value)
+        }
+    }
 
     @Test fun publishedArm64AssetRoundtripsThroughJsonAndSelectsExactBinary() {
         val json = Json { ignoreUnknownKeys = true }

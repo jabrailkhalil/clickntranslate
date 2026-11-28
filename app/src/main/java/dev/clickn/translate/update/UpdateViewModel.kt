@@ -36,6 +36,12 @@ import javax.inject.Inject
 @Serializable
 private data class PendingUpdate(val id: String, val apk: ReleaseApk, val installedCode: Int)
 
+/** Claim the visible offer before WorkManager starts inserting the request. A second tap must not observe an uncommitted id. */
+internal fun MutableStateFlow<UpdateViewModel.State>.claimUpdateDownload(apk: ReleaseApk): Boolean {
+    val offer = value as? UpdateViewModel.State.Loaded ?: return false
+    return offer.info.apk == apk && compareAndSet(offer, UpdateViewModel.State.Downloading(apk, 0))
+}
+
 @HiltViewModel
 class UpdateViewModel @Inject constructor(
     @ApplicationContext private val appContext: Context,
@@ -124,6 +130,14 @@ class UpdateViewModel @Inject constructor(
     }
 
     fun skipVersion(version: String) {
+        when (val visible = _state.value) {
+            is State.Loaded -> if (visible.info.apk?.version != version) return
+            is State.Ready -> {
+                if (visible.apk.version != version) return
+                record?.takeIf { it.apk == visible.apk }?.let(::forget)
+            }
+            else -> return
+        }
         prefs.edit().putString("skipped_version", version).apply()
         reset()
     }
@@ -141,7 +155,7 @@ class UpdateViewModel @Inject constructor(
     }
 
     fun download(apk: ReleaseApk) {
-        if (!AppBrand.updatesEnabled || !apk.isValid()) return
+        if (!AppBrand.updatesEnabled || !apk.isValid() || !_state.claimUpdateDownload(apk)) return
         dialogOpen = true
         saved()?.let { watch(it); return }
         val request = OneTimeWorkRequestBuilder<ApkUpdateWorker>()
@@ -194,6 +208,7 @@ class UpdateViewModel @Inject constructor(
 
     fun cancelDownload() {
         val pending = record ?: return
+        if (_transfer.value !is State.Downloading) return
         observer?.cancel()
         // Keep the persisted job until WorkManager acknowledges cancellation.
         viewModelScope.launch {

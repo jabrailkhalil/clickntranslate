@@ -37,7 +37,11 @@ class ReleaseUpdateDialogRuntimeTest {
     private val apk = ReleaseApk("v1.8.3", "ClicknTranslate-1.8.3-arm64.apk", 60_000_000, "b".repeat(64))
     private val actions = mutableListOf<String>()
 
-    private fun showUpdate(fontScale: Float = 1f, direction: LayoutDirection = LayoutDirection.Ltr) {
+    private fun showUpdate(
+        fontScale: Float = 1f,
+        direction: LayoutDirection = LayoutDirection.Ltr,
+        state: UpdateViewModel.State = UpdateViewModel.State.Loaded(UpdateInfo("1.8.2", "1.8.3", apk, "Release notes. ".repeat(300))),
+    ) {
         compose.setContent {
             CompositionLocalProvider(
                 LocalDensity provides Density(LocalDensity.current.density, fontScale),
@@ -45,7 +49,7 @@ class ReleaseUpdateDialogRuntimeTest {
             ) {
                 MaterialTheme {
                     UpdateResultDialog(
-                        state = UpdateViewModel.State.Loaded(UpdateInfo("1.8.2", "1.8.3", apk, "Release notes. ".repeat(300))),
+                        state = state,
                         onDismiss = { actions += "later" },
                         onOpenRelease = { fail("unexpected external navigation") },
                         onSkipVersion = { actions += "skip:$it" },
@@ -64,6 +68,14 @@ class ReleaseUpdateDialogRuntimeTest {
         assertTrue("This scenario requires a tablet window", context.resources.configuration.screenWidthDp >= 800)
         showUpdate()
         compose.onNodeWithTag(UPDATE_DIALOG_TAG).assertWidthIsEqualTo(560.dp)
+    }
+
+    @Test fun downloadedUpdateCanBeSkippedIndependentlyOfPostponingInstallation() {
+        showUpdate(state = UpdateViewModel.State.Ready(apk))
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        compose.onNodeWithText(context.getString(R.string.update_dialog_btn_later)).assertIsDisplayed().performClick()
+        compose.onNodeWithText(context.getString(R.string.update_dialog_btn_skip)).assertIsDisplayed().performClick()
+        assertEquals(listOf("later", "skip:1.8.3"), actions)
     }
 
     @Test

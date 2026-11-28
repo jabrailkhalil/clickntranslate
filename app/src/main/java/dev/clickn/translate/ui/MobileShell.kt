@@ -530,6 +530,7 @@ internal fun SettingsHub(settings: Settings, onProvider: () -> Unit, onAppearanc
             val subtitle = when (val current = task) {
                 is dev.clickn.translate.update.UpdateViewModel.State.Downloading -> stringResource(R.string.update_download_progress, current.percent)
                 is dev.clickn.translate.update.UpdateViewModel.State.Ready -> stringResource(R.string.update_ready, current.apk.version)
+                is dev.clickn.translate.update.UpdateViewModel.State.Failed -> current.errorMessage
                 else -> if (status is dev.clickn.translate.update.UpdateViewModel.State.Checking) stringResource(R.string.update_btn_checking)
                     else "${stringResource(R.string.mobile_version)} ${BuildConfig.VERSION_NAME}"
             }

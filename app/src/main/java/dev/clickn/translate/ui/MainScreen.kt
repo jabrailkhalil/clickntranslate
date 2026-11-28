@@ -1322,7 +1322,10 @@ internal fun UpdateResultDialog(
             onDismissRequest = onDismiss, title = { Text(stringResource(R.string.update_dialog_title_new)) },
             text = { Text(stringResource(R.string.update_ready, state.apk.version)) },
             confirmButton = { Button(onClick = { onInstall(state.apk) }) { Text(stringResource(R.string.update_install)) } },
-            dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.update_dialog_btn_later)) } },
+            dismissButton = {
+                TextButton(onClick = { onSkipVersion(state.apk.version) }) { Text(stringResource(R.string.update_dialog_btn_skip)) }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.update_dialog_btn_later)) }
+            },
         )
         is dev.clickn.translate.update.UpdateViewModel.State.Failed -> {
             CatalystAlertDialog(
