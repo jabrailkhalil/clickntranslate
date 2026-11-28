@@ -180,6 +180,20 @@ def check_global_hotkeys(window, command, top, requests, results, actions):
                     for dialog in main._live_translation_result_dialogs():
                         dialog.close()
 
+                    command('first')
+                    command('clear-events')
+                    command('switch-on-copy')
+                    statuses.clear()
+                    hidden.clear()
+                    request_count = len(requests)
+                    press()
+                    wait_until(lambda: assistant_text('en', 'selection_focus_lost') in statuses and hidden,
+                               'Plain selection did not reject the editor that took focus during Ctrl+C')
+                    moved = actions['different_field_during_copy'] = command('state')
+                    assert moved['secondFocused'] and moved['selected'][1] == 'Second', moved
+                    assert action_keys(moved) == [('First', 'C')] and len(requests) == request_count, moved
+                    assert pyperclip.paste() == 'Second'
+
                 command('first')
                 command('clear-events')
                 pyperclip.copy(CLIPBOARD)

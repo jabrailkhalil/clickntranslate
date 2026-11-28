@@ -50,6 +50,18 @@ foreach ($routedEvent in @([Windows.Input.Keyboard]::PreviewKeyDownEvent, [Windo
     $window.AddHandler($routedEvent, $recordKey, $true)
     $other.AddHandler($routedEvent, $recordKey, $true)
 }
+$script:switchOnCopy = $false
+$window.AddHandler([Windows.Input.Keyboard]::PreviewKeyDownEvent, [Windows.Input.KeyEventHandler]{
+    param($sender, $eventArgs)
+    if ($script:switchOnCopy -and $eventArgs.Key -eq 'C' -and
+        ($eventArgs.KeyboardDevice.Modifiers -band [Windows.Input.ModifierKeys]::Control)) {
+        $script:switchOnCopy = $false
+        $eventArgs.Handled = $true
+        [Windows.Input.Keyboard]::Focus($second) | Out-Null
+        $second.Select(0, 'Second'.Length)
+        $second.Copy()
+    }
+}, $true)
 
 $script:sequence = 0
 $timer = [Windows.Threading.DispatcherTimer]::new()
@@ -63,6 +75,7 @@ $timer.Add_Tick({
         $op = [IO.File]::ReadAllText($request) | ConvertFrom-Json
         if ($op -eq 'reset-first') { $first.Text = 'First: identical selection.' }
         if ($op -eq 'external-copy') { [Windows.Clipboard]::SetText('identical selection') }
+        if ($op -eq 'switch-on-copy') { $script:switchOnCopy = $true }
         if ($op -eq 'other-document') {
             $other.Show()
             $other.Activate() | Out-Null
