@@ -87,13 +87,19 @@ class PairedRegionSelector(game_mode.GameRegionSelector):
         self.cancel_button.clicked.connect(self.close)
         heading.addWidget(self.cancel_button)
         layout.addLayout(heading)
-        self.selection_controls = QtWidgets.QGridLayout()
+        self.selection_controls = QtWidgets.QBoxLayout(QtWidgets.QBoxLayout.LeftToRight)
         self.selection_controls.setSpacing(round(6*factor))
-        self._controls_wrapped = None
-        for widget in (self.source_combo, self.swap_button, self.target_combo,
-                       self.undo_button, self.start_button):
-            widget.setParent(self.toolbar)
-            widget.show()
+        for controls in ((self.source_combo, self.swap_button, self.target_combo),
+                         (self.undo_button, self.start_button)):
+            row = QtWidgets.QHBoxLayout()
+            row.setSpacing(self.selection_controls.spacing())
+            row.setAlignment(QtCore.Qt.AlignLeading)
+            for widget in controls:
+                widget.setParent(self.toolbar)
+                row.addWidget(widget)
+                widget.show()
+            self.selection_controls.addLayout(row)
+        self.selection_controls.setAlignment(QtCore.Qt.AlignLeading)
         layout.addLayout(self.selection_controls)
         self._manual_output = bool(self._config.get('game_manual_output', False))
         self.template_combo = DropDownCombo()
@@ -156,17 +162,11 @@ class PairedRegionSelector(game_mode.GameRegionSelector):
         if hasattr(self, 'selection_controls'):
             controls = (self.source_combo, self.swap_button, self.target_combo,
                         self.undo_button, self.start_button)
-            wrapped = sum(widget.width() for widget in controls)+round(48*factor) > self.toolbar.width()
-            if wrapped != self._controls_wrapped:
-                self._controls_wrapped = wrapped
-                for widget in controls:
-                    self.selection_controls.removeWidget(widget)
-                for column in range(6):
-                    self.selection_controls.setColumnStretch(column, 0)
-                for index, widget in enumerate(controls):
-                    row, column = ((1, index-3) if wrapped and index >= 3 else (0, index))
-                    self.selection_controls.addWidget(widget, row, column)
-                self.selection_controls.setColumnStretch(3 if wrapped else 5, 1)
+            width = sum(widget.width() for widget in controls) + (len(controls)-1)*self.selection_controls.spacing()
+            margins = self.toolbar.layout().contentsMargins()
+            available = self.toolbar.contentsRect().width() - margins.left() - margins.right()
+            self.selection_controls.setDirection(QtWidgets.QBoxLayout.LeftToRight if width <= available
+                                                else QtWidgets.QBoxLayout.TopToBottom)
         self.toolbar.adjustSize()
         self.toolbar.move(monitor.center().x()-self.toolbar.width()//2, monitor.top()+round(16*factor))
         self._caption_top = self.toolbar.geometry().bottom()+8

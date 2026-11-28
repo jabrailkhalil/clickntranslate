@@ -121,6 +121,31 @@ def test_failed_save_keeps_the_areas_and_form_open(isolated, monkeypatch):
         selector.close()
 
 
+@pytest.mark.parametrize('locale,rtl', [('de', False), ('ar', True)])
+def test_wrapped_builder_keeps_both_languages_next_to_swap(isolated, app, monkeypatch, locale, rtl):
+    from PyQt5.QtGui import QScreen
+
+    desktop = QtCore.QRect(0, 0, 800, 650)
+    for method in ('geometry', 'availableGeometry'):
+        monkeypatch.setattr(QScreen, method, lambda screen: desktop)
+    monkeypatch.setattr('ui_scaling.desktop_control_scale', lambda screen: 1.6)
+    isolated[0]['interface_language'] = locale
+    selector = workspace.PairedRegionSelector(template_builder=True)
+    try:
+        selector.setLayoutDirection(QtCore.Qt.RightToLeft if rtl else QtCore.Qt.LeftToRight)
+        areas(selector)
+        selector.template_name.setText('Subtitles')
+        app.processEvents()
+        assert selector.undo_button.y() > selector.source_combo.y()
+        row = sorted((selector.source_combo, selector.swap_button, selector.target_combo), key=lambda w: w.x())
+        assert [row[i+1].x() - row[i].geometry().right() - 1 for i in range(2)] == [
+            selector.selection_controls.spacing()] * 2
+        assert selector.toolbar.rect().contains(row[0].geometry())
+        assert selector.toolbar.rect().contains(row[-1].geometry())
+    finally:
+        selector.close()
+
+
 def test_enter_does_not_repeat_a_declined_overwrite_question(isolated):
     _, store = isolated
     previous = stored(store)

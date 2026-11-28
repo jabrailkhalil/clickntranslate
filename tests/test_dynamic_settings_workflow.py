@@ -46,6 +46,26 @@ def test_empty_template_catalog_has_an_action_instead_of_a_disabled_placeholder(
     assert not settings.game_delete_template_button.isEnabled()
 
 
+def test_unselected_template_paints_localized_hint_after_language_switch(window, app, isolated, monkeypatch):
+    _, store = isolated
+    save_layout(store)
+    window.config.update(game_remember_template=False, game_last_template='')
+    settings = settings_page(window, store, monkeypatch)
+    combo = settings.game_template_combo
+    for language in ('en', 'ar', 'de'):
+        window.set_interface_language(language)
+        app.processEvents()
+        assert combo.currentIndex() == -1
+        hint = dynamic_templates.text(language, 'choose_template')
+        assert combo.placeholderText() == hint
+        label = combo.grab().toImage()
+        combo.setPlaceholderText('')
+        combo.setCurrentIndex(-1)
+        assert combo.grab().toImage() != label
+        combo.setPlaceholderText(hint)
+    assert window.config['game_last_template'] == ''
+
+
 @pytest.mark.parametrize('trigger', ['mouse', 'keyboard'])
 def test_empty_picker_opens_builder_directly_without_an_intermediate_popup(window, app, isolated, monkeypatch, trigger):
     from PyQt5.QtTest import QTest

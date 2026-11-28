@@ -63,6 +63,7 @@ BINDINGS = (
     ('game_remember_template_checkbox', 'setToolTip', 'region_text', 'dynamic_hint'),
     ('game_template_combo', 'setToolTip', 'region_text', 'dynamic_hint'),
     ('game_template_combo', 'setAccessibleName', 'region_text', 'template_label'),
+    ('game_template_combo', 'setPlaceholderText', 'dynamic_text', 'choose_template'),
     ('game_delete_template_button', 'setToolTip', 'dynamic_text', 'delete_selected_template'),
     ('game_delete_template_button', 'setAccessibleName', 'dynamic_text', 'delete_selected_template'),
     ('game_workflow_note', 'setToolTip', 'settings_text', 'game_workflow_note'),

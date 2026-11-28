@@ -432,6 +432,15 @@ class DropDownCombo(QComboBox):
     def set_group_header(self, index):
         _configure_engine_group_header(self, index)
 
+    def initStyleOption(self, option):
+        super().initStyleOption(option)
+        # The native combo adds its placeholder in paintEvent, which this
+        # control replaces to draw its own arrow and elide the label.
+        if self.currentIndex() < 0 and not self.isEditable() and self.placeholderText():
+            option.currentText = self.placeholderText()
+            option.palette.setBrush(QtGui.QPalette.ButtonText,
+                                    option.palette.brush(QtGui.QPalette.PlaceholderText))
+
     def _closed_display_text(self):
         option = QtWidgets.QStyleOptionComboBox()
         self.initStyleOption(option)
