@@ -74,7 +74,7 @@ def _publish_new_file(source, target):
             raise
 
 
-def _write_complete(path, write_content, *, unique):
+def _write_complete(path, write_content, *, unique=False, only_if_missing=False):
     path = os.path.abspath(path)
     parent = os.path.dirname(path)
     os.makedirs(parent, exist_ok=True)
@@ -87,13 +87,15 @@ def _write_complete(path, write_content, *, unique):
             stream.flush()
             os.fsync(stream.fileno())
         # Same-directory replacement stays on the same filesystem.
-        if unique:
+        if unique or only_if_missing:
             base, extension = os.path.splitext(path)
             for index in count(1):
                 candidate = path if index == 1 else f'{base}_{index}{extension}'
                 try:
                     _publish_new_file(temporary, candidate)
                 except FileExistsError:
+                    if only_if_missing:
+                        return
                     continue
                 return candidate
         _replace_complete_file(temporary, path)
@@ -107,6 +109,15 @@ def _write_complete(path, write_content, *, unique):
 
 def write_text(path, text, *, unique=False):
     return _write_complete(path, lambda stream: stream.write(text), unique=unique)
+
+
+def ensure_json_file(path, default_content):
+    """Initialize one exact path and preserve any concurrent writer's complete file."""
+    if not os.path.exists(path):
+        def write_defaults(stream):
+            json.dump(default_content, stream, ensure_ascii=False, indent=4)
+
+        _write_complete(path, write_defaults, only_if_missing=True)
 
 
 def write_json(path, payload, *, indent=None, unique=False):

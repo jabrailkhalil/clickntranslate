@@ -1,6 +1,7 @@
 from icon_rendering import load_icon
 from button_styles import button_qss, button_palette, standard_buttons, paint_down_arrow
 from number_controls import ChoiceStepper, StepperFrame
+from atomic_storage import ensure_json_file
 from numeric_stepper import NumericStepper
 from control_hints import control_hint
 from settings_sections import (
@@ -5433,18 +5434,9 @@ class ClearableKeySequenceEdit(QKeySequenceEdit):
 # Класс HistoryDialog удалён, т.к. история теперь отображается внутри настроек
 
 def get_data_file(filename):
-    import os
-    def get_portable_dir():
-        return _portable_base_dir()
-    data_dir = os.path.join(get_portable_dir(), "data")
-    if not os.path.exists(data_dir):
-        os.makedirs(data_dir)
+    data_dir = os.path.join(_portable_base_dir(), "data")
+    os.makedirs(data_dir, exist_ok=True)
     return os.path.join(data_dir, filename)
-
-def ensure_json_file(filepath, default_content):
-    if not os.path.exists(filepath):
-        with open(filepath, "w", encoding="utf-8") as f:
-            json.dump(default_content, f, ensure_ascii=False, indent=4)
 
 
 from easyocr_models import (LANGUAGE_GROUPS as EASYOCR_MODEL_GROUP_BY_LANGUAGE,

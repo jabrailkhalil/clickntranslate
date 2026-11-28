@@ -145,7 +145,7 @@ from project_paths import resource_root
 from document_parser import DocumentParseError, parse_document
 from document_parser import SUPPORTED_EXTENSIONS
 from document_storage import default_output_paths, load_session, save_session, save_text, translations_dir
-from atomic_storage import read_cached_settings, write_json
+from atomic_storage import ensure_json_file, read_cached_settings, write_json
 from document_translation import TranslationChunkResult, translate_document_text
 from languages import (
     LANGUAGES as APP_LANGUAGES,
@@ -1334,15 +1334,9 @@ def get_portable_dir():
     Settings survive program updates — user just replaces exe/program files."""
     return _portable_base_dir()
 
-def ensure_json_file(filepath, default_content):
-    if not os.path.exists(filepath):
-        with open(filepath, "w", encoding="utf-8") as f:
-            json.dump(default_content, f, ensure_ascii=False, indent=4)
-
 def ensure_data_dir_and_files():
     data_dir = os.path.join(get_portable_dir(), "data")
-    if not os.path.exists(data_dir):
-        os.makedirs(data_dir)
+    os.makedirs(data_dir, exist_ok=True)
     config_path = os.path.join(data_dir, "config.json")
     ensure_json_file(config_path, DEFAULT_CONFIG)
     # copy_history.json

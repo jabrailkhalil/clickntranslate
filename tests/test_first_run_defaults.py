@@ -1,10 +1,45 @@
 """New installs, reset and language selection share the 1.8 defaults."""
 import copy
+import os
 
 import pytest
 
 import main
 from capture_regions import memory_control_modes
+
+
+@pytest.mark.parametrize('name', ['config.json', 'settings.json', 'copy_history.json', 'translation_history.json'])
+def test_first_launch_preserves_a_file_published_by_another_writer(tmp_path, monkeypatch, name):
+    monkeypatch.setattr(main, 'get_portable_dir', lambda: str(tmp_path))
+    data = tmp_path / 'data'
+    data.mkdir()
+    target = data / name
+    published = (b'[{"text":"first saved record"}]' if 'history' in name
+                 else b'{"interface_language":"ar","theme":"custom"}')
+    exists = os.path.exists
+
+    def concurrent_publication(path):
+        if os.fspath(path) == str(target) and not exists(path):
+            target.write_bytes(published)
+            return False
+        return exists(path)
+
+    monkeypatch.setattr(os.path, 'exists', concurrent_publication)
+    if 'history' in name:
+        main.ensure_data_dir_and_files()
+    else:
+        assert main.get_data_file(name) == str(target)
+    assert target.read_bytes() == published
+    assert not any(p.name.startswith('.cnt-save-') or p.stem.endswith('_2') for p in data.iterdir())
+
+
+def test_failed_default_serialization_leaves_the_file_available_for_a_retry(tmp_path):
+    target = tmp_path / 'settings.json'
+    with pytest.raises(TypeError):
+        main.ensure_json_file(target, {'valid': 1, 'unsupported': object()})
+    assert not list(tmp_path.iterdir())
+    main.ensure_json_file(target, {'saved': True})
+    assert main.json.loads(target.read_bytes()) == {'saved': True}
 
 
 FACTORY_FLAGS = {
