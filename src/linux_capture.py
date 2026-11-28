@@ -28,8 +28,12 @@ class CaptureError(RuntimeError):
     """Raised when no capture backend can produce an image."""
 
 
-class CaptureCancelled(CaptureError):
-    """The user cancelled the portal; do not try another capture backend."""
+class CaptureDeclined(CaptureError):
+    """The portal ended or refused the request. Do not start another capture."""
+
+
+class CaptureCancelled(CaptureDeclined):
+    """The user cancelled the portal."""
 
 
 #: External helpers, in the order they are tried. Each entry builds the command
@@ -179,7 +183,10 @@ def capture_with_portal():
             "Response",
             receiver.receive,
         )
-        raise CaptureError(f"The portal refused the screenshot request: {reply.error().message()}")
+        error = reply.error()
+        if error.name() in ('org.freedesktop.portal.Error.NotAllowed', 'org.freedesktop.DBus.Error.AccessDenied'):
+            raise CaptureDeclined(f"The portal denied screenshot access: {error.message()}")
+        raise CaptureError(f"The portal refused the screenshot request: {error.message()}")
 
     returned_path = (
         str(reply.value().path()) if hasattr(reply.value(), "path") else str(reply.value())
@@ -242,8 +249,8 @@ def capture_with_portal():
     if result["response"] == 1:
         raise CaptureCancelled("The screenshot request was cancelled.")
     if result["response"] != 0:
-        # 1 = cancelled by the user, 2 = ended some other way.
-        raise CaptureError("The screenshot permission was declined.")
+        # Response 2 includes both a stored denial and the portal's Deny button.
+        raise CaptureDeclined("The desktop portal ended the screenshot request without an image.")
 
     path = uri_to_path(result["uri"])
     if not path or not os.path.isfile(path):
@@ -439,7 +446,7 @@ def grab_screen(screen):
                 errors.append("portal: the returned image could not be read")
             finally:
                 _discard(path)
-        except CaptureCancelled:
+        except CaptureDeclined:
             raise
         except CaptureError as exc:
             errors.append(str(exc))

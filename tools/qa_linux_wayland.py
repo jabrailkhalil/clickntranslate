@@ -22,21 +22,29 @@ import linux_capture
 import platform_support
 
 
-WALLPAPER_SIZE = (256, 160)
+GRID_SIZE = (256, 160)
 MARKER_RECTS = ((41, 94, 22, 14), (180, 35, 16, 23), (96, 59, 17, 13))
 WALLPAPERS = {
-    'HEADLESS-1': ('#14644d', ('#ec742c', '#f9c741', '#7d97e8')),
-    'HEADLESS-2': ('#263555', ('#f9c741', '#7d97e8', '#ec742c')),
+    'HEADLESS-1': ((1280, 720), '#14644d', ('#ec742c', '#f9c741', '#7d97e8')),
+    'HEADLESS-2': ((1024, 768), '#263555', ('#f9c741', '#7d97e8', '#ec742c')),
 }
 
 
+def marker_rect(rect, size):
+    x, y, width, height = rect
+    sx, sy = size.width() / GRID_SIZE[0], size.height() / GRID_SIZE[1]
+    return QtCore.QRect(round(x * sx), round(y * sy), round(width * sx), round(height * sy))
+
+
 def write_wallpapers(folder):
-    for name, (background, colors) in WALLPAPERS.items():
-        image = QtGui.QImage(*WALLPAPER_SIZE, QtGui.QImage.Format_RGB32)
+    for name, (size, background, colors) in WALLPAPERS.items():
+        # A low-resolution wallpaper introduces a wide interpolation fringe at
+        # these edges, even on a 1x desktop. Paint at the output's native size.
+        image = QtGui.QImage(*size, QtGui.QImage.Format_RGB32)
         image.fill(QtGui.QColor(background))
         painter = QtGui.QPainter(image)
         for rect, color in zip(MARKER_RECTS, colors):
-            painter.fillRect(QtCore.QRect(*rect), QtGui.QColor(color))
+            painter.fillRect(marker_rect(rect, image.size()), QtGui.QColor(color))
         painter.end()
         if not image.save(str(folder / (name + '.png'))):
             raise OSError(f'Could not generate wallpaper for {name}')
@@ -45,13 +53,10 @@ def write_wallpapers(folder):
 def check_marker_regions(screen, full, check, item):
     import ocr
 
-    background, colors = WALLPAPERS[screen.name()]
-    scale_x = screen.geometry().width() / WALLPAPER_SIZE[0]
-    scale_y = screen.geometry().height() / WALLPAPER_SIZE[1]
+    _size, background, colors = WALLPAPERS[screen.name()]
     item['markers'] = []
-    for index, ((x, y, width, height), color) in enumerate(zip(MARKER_RECTS, colors)):
-        marker = QtCore.QRect(round(x * scale_x), round(y * scale_y),
-                              round(width * scale_x), round(height * scale_y))
+    for index, (rect, color) in enumerate(zip(MARKER_RECTS, colors)):
+        marker = marker_rect(rect, screen.geometry().size())
         area = marker.adjusted(-5, -5, 5, 5)
         # Exercise both paths used by the selection overlay. Its live path asks
         # the portal for a fresh frame, while its frozen path reuses the old one.
@@ -90,7 +95,7 @@ def run():
         return 0
     expected = dict(item.split('=', 1) for item in options.background)
     if options.check_markers:
-        expected.update({name: colors[0] for name, colors in WALLPAPERS.items()})
+        expected.update({name: background for name, (_size, background, _colors) in WALLPAPERS.items()})
     app = QtWidgets.QApplication([])
     if not platform_support.IS_LINUX or not app.platformName().startswith('wayland'):
         raise SystemExit('Run on Linux with QT_QPA_PLATFORM=wayland and a Wayland compositor.')

@@ -103,14 +103,17 @@ jobs:
           sudo apt-get install -y sway swaybg grim wl-clipboard pipewire dbus-x11 \
             xdg-desktop-portal xdg-desktop-portal-wlr xdg-desktop-portal-gtk \
             qtwayland5 python3-pyqt5 python3-venv python3-requests python3-pil
+          sudo apt-get install -y --no-install-recommends xdg-desktop-portal-gnome
           /usr/bin/python3 -m venv --system-site-packages --without-pip "$RUNNER_TEMP/wayland-python"
       - name: Check equal and mixed monitor scales on fresh Wayland sessions
         run: |
           export PATH="$RUNNER_TEMP/wayland-python/bin:$PATH"
-          for scale in 1 2; do
+          result=0
+          for scale in 1 1.5 2; do
             CNT_QA_WAYLAND_SCALE="$scale" dbus-run-session -- \
-              bash tools/qa_linux_wayland.sh "build/ui-wayland/scale-$scale"
+              bash tools/qa_linux_wayland.sh "build/ui-wayland/scale-$scale" || result=1
           done
+          exit "$result"
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -42,7 +42,7 @@ org.freedesktop.impl.portal.Screenshot=wlr
 org.freedesktop.impl.portal.ScreenCast=wlr
 PORTALS
 SCALE="${CNT_QA_WAYLAND_SCALE:-1}"
-case "$SCALE" in 1|2) ;; *) echo 'Scale must be 1 or 2.' >&2; exit 2;; esac
+case "$SCALE" in 1|1.5|2) ;; *) echo 'Scale must be 1, 1.5 or 2.' >&2; exit 2;; esac
 python "$ROOT/tools/qa_linux_wayland.py" --output "$RUNTIME" --write-wallpapers
 cat > "$RUNTIME/sway.conf" <<CONFIG
 output HEADLESS-1 resolution 1280x720 position 0 0 scale $SCALE bg "$RUNTIME/HEADLESS-1.png" stretch
@@ -69,3 +69,6 @@ pids+=("$!")
 /usr/libexec/xdg-desktop-portal > "$OUTPUT/portal.log" 2>&1 &
 pids+=("$!")
 python "$ROOT/tools/qa_linux_wayland.py" --output "$OUTPUT" --check-markers
+if [[ "$SCALE" == 1 ]]; then
+    python "$ROOT/tools/qa_linux_portal_denial.py" --output "$OUTPUT/denial"
+fi

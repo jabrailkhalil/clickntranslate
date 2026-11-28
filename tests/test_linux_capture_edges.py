@@ -1,5 +1,6 @@
 """Monitor origins, portal lifecycle and failed external capture processes."""
 import subprocess
+import sys
 from types import SimpleNamespace
 from unittest import mock
 
@@ -113,6 +114,44 @@ def test_portal_cancellation_never_runs_a_capture_helper(app, monkeypatch):
     with pytest.raises(capture.CaptureCancelled):
         capture.grab_screen(mock.Mock())
     helper.assert_not_called()
+
+
+@pytest.mark.parametrize('response,error_name,expect_helper', [
+    (1, None, False),
+    (2, None, False),
+    (None, 'org.freedesktop.portal.Error.NotAllowed', False),
+    (None, 'org.freedesktop.DBus.Error.AccessDenied', False),
+    (None, 'org.freedesktop.DBus.Error.ServiceUnknown', True),
+])
+def test_grab_honors_portal_denial_but_recovers_from_a_missing_service(app, monkeypatch, response, error_name, expect_helper):
+    import PyQt5
+    bus = mock.Mock()
+    bus.baseService.return_value = ':1.42'
+    subscription = {}
+    def connect(_service, path, _interface, _signal, slot):
+        subscription.update(path=path, slot=slot)
+        return True
+    bus.connect.side_effect = connect
+    def screenshot(*_args):
+        if error_name:
+            error = SimpleNamespace(name=lambda: error_name, message=lambda: 'Synthetic D-Bus error')
+            return SimpleNamespace(isValid=lambda: False, error=lambda: error)
+        subscription['slot'](response, {})
+        return SimpleNamespace(isValid=lambda: True, value=lambda: subscription['path'])
+    dbus = SimpleNamespace(
+        QDBusConnection=SimpleNamespace(sessionBus=lambda: bus), QDBusReply=lambda value: value,
+        QDBusInterface=lambda *_: SimpleNamespace(isValid=lambda: True, call=screenshot))
+    monkeypatch.setitem(sys.modules, 'PyQt5.QtDBus', dbus)
+    monkeypatch.setattr(PyQt5, 'QtDBus', dbus, raising=False)
+    monkeypatch.setattr(platform_support, 'IS_LINUX', True)
+    monkeypatch.setattr(capture, 'qt_platform_name', lambda: 'wayland')
+    monkeypatch.setattr(capture, 'portal_available', lambda: True)
+    helper = mock.Mock(side_effect=capture.CaptureError('fixture helper unavailable'))
+    monkeypatch.setattr(capture, 'capture_with_helper', helper)
+    with pytest.raises(capture.CaptureError):
+        capture.grab_screen(mock.Mock())
+    assert helper.call_count == int(expect_helper)
+    bus.disconnect.assert_called_once()
 
 
 def test_cancelled_wayland_background_capture_does_not_open_portal_twice(app, monkeypatch):
