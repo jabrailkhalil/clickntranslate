@@ -87,6 +87,9 @@ jobs:
       - name: Verify replacement targets in two native Cocoa fields when Accessibility is available
         if: ${{ !cancelled() && runner.os == 'macOS' && steps.deps.outcome == 'success' }}
         run: python tools/qa_macos_selection_target.py --output build/ui-native/selection-target/report.json
+      - name: Verify companion selection and replacement in native Windows fields
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.deps.outcome == 'success' }}
+        run: python tools/qa_windows_selection_target.py --output build/ui-native/selection-target/report.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
