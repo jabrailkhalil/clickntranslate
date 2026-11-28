@@ -210,6 +210,43 @@ class PresetCredentialRepositoryTest {
     }
 
     @Test
+    fun eachConfigurableApiOrSpeechProviderRequiresItsOwnReadableAddress() = runBlocking {
+        val fixture = Fixture()
+        val repo = fixture.repo()
+        val address = "https://synthetic.example/v1"
+        val dummy = "synthetic-for-binding"
+        repo.update { it.copy(
+            baseUrl = address, apiKey = dummy,
+            anthropicBaseUrl = address, anthropicApiKey = dummy,
+            libreTranslateBaseUrl = address, libreTranslateApiKey = dummy,
+            deeplBaseUrl = address, deeplApiKey = dummy, deeplCustomToken = dummy,
+            ttsHttpBaseUrl = address, ttsHttpBearerToken = dummy,
+            ttsVolcengineBaseUrl = address, ttsVolcengineApiKey = dummy,
+            ttsMiniMaxBaseUrl = address, ttsMiniMaxApiKey = dummy,
+            ttsMimoBaseUrl = address, ttsMimoApiKey = dummy,
+        ) }
+        data class Binding(val stored: String, val url: (Settings) -> String, val keys: (Settings) -> List<String>)
+        val bindings = listOf(
+            Binding("base_url", Settings::baseUrl) { listOf(it.apiKey) },
+            Binding("anthropic_base_url", Settings::anthropicBaseUrl) { listOf(it.anthropicApiKey) },
+            Binding("libre_url", Settings::libreTranslateBaseUrl) { listOf(it.libreTranslateApiKey) },
+            Binding("deepl_base_url", Settings::deeplBaseUrl) { listOf(it.deeplApiKey, it.deeplCustomToken) },
+            Binding("tts_http_base_url", Settings::ttsHttpBaseUrl) { listOf(it.ttsHttpBearerToken) },
+            Binding("tts_volcengine_base_url", Settings::ttsVolcengineBaseUrl) { listOf(it.ttsVolcengineApiKey) },
+            Binding("tts_minimax_base_url", Settings::ttsMiniMaxBaseUrl) { listOf(it.ttsMiniMaxApiKey) },
+            Binding("tts_mimo_base_url", Settings::ttsMimoBaseUrl) { listOf(it.ttsMimoApiKey) },
+        )
+        for (blocked in bindings) {
+            fixture.cipher.unreadableCiphertext = fixture.encryptedValue(blocked.stored).removePrefix(SettingsSecretCodec.PREFIX)
+            val current = repo.get()
+            assertTrue(blocked.stored, blocked.url(current).isEmpty() && blocked.keys(current).all(String::isEmpty))
+            bindings.filterNot { it === blocked }.forEach { other ->
+                assertTrue(other.stored, other.url(current) == address && other.keys(current).all { it == dummy })
+            }
+        }
+    }
+
+    @Test
     fun freshKeyWithNoKeystore_doesNotCommitAnUnusableProviderOrPlaintext() = runBlocking {
         val fixture = Fixture()
         val repo = fixture.repo()

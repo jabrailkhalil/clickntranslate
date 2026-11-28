@@ -282,6 +282,10 @@ class SettingsRepository internal constructor(
         Keys.BaiduFanyiAppId, Keys.BaiduFanyiSecretKey, Keys.TtsHttpBearerToken,
         Keys.TtsVolcengineApiKey, Keys.TtsMiniMaxApiKey, Keys.TtsMimoApiKey,
     )
+    private val credentialBindingKeys = credentialStringKeys + setOf(
+        Keys.BaseUrl, Keys.AnthropicBaseUrl, Keys.LibreUrl, Keys.DeeplBaseUrl,
+        Keys.TtsHttpBaseUrl, Keys.TtsVolcengineBaseUrl, Keys.TtsMiniMaxBaseUrl, Keys.TtsMimoBaseUrl,
+    )
     private var defaultSettingsProvider: () -> Settings = {
         Settings(translatorEngine = TranslatorEngine.GOOGLE,
             targetLang = defaultTranslationTarget(android.content.res.Resources.getSystem().configuration.locales[0]))
@@ -582,7 +586,7 @@ class SettingsRepository internal constructor(
     // Kept outside both Settings and TranslationPreset: no export/diagnostic serializer sees these records.
     private fun presetCredentialKey(id: String) = stringPreferencesKey("local_preset_credentials_v1_$id")
 
-    private fun Preferences.hasUnreadableCredential() = credentialStringKeys.any { key ->
+    private fun Preferences.hasUnreadableBinding() = credentialBindingKeys.any { key ->
         val stored = this[key]
         stored != null && secretCodec.isEncrypted(stored) && secretCodec.decodeStored(stored) == null
     }
@@ -601,7 +605,7 @@ class SettingsRepository internal constructor(
         val record = PresetCredentialPolicy.capture(id, source)
         val previous = presetCredentials(id, requireReadable = true)
         if (previous == record) return
-        if ((previous != null || record.groups.isNotEmpty()) && hasUnreadableCredential()) {
+        if ((previous != null || record.groups.isNotEmpty()) && hasUnreadableBinding()) {
             throw SecureSettingsUnavailableException()
         }
         val key = presetCredentialKey(id)
@@ -759,6 +763,16 @@ class SettingsRepository internal constructor(
         defaultValue: String
     ): String = this[key]?.let { secretCodec.decodeStored(it) } ?: defaultValue
 
+    // A provider default is valid on first use. A stored but unreadable address must
+    // never route the user's input or token to a different server.
+    private fun Preferences.providerAddress(key: Preferences.Key<String>, default: String): String? {
+        val stored = this[key] ?: return default
+        return secretCodec.decodeStored(stored)
+    }
+
+    private fun Preferences.providerKey(key: Preferences.Key<String>, address: String?, default: String): String =
+        if (address == null) "" else secureString(key, default)
+
     suspend fun update(transform: (Settings) -> Settings) {
         updateWithPreferences { current, _ -> transform(current) }
     }
@@ -809,13 +823,12 @@ class SettingsRepository internal constructor(
                 requested
             }
             val next = MangaOcrSettingsPolicy.normalize(languageSafe)
-            val hasUnreadableCredential by lazy { prefs.hasUnreadableCredential() }
+            val hasUnreadableBinding by lazy { prefs.hasUnreadableBinding() }
             fun writeProtected(key: Preferences.Key<String>, read: (Settings) -> String) {
                 val value = read(next)
                 val stored = prefs[key]
                 val changed = read(current) != value
-                // Never pair an unreadable existing credential with a newly edited endpoint.
-                if (changed && hasUnreadableCredential) throw SecureSettingsUnavailableException()
+                if (changed && hasUnreadableBinding) throw SecureSettingsUnavailableException()
                 if (stored != null && secretCodec.isEncrypted(stored)) {
                     // A locked Keystore makes reads return UI defaults. An edit to a different
                     // setting must leave the original ciphertext and its endpoint untouched.
@@ -1058,6 +1071,14 @@ class SettingsRepository internal constructor(
 
     private fun Preferences.toSettings(): Settings {
         val default = defaultSettingsProvider()
+        val openAiAddress = providerAddress(Keys.BaseUrl, default.baseUrl)
+        val anthropicAddress = providerAddress(Keys.AnthropicBaseUrl, default.anthropicBaseUrl)
+        val libreAddress = providerAddress(Keys.LibreUrl, default.libreTranslateBaseUrl)
+        val deeplAddress = providerAddress(Keys.DeeplBaseUrl, default.deeplBaseUrl)
+        val ttsHttpAddress = providerAddress(Keys.TtsHttpBaseUrl, default.ttsHttpBaseUrl)
+        val volcengineAddress = providerAddress(Keys.TtsVolcengineBaseUrl, default.ttsVolcengineBaseUrl)
+        val miniMaxAddress = providerAddress(Keys.TtsMiniMaxBaseUrl, default.ttsMiniMaxBaseUrl)
+        val mimoAddress = providerAddress(Keys.TtsMimoBaseUrl, default.ttsMimoBaseUrl)
         val storedTranslationOutputLayout = runCatching {
             TranslationOutputLayout.valueOf(this[Keys.TranslationOutputLayout] ?: "")
         }.getOrDefault(default.translationOutputLayout)
@@ -1080,11 +1101,11 @@ class SettingsRepository internal constructor(
             voiceClone = this[Keys.TtsMimoVoiceCloneInstruction],
         )
         return MangaOcrSettingsPolicy.normalize(Settings(
-            baseUrl = secureString(Keys.BaseUrl, default.baseUrl),
-            apiKey = secureString(Keys.ApiKey, default.apiKey),
+            baseUrl = openAiAddress.orEmpty(),
+            apiKey = providerKey(Keys.ApiKey, openAiAddress, default.apiKey),
             model = this[Keys.Model] ?: default.model,
-            anthropicBaseUrl = secureString(Keys.AnthropicBaseUrl, default.anthropicBaseUrl),
-            anthropicApiKey = secureString(Keys.AnthropicApiKey, default.anthropicApiKey),
+            anthropicBaseUrl = anthropicAddress.orEmpty(),
+            anthropicApiKey = providerKey(Keys.AnthropicApiKey, anthropicAddress, default.anthropicApiKey),
             anthropicModel = this[Keys.AnthropicModel] ?: default.anthropicModel,
             // 兼容 0.1.x 旧用户：那时 sourceLang 用 enum.name（"AUTO"/"JA"/...）保存。
             // 新版改为 BCP-47 tag（"auto"/"ja"/...）。读出时若是旧大写值，按 mapping 转回。
@@ -1204,22 +1225,16 @@ class SettingsRepository internal constructor(
                 MIN_TTS_PLAYBACK_GAIN_DB,
                 MAX_TTS_PLAYBACK_GAIN_DB,
             ),
-            ttsHttpBaseUrl = secureString(Keys.TtsHttpBaseUrl, default.ttsHttpBaseUrl),
-            ttsHttpBearerToken = secureString(Keys.TtsHttpBearerToken, default.ttsHttpBearerToken),
+            ttsHttpBaseUrl = ttsHttpAddress.orEmpty(),
+            ttsHttpBearerToken = providerKey(Keys.TtsHttpBearerToken, ttsHttpAddress, default.ttsHttpBearerToken),
             ttsHttpResponseMode = runCatching {
                 TtsHttpResponseMode.valueOf(this[Keys.TtsHttpResponseMode] ?: "")
             }.getOrDefault(default.ttsHttpResponseMode),
             ttsVolcengineResource = runCatching {
                 VolcengineTtsResource.valueOf(this[Keys.TtsVolcengineResource] ?: "")
             }.getOrDefault(default.ttsVolcengineResource),
-            ttsVolcengineBaseUrl = secureString(
-                Keys.TtsVolcengineBaseUrl,
-                default.ttsVolcengineBaseUrl,
-            ),
-            ttsVolcengineApiKey = secureString(
-                Keys.TtsVolcengineApiKey,
-                default.ttsVolcengineApiKey,
-            ),
+            ttsVolcengineBaseUrl = volcengineAddress.orEmpty(),
+            ttsVolcengineApiKey = providerKey(Keys.TtsVolcengineApiKey, volcengineAddress, default.ttsVolcengineApiKey),
             ttsVolcengineSpeaker = this[Keys.TtsVolcengineSpeaker]
                 ?: default.ttsVolcengineSpeaker,
             ttsVolcengineModel = this[Keys.TtsVolcengineModel] ?: default.ttsVolcengineModel,
@@ -1232,11 +1247,8 @@ class SettingsRepository internal constructor(
             ttsMiniMaxModel = runCatching {
                 MiniMaxTtsModel.valueOf(this[Keys.TtsMiniMaxModel] ?: "")
             }.getOrDefault(default.ttsMiniMaxModel),
-            ttsMiniMaxBaseUrl = secureString(
-                Keys.TtsMiniMaxBaseUrl,
-                default.ttsMiniMaxBaseUrl,
-            ),
-            ttsMiniMaxApiKey = secureString(Keys.TtsMiniMaxApiKey, default.ttsMiniMaxApiKey),
+            ttsMiniMaxBaseUrl = miniMaxAddress.orEmpty(),
+            ttsMiniMaxApiKey = providerKey(Keys.TtsMiniMaxApiKey, miniMaxAddress, default.ttsMiniMaxApiKey),
             ttsMiniMaxVoice = this[Keys.TtsMiniMaxVoice] ?: default.ttsMiniMaxVoice,
             ttsMiniMaxEmotion = this[Keys.TtsMiniMaxEmotion] ?: default.ttsMiniMaxEmotion,
             ttsMiniMaxSpeed = (this[Keys.TtsMiniMaxSpeed] ?: default.ttsMiniMaxSpeed)
@@ -1244,8 +1256,8 @@ class SettingsRepository internal constructor(
             ttsMiniMaxPitch = (this[Keys.TtsMiniMaxPitch] ?: default.ttsMiniMaxPitch)
                 .coerceIn(-12, 12),
             ttsMimoModel = storedMimoModel,
-            ttsMimoBaseUrl = secureString(Keys.TtsMimoBaseUrl, default.ttsMimoBaseUrl),
-            ttsMimoApiKey = secureString(Keys.TtsMimoApiKey, default.ttsMimoApiKey),
+            ttsMimoBaseUrl = mimoAddress.orEmpty(),
+            ttsMimoApiKey = providerKey(Keys.TtsMimoApiKey, mimoAddress, default.ttsMimoApiKey),
             ttsMimoVoice = this[Keys.TtsMimoVoice] ?: default.ttsMimoVoice,
             ttsMimoInstruction = mimoInstructions.preset,
             ttsMimoVoiceDesignPrompt = mimoInstructions.voiceDesign,
@@ -1307,17 +1319,17 @@ class SettingsRepository internal constructor(
             }.getOrDefault(default.foregroundAppDetectionMode),
             sendAppNameToTranslator = this[Keys.SendAppNameToTranslator]
                 ?: default.sendAppNameToTranslator,
-            lingvaBaseUrl = secureString(Keys.LingvaUrl, default.lingvaBaseUrl),
-            libreTranslateBaseUrl = secureString(Keys.LibreUrl, default.libreTranslateBaseUrl),
-            libreTranslateApiKey = secureString(Keys.LibreKey, default.libreTranslateApiKey),
+            lingvaBaseUrl = providerAddress(Keys.LingvaUrl, default.lingvaBaseUrl).orEmpty(),
+            libreTranslateBaseUrl = libreAddress.orEmpty(),
+            libreTranslateApiKey = providerKey(Keys.LibreKey, libreAddress, default.libreTranslateApiKey),
             myMemoryEmail = secureString(Keys.MyMemoryEmail, default.myMemoryEmail),
-            deeplApiKey = secureString(Keys.DeeplKey, default.deeplApiKey),
+            deeplApiKey = providerKey(Keys.DeeplKey, deeplAddress, default.deeplApiKey),
             deeplPro = this[Keys.DeeplPro] ?: default.deeplPro,
             deeplProtocol = runCatching { DeeplProtocol.valueOf(this[Keys.DeeplProtocol] ?: "") }
                 .getOrDefault(default.deeplProtocol),
-            deeplBaseUrl = secureString(Keys.DeeplBaseUrl, default.deeplBaseUrl),
+            deeplBaseUrl = deeplAddress.orEmpty(),
             deeplBearerAuth = this[Keys.DeeplBearerAuth] ?: default.deeplBearerAuth,
-            deeplCustomToken = secureString(Keys.DeeplCustomToken, default.deeplCustomToken),
+            deeplCustomToken = providerKey(Keys.DeeplCustomToken, deeplAddress, default.deeplCustomToken),
             niuTransMode = runCatching { NiuTransMode.valueOf(this[Keys.NiuTransMode] ?: "") }
                 .getOrDefault(default.niuTransMode),
             niuTransApiKey = secureString(Keys.NiuTransApiKey, default.niuTransApiKey),
