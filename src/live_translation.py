@@ -19,6 +19,7 @@ class LiveTextState:
         self.lines = []
         self._frame_translations = ()
         self._resolved_texts = set()
+        self._visible_translations = {}
         self._seen = {}
         self._wave_started = None
         self._cache = OrderedDict()
@@ -43,11 +44,16 @@ class LiveTextState:
                       if index >= len(self._frame_translations) or not self._frame_translations[index]}
         self._resolved_texts = {item[4] for item in self.lines} - unresolved
         seen = {}
+        visible_translations = {}
         for *_, text in self.lines:
             if text not in seen:
                 first, count = self._seen.get(text, (now, 0))
                 seen[text] = (first, count + 1)
+                value = self._visible_translations.get(text) or self._cache.get(text)
+                if value:
+                    visible_translations[text] = value
         self._seen = seen
+        self._visible_translations = visible_translations
         if any(not self._is_translated(text) for text in seen):
             if self._wave_started is None:
                 self._wave_started = now
@@ -55,7 +61,7 @@ class LiveTextState:
             self._wave_started = None
 
     def _is_translated(self, text):
-        return text in self._cache or text in self._resolved_texts
+        return text in self._visible_translations or text in self._resolved_texts
 
     def pending(self, now):
         return [text for text, (first, count) in self._seen.items()
@@ -71,12 +77,16 @@ class LiveTextState:
         for source, translated in pairs:
             if not source or not translated:
                 continue
+            # A dense, unchanged screen must keep its completed labels even
+            # when the bounded cache for returning to earlier screens is full.
+            if source in self._seen:
+                self._visible_translations[source] = translated
             size = len(source) + len(translated)
-            if size > self.max_chars:
-                continue
             previous = self._cache.pop(source, None)
             if previous is not None:
                 self._cache_chars -= len(source) + len(previous)
+            if size > self.max_chars:
+                continue
             self._cache[source] = translated
             self._cache_chars += size
             while len(self._cache) > self.max_entries or self._cache_chars > self.max_chars:
@@ -91,15 +101,17 @@ class LiveTextState:
             translated = self._frame_translations[index] if index < len(self._frame_translations) else ''
             if translated:
                 blocks.append((*rect, source, translated))
-            elif source in self._cache:
-                self._cache.move_to_end(source)
-                blocks.append((*rect, source, self._cache[source]))
+            elif source in self._visible_translations:
+                if source in self._cache:
+                    self._cache.move_to_end(source)
+                blocks.append((*rect, source, self._visible_translations[source]))
         return blocks
 
     def reset_visible(self):
         self.lines = []
         self._frame_translations = ()
         self._resolved_texts = set()
+        self._visible_translations.clear()
         self._seen = {}
         self._wave_started = None
 

@@ -73,6 +73,24 @@ def test_cache_is_bounded_and_does_not_cross_sessions():
     assert another_provider.blocks() == []
 
 
+def test_oversized_translation_is_shown_only_while_its_source_is_visible():
+    state = LiveTextState(max_chars=24)
+    item = line('Short label')
+    result = 'This translation exceeds the reusable cache budget.'
+    state.observe([item], 0)
+    state.remember([(item[4], result)])
+    state.observe([item], 1)
+    assert state.blocks() == [(*item, result)]
+    assert not state.pending(2)
+    assert state._cache_chars == 0
+
+    state.observe([], 3)
+    state.observe([item], 4)
+    state.observe([item], 5)
+    assert not state.blocks()
+    assert state.pending(5) == [item[4]]
+
+
 def test_small_changed_label_is_detected_on_a_large_unchanged_screen():
     before = [20] * (192 * 108)
     after = before.copy()

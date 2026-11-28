@@ -272,3 +272,22 @@ def test_old_api_error_queued_before_pause_does_not_overwrite_resumed_status(app
     status, tooltip = overlay.status_label.text(), overlay.status_label.toolTip()
     app.processEvents()
     assert (overlay.status_label.text(), overlay.status_label.toolTip()) == (status, tooltip)
+
+
+def test_dense_static_screen_completes_without_resubmitting_evicted_labels(live_overlays, monkeypatch):
+    overlay = live_overlays(fullscreen=True)
+    jobs = []
+    monkeypatch.setattr(background_tasks.TRANSLATION_EXECUTOR, 'submit', lambda work: jobs.append(work) or True)
+    monkeypatch.setattr(translater, 'translate_text',
+                        lambda text, *args, **kwargs: text.replace('Label ', 'Translated '))
+    count = overlay._live.max_entries + 1
+    lines = [(i % 24 * 24, i // 24 * 16, 24, 16, f'Label {i}') for i in range(count)]
+    overlay._live.observe(lines, 0)
+    overlay._live.observe(lines, 1)
+    overlay._start_block_translation(lines)
+    assert len(jobs) == 1
+    jobs.pop()()
+
+    assert not jobs and not overlay._translation_busy
+    assert [item[5] for item in overlay._blocks] == [f'Translated {i}' for i in range(count)]
+    assert len(overlay._live._cache) <= overlay._live.max_entries
