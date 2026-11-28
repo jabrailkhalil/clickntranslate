@@ -33,6 +33,54 @@ import org.junit.runner.RunWith
 class ProviderEditorRotationIntegrationTest {
     @get:Rule val compose = createEmptyComposeRule()
 
+    @Test fun leavingAnInvalidLibreAddressPreservesAKeyBackedByTheDeviceKeystore() {
+        assumeTrue(InstrumentationRegistry.getArguments().getString("providerRotation") == "true")
+        val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as ClickTranslateApp
+        val repo = app.settingsRepository
+        val original = runBlocking { repo.get() }
+        val savedKey = "disposable-avd-fixture-key"
+        val savedUrl = "https://saved.example.invalid"
+        fun button(id: Int) = hasText(app.getString(id)) and hasClickAction()
+        try {
+            runBlocking {
+                repo.update { it.copy(translatorEngine = TranslatorEngine.GOOGLE, libreTranslateBaseUrl = savedUrl,
+                    libreTranslateApiKey = savedKey) }
+                assertEquals("The real Android keystore must preserve the fixture before editing", savedKey, repo.get().libreTranslateApiKey)
+            }
+            ActivityScenario.launch(MainActivity::class.java).use {
+                val settings = button(R.string.mobile_nav_settings)
+                compose.waitUntil(15_000) { compose.onAllNodes(settings).fetchSemanticsNodes().isNotEmpty() }
+                compose.onNode(settings).performClick()
+                val service = button(R.string.mobile_provider)
+                compose.onNodeWithTag("settings-hub").performScrollToNode(service)
+                compose.onNode(service).performClick()
+                val libre = hasText("LibreTranslate") and hasClickAction() and hasAnyAncestor(hasTestTag("translation-services"))
+                compose.onNodeWithTag("translation-services").performScrollToNode(libre)
+                compose.onNode(libre).performClick()
+                val form = compose.onNodeWithTag("provider-form")
+                val fields = compose.onAllNodes(hasSetTextAction() and hasAnyAncestor(hasTestTag("provider-form")))
+                form.performScrollToNode(hasSetTextAction())
+                fields[0].assertTextContains(savedUrl).performTextReplacement("bad-address")
+                fields[1].performTextReplacement("unused-draft-key")
+                form.performScrollToNode(hasTestTag("provider-save"))
+                compose.onNodeWithTag("provider-save").assertIsNotEnabled()
+                form.performScrollToNode(hasTestTag("provider-advanced"))
+                compose.onNodeWithTag("provider-advanced").assertIsEnabled().performClick()
+                compose.waitUntil(10_000) { compose.onAllNodesWithTag("provider-form").fetchSemanticsNodes().isEmpty() }
+                val general = button(R.string.refine_general)
+                compose.onNode(hasScrollAction()).performScrollToNode(general)
+                compose.onNode(general).assertIsDisplayed()
+                val stored = runBlocking { repo.get() }
+                assertEquals(TranslatorEngine.GOOGLE, stored.translatorEngine)
+                assertEquals(savedUrl, stored.libreTranslateBaseUrl)
+                assertEquals(savedKey, stored.libreTranslateApiKey)
+            }
+        } finally {
+            runBlocking { repo.update { it.copy(translatorEngine = original.translatorEngine,
+                libreTranslateBaseUrl = original.libreTranslateBaseUrl, libreTranslateApiKey = original.libreTranslateApiKey) } }
+        }
+    }
+
     @Test fun largeTextLandscapeEditorCanDiscardAndSaveWithTheKeyboardOpen() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         assumeTrue("Opt-in companion to the emulator onboarding journey",

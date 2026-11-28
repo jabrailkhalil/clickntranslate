@@ -8,8 +8,10 @@ import dev.clickn.translate.ClickTranslateApp
 import dev.clickn.translate.R
 import dev.clickn.translate.data.TranslatorEngine
 import dev.clickn.translate.onboarding.OnboardingPrefs
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -28,7 +30,7 @@ class ProviderAdvancedNavigationRuntimeTest {
     @Test fun invalidLingvaAddressCanLeaveForAdvancedWithoutOverwritingTheWorkingProvider() =
         navigate(TranslatorEngine.LINGVA, "bad-address", valid = false)
 
-    @Test fun invalidLibreTranslateAddressAlsoLeavesItsStoredKeyUnchanged() =
+    @Test fun invalidLibreTranslateAddressKeepsTheActiveEngineAndItsSelectionRevision() =
         navigate(TranslatorEngine.LIBRETRANSLATE, "https://example.invalid/?broken=true", valid = false)
 
     @Test fun aValidAddressStillSavesAndSelectsThatProviderBeforeOpeningAdvanced() =
@@ -38,10 +40,10 @@ class ProviderAdvancedNavigationRuntimeTest {
         val app = ApplicationProvider.getApplicationContext<ClickTranslateApp>()
         OnboardingPrefs.markCompleted(app)
         val oldAddress = "https://saved.example.invalid"
-        val oldKey = "test-key-before-edit"
         val repo = app.settingsRepository
         runBlocking { repo.update { it.copy(translatorEngine = TranslatorEngine.GOOGLE,
-            lingvaBaseUrl = oldAddress, libreTranslateBaseUrl = oldAddress, libreTranslateApiKey = oldKey) } }
+            lingvaBaseUrl = oldAddress, libreTranslateBaseUrl = oldAddress) } }
+        val initialRevision = runBlocking { repo.selectionSnapshots.first().revision }
         fun button(id: Int) = hasText(app.getString(id)) and hasClickAction()
         ActivityScenario.launch(MainActivity::class.java).use {
             val settings = button(R.string.mobile_nav_settings)
@@ -72,10 +74,11 @@ class ProviderAdvancedNavigationRuntimeTest {
             compose.onNode(hasScrollAction()).performScrollToNode(general)
             compose.onNode(general).assertIsDisplayed()
         }
-        val stored = runBlocking { repo.get() }
+        val committed = runBlocking { repo.selectionSnapshots.first() }
+        val stored = committed.settings
         assertEquals(if (valid) engine else TranslatorEngine.GOOGLE, stored.translatorEngine)
         assertEquals(if (valid && engine == TranslatorEngine.LINGVA) address else oldAddress, stored.lingvaBaseUrl)
         assertEquals(oldAddress, stored.libreTranslateBaseUrl)
-        assertEquals(oldKey, stored.libreTranslateApiKey)
+        if (valid) assertTrue(committed.revision > initialRevision) else assertEquals(initialRevision, committed.revision)
     }
 }

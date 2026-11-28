@@ -19,6 +19,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -31,8 +32,10 @@ class SettingsEditorPersistenceIntegrationTest {
         withOwnedStore { repository, _ ->
             val before = seed(repository)
             val entered = CompletableDeferred<Unit>()
+            val initialEmission = CompletableDeferred<Unit>()
             val release = CountDownLatch(1)
             val writer = async(Dispatchers.IO) {
+                initialEmission.await()
                 repository.update { latest ->
                     entered.complete(Unit)
                     check(release.await(5, TimeUnit.SECONDS))
@@ -41,7 +44,8 @@ class SettingsEditorPersistenceIntegrationTest {
             }
             val editor = MutableStateFlow(SettingsEditingSnapshot(before, before))
             val observer = launch(start = CoroutineStart.UNDISPATCHED) {
-                observeSettingsEditing(editor.value, repository.settings, { editor.value }, { editor.value = it })
+                val updates = repository.settings.onEach { if (it == before) initialEmission.complete(Unit) }
+                observeSettingsEditing(editor.value, updates, { editor.value }, { editor.value = it })
             }
             try {
                 withTimeout(5_000) { entered.await() }
@@ -61,6 +65,22 @@ class SettingsEditorPersistenceIntegrationTest {
                 observer.cancelAndJoin()
                 writer.cancelAndJoin()
             }
+        }
+    }
+
+    @Test fun aProviderCommitCompletedBeforeObservationIsPickedUpFromTheFirstEmission() = runBlocking {
+        withOwnedStore { repository, _ ->
+            val before = seed(repository)
+            val editor = MutableStateFlow(SettingsEditingSnapshot(before, before))
+            repository.update(::providerAfter)
+            val observer = launch(start = CoroutineStart.UNDISPATCHED) {
+                observeSettingsEditing(editor.value, repository.settings, { editor.value }, { editor.value = it })
+            }
+            try {
+                val updated = withTimeout(5_000) { editor.first { it.draft.translatorEngine == TranslatorEngine.OPENAI } }
+                assertEquals(repository.get(), updated.persisted)
+                assertEquals(updated.persisted, updated.draft)
+            } finally { observer.cancelAndJoin() }
         }
     }
 
