@@ -33,7 +33,14 @@ jobs:
           cache-read-only: ${{ github.ref_name != 'android-release-updater' }}
       - name: Install Android build tools
         run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'ndk;28.2.13676358' 'cmake;3.22.1'
+      - name: Reuse the Android frameworks verified by Robolectric
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository/org/robolectric/android-all-instrumented
+          key: robolectric-frameworks-${{ runner.os }}-${{ hashFiles('app/build.gradle.kts', 'gradle/libs.versions.toml') }}
       - name: Run unit tests including opt-in Compose runtime scenarios
+        env:
+          JAVA_TOOL_OPTIONS: -Drobolectric.dependency.repo.url=https://repo.maven.apache.org/maven2
         run: >-
           bash gradlew :app:testDebugUnitTest --console=plain --no-parallel --max-workers=2
           -ParchiveCpuDebug=true -PruntimeUiTests

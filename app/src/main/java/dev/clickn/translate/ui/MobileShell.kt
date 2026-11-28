@@ -711,7 +711,10 @@ internal fun ProviderSheet(editor: ProviderEditSession, viewModel: MobileViewMod
         }
     }
     val canDismiss by rememberUpdatedState({ editor.pending.value == null && viewModel.providerSaveState.value != ProviderSaveStatus.SAVING })
-    val sheetState = rememberModalBottomSheetState(confirmValueChange = { value -> value != SheetValue.Hidden || canDismiss() })
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { value -> value != SheetValue.Hidden || canDismiss() },
+    )
     ModalBottomSheet(onDismissRequest = { if (canDismiss()) onDismiss() }, sheetState = sheetState) {
         LazyColumn(Modifier.fillMaxWidth().heightIn(max = 600.dp).imePadding().testTag("provider-form"), contentPadding = PaddingValues(24.dp, 0.dp, 24.dp, 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             item { Text(providerName(engine), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold) }

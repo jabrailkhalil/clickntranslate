@@ -3,13 +3,11 @@ package dev.clickn.translate.ui
 import android.content.Context
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.text.TextLayoutResult
-import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
@@ -38,13 +36,11 @@ class ReleaseUpdateDialogRuntimeTest {
     private val actions = mutableListOf<String>()
 
     private fun showUpdate(
-        fontScale: Float = 1f,
         direction: LayoutDirection = LayoutDirection.Ltr,
         state: UpdateViewModel.State = UpdateViewModel.State.Loaded(UpdateInfo("1.8.2", "1.8.3", apk, "Release notes. ".repeat(300))),
     ) {
         compose.setContent {
             CompositionLocalProvider(
-                LocalDensity provides Density(LocalDensity.current.density, fontScale),
                 LocalLayoutDirection provides direction,
             ) {
                 MaterialTheme {
@@ -79,9 +75,9 @@ class ReleaseUpdateDialogRuntimeTest {
     }
 
     @Test
-    @Config(qualifiers = "ru-rRU-w320dp-h800dp")
+    @Config(qualifiers = "ru-rRU-w320dp-h800dp", fontScale = 1.7f)
     fun narrowScreenWithLargeRtlTextCanReadAndActivateEveryUpdateAction() {
-        showUpdate(fontScale = 1.7f, direction = LayoutDirection.Rtl)
+        showUpdate(direction = LayoutDirection.Rtl)
         val dialogNode = compose.onNodeWithTag(UPDATE_DIALOG_TAG)
         val context = ApplicationProvider.getApplicationContext<Context>()
         val buttons = listOf(R.string.update_dialog_btn_skip, R.string.update_dialog_btn_later, R.string.update_dialog_btn_download)
@@ -97,6 +93,8 @@ class ReleaseUpdateDialogRuntimeTest {
                     val results = mutableListOf<TextLayoutResult>()
                     assertTrue(read(results))
                     val text = results.single()
+                    assertEquals("Native dialog font scale", 1.7f, text.layoutInput.density.fontScale, 0.001f)
+                    assertEquals(LayoutDirection.Rtl, text.layoutInput.layoutDirection)
                     val detail = "$label: size=${text.size}, paragraph=${text.multiParagraph.width}x${text.multiParagraph.height}, " +
                         "lines=${text.lineCount}, constraints=${text.layoutInput.constraints}"
                     assertFalse("Clipped vertically: $detail", text.didOverflowHeight)
