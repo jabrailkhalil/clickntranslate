@@ -107,7 +107,10 @@
     <string name="gallery_main_no_history_task">Pas encore d\'historique des tâches</string>
     <string name="gallery_main_progress">%1$d / %2$d  traitées</string>
     <string name="gallery_confirm_title">Traduire des images</string>
-    <string name="gallery_confirm_count">%1$d images sélectionnées</string>
+    <plurals name="gallery_confirm_count">
+        <item quantity="one">%1$d image sélectionnée</item>
+        <item quantity="other">%1$d images sélectionnées</item>
+    </plurals>
     <string name="gallery_confirm_add_photos">Ajouter d\'autres images</string>
     <string name="gallery_confirm_remove_photo">Supprimer l\'image %1$d</string>
     <string name="gallery_confirm_empty_selection">Sélectionnez au moins une image pour créer une tâche.</string>
@@ -120,7 +123,10 @@
     <string name="gallery_confirm_create">Traduire les images</string>
     <string name="gallery_confirm_create_dialog_title">Avis</string>
     <string name="gallery_confirm_create_dialog_confirm">Très bien</string>
-    <string name="gallery_confirm_create_dialog_message">%1$d images vont être traduites. Le traitement peut continuer en arrière-plan.</string>
+    <plurals name="gallery_confirm_create_dialog_message">
+        <item quantity="one">%1$d image sera traduite. Le traitement peut continuer en arrière-plan.</item>
+        <item quantity="other">%1$d images seront traduites. Le traitement peut continuer en arrière-plan.</item>
+    </plurals>
     <string name="gallery_confirm_creating">Préparation des images…</string>
     <string name="gallery_confirm_error">Impossible de créer la tâche : %1$s</string>
     <string name="gallery_tasks_title">Tâches de traduction</string>

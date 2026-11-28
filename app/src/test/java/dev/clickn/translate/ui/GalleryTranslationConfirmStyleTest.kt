@@ -33,7 +33,7 @@ class GalleryTranslationConfirmStyleTest {
             OrderCase(
                 "task settings are shown before selected count",
                 "R.string.gallery_confirm_settings",
-                "R.string.gallery_confirm_count",
+                "R.plurals.gallery_confirm_count",
             ),
             OrderCase(
                 "add image tile follows selected thumbnails",

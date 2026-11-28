@@ -107,7 +107,12 @@
     <string name="gallery_main_no_history_task">Задач пока нет</string>
     <string name="gallery_main_progress">Обработано: %1$d / %2$d</string>
     <string name="gallery_confirm_title">Перевод фото</string>
-    <string name="gallery_confirm_count">Выбрано изображений: %1$d</string>
+    <plurals name="gallery_confirm_count">
+        <item quantity="one">Выбрано %1$d изображение</item>
+        <item quantity="few">Выбрано %1$d изображения</item>
+        <item quantity="many">Выбрано %1$d изображений</item>
+        <item quantity="other">Выбрано %1$d изображения</item>
+    </plurals>
     <string name="gallery_confirm_add_photos">Добавить больше изображений</string>
     <string name="gallery_confirm_remove_photo">Удалить изображение %1$d</string>
     <string name="gallery_confirm_empty_selection">Выберите хотя бы одно изображение для создания задачи.</string>
@@ -120,7 +125,12 @@
     <string name="gallery_confirm_create">Перевести фото</string>
     <string name="gallery_confirm_create_dialog_title">Уведомление</string>
     <string name="gallery_confirm_create_dialog_confirm">ОК</string>
-    <string name="gallery_confirm_create_dialog_message">Будет переведено изображений: %1$d. Обработка продолжится в фоне.</string>
+    <plurals name="gallery_confirm_create_dialog_message">
+        <item quantity="one">Будет переведено %1$d изображение. Обработка продолжится в фоне.</item>
+        <item quantity="few">Будет переведено %1$d изображения. Обработка продолжится в фоне.</item>
+        <item quantity="many">Будет переведено %1$d изображений. Обработка продолжится в фоне.</item>
+        <item quantity="other">Будет переведено %1$d изображения. Обработка продолжится в фоне.</item>
+    </plurals>
     <string name="gallery_confirm_creating">Подготавливаем фото…</string>
     <string name="gallery_confirm_error">Не удалось создать задание: %1$s</string>
     <string name="gallery_tasks_title">Задачи перевода</string>

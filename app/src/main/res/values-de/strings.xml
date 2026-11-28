@@ -107,7 +107,10 @@
     <string name="gallery_main_no_history_task">Noch keine Aufgabengeschichte</string>
     <string name="gallery_main_progress">%1$d / %2$d verarbeitet</string>
     <string name="gallery_confirm_title">Bilder übersetzen</string>
-    <string name="gallery_confirm_count">%1$d Bilder ausgewählt</string>
+    <plurals name="gallery_confirm_count">
+        <item quantity="one">%1$d Bild ausgewählt</item>
+        <item quantity="other">%1$d Bilder ausgewählt</item>
+    </plurals>
     <string name="gallery_confirm_add_photos">Mehr Bilder hinzufügen</string>
     <string name="gallery_confirm_remove_photo">Bild entfernen %1$d</string>
     <string name="gallery_confirm_empty_selection">Wählen Sie mindestens ein Bild aus, um eine Aufgabe zu erstellen.</string>
@@ -120,7 +123,10 @@
     <string name="gallery_confirm_create">Bilder übersetzen</string>
     <string name="gallery_confirm_create_dialog_title">Mitteilung</string>
     <string name="gallery_confirm_create_dialog_confirm">Okay</string>
-    <string name="gallery_confirm_create_dialog_message">%1$d Bilder werden übersetzt. Die Verarbeitung kann im Hintergrund fortgesetzt werden.</string>
+    <plurals name="gallery_confirm_create_dialog_message">
+        <item quantity="one">%1$d Bild wird übersetzt. Die Verarbeitung kann im Hintergrund fortgesetzt werden.</item>
+        <item quantity="other">%1$d Bilder werden übersetzt. Die Verarbeitung kann im Hintergrund fortgesetzt werden.</item>
+    </plurals>
     <string name="gallery_confirm_creating">Bilder werden vorbereitet…</string>
     <string name="gallery_confirm_error">Ich kann keine Aufgabe erstellen: %1$s</string>
     <string name="gallery_tasks_title">Übersetzungsaufgaben</string>

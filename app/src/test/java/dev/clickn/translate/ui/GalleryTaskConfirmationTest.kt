@@ -71,13 +71,13 @@ class GalleryTaskConfirmationTest {
                 listOf(
                     "gallery_confirm_create_dialog_title",
                     "gallery_confirm_create_dialog_confirm",
-                    "gallery_confirm_create_dialog_message",
                     "gallery_task_cancel_title",
                     "gallery_task_cancel_message",
                 ).all { key ->
                     """<string name="$key">""" in english &&
                         """<string name="$key">""" in chinese
-                },
+                } && """<plurals name="gallery_confirm_create_dialog_message">""" in english &&
+                    """<plurals name="gallery_confirm_create_dialog_message">""" in chinese,
             ),
             Case(
                 "create dialog uses its own confirm copy",

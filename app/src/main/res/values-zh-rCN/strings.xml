@@ -110,7 +110,9 @@
     <string name="gallery_main_no_history_task">暂无历史任务</string>
     <string name="gallery_main_progress">已处理 %1$d / %2$d</string>
     <string name="gallery_confirm_title">翻译图片</string>
-    <string name="gallery_confirm_count">已选择 %1$d 张图片</string>
+    <plurals name="gallery_confirm_count">
+        <item quantity="other">已选择 %1$d 张图片</item>
+    </plurals>
     <string name="gallery_confirm_add_photos">继续添加图片</string>
     <string name="gallery_confirm_remove_photo">移除第 %1$d 张图片</string>
     <string name="gallery_confirm_empty_selection">请至少选择一张图片后再创建任务。</string>
@@ -123,7 +125,9 @@
     <string name="gallery_confirm_create">翻译图片</string>
     <string name="gallery_confirm_create_dialog_title">提示</string>
     <string name="gallery_confirm_create_dialog_confirm">确定</string>
-    <string name="gallery_confirm_create_dialog_message">将翻译 %1$d 张图片，处理可在后台继续。</string>
+    <plurals name="gallery_confirm_create_dialog_message">
+        <item quantity="other">将翻译 %1$d 张图片，处理可在后台继续。</item>
+    </plurals>
     <string name="gallery_confirm_creating">正在准备图片…</string>
     <string name="gallery_confirm_error">任务创建失败：%1$s</string>
     <string name="gallery_tasks_title">翻译任务</string>

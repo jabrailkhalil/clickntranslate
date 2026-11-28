@@ -115,6 +115,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -287,8 +288,9 @@ fun GalleryTranslationConfirmScreen(
             },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(stringResource(
-                        R.string.gallery_confirm_create_dialog_message,
+                    Text(pluralStringResource(
+                        R.plurals.gallery_confirm_create_dialog_message,
+                        submission.uris.size,
                         submission.uris.size,
                     ))
                     Text(stringResource(R.string.gallery_confirm_language,
@@ -460,7 +462,7 @@ fun GalleryTranslationConfirmScreen(
                 }
                 item {
                     Text(
-                        text = stringResource(R.string.gallery_confirm_count, selectedUris.size),
+                        text = pluralStringResource(R.plurals.gallery_confirm_count, selectedUris.size, selectedUris.size),
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.SemiBold,
                     )

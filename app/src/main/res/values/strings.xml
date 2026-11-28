@@ -110,7 +110,10 @@
     <string name="gallery_main_no_history_task">No task history yet</string>
     <string name="gallery_main_progress">%1$d / %2$d processed</string>
     <string name="gallery_confirm_title">Translate images</string>
-    <string name="gallery_confirm_count">%1$d images selected</string>
+    <plurals name="gallery_confirm_count">
+        <item quantity="one">%1$d image selected</item>
+        <item quantity="other">%1$d images selected</item>
+    </plurals>
     <string name="gallery_confirm_add_photos">Add more images</string>
     <string name="gallery_confirm_remove_photo">Remove image %1$d</string>
     <string name="gallery_confirm_empty_selection">Select at least one image to create a task.</string>
@@ -123,7 +126,10 @@
     <string name="gallery_confirm_create">Translate images</string>
     <string name="gallery_confirm_create_dialog_title">Notice</string>
     <string name="gallery_confirm_create_dialog_confirm">OK</string>
-    <string name="gallery_confirm_create_dialog_message">%1$d images will be translated. Processing can continue in the background.</string>
+    <plurals name="gallery_confirm_create_dialog_message">
+        <item quantity="one">%1$d image will be translated. Processing can continue in the background.</item>
+        <item quantity="other">%1$d images will be translated. Processing can continue in the background.</item>
+    </plurals>
     <string name="gallery_confirm_creating">Preparing images…</string>
     <string name="gallery_confirm_error">Could not create task: %1$s</string>
     <string name="gallery_tasks_title">Translation tasks</string>
