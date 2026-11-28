@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.ContextWrapper
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.stringPreferencesKey
+import dev.clickn.translate.translate.CommunityTranslationClient
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.nio.file.Files
@@ -13,6 +14,11 @@ import java.util.zip.ZipInputStream
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.spec.GCMParameterSpec
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Protocol
+import okhttp3.Response
+import okhttp3.ResponseBody.Companion.toResponseBody
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
@@ -168,6 +174,42 @@ class PresetCredentialRepositoryTest {
     }
 
     @Test
+    fun cannotSendASavedKeyOrSourceTextToTheDefaultServerWhenTheCustomAddressIsUnreadable() = runBlocking {
+        val fixture = Fixture()
+        val repo = fixture.repo()
+        val endpoint = "https://configured.example/v1"
+        val dummy = "synthetic-libre-key"
+        val hosts = java.util.Collections.synchronizedList(mutableListOf<String>())
+        // This interceptor ends every request in memory, before any DNS or socket operation.
+        val client = CommunityTranslationClient(OkHttpClient.Builder().addInterceptor { chain ->
+            hosts += chain.request().url.host
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(200).message("OK")
+                .body("""{"translatedText":"synthetic result"}""".toResponseBody("application/json".toMediaType())).build()
+        }.build(), json)
+        repo.update { it.copy(translatorEngine = TranslatorEngine.LIBRETRANSLATE, sourceLang = "en", targetLang = "fr",
+            libreTranslateBaseUrl = endpoint, libreTranslateApiKey = dummy) }
+        assertEquals("synthetic result", client.translate("sample", repo.get()))
+        assertEquals(listOf("configured.example"), hosts.toList())
+        hosts.clear()
+        fixture.cipher.unreadableCiphertext = fixture.encryptedValue("libre_url").removePrefix(SettingsSecretCodec.PREFIX)
+        val unavailable = repo.get()
+        val result = runCatching { client.translate("sample", unavailable) }
+        assertTrue("No request may reach the transport while the selected address is unavailable", hosts.isEmpty())
+        assertTrue(result.isFailure)
+        assertTrue(unavailable.libreTranslateApiKey.isEmpty())
+        val edit = runCatching { repo.update { it.copy(libreTranslateApiKey = "synthetic-replacement") } }
+        assertTrue(edit.exceptionOrNull() is SecureSettingsUnavailableException)
+        repo.update { it.copy(overlayAlpha = 0.62f) }
+        fixture.cipher.unreadableCiphertext = null
+        val restored = fixture.repo().get()
+        assertTrue(restored.libreTranslateApiKey == dummy)
+        assertEquals(endpoint, restored.libreTranslateBaseUrl)
+        assertEquals(0.62f, restored.overlayAlpha, 0.001f)
+        assertEquals("synthetic result", client.translate("sample", restored))
+        assertEquals(listOf("configured.example"), hosts.toList())
+    }
+
+    @Test
     fun freshKeyWithNoKeystore_doesNotCommitAnUnusableProviderOrPlaintext() = runBlocking {
         val fixture = Fixture()
         val repo = fixture.repo()
@@ -266,6 +308,10 @@ class PresetCredentialRepositoryTest {
         private val store = PreferenceDataStoreFactory.create(
             scope = CoroutineScope(SupervisorJob() + Dispatchers.IO).also(storeScopes::add),
         ) { File(root, "datastore/clickntranslate_settings.preferences_pb") }
+        suspend fun encryptedValue(name: String): String =
+            requireNotNull(store.data.first()[stringPreferencesKey(name)]).also {
+                assertTrue(it.startsWith(SettingsSecretCodec.PREFIX))
+            }
         suspend fun protectedValues(id: String): List<String> {
             val prefs = store.data.first()
             return listOf("api_key", "base_url", "translation_presets_json", "local_preset_credentials_v1_$id").map {
