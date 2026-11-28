@@ -7,11 +7,28 @@ import pytest
 from tools import run_ci_tests
 
 
-def test_partitions_cover_every_file_once_in_order():
+def test_partitions_cover_every_file_once_in_deterministic_order():
     files = [f'test_{index:03}.py' for index in range(111)]
     parts = run_ci_tests.partition_files(list(reversed(files)), 2)
     assert [len(part) for part in parts] == [56, 55]
-    assert [name for part in parts for name in part] == files
+    assert sorted(name for part in parts for name in part) == files
+    assert parts == run_ci_tests.partition_files(files, 2)
+    assert all(part == sorted(part) for part in parts)
+
+
+def test_dominant_ui_suites_get_separate_runners_and_new_files_are_included():
+    heavy = ['tests/test_engine_background_jobs.py', 'tests/test_engine_center_stationary_layout.py',
+             'tests/test_guide_setup.py']
+    files = heavy + [f'tests/test_new_{n:02}.py' for n in range(24)]
+    parts = run_ci_tests.partition_files(files, 3)
+    assert all(len(set(part).intersection(heavy)) == 1 for part in parts)
+    assert sorted(name for part in parts for name in part) == sorted(files)
+
+
+def test_every_requested_runner_receives_work_when_there_are_enough_files():
+    files = [f'tests/test_{n}.py' for n in range(7)]
+    parts = run_ci_tests.partition_files(files, 6)
+    assert len(parts) == 6 and all(parts)
 
 
 def test_partitions_reject_empty_input_or_invalid_count():
