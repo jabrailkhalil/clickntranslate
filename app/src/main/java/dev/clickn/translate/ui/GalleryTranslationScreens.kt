@@ -115,6 +115,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -176,7 +178,7 @@ fun GalleryTranslationConfirmScreen(
     val scope = rememberCoroutineScope()
     var creating by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf("") }
-    var previewIndex by remember { mutableStateOf<Int?>(null) }
+    var previewIndex by rememberSaveable { mutableStateOf<Int?>(null) }
     var pendingSubmission by remember { mutableStateOf<GallerySubmission?>(null) }
     var showPresetSwitcher by rememberSaveable { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -273,7 +275,7 @@ fun GalleryTranslationConfirmScreen(
                 title = { Text(stringResource(R.string.gallery_confirm_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 },
             )
@@ -746,9 +748,11 @@ private fun GallerySelectedThumbnail(
             imageDecoder.decodeThumbnail(uriString, localPath = "")
         }
     }
+    val description = stringResource(R.string.gallery_preview_selected_name, index + 1)
     Card(
         onClick = onPreview,
-        modifier = modifier.aspectRatio(1f),
+        enabled = enabled,
+        modifier = modifier.aspectRatio(1f).semantics { contentDescription = description },
         shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -856,7 +860,7 @@ fun GalleryTranslationTasksScreen(
                 title = { Text(stringResource(R.string.gallery_tasks_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 },
                 actions = {
@@ -919,7 +923,7 @@ fun GalleryTranslationTaskDetailScreen(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showCancelDialog by remember { mutableStateOf(false) }
     var actionsExpanded by remember { mutableStateOf(false) }
-    var previewItemId by remember { mutableStateOf<String?>(null) }
+    var previewItemId by rememberSaveable(taskId) { mutableStateOf<String?>(null) }
     var exportProgress by remember { mutableStateOf<GalleryExportProgress?>(null) }
     var resultFilterIndex by rememberSaveable(taskId) { mutableIntStateOf(0) }
     val resultFilter = GalleryResultFilter.entries
@@ -1063,7 +1067,7 @@ fun GalleryTranslationTaskDetailScreen(
                 title = { Text(stringResource(R.string.gallery_task_detail_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 },
                 actions = {
@@ -1751,6 +1755,7 @@ private fun GalleryResultThumbnail(
     onPreview: () -> Unit,
 ) {
     val showProcessingPlaceholder = galleryResultThumbnailShowsProcessing(item.status)
+    val description = item.displayName.ifBlank { stringResource(R.string.gallery_preview_selected_name, item.position + 1) }
     val thumbnailShape = RoundedCornerShape(4.dp)
     val bitmap by produceState<android.graphics.Bitmap?>(
         initialValue = null,
@@ -1776,7 +1781,8 @@ private fun GalleryResultThumbnail(
             .clickable(
                 enabled = !showProcessingPlaceholder,
                 onClick = onPreview,
-            ),
+            )
+            .semantics { contentDescription = description },
         contentAlignment = Alignment.Center,
     ) {
         if (showProcessingPlaceholder) {
@@ -1835,7 +1841,7 @@ private fun GalleryImagePreviewDialog(
     if (sources.isEmpty()) return
     val safeInitialPage = galleryPreviewInitialPage(initialPage, sources.size)
     val pagerState = rememberPagerState(initialPage = safeInitialPage) { sources.size }
-    val currentSource = sources[pagerState.currentPage]
+    val currentSource = sources[galleryPreviewInitialPage(pagerState.currentPage, sources.size)]
 
     Dialog(
         onDismissRequest = onDismiss,

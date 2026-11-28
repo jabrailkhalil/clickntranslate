@@ -63,6 +63,10 @@ for orientation in portrait landscape landscape-ime; do
 done
 run_tests home-overlay-denial -e class dev.clickn.translate.ui.HomeOverlayPermissionIntegrationTest -e homeOverlayDenial true || failure=1
 run_tests offline-download-recovery -e class dev.clickn.translate.ui.OfflineDownloadRecoveryIntegrationTest -e offlineRecovery true || failure=1
+run_tests shared-preview -e class dev.clickn.translate.ui.SharedPhotoPreviewIntegrationTest -e sharedPreview true || failure=1
+if adb -s "$serial" shell run-as dev.clickn.translate.debug test -f files/qa-shared-preview-landscape.png; then
+  adb -s "$serial" exec-out run-as dev.clickn.translate.debug cat files/qa-shared-preview-landscape.png > "$report/shared-preview-landscape.png"
+fi
 # These tests exercise the enabled features, including Android's contextual action toolbar.
 # The fresh-install journey above runs with the normal initial permissions.
 adb -s "$serial" shell cmd appops set dev.clickn.translate.debug SYSTEM_ALERT_WINDOW allow
