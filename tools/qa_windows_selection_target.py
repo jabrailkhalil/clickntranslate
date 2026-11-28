@@ -256,17 +256,21 @@ def check_global_hotkeys(window, command, top, requests, results, actions):
             try:
                 wait_until(lambda: listener._registered, 'The fixture chord could not register')
                 if identifier == 4:
-                    with scenario('stable_window', listener) as observation:
-                        count = len(results)
-                        request_count = len(requests)
-                        press(listener)
-                        observation['before_dispatch'] = command('state', process_qt=False)
-                        wait_until(lambda: len(results) == count + 1, 'The stable global selection did not complete')
-                        normal = command('state')
-                        assert action_keys(normal) == [('First', 'C')] and requests[request_count:] == [SAMPLE], normal
-                        assert results[-1][4] == SAMPLE and results[-1][0] == TRANSLATION
-                    for dialog in main._live_translation_result_dialogs():
-                        dialog.close()
+                    # WPF can publish several formats while the copy shortcut is
+                    # returning. Repeat the actual registered chord to observe both schedules.
+                    for attempt in range(4):
+                        label = 'stable_window' if attempt == 0 else f'stable_window_repeat_{attempt + 1}'
+                        with scenario(label, listener) as observation:
+                            count = len(results)
+                            request_count = len(requests)
+                            press(listener)
+                            observation['before_dispatch'] = command('state', process_qt=False)
+                            wait_until(lambda: len(results) == count + 1, 'The stable global selection did not complete')
+                            normal = command('state')
+                            assert action_keys(normal) == [('First', 'C')] and requests[request_count:] == [SAMPLE], normal
+                            assert results[-1][4] == SAMPLE and results[-1][0] == TRANSLATION
+                        for dialog in main._live_translation_result_dialogs():
+                            dialog.close()
 
                     with scenario('different_field_during_copy', listener) as observation:
                         command('switch-on-copy')
