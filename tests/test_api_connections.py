@@ -68,6 +68,33 @@ def test_positioned_one_request_result_preserves_mapping(config):
     assert result.translations == ['Привет']
 
 
+@pytest.mark.parametrize(('target', 'direct', 'joined', 'unit'), [
+    ('en', True, True, 'paragraph'), ('en', True, False, 'visual line'),
+    ('en', False, True, 'visual line'), ('en', False, False, 'visual line'),
+    (None, True, True, 'visual line'),
+])
+def test_positioned_vision_requests_the_configured_layout_in_one_call(config, target, direct, joined, unit):
+    config['api_providers']['openai']['direct'] = direct
+    config['ocr_join_paragraphs'] = joined
+    with mock.patch.object(api, '_text_response', return_value='{"regions":[]}') as request:
+        api.recognize_regions('openai', Image.new('RGB', (40, 20)), 'ar', target, config)
+    request.assert_called_once()
+    instruction = request.call_args.args[3].lower()
+    assert 'one region per ' + unit in instruction
+    assert 'column' in instruction and 'list item' in instruction
+
+
+@pytest.mark.parametrize(('target', 'joined'), [(None, True), ('en', False)])
+def test_plain_vision_explicitly_preserves_visual_breaks_for_copy_and_unjoined_translation(config, target, joined):
+    config['ocr_join_paragraphs'] = joined
+    source = 'هَذَا مَلَكٌ\nمِنَ السَّمَاءِ'
+    with mock.patch.object(api, '_text_response', return_value=json.dumps({
+            'source': source, 'translation': 'An angel\nfrom heaven' if target else None})) as request:
+        result = api.recognize('openai', Image.new('RGB', (40, 20)), 'ar', target, config)
+    assert result.source == source
+    assert 'preserve the visual line breaks' in request.call_args.args[3].lower()
+
+
 @pytest.mark.parametrize('box', [[0,0,1001,30],[10,10,5,30],[0,0,float('nan'),10],[True,0,10,10]])
 def test_invalid_model_boxes_are_rejected(config, box):
     with mock.patch.object(api, '_text_response', return_value=json.dumps({'regions':[{'source':'Hi','box':box,'translation':'Привет'}]})):

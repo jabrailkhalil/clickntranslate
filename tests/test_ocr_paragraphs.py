@@ -199,6 +199,34 @@ def test_fullscreen_paragraphs_reach_the_actual_translation_call(enabled):
 
 
 @pytest.mark.parametrize('enabled', [False, True])
+@pytest.mark.parametrize(('source', 'left', 'right', 'joined'), [
+    ('ar', ('مَلِكٌ', 'فِي الْقَصْرِ'), ('مَلَكٌ', 'فِي السَّمَاءِ'),
+     ('مَلِكٌ فِي الْقَصْرِ', 'مَلَكٌ فِي السَّمَاءِ')),
+    ('ja', ('庭の', '花です'), ('本を', '読みます'), ('庭の花です', '本を読みます')),
+    ('ru', ('Проверка API', 'версии 2'), ('Русский', 'и English'), ('Проверка API версии 2', 'Русский и English')),
+])
+def test_fullscreen_vision_without_direct_translation_groups_each_column_at_its_own_bounds(
+        enabled, source, left, right, joined):
+    from api_providers import VisionLayout
+    owner = SimpleNamespace(_translation_run_id=7, _ocr_scale_x=1, _ocr_scale_y=1,
+                            _translation_result_ready=mock.Mock())
+    owner._translate_all = lambda *args: ocr.FullScreenTranslateOverlay._translate_all(owner, *args)
+    layout = VisionLayout([(24, 12, 172, 18, left[0]), (232, 12, 146, 18, right[0]),
+                           (24, 37, 172, 18, left[1]), (232, 37, 146, 18, right[1])])
+    with (mock.patch.object(ocr, 'get_cached_ocr_config', return_value={'ocr_join_paragraphs': enabled}),
+          mock.patch('threading.Thread', side_effect=inline_thread),
+          mock.patch('translater.translate_text', side_effect=lambda value, *args, **kwargs: value) as translate):
+        ocr.FullScreenTranslateOverlay._on_ocr_complete(owner, layout, 7, source, 'en')
+    translate.assert_called_once()
+    _run, blocks, error = owner._translation_result_ready.emit.call_args.args
+    assert not error
+    actual = {rect.getRect(): (original, translated) for rect, original, translated in blocks}
+    expected = ([(24, 12, 172, 43, joined[0]), (232, 12, 146, 43, joined[1])]
+                if enabled else layout)
+    assert actual == {tuple(row[:4]): (row[4], row[4]) for row in expected}
+
+
+@pytest.mark.parametrize('enabled', [False, True])
 def test_dynamic_paragraphs_reach_the_actual_translation_call(enabled):
     import game_mode
     owner = SimpleNamespace(_closed=False, paused=False, _target_is_active=lambda: True,

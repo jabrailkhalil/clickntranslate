@@ -6993,8 +6993,11 @@ class FullScreenTranslateOverlay(QWidget):
             return
 
         try:
-            from api_providers import VisionLayout
-            self._lines_data = lines_data if isinstance(lines_data, VisionLayout) else _group_screen_ocr_lines(lines_data, join_paragraphs=get_cached_ocr_config().get('ocr_join_paragraphs', True) is True)
+            if getattr(lines_data, 'translations', None) is not None:
+                self._lines_data = lines_data
+            else:
+                self._lines_data = _group_screen_ocr_lines(
+                    lines_data, join_paragraphs=get_cached_ocr_config().get('ocr_join_paragraphs', True) is True)
             if not self._lines_data:
                 self._fail_translation(run_id, "screen_no_text")
                 return
