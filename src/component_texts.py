@@ -55,10 +55,29 @@ CUSTOM_MODEL = {
 }
 
 
+SPACE_REQUIRED = {
+    'en': 'Free at least {mb} MB of disk space, then try the installation again.',
+    'ru': 'Освободите ещё хотя бы {mb} МБ на диске и повторите установку.',
+    'es': 'Libera al menos {mb} MB más de espacio en disco y vuelve a intentar la instalación.',
+    'de': 'Gib mindestens weitere {mb} MB Speicherplatz frei und versuche die Installation erneut.',
+    'fr': 'Libérez au moins {mb} Mo supplémentaires sur le disque, puis relancez l’installation.',
+    'zh': '请再释放至少 {mb} MB 磁盘空间，然后重新安装。',
+    'pt': 'Libere pelo menos mais {mb} MB de espaço em disco e tente instalar novamente.',
+    'it': 'Libera almeno altri {mb} MB di spazio su disco e riprova a installare.',
+    'ar': 'حرّر ما لا يقل عن {mb} ميغابايت إضافية على القرص ثم أعد محاولة التثبيت.',
+    'tr': 'Diskte en az {mb} MB daha yer açıp kurulumu yeniden deneyin.',
+    'hi': 'डिस्क पर कम से कम {mb} MB और जगह खाली करें, फिर दोबारा इंस्टॉल करें।',
+    'id': 'Kosongkan setidaknya {mb} MB lagi di disk, lalu coba pasang kembali.',
+}
+
+
 def error_text(language, error):
     values = TEXT.get(language, TEXT['en'])
     code = getattr(error, 'code', '')
     if code == 'custom_model_not_approved':
         return CUSTOM_MODEL.get(language, CUSTOM_MODEL['en'])
+    if code == 'not_enough_space' and getattr(error, 'missing_bytes', 0) > 0:
+        megabytes = (error.missing_bytes + 999_999) // 1_000_000
+        return SPACE_REQUIRED.get(language, SPACE_REQUIRED['en']).format(mb=megabytes)
     index = 1 if code == 'no_compatible_update' else 2 if code in ('catalog_unavailable', 'update_client_missing') else 3
     return values[index] + (f' [{code}]' if code else '')

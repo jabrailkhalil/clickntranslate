@@ -10,6 +10,7 @@ from pathlib import Path
 import shutil
 import sys
 import threading
+from types import SimpleNamespace
 import zipfile
 
 import pytest
@@ -108,6 +109,51 @@ def test_failed_install_keeps_previous_and_reuses_bytes(tmp_path):
     assert store.active('ocr.rapidocr')['receipt']['revision'] == 2
     store.rollback('ocr.rapidocr', validate, catalog)
     assert store.active('ocr.rapidocr')['receipt']['revision'] == 1
+
+
+@pytest.mark.parametrize('saved', ['none', 'half', 'complete', 'duplicate'])
+def test_install_reserves_only_the_missing_download_once(tmp_path, monkeypatch, saved):
+    catalog, archive = fixture_catalog(tmp_path)
+    bundle = catalog['bundles'][0]
+    digest = bundle['files'][0]['sha256']
+    data = archive.read_bytes()
+    store = ComponentStore(tmp_path / 'store')
+    if saved == 'duplicate':
+        bundle['files'].append(dict(bundle['files'][0], destination='runtime-copy'))
+    count = {'half': len(data) // 2, 'complete': len(data)}.get(saved, 0)
+    partial = store.root / 'downloads' / digest
+    if count:
+        partial.parent.mkdir(parents=True)
+        partial.write_bytes(data[:count])
+    expanded = len(bundle['files']) * catalog['artifacts'][digest]['unpacked_size']
+    required = 64 * 1024**2 + expanded + len(data) - count
+    calls = []
+    def download(_url, target):
+        calls.append(target)
+        Path(target).write_bytes(data)
+    with store.lock():
+        monkeypatch.setattr(shutil, 'disk_usage', lambda _: SimpleNamespace(free=required - 1))
+        with pytest.raises(ComponentError, match='not_enough_space') as exc:
+            store.install(catalog, bundle, download, lambda *_: None)
+        assert not calls and store.describe(bundle['component']) is None
+        if count:
+            assert partial.read_bytes() == data[:count]
+        monkeypatch.setattr(shutil, 'disk_usage', lambda _: SimpleNamespace(free=required))
+        active = store.install(catalog, bundle, download, lambda *_: None)
+    assert (active['folder'] / 'runtime' / 'python.exe').read_text() == 'test interpreter'
+    assert len(calls) == (0 if saved == 'complete' else 1)
+    if saved == 'duplicate':
+        assert (active['folder'] / 'runtime-copy' / 'python.exe').is_file()
+    assert exc.value.missing_bytes == 1
+
+
+def test_insufficient_space_reports_how_much_to_free_in_each_interface_language():
+    from component_catalog import NotEnoughSpace
+    from component_texts import TEXT, error_text
+
+    messages = [error_text(locale, NotEnoughSpace(2_000_001)) for locale in TEXT]
+    assert len(set(messages)) == len(TEXT)
+    assert all('3' in message and 'not_enough_space' not in message for message in messages)
 
 
 def test_native_data_arguments_do_not_use_device_paths_with_mixed_separators():

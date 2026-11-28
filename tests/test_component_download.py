@@ -142,6 +142,21 @@ def test_canceled_download_resumes_exact_prefix_and_checks_full_digest(tmp_path)
         assert not ComponentDownloader.metadata_path(partial).exists()
 
 
+def test_repair_reclaims_a_damaged_cache_object_before_downloading_another_copy(tmp_path):
+    store = ComponentStore(tmp_path)
+    data = b'approved runtime' * 128
+    digest, artifact = specification(data, 'https://example.org/runtime')
+    cached = store.object_path(digest)
+    cached.parent.mkdir(parents=True)
+    cached.write_bytes(b'x' * len(data))
+    def replace(_url, destination):
+        assert not cached.exists()
+        from pathlib import Path
+        Path(destination).write_bytes(data)
+    with store.lock():
+        assert store.obtain(digest, artifact, replace, lambda: None).read_bytes() == data
+
+
 @pytest.mark.parametrize('mode', ['normal', 'ignore-range', 'bad-range', 'reject-range'])
 def test_resume_handles_standard_and_nonresuming_servers_without_mixing_bytes(tmp_path, mode):
     data = b'approved component bytes' * 4096

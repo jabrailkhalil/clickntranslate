@@ -21,6 +21,12 @@ class ComponentError(RuntimeError):
         super().__init__(f'{code}: {detail}' if detail else code)
 
 
+class NotEnoughSpace(ComponentError):
+    def __init__(self, missing_bytes):
+        self.missing_bytes = missing_bytes
+        super().__init__('not_enough_space', f'{missing_bytes} more bytes required')
+
+
 def safe_relative(value):
     if not isinstance(value, str) or not value or '\x00' in value or '\\' in value or ':' in value:
         raise ComponentError('invalid_path', str(value))

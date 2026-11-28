@@ -13,7 +13,7 @@ import uuid
 import zipfile
 import threading
 
-from component_catalog import ComponentError, SAFE_ID, SHA256, safe_relative, runtime_command
+from component_catalog import ComponentError, NotEnoughSpace, SAFE_ID, SHA256, safe_relative, runtime_command
 from component_download import ComponentDownloader
 
 _MAINTENANCE_LOCK = threading.Lock()
@@ -258,12 +258,25 @@ class ComponentStore:
             raise ComponentError('invalid_artifact')
         return self.root / 'objects' / digest
 
+    def _missing_download_size(self, digest, size):
+        cached = self.object_path(digest)
+        partial = self.root / 'downloads' / digest
+        for path in (cached, partial):
+            if path.is_symlink():
+                raise ComponentError('invalid_artifact', 'cache or download link')
+        if cached.is_file() and cached.stat().st_size == size:
+            return 0
+        # Both an append and a fresh GET reuse the space occupied by this prefix.
+        return max(0, size - partial.stat().st_size) if partial.is_file() else size
+
     def obtain(self, digest, artifact, download, check_cancel):
         path = self.object_path(digest)
         if path.is_symlink():
             raise ComponentError('invalid_artifact', 'cache link')
-        if path.is_file() and path.stat().st_size == artifact['size'] and file_digest(path, check_cancel) == digest:
-            return path
+        if path.is_file():
+            if path.stat().st_size == artifact['size'] and file_digest(path, check_cancel) == digest:
+                return path
+            path.unlink()  # Release the invalid cache object before writing its replacement.
         path.parent.mkdir(parents=True, exist_ok=True)
         partial = self.root / 'downloads' / digest
         partial.parent.mkdir(parents=True, exist_ok=True)
@@ -365,10 +378,19 @@ class ComponentStore:
                 # objects. Do not retain this known-broken generation as rollback.
                 # If rebuilding fails, its active pointer is still untouched.
                 old = None
-        expanded = sum(catalog['artifacts'][f['sha256']].get('unpacked_size', catalog['artifacts'][f['sha256']]['size']) for f in bundle['files'])
-        compressed = sum(catalog['artifacts'][f['sha256']]['size'] for f in bundle['files'] if not self.object_path(f['sha256']).exists())
-        if shutil.disk_usage(self.root).free < expanded + compressed + 64 * 1024**2:
-            raise ComponentError('not_enough_space')
+        artifacts = catalog['artifacts']
+        expanded = 0
+        requested = set()
+        for item in bundle['files']:
+            digest = item['sha256']
+            requested.add(digest)
+            artifact = artifacts[digest]
+            expanded += artifact['size'] if item['kind'] == 'file' else artifact['unpacked_size']
+        downloads = sum(self._missing_download_size(digest, artifacts[digest]['size']) for digest in requested)
+        required = expanded + downloads + 64 * 1024**2
+        free = shutil.disk_usage(self.root).free
+        if free < required:
+            raise NotEnoughSpace(required - free)
         generation = uuid.uuid4().hex
         folder = self.generation(generation)
         receipt = {**bundle, 'bundle': bundle['id'], 'generation': generation, 'installed_at': int(time.time()),
