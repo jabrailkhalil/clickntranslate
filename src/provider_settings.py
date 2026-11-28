@@ -380,7 +380,7 @@ def show_provider_settings(settings, provider=None):
 
 
 class ProviderSettingsPage(QWidget):
-    def __init__(self, settings, parent=None):
+    def __init__(self, settings, parent=None, *, edit_state=None):
         super().__init__(parent)
         from settings_window import DropDownCombo
         from styled_dialogs import tooltip_text
@@ -491,6 +491,9 @@ class ProviderSettingsPage(QWidget):
         self.save.clicked.connect(self.save_profile)
         self.use.clicked.connect(self.select_profile)
         self.delete.clicked.connect(self.delete_key)
+        if edit_state is not None:
+            selected, self.drafts = edit_state
+            self.service.setCurrentIndex(self.service.findData(selected))
         self.service.currentIndexChanged.connect(self.load_profile)
         self.usage.currentIndexChanged.connect(self._refresh_routing_preview)
         self.model.textChanged.connect(self._refresh_routing_preview)
@@ -538,8 +541,12 @@ class ProviderSettingsPage(QWidget):
 
     def _capture(self):
         usage = self.usage.currentData()
-        return dict(url=self.address.text().strip(), model=self.model.text().strip(),
+        return dict(url=self.address.text(), model=self.model.text(),
                     vision=usage in ('ocr', 'direct'), direct=usage == 'direct', key=self.key.text())
+
+    def edit_state(self):
+        """Keep incomplete edits only in the open window during relocalization."""
+        return self.active, {**self.drafts, self.active: self._capture()}
 
     def _set_status(self, text):
         self.status.setText(text)
@@ -617,6 +624,8 @@ class ProviderSettingsPage(QWidget):
     def save_profile(self):
         from provider_secrets import set_key, get_key
         spec, item = BY_KEY[self.active], self._capture()
+        item['url'] = item['url'].strip()
+        item['model'] = item['model'].strip()
         try:
             validate_url(item['url'])
             if self.active == 'deepl' and item['url'] not in {'https://api-free.deepl.com/v2', 'https://api.deepl.com/v2'}:

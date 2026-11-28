@@ -7006,12 +7006,15 @@ class OcrLanguageManagerDialog(QDialog):
         if self.api_page is not None:
             self.api_page.apply_theme()
 
-    def show_api(self, provider=None):
-        self.body_stack.setCurrentWidget(self.tabs)
+    def _ensure_api_page(self, edit_state=None):
         if self.api_page is None:
             from provider_settings import ProviderSettingsPage
-            self.api_page = ProviderSettingsPage(self.owner, self.api_section_page)
+            self.api_page = ProviderSettingsPage(self.owner, self.api_section_page, edit_state=edit_state)
             self.api_section_layout.addWidget(self.api_page)
+
+    def show_api(self, provider=None):
+        self.body_stack.setCurrentWidget(self.tabs)
+        self._ensure_api_page()
         self.tabs.setCurrentWidget(self.api_section_page)
         from engine_center import text as center_text
         self.intro_label.setText(center_text(self.lang, 'api_intro'))
@@ -15965,6 +15968,7 @@ finally {
             if _package_mutation_busy(self):
                 return
             was_visible = dialog.isVisible()
+            api_edits = dialog.api_page.edit_state() if was_visible and dialog.api_page is not None else None
             sections = (
                 dialog.tabs.currentIndex(),
                 dialog.ocr_tabs.currentIndex(),
@@ -15982,6 +15986,8 @@ finally {
 
         fresh = OcrLanguageManagerDialog(self)
         self._language_manager_dialog = fresh
+        if api_edits is not None:
+            fresh._ensure_api_page(api_edits)
         # Put the user back on the tab they were reading, where they left it.
         fresh.tabs.setCurrentIndex(sections[0])
         fresh.ocr_tabs.setCurrentIndex(sections[1])

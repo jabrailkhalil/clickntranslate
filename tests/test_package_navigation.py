@@ -48,6 +48,44 @@ def test_api_tab_click_retains_navigation_and_editable_draft(window, app, langua
         dialog.close()
 
 
+@pytest.mark.parametrize('visible_section', [0, 2], ids=['ocr', 'api'])
+def test_open_engine_center_retains_provider_drafts_across_language_change(window, app, visible_section):
+    window.set_interface_language('en')
+    window.show_settings()
+    settings = window.settings_window
+    with (mock.patch('provider_secrets.get_key', return_value=''),
+          mock.patch('provider_secrets.set_key') as store,
+          mock.patch.object(OcrLanguageManagerDialog, '_start_runtime_probe'),
+          mock.patch.object(OcrLanguageManagerDialog, '_start_argos_catalog_refresh')):
+        settings.show_ocr_language_manager()
+        dialog = settings._language_manager_dialog
+        page = dialog.show_api('openai-compatible')
+        page.address.setText('https://example.org/pending/v1')
+        page.model.setText('draft model ')
+        page.key.setText('synthetic unsaved value')
+        page.usage.setCurrentIndex(page.usage.findData('direct'))
+        page.service.setCurrentIndex(page.service.findData('gemini'))
+        page.model.setText('another draft')
+        dialog.tabs.setCurrentIndex(visible_section)
+        original_config = window.config.get('api_providers')
+        window.set_interface_language('ar')
+        app.processEvents()
+        fresh = settings._language_manager_dialog
+        assert fresh.isVisible() and fresh.lang == 'ar'
+        assert fresh.tabs.currentIndex() == visible_section
+        fresh.tabs.setCurrentIndex(2)
+        page = fresh.api_page
+        assert (page.service.currentData(), page.model.text()) == ('gemini', 'another draft')
+        page.service.setCurrentIndex(page.service.findData('openai-compatible'))
+        assert page.address.text() == 'https://example.org/pending/v1'
+        assert page.model.text() == 'draft model ' and page.usage.currentData() == 'direct'
+        assert page.key.text() == 'synthetic unsaved value'
+        assert page.key.echoMode() == QtWidgets.QLineEdit.Password
+        assert window.config.get('api_providers') == original_config
+        store.assert_not_called()
+        fresh.close()
+
+
 @pytest.mark.parametrize('percent', (80, 100, 137))
 @pytest.mark.skipif(sys.platform != 'win32', reason='Windows native popup policy')
 def test_lower_main_language_lists_open_below_the_field_when_desktop_space_exists(window, app, percent):
