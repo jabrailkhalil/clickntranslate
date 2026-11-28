@@ -1433,6 +1433,13 @@ class _HotkeyErrorDispatcher(QtCore.QObject):
 
 hotkey_error_dispatcher = _HotkeyErrorDispatcher()
 
+
+def _selection_hotkey(callback):
+    """Capture the source HWND when Windows delivers this action's shortcut."""
+    callback._capture_hotkey_window = True
+    return callback
+
+
 class HotkeyListenerThread(threading.Thread):
     def __init__(self, hotkey_str, callback, hotkey_id=1):
         super().__init__()
@@ -1455,7 +1462,7 @@ class HotkeyListenerThread(threading.Thread):
             try:
                 from double_tap_hotkeys import registry
                 self._double_registration = registry().register(
-                    self.hotkey_str, lambda: hotkey_dispatcher.triggered.emit(self._invoke))
+                    self.hotkey_str, self._queue_invoke)
             except Exception:
                 logging.exception('Could not register double-tap shortcut')
                 hotkey_error_dispatcher.registration_failed_owned.emit(self._stop_event, self.hotkey_str)
@@ -1496,7 +1503,16 @@ class HotkeyListenerThread(threading.Thread):
         # not by the GUI thread calling stop(). The short wait in run() wakes
         # within 50 ms and releases it in finally before join() returns.
 
-    def _invoke(self):
+    def _queue_invoke(self):
+        if platform_support.IS_WINDOWS and getattr(self.callback, '_capture_hotkey_window', False) is True:
+            # The GUI may consume this event after another application takes focus.
+            # A zero HWND must also travel with the event, so it cannot adopt a new window.
+            window = _windows_foreground_window()
+            hotkey_dispatcher.triggered.emit(lambda: self._invoke(_hotkey_window=window))
+        else:
+            hotkey_dispatcher.triggered.emit(self._invoke)
+
+    def _invoke(self, **selection_options):
         if self._stop_event.is_set():
             return
         focus = QApplication.focusWidget()
@@ -1504,7 +1520,7 @@ class HotkeyListenerThread(threading.Thread):
             if isinstance(focus, QtWidgets.QKeySequenceEdit):
                 return  # Recording a shortcut must not launch its old action.
             focus = focus.parentWidget()
-        self.callback()
+        self.callback(**selection_options)
 
     def parse_hotkey(self, hotkey_str):
         if not isinstance(hotkey_str, str) or not hotkey_str.strip():
@@ -1637,7 +1653,7 @@ class HotkeyListenerThread(threading.Thread):
                 while not self._stop_event.is_set() and ctypes.windll.user32.PeekMessageW(
                         ctypes.byref(msg), None, 0, 0, 0x0001):  # PM_REMOVE
                     if msg.message == WM_HOTKEY and msg.wParam == self.hotkey_id:
-                        hotkey_dispatcher.triggered.emit(self._invoke)
+                        self._queue_invoke()
                     ctypes.windll.user32.TranslateMessage(ctypes.byref(msg))
                     ctypes.windll.user32.DispatchMessageW(ctypes.byref(msg))
         except Exception:
@@ -13273,18 +13289,20 @@ class DarkThemeApp(QMainWindow):
                 continue
         return ""
 
-    def launch_translate_selection(self, expected_target=None, *, _request_token=None):
+    @_selection_hotkey
+    def launch_translate_selection(self, expected_target=None, **request_options):
         """Translate selected text without ever modifying the source application."""
         return self._launch_translate_selection(replace_selection=False, expected_target=expected_target,
-                                               **({'_request_token': _request_token} if _request_token is not None else {}))
+                                               **request_options)
 
-    def launch_translate_replace_selection(self, expected_target=None, *, _request_token=None):
+    @_selection_hotkey
+    def launch_translate_replace_selection(self, expected_target=None, **request_options):
         """Translate selected text and safely replace that exact selection on Windows."""
         return self._launch_translate_selection(replace_selection=True, expected_target=expected_target,
-                                               **({'_request_token': _request_token} if _request_token is not None else {}))
+                                               **request_options)
 
     def _launch_translate_selection(self, replace_selection=False, preloaded_text=None, expected_target=None,
-                                    *, _request_token=None):
+                                    *, _request_token=None, _hotkey_window=None):
         """Shared selected-text workflow used by the safe and replacement hotkeys."""
         preloaded = str(preloaded_text or "").strip()
         if platform_support.IS_MAC and not preloaded:
@@ -13306,7 +13324,7 @@ class DarkThemeApp(QMainWindow):
             from windows_selection import prepare_windows_selection
             prepare_windows_selection()
         # Pin the source of a hotkey before its worker starts waiting for modifiers.
-        selection_window = expected_target
+        selection_window = expected_target if expected_target is not None else _hotkey_window
         if selection_window is None and (replace_selection or not preloaded):
             if platform_support.IS_WINDOWS:
                 selection_window = _windows_foreground_window()

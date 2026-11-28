@@ -12,6 +12,7 @@ import selection_quick_translate as quick
 import windows_selection
 from selection_test_support import editable_editor
 from test_companion_selection_target import SelectionRequest, capture
+from test_windows_hotkey_lifecycle import FakeUser32
 from test_windows_uia_contract import NativeCall
 
 
@@ -200,3 +201,53 @@ def test_switch_and_new_copy_during_final_focus_verification_preserve_the_user_c
     paste.assert_not_called()
     assert capture.clipboard.text == 'User copy from second editor'
     assert len(owner.shown_dialogs) == 1 and owner.shown_dialogs[0][0] == 'Translated selection'
+
+
+@pytest.mark.parametrize('identifier,action', [(4, 'launch_translate_selection'),
+                                               (6, 'launch_translate_replace_selection')])
+@pytest.mark.parametrize('original,current', [(42, 42), (42, 99), (0, 99), (42, 0)])
+def test_global_selection_uses_the_window_that_received_the_native_hotkey(
+        capture, editable_editor, monkeypatch, identifier, action, original, current):
+    owner = SelectionRequest()
+    native = FakeUser32()
+    pending = []
+    delivered = Event()
+    message = [main.WM_HOTKEY]
+
+    def peek(pointer, *_args):
+        if not message:
+            return 0
+        pointer._obj.message = message.pop()
+        pointer._obj.wParam = identifier
+        return 1
+
+    native.PeekMessageW = peek
+    native.TranslateMessage = lambda _pointer: True
+    native.DispatchMessageW = lambda _pointer: delivered.set()
+    monkeypatch.setattr(main.ctypes.windll, 'user32', native)
+    monkeypatch.setattr(main, 'hotkey_dispatcher', SimpleNamespace(triggered=SimpleNamespace(emit=pending.append)))
+    monkeypatch.setattr(main.QApplication, 'focusWidget', lambda: None)
+    paste = mock.Mock()
+    monkeypatch.setattr(main, 'simulate_paste', paste)
+    editable_editor.side_effect = lambda window: windows_selection.WindowsEditTarget(window, 105, (window, 1))
+    capture.foreground = original
+    listener = main.HotkeyListenerThread('Ctrl+Alt+F23', getattr(owner, action), hotkey_id=identifier)
+    listener.start()
+    try:
+        assert delivered.wait(2) and len(pending) == 1
+        capture.foreground = current
+        pending.pop()()
+    finally:
+        listener.stop()
+        listener.join(timeout=2)
+    assert not listener.is_alive()
+    if original == current:
+        capture.provider.assert_called_once_with('Source selection', 'es', 'en')
+        assert paste.called is (identifier == 6)
+    else:
+        capture.copy.assert_not_called()
+        capture.copy_shortcut.assert_not_called()
+        capture.provider.assert_not_called()
+        paste.assert_not_called()
+        assert capture.clipboard.text == 'Clipboard before selection'
+    assert owner.finished == []
