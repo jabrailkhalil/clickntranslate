@@ -30,11 +30,16 @@ def prepare(current, output):
 
     expected_certificate = fingerprint(current)
     with zipfile.ZipFile(current) as archive:
-        libraries = [info for info in archive.infolist() if info.filename.startswith("lib/x86_64/") and info.filename.endswith(".so")]
+        # The Google APIs x86_64 AVD also reports arm64-v8a through its native bridge.
+        # Carry the architecture that this build actually ships.
+        libraries = [info for info in archive.infolist()
+                     if info.filename.startswith(("lib/arm64-v8a/", "lib/x86_64/")) and info.filename.endswith(".so")]
+        if not libraries:
+            raise ValueError("The debug APK has no supported native library for the acceptance device")
         lib = min(libraries, key=lambda info: info.file_size)
         content = archive.read(lib)
         if not content.startswith(b"\x7fELF"):
-            raise ValueError("Expected a native x86_64 library from the current APK")
+            raise ValueError("Expected a native ELF library from the current APK")
 
     for name, fixture_code in (("older", code - 1), ("newer", code + 1)):
         with tempfile.TemporaryDirectory(dir=output) as tmp:

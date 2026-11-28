@@ -4,6 +4,7 @@ import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
 import android.view.accessibility.AccessibilityWindowInfo
@@ -25,6 +26,7 @@ import java.io.File
 import java.security.MessageDigest
 import java.util.UUID
 import java.util.concurrent.TimeUnit
+import java.util.zip.ZipFile
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Assume.assumeTrue
@@ -58,7 +60,12 @@ class ApkInstallerContinuityIntegrationTest {
                 digest.update(buffer, 0, count)
             }
         }
-        val apk = ReleaseApk("v$version", "ClicknTranslate-$version-x64.apk", source.length(), digest.digest().hex(), code + 1)
+        val abi = ZipFile(source).use { zip ->
+            zip.entries().asSequence().filter { it.name.startsWith("lib/") && it.name.endsWith(".so") }
+                .map { it.name.split('/')[1] }.distinct().single()
+        }
+        assertTrue("The generated fixture must use an ABI actually supported by this AVD", abi in Build.SUPPORTED_ABIS)
+        val apk = ReleaseApk("v$version", "ClicknTranslate-$version-$abi.apk", source.length(), digest.digest().hex(), code + 1)
         val ready = verifiedApkFile(app, apk)
         ready.parentFile!!.mkdirs()
         try {

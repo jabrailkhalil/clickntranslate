@@ -110,7 +110,7 @@ if adb -s "$serial" shell run-as dev.clickn.translate.debug test -f files/qa-upd
   adb -s "$serial" exec-out run-as dev.clickn.translate.debug cat files/qa-update-320dp-large-rtl.png > "$report/update-320dp-large-rtl.png"
 fi
 run_tests provider-rotation -e class dev.clickn.translate.ui.ProviderEditorRotationIntegrationTest -e providerRotation true || failure=1
-for orientation in portrait landscape landscape-ime; do
+for orientation in portrait landscape landscape-ime advanced-after-tap; do
   if adb -s "$serial" shell run-as dev.clickn.translate.debug test -f "files/qa-provider-rotation/$orientation.png"; then
     adb -s "$serial" exec-out run-as dev.clickn.translate.debug cat "files/qa-provider-rotation/$orientation.png" > "$report/provider-$orientation.png"
   fi

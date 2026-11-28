@@ -62,11 +62,26 @@ class ProviderEditorRotationIntegrationTest {
                 form.performScrollToNode(hasSetTextAction())
                 fields[0].assertTextContains(savedUrl).performTextReplacement("bad-address")
                 fields[1].performTextReplacement("unused-draft-key")
+                Espresso.closeSoftKeyboard()
+                compose.waitForIdle()
                 form.performScrollToNode(hasTestTag("provider-save"))
                 compose.onNodeWithTag("provider-save").assertIsNotEnabled()
                 form.performScrollToNode(hasTestTag("provider-advanced"))
-                compose.onNodeWithTag("provider-advanced").assertIsEnabled().performClick()
-                compose.waitUntil(10_000) { compose.onAllNodesWithTag("provider-form").fetchSemanticsNodes().isEmpty() }
+                compose.onNodeWithTag("provider-advanced").assertIsDisplayed().assertIsEnabled().performTouchInput { click() }
+                try {
+                    compose.waitUntil(10_000) { compose.onAllNodesWithTag("provider-form").fetchSemanticsNodes().isEmpty() }
+                } catch (failure: ComposeTimeoutException) {
+                    val frame = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
+                    if (frame != null) {
+                        val directory = File(app.filesDir, "qa-provider-rotation").apply { mkdirs() }
+                        try {
+                            File(directory, "advanced-after-tap.png").outputStream().use {
+                                frame.compress(Bitmap.CompressFormat.PNG, 100, it)
+                            }
+                        } finally { frame.recycle() }
+                    }
+                    throw failure
+                }
                 val general = button(R.string.refine_general)
                 compose.onNode(hasScrollAction()).performScrollToNode(general)
                 compose.onNode(general).assertIsDisplayed()
