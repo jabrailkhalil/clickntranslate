@@ -136,7 +136,8 @@ def test_legacy_backend_does_not_claim_to_recognize_arabic():
 
 @pytest.mark.parametrize('code,group,use_cls,detector_min_side', [
     ('en', 'en', True, 448), ('ru', 'cyrillic', True, 448),
-    ('ar', 'arabic', False, 736), ('zh', 'ch', True, 736), ('de', 'latin', True, 736),
+    ('ar', 'arabic', False, 192), ('ar-SA', 'arabic', False, 192),
+    ('fa', 'arabic', False, 736), ('zh', 'ch', True, 736), ('de', 'latin', True, 736),
 ])
 def test_modern_profile_pins_v5_and_local_paths_instead_of_upstream_defaults(
         tmp_path, code, group, use_cls, detector_min_side):

@@ -118,8 +118,12 @@ def create_engine(rapid_cls, language_code='en', root_dir=''):
                        f'{component}.ocr_version': OCRVersion(version),
                        f'{component}.lang_type': language,
                        f'{component}.model_path': paths[key]})
-    if group not in ('en', 'cyrillic'):
+    if group not in ('en', 'cyrillic') and code != 'ar':
         return rapid_cls(params=params)
+
+    # Arabic dots and short vowels detach from their word when a compact
+    # screenshot is enlarged to the full-page detector's minimum size.
+    selection_side = 192 if code == 'ar' else 448
 
     class ScreenSelectionOCR(rapid_cls):
         def detect_and_crop(self, image, op_record):
@@ -130,7 +134,7 @@ def create_engine(rapid_cls, language_code='en', root_dir=''):
             # Share the loaded ONNX session but keep this call's scale private.
             selection = copy(self)
             selection.text_det = copy(self._load_det_model())
-            selection.text_det.limit_side_len = 448
+            selection.text_det.limit_side_len = selection_side
             return rapid_cls.detect_and_crop(selection, image, op_record)
 
     return ScreenSelectionOCR(params=params)

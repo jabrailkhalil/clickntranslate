@@ -54,8 +54,10 @@ def rapidocr(cards):
 def geometry_comparison(cards):
     """Separate detector crop errors from recognizer errors using the same pinned model."""
     from copy import copy
+    from types import MethodType
     from PIL import Image, ImageChops, ImageOps
     import pytesseract
+    from rapidocr import RapidOCR
     from ocr_worker import _parse_rapidocr_output, _rapidocr_class
     from ocr_text_layout import ocr_text_from_items
     from rapidocr_models import create_engine
@@ -76,6 +78,7 @@ def geometry_comparison(cards):
                 engine = copy(base)
                 engine.text_det = copy(base._load_det_model())
                 engine.text_det.limit_side_len = limit
+                engine.detect_and_crop = MethodType(RapidOCR.detect_and_crop, engine)
                 trials.append((f'det-{limit}-{treatment}',
                                lambda e=engine, im=image: [ocr_text_from_items(_parse_rapidocr_output(e(im)))]))
         for padding in (2, 6, 12):
@@ -93,6 +96,47 @@ def geometry_comparison(cards):
             value = ' '.join(probe() or ()).strip()
             pieces.setdefault(setting, {})[name] = dict(compare(reference, value), elapsed_ms=round((time.monotonic()-start)*1000, 1))
     return pieces
+
+
+def independent_screens():
+    """Compare the application with the original detector on a different font and new text."""
+    from copy import copy
+    from types import MethodType
+    from PIL import Image, ImageDraw, ImageFont, features
+    from rapidocr import RapidOCR
+    from ocr_worker import _parse_rapidocr_output
+    from ocr_text_layout import ocr_text_from_items
+    from rapidocr_models import create_engine
+
+    if not features.check('raqm'):
+        raise RuntimeError('Arabic shaping is required to render the independent test images')
+    engine = create_engine(RapidOCR, 'ar')
+    original = copy(engine)
+    original.detect_and_crop = MethodType(RapidOCR.detect_and_crop, original)
+    sentences = ('وصل القطار في المساء.', 'اقرأ الكِتاب ثم اكتب الجواب.',
+                 'رقم الطلب AB-25 اليوم.', 'تبدأ الرحلة عند الساعة 12:30.',
+                 'في المطار مَلِك عادل.', 'على السحابة مَلَك صغير.')
+    reports = []
+    for size in (16, 26, 40):
+        font = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', size)
+        for sequence, sentence in enumerate(sentences):
+            for fg, bg in ((24, 246), (240, 26)):
+                lines = ([sentence, sentences[(sequence+1) % len(sentences)]]
+                         if sequence % 3 == 0 else [sentence])
+                w = max(int(font.getlength(line, direction='rtl')) for line in lines) + 34
+                spacing = int(size*1.65)
+                im = Image.new('RGB', (w, 28 + spacing*len(lines)), (bg, bg, bg))
+                draw = ImageDraw.Draw(im)
+                for y, line in enumerate(lines):
+                    draw.text((w-16, 12+y*spacing), line, font=font, anchor='rt', direction='rtl', fill=(fg,fg,fg))
+                expected = ' '.join(lines)
+                row = dict(expected=expected, size=size, background=bg, lines=len(lines))
+                for name, run in (('original', original), ('candidate', engine)):
+                    start = time.perf_counter()
+                    text = ocr_text_from_items(_parse_rapidocr_output(run(im)))
+                    row[name] = dict(compare(expected, text), elapsed_ms=round(1000*(time.perf_counter()-start),1))
+                reports.append(row)
+    return reports
 
 
 def platform_ocr(cards):
@@ -131,7 +175,7 @@ def platform_ocr(cards):
     return dict(engine=engine, available=True, cases=rows)
 
 
-def main(path):
+def main(path, calibrate=False):
     if os.environ.get('RUNNER_ENVIRONMENT') != 'github-hosted':
         raise SystemExit('Runs on a disposable hosted desktop.')
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -147,7 +191,9 @@ def main(path):
                 try:
                     report['engines']['platform'] = platform_ocr(cards)
                     if sys.platform.startswith('linux'):
-                        report['geometry_comparison'] = geometry_comparison(cards)
+                        report['independent_screens'] = independent_screens()
+                        if calibrate:
+                            report['geometry_comparison'] = geometry_comparison(cards)
                 finally:
                     if 'ocr' in sys.modules:
                         sys.modules['ocr'].close_ocr_diagnostics_logging()
@@ -156,6 +202,8 @@ def main(path):
                 result['exact_count'] = sum(case['exact_letters_and_marks'] for case in rows.values())
                 result['base_count'] = sum(case['same_base_letters'] for case in rows.values())
                 assert any(case['text'] for case in rows.values())
+        critical = ('angel-dark54', 'king-dark54', 'another-angel-dark54', 'another-king-dark54', 'mixed-dark54')
+        assert all(report['engines']['rapidocr']['cases'][case]['exact_letters_and_marks'] for case in critical)
     finally:
         path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
 
@@ -163,4 +211,6 @@ def main(path):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('output', type=Path)
-    main(parser.parse_args().output)
+    parser.add_argument('--compare-geometry', action='store_true')
+    options = parser.parse_args()
+    main(options.output, options.compare_geometry)

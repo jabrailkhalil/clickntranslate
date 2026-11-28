@@ -50,7 +50,7 @@ jobs:
       - if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libegl1 tesseract-ocr-ara
+          sudo apt-get install -y libegl1 libfribidi0 fonts-dejavu-core tesseract-ocr-ara
       - name: Enable Windows Arabic OCR when the hosted image offers it
         if: runner.os == 'Windows'
         timeout-minutes: 3
