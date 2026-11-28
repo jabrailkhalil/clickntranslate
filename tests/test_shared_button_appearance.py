@@ -5,10 +5,10 @@ import os
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import pytest
-from PyQt5.QtCore import QEvent, QPoint, Qt
+from PyQt5.QtCore import QEvent, QPoint, QRect, Qt
 from PyQt5.QtGui import QHelpEvent, QPalette
 from PyQt5.QtTest import QTest
-from PyQt5.QtWidgets import QApplication, QPushButton, QToolButton, QWidget, QLabel, QLineEdit, QComboBox
+from PyQt5.QtWidgets import QApplication, QPushButton, QToolButton, QWidget, QLabel, QLineEdit, QComboBox, QVBoxLayout
 
 import main
 from button_styles import button_palette, button_qss
@@ -73,20 +73,65 @@ def test_mouse_click_clears_the_ring_but_tab_focus_remains_visible(app, dark, bu
         owner.show()
         app.processEvents()
         button.clearFocus()
+        def rendered():
+            return owner.grab(button.geometry()).toImage().scaled(button.size())
+
+        before = rendered()
         # A TabFocusReason can also come from an automatic mouse-driven focus
         # transfer. Enter keyboard navigation explicitly for this paint check.
         focus_control(button)
         app.processEvents()
         assert button.property("keyboardFocus") is True
-        focus = button_palette(dark)["focus"]
-        assert button.grab().toImage().pixelColor(0, 16).name() == focus
+        focused = rendered()
+        assert focused.pixelColor(0, 16) == before.pixelColor(0, 16)
+        assert focused.pixelColor(4, 16) != before.pixelColor(4, 16)
         QTest.mouseClick(button, Qt.LeftButton)
         app.processEvents()
         assert not button.property("keyboardFocus")
-        assert button.grab().toImage().pixelColor(0, 16).name() != focus
+        assert not owner._keyboard_focus_ring.isVisible()
         # Moving the pointer away must not reveal a lingering focus outline.
         app.sendEvent(button, QEvent(QEvent.Leave))
-        assert button.grab().toImage().pixelColor(0, 16).name() != focus
+        assert rendered().pixelColor(4, 16) == before.pixelColor(4, 16)
+    finally:
+        owner.close()
+        owner.deleteLater()
+
+
+@pytest.mark.parametrize('dark', [True, False])
+def test_focused_language_selectors_keep_the_normal_outer_border(app, dark):
+    from types import SimpleNamespace
+    from interface_language_picker import InterfaceLanguagePicker
+    from settings_window import DropDownCombo, compact_combo_style
+    owner = QWidget()
+    layout = QVBoxLayout(owner)
+    main_combo = DropDownCombo()
+    settings_combo = DropDownCombo()
+    for combo in (main_combo, settings_combo):
+        combo.addItems(['English', 'Spanish'])
+        layout.addWidget(combo)
+    settings_combo.setStyleSheet(compact_combo_style(dark))
+    theme_host = SimpleNamespace(source_lang=main_combo, _apply_main_translate_button_theme=lambda _dark: None)
+    main.DarkThemeApp._apply_main_combo_theme(theme_host, dark)
+    picker = InterfaceLanguagePicker(main.INTERFACE_LANGUAGE_OPTIONS, 'ar', main.resource_path, dark=dark)
+    layout.addWidget(picker)
+    other = QPushButton('Next')
+    layout.addWidget(other)
+    try:
+        owner.show()
+        app.processEvents()
+        for control in (main_combo, settings_combo, picker.buttons['de']):
+            bounds = QRect(control.mapTo(owner, QPoint()), control.size())
+            focus_control(other)
+            app.processEvents()
+            plain = owner.grab(bounds).toImage().scaled(control.size())
+            focus_control(control)
+            app.processEvents()
+            focused = owner.grab(bounds).toImage().scaled(control.size())
+            x = control.width() // 2
+            assert focused.pixelColor(x, 0) == plain.pixelColor(x, 0)
+            owner._keyboard_focus_ring.hide()
+            without_cue = owner.grab(bounds).toImage().scaled(control.size())
+            assert any(focused.pixelColor(x, y) != without_cue.pixelColor(x, y) for y in range(2, 6))
     finally:
         owner.close()
         owner.deleteLater()

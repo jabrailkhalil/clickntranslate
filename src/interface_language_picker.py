@@ -436,7 +436,6 @@ class InterfaceLanguagePicker(QtWidgets.QFrame):
             QPushButton#interfaceLanguageCell[pointerHover="true"] {{background:{colors['hover']};}}
             QPushButton#interfaceLanguageCell[pointerHover="false"]:hover {{background:transparent;}}
             QPushButton#interfaceLanguageCell[current="true"] {{background:{colors['selected']};}}
-            QPushButton#interfaceLanguageCell[keyboardFocus="true"]:focus {{border:1px solid {colors['accent_text']};}}
         '''
         for cell in self.choices.findChildren(QtWidgets.QWidget, 'interfaceLanguageCell'):
             cell.setStyleSheet(cell_style)

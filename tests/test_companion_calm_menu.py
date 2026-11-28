@@ -14,6 +14,29 @@ from desktop_assistant import AssistantMenu, FOREGROUND_ACTIONS
 from test_desktop_assistant import app, companion, windows_selection_platform
 
 
+@pytest.mark.parametrize('locale,dark,factor', [('ar', True, 1.5), ('en', False, 1.0)])
+def test_title_button_paints_only_the_inset_keyboard_cue(app, locale, dark, factor):
+    from keyboard_navigation import focus_control
+    menu = AssistantMenu(locale, dark, factor=factor, keyboard=True)
+    try:
+        menu.open_beside(QtCore.QRect(92, 95, 80, 84), QtCore.QRect(0, 0, 900, 650))
+        app.processEvents()
+        close = menu.header.findChild(QtWidgets.QPushButton)
+        bounds = QtCore.QRect(close.mapTo(menu, QtCore.QPoint()), close.size())
+        focus_control(menu.buttons['open'])
+        app.processEvents()
+        plain = menu.grab(bounds).toImage().scaled(close.size())
+        focus_control(close)
+        app.processEvents()
+        focused = menu.grab(bounds).toImage().scaled(close.size())
+        x = close.width() // 2
+        assert focused.pixelColor(x, 0) == plain.pixelColor(x, 0)
+        assert any(focused.pixelColor(x, y) != plain.pixelColor(x, y) for y in range(2, 6))
+    finally:
+        menu.close()
+        menu.deleteLater()
+
+
 @pytest.mark.parametrize('locale', ('en', 'ar'))
 def test_scrolling_a_short_menu_clips_the_focus_cue_to_its_action(app, locale):
     from keyboard_navigation import focus_control

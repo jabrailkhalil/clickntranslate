@@ -250,7 +250,6 @@ def button_qss(dark, role="secondary", selector="QPushButton", *, compact=False,
         {state('[pointerHover="false"]:hover')} {{ background:{background}; }}
         {state('[pointerHover="true"]')} {{ background:{hover}; }}
         {state(':pressed')} {{ background:{pressed}; }}
-        {state('[keyboardFocus="true"]:focus')} {{ border-color:{colors['focus']}; }}
         {state(':checked')} {{ background:{colors['pressed']}; border-color:{colors['focus']}; }}
         {state(':disabled')} {{ background:{colors['disabled_surface']};
             color:{colors['disabled']}; border-color:{colors['disabled_border']}; }}

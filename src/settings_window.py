@@ -972,6 +972,8 @@ def modern_combo_style(dark, font_size=15):
         }}
         QComboBox:focus, QComboBox:on {{
             background-color: {bg_lit};
+        }}
+        QComboBox:on {{
             border-color: {accent};
         }}
         QComboBox::drop-down {{

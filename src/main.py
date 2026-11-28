@@ -13861,8 +13861,7 @@ class DarkThemeApp(QMainWindow):
                         QComboBox {{ background:{field}; border:1px solid {field_border};
                             margin:0; min-height:22px; max-height:22px; }}
                         QComboBox:hover, QComboBox:on {{ background:{hover}; border-color:{focus}; }}
-                        QComboBox:focus {{ border-color:{field_border}; }}
-                        QComboBox[keyboardFocus="true"]:focus {{ background:{hover}; border-color:{focus}; }}
+                        QComboBox[keyboardFocus="true"]:focus {{ background:{hover}; }}
                     """
                     combo.setStyleSheet(combo_style)
                     combo.setFixedHeight(30)
