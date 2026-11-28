@@ -84,6 +84,11 @@ jobs:
           CNT_QA_PRIVATE_X11=1 xvfb-run -a -s '-screen 0 1280x800x24' \
             python tools/run_regression_tests.py --qt-platform xcb --output build/ui-native/frozen-frame \
             --basetemp build/ui-native/frozen-frame/cases tests/test_native_x11_frozen_frame.py
+      - name: Translate a generated X11 region and stop during compositor capture
+        if: ${{ !cancelled() && runner.os == 'Linux' && steps.deps.outcome == 'success' }}
+        run: |
+          CNT_QA_OUTPUT="$PWD/build/ui-native/dynamic-region" xvfb-run -a -s '-screen 0 1280x800x24' \
+            python tools/qa_linux_dynamic_output.py
       - name: Verify replacement targets in two native Cocoa fields when Accessibility is available
         if: ${{ !cancelled() && runner.os == 'macOS' && steps.deps.outcome == 'success' }}
         run: python tools/qa_macos_selection_target.py --output build/ui-native/selection-target/report.json
@@ -104,6 +109,7 @@ jobs:
             build/ui-native/frozen-frame/run.json
             build/ui-native/frozen-frame/cases/**/*.png
             build/ui-native/selection-target/
+            build/ui-native/dynamic-region/
           if-no-files-found: warn
           retention-days: 7
 

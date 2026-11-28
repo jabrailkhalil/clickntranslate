@@ -2,7 +2,7 @@
 
 import logging
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5 import QtCore, QtGui, QtWidgets, sip
 from PyQt5.QtTest import QTest
 
 import game_mode
@@ -521,7 +521,6 @@ def open_template_builder(owner, on_saved=None):
     shortcuts can cancel it normally. Returning from a superseded selection
     must not raise the main window above the replacement capture mode.
     """
-    from PyQt5 import sip
     from mode_coordinator import active_mode, request_mode, release_mode
     current = getattr(owner, '_dynamic_template_builder', None)
     if current is not None and not sip.isdeleted(current):
@@ -655,10 +654,13 @@ class PairedTranslationOverlay(game_mode.GameTranslationOverlay):
         # that overlaps the captured region is therefore hidden for the grab
         # and restored afterwards, while windows outside the region stay
         # untouched and keep the output visible without any flicker.
-        region = self.region
+        region = QtCore.QRect(self.region)
+        generation = self._ocr_generation
         hidden = [widget for widget in windows
                   if widget.isVisible() and widget.geometry().intersects(region)]
         for widget in hidden:
+            if isinstance(widget, OutputControls):
+                widget._unmapped_for_capture = True
             widget.hide()
         if hidden:
             # Let the window manager actually unmap the windows and repaint the
@@ -667,6 +669,8 @@ class PairedTranslationOverlay(game_mode.GameTranslationOverlay):
             QtWidgets.QApplication.processEvents(QtCore.QEventLoop.ExcludeUserInputEvents)
             QTest.qWait(60)
         try:
+            if not game_mode._current_game_capture(self, generation):
+                return None
             # Same capture as the base class, but without its windowOpacity
             # dance: visibility here is managed by hide()/show() above.
             from ocr import grab_screen_pixmap
@@ -676,16 +680,27 @@ class PairedTranslationOverlay(game_mode.GameTranslationOverlay):
             return grab_screen_pixmap(screen, local.x(), local.y(), local.width(), local.height())
         finally:
             for widget in hidden:
+                if sip.isdeleted(widget):
+                    continue
+                if isinstance(widget, OutputControls):
+                    widget._unmapped_for_capture = False
+                    if not widget._toolbar_requested or widget._closing:
+                        continue
+                elif widget._closed:
+                    continue
                 if widget.isHidden():
                     widget.show()
                     widget.raise_()
 
     def _process_frame(self, image):
         if platform_support.IS_WINDOWS:
-            from ocr import grab_screen_pixmap
-            screen = QtWidgets.QApplication.screenAt(self.output_rect.center()) or QtWidgets.QApplication.primaryScreen()
-            local = self.output_rect.translated(-screen.geometry().topLeft())
-            self._output_frame = grab_screen_pixmap(screen, *local.getRect()).toImage()
+            if self.output_rect == self.region:
+                self._output_frame = image
+            else:
+                from ocr import grab_screen_pixmap
+                screen = QtWidgets.QApplication.screenAt(self.output_rect.center()) or QtWidgets.QApplication.primaryScreen()
+                local = self.output_rect.translated(-screen.geometry().topLeft())
+                self._output_frame = grab_screen_pixmap(screen, *local.getRect()).toImage()
         super()._process_frame(image)
 
     def paintEvent(self, event):
@@ -745,6 +760,7 @@ class OutputControls(QtWidgets.QFrame):
         self._gesture = None
         self._drag_offset = None
         self._closing = False
+        self._unmapped_for_capture = False
         self._errors = {}
         self._placed = False
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
@@ -900,8 +916,11 @@ class OutputControls(QtWidgets.QFrame):
         self.set_toolbar_visible(self.overlay.config.get('game_show_toolbar', True))
 
     def set_toolbar_visible(self, visible):
-        self.setVisible(bool(visible))
-        if visible:
+        self._toolbar_requested = bool(visible)
+        if self._unmapped_for_capture:
+            return
+        self.setVisible(self._toolbar_requested)
+        if self._toolbar_requested:
             self._capture_excluded = game_mode._exclude_from_windows_capture(self)
 
     def paintEvent(self, event):

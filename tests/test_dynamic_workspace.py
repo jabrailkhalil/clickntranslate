@@ -336,6 +336,31 @@ def test_in_place_output_follows_the_source_window_when_moved(isolated, monkeypa
         overlay.close()
 
 
+@pytest.mark.parametrize('same_place', [False, True])
+def test_windows_paints_the_existing_capture_when_output_covers_its_source(isolated, monkeypatch, same_place):
+    source = QtCore.QRect(50, 320, 200, 80)
+    destination = source if same_place else source.translated(300, 12)
+    overlay = make_overlay(source, 'en', 'ru', output_region=destination)
+    try:
+        monkeypatch.setattr(workspace.platform_support, 'IS_WINDOWS', True)
+        source_image = QtGui.QImage(source.size(), QtGui.QImage.Format_RGB32)
+        source_image.fill(QtGui.QColor('#349712'))
+        output_pixmap = QtGui.QPixmap(destination.size())
+        output_pixmap.fill(QtGui.QColor('#a67234'))
+        with mock.patch.object(ocr, 'grab_screen_pixmap', return_value=output_pixmap) as capture, \
+                mock.patch.object(game_mode.GameTranslationOverlay, '_process_frame') as recognize:
+            overlay._process_frame(source_image)
+        recognize.assert_called_once_with(source_image)
+        if same_place:
+            capture.assert_not_called()
+            assert overlay._output_frame == source_image
+        else:
+            assert capture.call_args.args[1:] == destination.getRect()
+            assert overlay._output_frame == output_pixmap.toImage()
+    finally:
+        overlay.close()
+
+
 def test_output_controls_large_dpi_fit_screen_without_scrolling_and_keep_stop_visible(isolated, app):
     with mock.patch('ui_scaling.desktop_control_scale', return_value=3.):
         overlay = make_overlay(
@@ -390,6 +415,49 @@ def test_linux_disjoint_output_and_controls_remain_visible_during_capture(isolat
                   mock.patch.object(overlay.controls, 'setWindowOpacity', side_effect=AssertionError('Unnecessary controls flicker'))):
                 overlay._grab_region()
         finally:
+            overlay.close()
+
+
+@pytest.mark.parametrize('action', ['close', 'pause', 'pause_resume', 'hide_toolbar'])
+def test_x11_compositor_wait_respects_new_session_state(isolated, app, monkeypatch, action):
+    from PyQt5 import sip
+
+    monkeypatch.setattr(workspace.platform_support, 'IS_WINDOWS', False)
+    monkeypatch.setattr(workspace.platform_support, 'IS_MAC', False)
+    monkeypatch.setattr('ocr_readiness.begin_activity', lambda *args: None)
+    source = QtCore.QRect(30, 320, 300, 90)
+    overlay = make_overlay(source, 'en', 'ru', output_region=source)
+    controls = overlay.controls
+    controls.move(source.topLeft())
+    observed = []
+
+    def act_while_windows_are_unmapped():
+        observed.append((overlay.isHidden(), controls.isHidden()))
+        if action == 'close':
+            overlay.close()
+        elif action == 'hide_toolbar':
+            controls.set_toolbar_visible(False)
+        else:
+            overlay._toggle_pause()
+            if action == 'pause_resume':
+                overlay._toggle_pause()
+
+    try:
+        app.processEvents()
+        QtCore.QTimer.singleShot(0, act_while_windows_are_unmapped)
+        with mock.patch.object(ocr, 'grab_screen_pixmap', return_value=QtGui.QPixmap(source.size())) as capture, \
+                mock.patch.object(overlay, '_process_frame') as process:
+            overlay._scan_once()
+        assert observed == [(True, True)]
+        if action == 'hide_toolbar':
+            capture.assert_called_once()
+            process.assert_called_once()
+            assert not controls.isVisible()
+        else:
+            capture.assert_not_called()
+            process.assert_not_called()
+    finally:
+        if not sip.isdeleted(overlay) and not overlay._closed:
             overlay.close()
 
 

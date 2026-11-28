@@ -573,6 +573,25 @@ def _cancel_game_session(overlay):
                 pass
 
 
+def _current_game_capture(overlay, generation):
+    return not overlay._closed and not overlay.paused and overlay._ocr_generation == generation
+
+
+def _grab_game_frame(overlay, grab):
+    """A synchronous window-system grab may dispatch another timer or a stop."""
+    generation = overlay._ocr_generation
+    overlay._capture_busy = True
+    try:
+        frame = grab()
+    except Exception:
+        if _current_game_capture(overlay, generation):
+            raise
+        return None
+    finally:
+        overlay._capture_busy = False
+    return frame if _current_game_capture(overlay, generation) else None
+
+
 def _start_macos_capture(overlay, screen, region):
     from macos_capture import OverlayCapture
 
@@ -1382,7 +1401,9 @@ class GameTranslationOverlay(QtWidgets.QWidget):
                           or QtWidgets.QApplication.primaryScreen())
                 _start_macos_capture(self, screen, self.region)
                 return
-            pixmap = self._grab_region()
+            pixmap = _grab_game_frame(self, self._grab_region)
+            if pixmap is None:
+                return
             if pixmap.isNull():
                 self._set_status("capture_error", active=False)
                 return
@@ -2119,7 +2140,9 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
                 self._set_status('capture_error', error=True)
             return
         try:
-            pixmap = self._grab_screen()
+            pixmap = _grab_game_frame(self, self._grab_screen)
+            if pixmap is None:
+                return
             if pixmap.isNull():
                 self._set_status("capture_error", error=True)
                 return

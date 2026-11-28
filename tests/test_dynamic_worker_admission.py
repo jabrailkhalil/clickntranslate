@@ -1,4 +1,6 @@
 """Dynamic retries launch failures using generated pixels, never a desktop grab."""
+from unittest import mock
+
 import pytest
 from PyQt5 import QtGui
 
@@ -113,3 +115,29 @@ def test_failed_macos_capture_launch_can_retry_without_a_stale_busy_token(
     workers[-1].finished.emit()  # Cooperative cancellation may produce no image.
     assert not overlay._capture_busy
     assert not overlay._workers
+
+
+@pytest.mark.parametrize('fullscreen', [False, True])
+def test_sync_capture_drops_nested_tick_and_frame_from_before_pause(live_overlays, monkeypatch, fullscreen):
+    overlay = live_overlays(fullscreen)
+    run = type(overlay)._scan_once.__get__(overlay)
+    captures = []
+    frame = QtGui.QPixmap(120, 80)
+
+    def capture():
+        captures.append(True)
+        if len(captures) == 1:
+            run()
+            overlay._toggle_pause()
+            overlay._toggle_pause()
+        return frame
+
+    monkeypatch.setattr(game_mode.platform_support, 'IS_MAC', False)
+    monkeypatch.setattr(overlay, '_grab_screen' if fullscreen else '_grab_region', capture)
+    monkeypatch.setattr(overlay, '_process_frame', mock.Mock())
+    run()
+    assert len(captures) == 1
+    overlay._process_frame.assert_not_called()
+    assert not overlay._capture_busy
+    run()
+    overlay._process_frame.assert_called_once()

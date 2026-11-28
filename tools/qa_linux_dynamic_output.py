@@ -142,7 +142,25 @@ def run():
                 check('hidden_toolbar_output', controls.isHidden() and overlay.isVisible()
                       and overlay.translation_label.text() == 'Обновление без панели')
                 controls.set_toolbar_visible(True)
-                controls.stop_button.click()
+                overlay.set_output_geometry(source)
+                controls.move(source.topLeft())
+                QTest.qWait(80)
+                hidden_during_capture = []
+
+                def hide_toolbar():
+                    hidden_during_capture.append(overlay.isHidden() and controls.isHidden())
+                    controls.set_toolbar_visible(False)
+
+                QtCore.QTimer.singleShot(0, hide_toolbar)
+                frame = overlay._grab_region().toImage()
+                check('hide_toolbar_during_capture',
+                      hidden_during_capture == [True] and controls.isHidden()
+                      and overlay.isVisible() and frame == baseline)
+                controls.set_toolbar_visible(True)
+                QtCore.QTimer.singleShot(0, controls.stop_button.click)
+                with mock.patch.object(ocr, 'grab_screen_pixmap', wraps=ocr.grab_screen_pixmap) as capture_after_stop:
+                    overlay._scan_once()
+                check('stop_during_capture', not capture_after_stop.called)
                 check('stop_session', overlay._closed and not game_mode._game_overlay_refs)
             finally:
                 game_mode.stop_game_mode()
