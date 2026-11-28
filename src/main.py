@@ -13318,7 +13318,7 @@ class DarkThemeApp(QMainWindow):
             else self._selected_text_translation_pair()
         )
         replace_selection = bool(replace_selection and (platform_support.IS_WINDOWS or platform_support.IS_MAC))
-        if platform_support.IS_WINDOWS and replace_selection:
+        if platform_support.IS_WINDOWS and (replace_selection or not preloaded):
             # Lazy preparation on the GUI thread; no model or automation
             # object is started at application launch or in a pool worker.
             from windows_selection import prepare_windows_selection
@@ -13383,6 +13383,17 @@ class DarkThemeApp(QMainWindow):
                 ):
                     clipboard_preservation.restore()
 
+            def stop_capture(message):
+                restore_captured_clipboard(force=True)
+                show_status(message)
+                time.sleep(1.5)
+                hide_status()
+                return False
+
+            def reject_focus_change():
+                from assistant_text import assistant_text
+                return stop_capture(assistant_text(lang, 'selection_focus_lost'))
+
             def expected_target_is_active():
                 if request_cancelled():
                     restore_captured_clipboard(force=True)
@@ -13399,27 +13410,16 @@ class DarkThemeApp(QMainWindow):
                     matches = False
                 if matches:
                     return True
-                restore_captured_clipboard(force=True)
-                from assistant_text import assistant_text
-                show_status(assistant_text(lang, 'selection_focus_lost'))
-                time.sleep(1.5)
-                hide_status()
-                return False
+                return reject_focus_change()
 
             def reject_editor_target():
-                restore_captured_clipboard(force=True)
                 from selection_safety_text import edit_target_unavailable
-                show_status(edit_target_unavailable(lang))
-                time.sleep(1.5)
-                hide_status()
-                return False
+                return stop_capture(edit_target_unavailable(lang))
 
             def editor_is_active():
-                if not (platform_support.IS_WINDOWS and replace_selection):
+                if edit_target is None or _windows_edit_target(selection_window) == edit_target:
                     return True
-                if edit_target is not None and _windows_edit_target(selection_window) == edit_target:
-                    return True
-                return reject_editor_target()
+                return reject_editor_target() if replace_selection else reject_focus_change()
 
             def capture_target_is_active():
                 return expected_target_is_active() and editor_is_active()
@@ -13430,11 +13430,13 @@ class DarkThemeApp(QMainWindow):
                 if (platform_support.IS_MAC and replace_selection and selection_window is not None
                         and selection_window.focused_element is None):
                     return reject_editor_target()
-                if platform_support.IS_WINDOWS and replace_selection:
+                if platform_support.IS_WINDOWS and (replace_selection or not preloaded):
                     if not expected_target_is_active():
                         return
                     edit_target = _windows_edit_target(selection_window)
-                    if edit_target is None:
+                    # Read-only documents keep their normal explicit copy action.
+                    # When a writable field is identifiable, pin it for reading too.
+                    if replace_selection and edit_target is None:
                         reject_editor_target()
                         return
                 if preloaded:

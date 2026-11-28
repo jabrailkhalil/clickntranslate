@@ -251,3 +251,45 @@ def test_global_selection_uses_the_window_that_received_the_native_hotkey(
         paste.assert_not_called()
         assert capture.clipboard.text == 'Clipboard before selection'
     assert owner.finished == []
+
+
+@pytest.mark.parametrize('from_panel', [False, True])
+@pytest.mark.parametrize('when', ['sending_copy', 'reading_clipboard'])
+def test_plain_selection_rejects_text_published_after_leaving_a_known_editor(
+        capture, editable_editor, when, from_panel):
+    first = editable_editor.return_value
+    focused = [first]
+    second = windows_selection.WindowsEditTarget(first.window, first.process_id, (42, 9))
+    editable_editor.side_effect = lambda _window: focused[0]
+
+    def move_and_copy():
+        focused[0] = second
+        capture.clipboard.copy('Text selected in a different field')
+
+    def copy():
+        if when == 'sending_copy':
+            move_and_copy()
+        else:
+            capture.clipboard.copy('Text from the original field')
+
+    def read():
+        if when == 'reading_clipboard' and capture.clipboard.text == 'Text from the original field':
+            move_and_copy()
+        return capture.clipboard.paste()
+
+    capture.copy_shortcut.side_effect = copy
+    capture.read.side_effect = read
+    owner = SelectionRequest()
+    owner.launch_translate_selection(expected_target=42 if from_panel else None)
+    assert focused[0] == second
+    capture.provider.assert_not_called()
+    assert not owner.shown_dialogs
+    assert owner.finished == ([False] if from_panel else [])
+
+
+def test_plain_selection_can_still_read_a_document_without_a_writable_uia_editor(capture, editable_editor):
+    editable_editor.return_value = None
+    owner = SelectionRequest()
+    owner.launch_translate_selection()
+    capture.provider.assert_called_once_with('Source selection', 'es', 'en')
+    assert len(owner.shown_dialogs) == 1 and owner.finished == []
