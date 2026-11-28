@@ -154,6 +154,11 @@ def check_global_hotkeys(window, command, top, requests, results, actions):
     from PyQt5 import QtCore
 
     user = ctypes.WinDLL('user32', use_last_error=True)
+    for function in (user.GetClipboardOwner, user.GetOpenClipboardWindow):
+        function.argtypes = []
+        function.restype = wintypes.HWND
+    user.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
+    user.GetWindowThreadProcessId.restype = wintypes.DWORD
     received = threading.Event()
     deliveries = []
     statuses = []
@@ -189,9 +194,42 @@ def check_global_hotkeys(window, command, top, requests, results, actions):
         command('clear-events')
         observed = actions[label] = dict(shortcut=listener.hotkey_str, before=initial)
         count = len(requests)
+        events = observed['clipboard_observations'] = []
+        native_sequence = main._clipboard_sequence_number
+        native_read = pyperclip.paste
+
+        def process(hwnd):
+            pid = wintypes.DWORD()
+            if hwnd:
+                user.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+            return int(pid.value)
+
+        def sample(site, sequence, text=None):
+            point = dict(site=site, sequence=sequence, owner_pid=process(user.GetClipboardOwner()),
+                         open_pid=process(user.GetOpenClipboardWindow()))
+            if text is not None:
+                point['text'] = text
+            if not events or events[-1] != point:
+                events.append(point)
+
+        def sequence():
+            frame = sys._getframe(1)
+            if frame.f_code.co_name == '_sequence':
+                frame = frame.f_back
+            value = native_sequence()
+            sample(frame.f_code.co_name, value)
+            return value
+
+        def read():
+            sample('before_read', native_sequence())
+            value = native_read()
+            sample('after_read', native_sequence(), value)
+            return value
+
         try:
             assert initial['firstFocused'] and initial['selected'][0] == SAMPLE, initial
-            yield observed
+            with patch.object(main, '_clipboard_sequence_number', sequence), patch.object(pyperclip, 'paste', read):
+                yield observed
             observed['passed'] = True
         except AssertionError as error:
             observed.update(passed=False, error=str(error))
