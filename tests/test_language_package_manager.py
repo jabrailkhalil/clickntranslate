@@ -75,9 +75,9 @@ class _ManagerOwner(QWidget):
     def _find_available_tesseract_exe(self):
         return self.tesseract_path
 
-    def _easyocr_importable_status(self):
+    def _easyocr_runtime_installed(self):
         self.easyocr_status_checks += 1
-        return self.easyocr_status
+        return self.easyocr_status[0]
 
     def _rapidocr_importable_status(self):
         self.rapidocr_status_checks += 1

@@ -69,6 +69,32 @@ def test_check_updates_reuses_a_catalog_being_loaded_when_the_center_opens(app, 
         parent.close()
 
 
+def test_package_inventory_does_not_import_or_start_easyocr_to_list_its_languages(app):
+    from PyQt5 import QtWidgets
+    from settings_window import SettingsWindow
+
+    class Inventory(SettingsWindow):
+        def __init__(self):
+            QtWidgets.QWidget.__init__(self)
+
+    owner = Inventory()
+    probe = SimpleNamespace(owner=owner, _engine_states_ready=mock.Mock(),
+                            _emit_runtime_probe_payload=mock.Mock(),
+                            _available_windows_tags=mock.Mock(return_value=[]),
+                            _windows_ocr_capability_catalog=mock.Mock(return_value={}))
+    try:
+        with (mock.patch.object(owner, '_easyocr_runtime_installed', return_value=True) as files,
+              mock.patch.object(owner, '_easyocr_importable_status', side_effect=AssertionError('loaded EasyOCR')) as heavy,
+              mock.patch.object(owner, '_rapidocr_runtime_status', return_value=(False, 'missing')),
+              mock.patch('engine_center.installed_states', return_value={})):
+            OcrLanguageManagerDialog._runtime_probe_worker(probe)
+        heavy.assert_not_called()
+        files.assert_called_once_with()
+        probe._emit_runtime_probe_payload.assert_any_call({'easyocr': (True, '')})
+    finally:
+        owner.deleteLater()
+
+
 def unavailable_thread(point):
     failure = RuntimeError('worker thread unavailable')
     return (mock.Mock(side_effect=failure) if point == 'constructor' else

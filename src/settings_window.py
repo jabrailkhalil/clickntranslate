@@ -7699,8 +7699,9 @@ class OcrLanguageManagerDialog(QDialog):
 
         easyocr_status = (False, "EasyOCR check failed")
         try:
-            status = getattr(self.owner, '_easyocr_runtime_status', None) or self.owner._easyocr_importable_status
-            easyocr_status = status()
+            # The package list needs the installed runtime even when no language
+            # models are present. Importing EasyOCR here also loads PyTorch.
+            easyocr_status = (self.owner._easyocr_runtime_installed(), "")
         except Exception as exc:
             easyocr_status = (False, str(exc))
         self._emit_runtime_probe_payload({"easyocr": easyocr_status})
