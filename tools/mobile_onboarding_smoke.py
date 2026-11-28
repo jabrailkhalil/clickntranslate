@@ -172,7 +172,7 @@ class Journey:
         (self.output / "home-after-restart.png").write_bytes(self.run("exec-out", "screencap", "-p"))
         self.check_system_app_language(home)
         self.screen("open-help", home, "How it works", completed=True)
-        self.screen("help-version", ("Set up your translator", f"Version {self.installed_version}"))
+        self.screen("help-version", ("How it works", f"Version {self.installed_version}"))
         self.run("shell", "am", "force-stop", self.package)
 
     def check_system_app_language(self, english_home):

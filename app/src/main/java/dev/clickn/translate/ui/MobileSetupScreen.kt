@@ -50,6 +50,7 @@ internal fun openSetupAndroidSettings(context: Context, primary: Intent, fallbac
 @Composable
 fun MobileSetupScreen(onFinished: () -> Unit, onAdvanced: (String) -> Unit, firstRun: Boolean = false,
     viewModel: MobileViewModel = hiltViewModel(), openedFromHelp: Boolean = false) {
+    val showingHelp = openedFromHelp && !firstRun
     val settings by viewModel.settings.collectAsState()
     val captureModeInitialized by viewModel.captureModeInitialized.collectAsState()
     val context = LocalContext.current
@@ -81,7 +82,9 @@ fun MobileSetupScreen(onFinished: () -> Unit, onAdvanced: (String) -> Unit, firs
         }
     }
     Scaffold(
-        topBar = { TopAppBar(title = { Text(stringResource(R.string.setup_title)) }, navigationIcon = {
+        topBar = { TopAppBar(title = {
+            Text(stringResource(if (showingHelp) R.string.mobile_help else R.string.setup_title))
+        }, navigationIcon = {
             if (step > MobileSetupSteps.LANGUAGE) IconButton(onClick = { step-- }) {
                 Icon(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(R.string.setup_previous))
             }
@@ -97,7 +100,7 @@ fun MobileSetupScreen(onFinished: () -> Unit, onAdvanced: (String) -> Unit, firs
                         modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).testTag("setup-next")) {
                         Text(stringResource(if (step < MobileSetupSteps.LANGUAGES) R.string.setup_next else R.string.setup_finish))
                     }
-                    if (openedFromHelp && !firstRun) {
+                    if (showingHelp) {
                         Text(stringResource(R.string.settings_about_version_format, BuildConfig.VERSION_NAME),
                             modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 8.dp),
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
