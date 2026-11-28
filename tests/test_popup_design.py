@@ -235,6 +235,59 @@ def test_search_header_disappears_when_provider_reduces_languages(app, show_pick
     assert combo.view().window().height() < 110
 
 
+@pytest.mark.parametrize('painter_direction', (QtCore.Qt.LeftToRight, QtCore.Qt.RightToLeft))
+def test_rtl_row_paints_its_name_next_to_the_flag_in_either_painter(app, painter_direction):
+    combo = DropDownCombo()
+    combo.setLayoutDirection(QtCore.Qt.RightToLeft)
+    combo.addItem('First option')
+    combo.addItem('اللغة الروسية', 'ru')
+    option = QtWidgets.QStyleOptionViewItem()
+    option.initFrom(combo.view())
+    option.rect = QtCore.QRect(0, 0, 460, 42)
+    option.state &= ~(QtWidgets.QStyle.State_MouseOver | QtWidgets.QStyle.State_Selected)
+    image = QtGui.QImage(option.rect.size(), QtGui.QImage.Format_ARGB32)
+    background = QtGui.QColor('#ffeedd')
+    image.fill(background)
+    painter = QtGui.QPainter(image)
+    try:
+        painter.setLayoutDirection(painter_direction)
+        combo.itemDelegate().paint(painter, option, combo.model().index(1, 0))
+    finally:
+        painter.end()
+        combo.deleteLater()
+    # Exclude both icon gutters. The remaining ink is the rendered name.
+    columns = [x for x in range(36, image.width()-36)
+               if any(image.pixelColor(x, y) != background for y in range(image.height()))]
+    assert columns and min(columns) > image.width() // 2
+
+
+def test_canvas_language_search_follows_its_owner_when_another_window_is_active(app, monkeypatch):
+    from language_search import prepare_language_search
+    from ui_scaling import MainWindowScaleController
+
+    owner = QtWidgets.QMainWindow()
+    controller = MainWindowScaleController(owner)
+    combo = DropDownCombo(controller.canvas)
+    other = QtWidgets.QWidget()
+    other.current_interface_language = 'en'
+    monkeypatch.setattr(QtWidgets.QApplication, 'activeWindow', staticmethod(lambda: other))
+    for language in LANGUAGES:
+        combo.addItem(language.english_name, language.code)
+    try:
+        for locale in ('ar', 'de', 'en'):
+            owner.current_interface_language = locale
+            prepare_language_search(combo)
+            prompt, empty = SEARCH_TEXT[locale]
+            assert combo._language_search.placeholderText() == prompt
+            assert combo._language_search.accessibleName() == prompt
+            combo._language_search.setText('no such language')
+            assert combo._language_empty.text() == empty
+    finally:
+        owner.deleteLater()
+        other.deleteLater()
+        app.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)
+
+
 @pytest.mark.parametrize('locale', SEARCH_TEXT)
 def test_all_language_options_have_flags_even_when_original_field_has_no_icons(app, show_picker, locale):
     combo = DropDownCombo()

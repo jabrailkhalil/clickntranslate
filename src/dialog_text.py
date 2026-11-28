@@ -55,7 +55,11 @@ def dialog_language(widget=None):
                 return config['interface_language']
             owner = getattr(current, 'owner', None)
             parent = getattr(current, 'parent', None)
-            pending[0:0] = [owner, parent() if callable(parent) else parent]
+            # A scaled main canvas is owned by its scene, so QObject.parent()
+            # cannot reach the window that holds the current interface language.
+            native_owner = getattr(current, '_ui_native_owner', None)
+            pending[0:0] = [owner, parent() if callable(parent) else parent,
+                            native_owner() if native_owner is not None else None]
         except (RuntimeError, TypeError):
             continue  # An owner may have been disposed before its modal child.
     return 'en'

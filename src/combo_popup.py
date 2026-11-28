@@ -221,7 +221,8 @@ class PopupRowDelegate(QtWidgets.QStyledItemDelegate):
         if not header:
             content.adjust(20*scale if rtl else 0, 0, 0 if rtl else -20*scale, 0)
         label = QtGui.QFontMetrics(font).elidedText(self.label(index), QtCore.Qt.ElideRight, max(0, round(content.width())))
-        painter.drawText(content, QtCore.Qt.AlignVCenter | (QtCore.Qt.AlignRight if rtl else QtCore.Qt.AlignLeft), label)
+        alignment = QtCore.Qt.AlignRight if rtl else QtCore.Qt.AlignLeft
+        painter.drawText(content, QtCore.Qt.AlignVCenter | QtCore.Qt.AlignAbsolute | alignment, label)
         if chosen:
             x = rect.left()+11*scale if rtl else rect.right()-11*scale
             y = rect.center().y()
