@@ -13316,6 +13316,7 @@ class DarkThemeApp(QMainWindow):
             from PyQt5 import sip
             lang = self.config.get("interface_language", "ru")
             clipboard_preservation = None
+            published_sequence = None
             translation_received = False
             edit_target = None
 
@@ -13457,18 +13458,28 @@ class DarkThemeApp(QMainWindow):
                         notify_copy_failed(self.config)
                         return
                     clipboard_preservation.claim("")
-                    if not _copy_from_focused_target(capture_target_is_active):
+                    cleared_sequence = _clipboard_sequence_number()
+
+                    def ready_to_copy():
+                        return (capture_target_is_active() and (cleared_sequence is None
+                                or _clipboard_sequence_number() == cleared_sequence))
+
+                    if not _copy_from_focused_target(ready_to_copy):
                         restore_captured_clipboard(force=True)
                         return
+                    # Many editors have already published by key-up. Pin that
+                    # generation before a slow focus query or clipboard read.
+                    after_copy = _clipboard_sequence_number()
+                    if after_copy != cleared_sequence:
+                        published_sequence = after_copy
                     if not capture_target_is_active():
                         return
                     time.sleep(0.25)
                     if not capture_target_is_active():
                         return
-                    text = pyperclip.paste()
-                    if not capture_target_is_active():
+                    text = clipboard_preservation.read_and_claim(capture_target_is_active, published_sequence)
+                    if text is None:
                         return
-                    clipboard_preservation.claim(str(text or ""))
                 if not text or not text.strip():
                     time.sleep(0.3)
                     if preloaded:
@@ -13476,15 +13487,14 @@ class DarkThemeApp(QMainWindow):
                     else:
                         if not capture_target_is_active():
                             return
-                        text = (
-                            self._read_primary_selection()
-                            if platform_support.IS_LINUX
-                            else pyperclip.paste()
-                        )
-                        if not capture_target_is_active():
-                            return
-                        if clipboard_preservation is not None:
-                            clipboard_preservation.claim(str(text or ""))
+                        if platform_support.IS_LINUX:
+                            text = self._read_primary_selection()
+                            if not capture_target_is_active():
+                                return
+                        else:
+                            text = clipboard_preservation.read_and_claim(capture_target_is_active, published_sequence)
+                            if text is None:
+                                return
                 if not text or not text.strip():
                     restore_captured_clipboard(force=True)
                     lang = self.config.get("interface_language", "ru")

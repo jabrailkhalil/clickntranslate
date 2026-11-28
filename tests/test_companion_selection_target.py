@@ -438,3 +438,45 @@ def test_already_captured_text_needs_no_foreground_or_clipboard_access(capture):
     capture.copy_shortcut.assert_not_called()
     capture.provider.assert_called_once_with('Captured text', 'es', 'en')
     assert owner.finished == [True]
+
+
+@pytest.mark.parametrize('system', ['windows', 'macos'])
+@pytest.mark.parametrize('new_value', ['New external copy', 'Source selection'])
+@pytest.mark.parametrize('when', ['after_publication', 'during_read'])
+def test_external_copy_wins_over_a_later_cancelled_capture(capture, monkeypatch, system, new_value, when):
+    import threading
+    owner = SelectionRequest()
+    token = threading.Event()
+    for name in ('_companion_selection_status_signal', '_companion_selection_hide_status_signal',
+                 '_companion_selection_result_signal', '_companion_selection_finished_signal'):
+        setattr(owner, name, SimpleNamespace(emit=mock.Mock()))
+    target = setup_fake_mac(capture, monkeypatch)[0] if system == 'macos' else 42
+    clipboard = capture.clipboard
+    generations = []
+
+    def external_copy():
+        if not generations:
+            clipboard.copy(new_value)
+            generations.append(clipboard.sequence)
+
+    def read():
+        text = clipboard.paste()
+        if when == 'during_read' and text == 'Source selection':
+            external_copy()
+        return text
+
+    def sleep(seconds):
+        if when == 'after_publication' and seconds == .25:
+            external_copy()
+
+    def cancel_provider(*_args, **_kwargs):
+        token.set()
+        return 'Late translation'
+
+    capture.read.side_effect = read
+    capture.provider.side_effect = cancel_provider
+    monkeypatch.setattr(main.time, 'sleep', sleep)
+    owner.launch_translate_selection(expected_target=target, _request_token=token)
+    assert generations == [clipboard.sequence] and clipboard.text == new_value
+    capture.provider.assert_not_called()
+    assert owner.finished == [False]

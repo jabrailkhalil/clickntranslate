@@ -14,6 +14,91 @@ SAMPLE = 'Identical synthetic selection'
 SOURCE = Path(__file__).resolve().parents[1] / 'src'
 
 
+def write_private_text(board, text):
+    from AppKit import NSPasteboardTypeString
+
+    board.clearContents()
+    assert board.setString_forType_(text, NSPasteboardTypeString)
+    return int(board.changeCount())
+
+
+def pasteboard_writer(pipe, name):
+    from AppKit import NSPasteboard
+
+    board = NSPasteboard.pasteboardWithName_(name)
+    try:
+        while (text := pipe.recv()) is not None:
+            pipe.send(write_private_text(board, text))
+    finally:
+        pipe.close()
+
+
+def exercise_private_clipboard():
+    """Test real Cocoa change counts and an independent writer without AX or the general pasteboard."""
+    from AppKit import NSPasteboard, NSPasteboardTypeString
+    from clipboard_preservation import ClipboardPreservation
+
+    board = NSPasteboard.pasteboardWithUniqueName()
+    context = multiprocessing.get_context('spawn')
+    control, child = context.Pipe()
+    process = context.Process(target=pasteboard_writer, args=(child, str(board.name())))
+    process.start()
+    child.close()
+
+    def publish(text):
+        control.send(text)
+        assert control.poll(10), 'The separate pasteboard writer did not reply'
+        return control.recv()
+
+    def read():
+        return str(board.stringForType_(NSPasteboardTypeString) or '')
+
+    def copy(text):
+        write_private_text(board, text)
+        return True
+
+    records = []
+    try:
+        for timing in ('stable', 'before_read', 'during_validation'):
+            values = (SAMPLE,) if timing == 'stable' else (SAMPLE, 'A newer external copy')
+            for value in values:
+                copy('Original fixture clipboard')
+                guard = ClipboardPreservation(read, copy, lambda: int(board.changeCount()))
+                copy('')
+                assert guard.claim('')
+                source_sequence = publish(SAMPLE)
+                newer = publish(value) if timing == 'before_read' else None
+
+                def still_focused():
+                    nonlocal newer
+                    if timing == 'during_validation':
+                        newer = publish(value)
+                    return True
+
+                captured = guard.read_and_claim(still_focused, source_sequence)
+                restored = guard.restore()  # The same cleanup runs on cancelled selection requests.
+                final_sequence = int(board.changeCount())
+                if timing == 'stable':
+                    assert captured == SAMPLE and restored and read() == 'Original fixture clipboard'
+                else:
+                    assert newer != source_sequence and final_sequence == newer
+                    assert captured is None and not restored and read() == value
+                records.append(dict(timing=timing, identical_text=value == SAMPLE, restored=restored,
+                                    source_sequence=source_sequence, foreign_sequence=newer,
+                                    final_sequence=final_sequence))
+        return dict(status='passed', private_board=True, reader_pid=os.getpid(),
+                    external_writer_pid=process.pid, cases=records)
+    finally:
+        if process.is_alive():
+            control.send(None)
+            process.join(5)
+        if process.is_alive():
+            process.terminate()
+            process.join(5)
+        control.close()
+        board.releaseGlobally()
+
+
 def editor_fixture(pipe):
     from AppKit import NSApplication, NSApplicationActivationPolicyRegular, NSApplicationActivateIgnoringOtherApps
     from AppKit import NSRunningApplication
@@ -74,10 +159,11 @@ def wait_target(desktop, pid, previous=None):
 
 def exercise(report):
     import ApplicationServices
+    sys.path.insert(0, str(SOURCE))
+    report['private_clipboard'] = exercise_private_clipboard()
     if not ApplicationServices.AXIsProcessTrusted():
         report.update(status='skipped', reason='Accessibility is not granted to this Python process')
         return
-    sys.path.insert(0, str(SOURCE))
     import macos_desktop as desktop
     import main
 

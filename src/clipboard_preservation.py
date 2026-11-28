@@ -86,6 +86,18 @@ class ClipboardPreservation:
         except Exception:
             return False
 
+    def read_and_claim(self, validate_target, published_sequence):
+        """Capture one stable copy response, including time spent rechecking its source."""
+        before = self._sequence()
+        if published_sequence is not None and before != published_sequence:
+            return None
+        text = str(self._read_text() or "")
+        if not validate_target() or self._sequence() != before:
+            return None
+        self._owned_sequence = before
+        self._owned_text = text
+        return text
+
     def claim_changed(self):
         """Claim the first copy response: None means pending, False uncertain.
 
