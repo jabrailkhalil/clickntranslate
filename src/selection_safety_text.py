@@ -20,6 +20,22 @@ def edit_target_unavailable(language):
     return EDIT_TARGET_UNAVAILABLE.get(language, EDIT_TARGET_UNAVAILABLE['en'])
 
 
+RELEASE_SHORTCUT_KEYS = {
+    'ru': 'Отпустите клавиши сочетания и попробуйте ещё раз.',
+    'en': 'Release the shortcut keys and try again.',
+    'es': 'Suelta las teclas del atajo y vuelve a intentarlo.',
+    'de': 'Lass die Tasten des Tastenkürzels los und versuche es erneut.',
+    'fr': 'Relâchez les touches du raccourci et réessayez.',
+    'zh': '请松开快捷键后重试。',
+    'pt': 'Solte as teclas do atalho e tente novamente.',
+    'it': 'Rilascia i tasti della scorciatoia e riprova.',
+    'ar': 'حرّر مفاتيح الاختصار وحاول مرة أخرى.',
+    'tr': 'Kısayol tuşlarını bırakıp tekrar deneyin.',
+    'hi': 'शॉर्टकट की कुंजियाँ छोड़ें और फिर से कोशिश करें।',
+    'id': 'Lepaskan tombol pintasan lalu coba lagi.',
+}
+
+
 PASSIVE_SELECTION_HELP = {
     'ru': 'Кнопка и автоперевод работают, когда приложение поддерживает системное чтение выделения. Если они не появляются, используйте горячую клавишу перевода выделенного текста.',
     'en': 'The button and automatic translation require system access to the selected text. If they do not appear, use the Translate selected text hotkey.',

@@ -79,11 +79,11 @@ def test_existing_wrong_target_is_rejected_before_any_clipboard_change(capture):
 def test_focus_is_rechecked_after_releasing_modifiers(capture, monkeypatch):
     owner = SelectionRequest()
 
-    def sleep(seconds):
-        if seconds == .35:
-            capture.foreground = 99
+    def release():
+        capture.foreground = 99
+        return True
 
-    monkeypatch.setattr(main.time, 'sleep', sleep)
+    monkeypatch.setattr('windows_selection.wait_for_modifier_release', release)
     owner.launch_translate_selection(expected_target=42)
     assert_focus_rejected(owner, capture)
     capture.copy.assert_not_called()

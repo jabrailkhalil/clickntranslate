@@ -136,7 +136,11 @@ def foreground_token():
     """Identity of the foreground owner, for rejecting a stale asynchronous read."""
     if platform_support.IS_WINDOWS:
         import ctypes
-        return int(ctypes.windll.user32.GetForegroundWindow() or 0)
+        from ctypes import wintypes
+        foreground = ctypes.windll.user32.GetForegroundWindow
+        foreground.argtypes = []
+        foreground.restype = wintypes.HWND
+        return int(foreground() or 0)
     if platform_support.IS_MAC:
         import AppKit
         application = AppKit.NSWorkspace.sharedWorkspace().frontmostApplication()
@@ -148,13 +152,16 @@ def is_foreign_foreground():
     """True when another application owns the foreground window."""
     if platform_support.IS_WINDOWS:
         import ctypes
+        from ctypes import wintypes
 
-        hwnd = int(ctypes.windll.user32.GetForegroundWindow())
+        hwnd = foreground_token()
         if not hwnd:
             return False
-        pid = ctypes.c_ulong()
-        ctypes.windll.user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
-        return int(pid.value) != os.getpid()
+        read_pid = ctypes.windll.user32.GetWindowThreadProcessId
+        read_pid.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
+        read_pid.restype = wintypes.DWORD
+        pid = wintypes.DWORD()
+        return bool(read_pid(hwnd, ctypes.byref(pid)) and pid.value and pid.value != os.getpid())
     if platform_support.IS_MAC:
         import AppKit
 

@@ -234,15 +234,22 @@ class TranslationResultUiTest(unittest.TestCase):
 
     def test_safe_selection_replacement_revalidates_then_pastes(self):
         copied = []
+        clipboard = ['Previous clipboard text']
+
+        def copy(value):
+            copied.append(value)
+            clipboard[0] = value
+            return True
+
         with mock.patch.multiple(platform_support, IS_WINDOWS=True, IS_LINUX=False, IS_MAC=False), \
                 mock.patch.object(main, "_windows_foreground_window", return_value=42), \
-                mock.patch.object(platform_support, "copy_text",
-                                  side_effect=lambda value: copied.append(value) or True), \
+                mock.patch.object(platform_support, "copy_text", side_effect=copy), \
                 mock.patch.object(main, "_clipboard_sequence_number", return_value=7), \
                 mock.patch.object(main, "_wait_for_clipboard_change", return_value=True), \
-                mock.patch.object(main, "simulate_copy") as simulate_copy, \
+                mock.patch.object(main, "simulate_copy",
+                                  side_effect=lambda: clipboard.__setitem__(0, "Hello world")) as simulate_copy, \
                 mock.patch.object(main, "simulate_paste") as simulate_paste, \
-                mock.patch.object(main.pyperclip, "paste", return_value="Hello world"), \
+                mock.patch.object(main.pyperclip, "paste", side_effect=lambda: clipboard[0]), \
                 mock.patch.object(main.time, "sleep"):
             success, reason = main.replace_selected_text_in_foreground(
                 "Hello world", "Привет, мир", 42

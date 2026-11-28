@@ -14,4 +14,5 @@ def editable_editor(monkeypatch):
     monkeypatch.setattr(main, '_windows_edit_target', reader)
     monkeypatch.setattr(main, '_windows_foreground_window', lambda: 42)
     monkeypatch.setattr(windows_selection, 'prepare_windows_selection', lambda: True)
+    monkeypatch.setattr(windows_selection, '_modifiers_down', lambda: False)
     return reader

@@ -77,6 +77,15 @@ class ClipboardPreservation:
             return False
         return True
 
+    def owns_text(self, text):
+        """Verify the payload and its generation across a potentially delayed clipboard read."""
+        if not self.owns_clipboard():
+            return False
+        try:
+            return self._read_text() == text and self.owns_clipboard()
+        except Exception:
+            return False
+
     def claim_changed(self):
         """Claim the first copy response: None means pending, False uncertain.
 

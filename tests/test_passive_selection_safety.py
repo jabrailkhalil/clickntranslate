@@ -189,10 +189,10 @@ def test_changing_editors_in_the_same_window_never_receives_a_paste(capture, mon
     monkeypatch.setattr(main, 'simulate_paste', paste)
     monkeypatch.setattr(main, '_wait_for_clipboard_change', lambda previous: True)
     if when == 'before_copy':
-        def sleep(seconds):
-            if seconds == .35:
-                current[0] = second
-        monkeypatch.setattr(main.time, 'sleep', sleep)
+        def release():
+            current[0] = second
+            return True
+        monkeypatch.setattr(selection, 'wait_for_modifier_release', release)
     elif when == 'during_translation':
         def translate(*args, **kwargs):
             current[0] = second
@@ -231,10 +231,10 @@ def test_confirmed_editor_preserves_explicit_chat_replacement(capture, monkeypat
 
 
 def test_ordinary_hotkey_rejects_a_new_foreground_before_copy(capture, monkeypatch):
-    def sleep(seconds):
-        if seconds == .35:
-            capture.foreground = 99
-    monkeypatch.setattr(main.time, 'sleep', sleep)
+    def release():
+        capture.foreground = 99
+        return True
+    monkeypatch.setattr(selection, 'wait_for_modifier_release', release)
     owner = SelectionRequest()
     owner.launch_translate_selection()
     capture.copy_shortcut.assert_not_called()

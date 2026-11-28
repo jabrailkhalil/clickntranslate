@@ -5,11 +5,33 @@ from __future__ import annotations
 import logging
 import sys
 import threading
+import time
 from dataclasses import dataclass
 
 logger = logging.getLogger("clickntranslate.selection")
 _com_client = None
 _bootstrap_attempted = False
+
+
+def _modifiers_down():
+    import ctypes
+    state = ctypes.windll.user32.GetAsyncKeyState
+    state.argtypes = [ctypes.c_int]
+    state.restype = ctypes.c_short
+    return any(state(key) & 0x8000 for key in (0x11, 0x12, 0x10, 0x5b, 0x5c))
+
+
+def wait_for_modifier_release():
+    """Wait for Ctrl, Alt, Shift and Windows keys without modifying the user's input."""
+    deadline = time.monotonic() + 1.5
+    try:
+        while _modifiers_down():
+            if time.monotonic() >= deadline:
+                return False
+            time.sleep(.02)
+        return True
+    except (AttributeError, OSError):
+        return False
 
 
 def _discard_provider_error_frames(error):

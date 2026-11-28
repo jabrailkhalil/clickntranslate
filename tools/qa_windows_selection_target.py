@@ -192,6 +192,7 @@ def exercise(report, directory, exchange):
             assert results[-1][4] == SAMPLE and requests == [SAMPLE]
             read = report['selection'] = command('state')
             assert action_keys(read) == [('First', 'C')], read
+            assert all(e['key'] in ('LeftCtrl', 'RightCtrl', 'C') for e in read['keys']), read
             assert (read['first'], read['second']) == (first['first'], first['second'])
             assert pyperclip.paste() == CLIPBOARD and menu.isVisible()
             dialogs = main._live_translation_result_dialogs()
@@ -208,6 +209,7 @@ def exercise(report, directory, exchange):
             assert finished[-1] and requests == [SAMPLE, SAMPLE]
             assert replaced['first'] == 'First: translated span.' and replaced['second'] == first['second'], replaced
             assert action_keys(replaced) == [('First', 'C'), ('First', 'C'), ('First', 'V')], replaced
+            assert all(e['key'] in ('LeftCtrl', 'RightCtrl', 'C', 'V') for e in replaced['keys']), replaced
             assert menu.isVisible() and pyperclip.paste() == CLIPBOARD
 
             original = command('reset-first')

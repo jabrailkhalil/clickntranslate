@@ -31,10 +31,10 @@ $grid.Items.Add($row) | Out-Null
 $events = [Collections.Generic.List[object]]::new()
 foreach ($routedEvent in @([Windows.Input.Keyboard]::PreviewKeyDownEvent, [Windows.Input.Keyboard]::PreviewKeyUpEvent)) {
     $window.AddHandler($routedEvent, [Windows.Input.KeyEventHandler]{
-        param($sender, $args)
-        $key = if ($args.Key -eq 'System') { $args.SystemKey } else { $args.Key }
-        $events.Add(@{ event = $args.RoutedEvent.Name; key = [string]$key
-                       focus = $args.OriginalSource.Name; modifiers = [string]$args.KeyboardDevice.Modifiers })
+        param($sender, $eventArgs)
+        $key = if ($eventArgs.Key -eq 'System') { $eventArgs.SystemKey } else { $eventArgs.Key }
+        $events.Add(@{ event = $eventArgs.RoutedEvent.Name; key = [string]$key
+                       focus = $eventArgs.OriginalSource.Name; modifiers = [string]$eventArgs.KeyboardDevice.Modifiers })
     }, $true)
 }
 
@@ -57,6 +57,8 @@ $timer.Add_Tick({
             $editor.Select($editor.Text.IndexOf('identical selection'), 'identical selection'.Length)
         }
         if ($op -eq 'clear-events') { $events.Clear() }
+        $grid.ScrollIntoView($row)
+        $grid.UpdateLayout()
         $cellText = $grid.Columns[0].GetCellContent($row)
         $point = $cellText.PointToScreen([Windows.Point]::new(6, 6))
         $handle = [Windows.Interop.WindowInteropHelper]::new($window).Handle
