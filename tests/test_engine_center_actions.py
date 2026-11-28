@@ -137,6 +137,71 @@ def test_catalog_refresh_keeps_user_choice_after_following_argos_install_link(ce
     assert dialog._highlighted_codes(table) == ['en->de']
 
 
+def test_refreshing_packages_discards_the_previous_update_offer(center):
+    dialog, _, _ = center
+    table = dialog.easyocr_table
+    button = next(b for b in table._package_engine_actions if b.property('packageAction') == 'update')
+    install = mock.Mock()
+    plan = dict(current=False, installed='1', available='2', size=7000000)
+    dialog._on_update_plan_ready('easyocr', plan)
+    with (mock.patch.object(dialog, '_start_runtime_probe'),
+          mock.patch.object(dialog, '_start_argos_catalog_refresh'),
+          mock.patch('settings_window.threading.Thread') as thread):
+        dialog.refresh_catalog()
+        assert button.text() == text('en', 'check_updates')
+        assert 'Available: 2' not in table._package_size_label.text()
+        dialog._request_update_check(table, button, install)
+        thread.assert_called_once()
+        install.assert_not_called()
+
+
+def test_old_update_check_cannot_replace_a_more_recent_request(center, tmp_path, monkeypatch):
+    dialog, _, _ = center
+    table = dialog.easyocr_table
+    button = next(b for b in table._package_engine_actions if b.property('packageAction') == 'update')
+    monkeypatch.setenv('CLICKNTRANSLATE_COMPONENTS_DIR', str(tmp_path))
+    catalog = dict(schema=1, revision=1, artifacts={}, bundles=[])
+    old = dict(current=False, installed='1', available='2', size=10)
+    new = dict(current=False, installed='1', available='3', size=20)
+    with (mock.patch.object(dialog, '_start_runtime_probe'),
+          mock.patch.object(dialog, '_start_argos_catalog_refresh'),
+          mock.patch('settings_window.threading.Thread') as thread,
+          mock.patch('component_catalog.trusted_catalog', return_value=catalog),
+          mock.patch('engine_center.compare_update', side_effect=(old, new))):
+        install = mock.Mock()
+        dialog._request_update_check(table, button, install)
+        old_request = thread.call_args.kwargs
+        dialog.refresh_catalog()
+        dialog._request_update_check(table, button, install)
+        assert thread.call_count == 2
+        new_request = thread.call_args.kwargs
+        old_request['target'](*old_request['args'])
+        assert button.property('packageUpdateChecking') and not button.isEnabled()
+        assert button.property('packageUpdatePlan') is None
+        new_request['target'](*new_request['args'])
+        assert button.property('packageUpdatePlan')['available'] == '3'
+        assert button.isEnabled()
+        install.assert_not_called()
+
+
+def test_newer_signed_catalog_retires_old_offers_and_never_rolls_sizes_back(center):
+    dialog, _, _ = center
+    table = dialog.easyocr_table
+    button = next(b for b in table._package_engine_actions if b.property('packageAction') == 'update')
+    first = dict(schema=1, revision=4, artifacts={}, bundles=[])
+    second = dict(first, revision=5)
+    offer = dict(current=False, installed='1', available='2', size=10, catalog_revision=4)
+    dialog._on_package_sizes_ready(first)
+    dialog._on_update_plan_ready('easyocr', offer)
+    assert button.property('packageUpdatePlan')
+    dialog._on_package_sizes_ready(second)
+    dialog._on_package_sizes_ready(first)
+    dialog._on_update_plan_ready('easyocr', offer)
+    assert dialog._package_sizes.catalog['revision'] == 5
+    assert not button.property('packageUpdatePlan')
+    assert button.text() == text('en', 'check_updates')
+
+
 def test_engine_maintenance_is_only_in_current_engine_menu_and_respects_busy_state(center):
     dialog, _, _ = center
     table = dialog.easyocr_table

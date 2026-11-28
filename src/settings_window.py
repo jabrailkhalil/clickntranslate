@@ -6550,7 +6550,7 @@ def _package_mutation_busy(owner):
 class OcrLanguageManagerDialog(QDialog):
     _runtime_probe_ready = QtCore.pyqtSignal(object)
     _package_sizes_ready = QtCore.pyqtSignal(object)
-    _update_plan_ready = QtCore.pyqtSignal(str, object)
+    _update_plan_ready = QtCore.pyqtSignal(str, object, int)
     _engine_states_ready = QtCore.pyqtSignal(object)
 
     def __init__(self, owner):
@@ -6589,6 +6589,7 @@ class OcrLanguageManagerDialog(QDialog):
         self._package_sizes_error = ''
         self._catalog_read_lock = threading.Lock()
         self._verified_catalog = None
+        self._update_check_generation = 0
         self._engine_states = {}
         self._download_access_page = None
         self._title_drag_offset = None
@@ -7641,6 +7642,7 @@ class OcrLanguageManagerDialog(QDialog):
             self._refresh_engine_table(getattr(self, name, None))
 
     def refresh_catalog(self):
+        self._invalidate_update_checks()
         self._windows_tags_cache = None
         self._windows_capabilities_cache = None
         self._windows_ready_codes_cache = None
@@ -7905,6 +7907,13 @@ class OcrLanguageManagerDialog(QDialog):
     def _on_package_sizes_ready(self, catalog):
         from package_presentation import PackageSizes
         if isinstance(catalog, dict):
+            previous = self._package_sizes.catalog.get('revision') if self._package_sizes else None
+            revision = catalog.get('revision')
+            if previous is not None and revision is not None:
+                if revision < previous:
+                    return
+                if revision > previous:
+                    self._invalidate_update_checks(completed_only=True)
             self._package_sizes = PackageSizes(catalog, channel=os.environ.get('CLICKNTRANSLATE_COMPONENT_CHANNEL', 'stable'))
             self._package_sizes_error = ''
             if self._download_access_page is not None:
@@ -8044,6 +8053,33 @@ class OcrLanguageManagerDialog(QDialog):
                      else center_text(self.lang, 'check_help'))
         button.setToolTip(tooltip_text(help_text))
 
+    def _clear_update_offer(self, table, button):
+        from package_presentation import text as package_text
+        if getattr(table, '_package_update_status', ''):
+            table._package_update_status = ''
+            label = table._package_size_label
+            label.setText(getattr(table, '_package_summary', ''))
+            label.setToolTip(tooltip_text(package_text(self.lang, 'size_help')))
+        button.setProperty('packageUpdatePlan', None)
+        button.setProperty('packageUpdateChecking', False)
+        button.setEnabled(not self._packages_busy())
+        self._set_update_button_caption(button)
+
+    def _invalidate_update_checks(self, *, completed_only=False):
+        # An offer includes the installed revision and the size of the package.
+        # A refresh or a local installation invalidates those values.
+        if not completed_only:
+            self._update_check_generation += 1
+        for table in (self.tesseract_table, self.easyocr_table, self.rapidocr_table,
+                      self.hymt_table, self.argos_table):
+            if table is None:
+                continue
+            for button in table._package_engine_actions:
+                if button.property('packageAction') != 'update':
+                    continue
+                if not completed_only or not button.property('packageUpdateChecking'):
+                    self._clear_update_offer(table, button)
+
     def _request_update_check(self, table, button, install):
         if self._packages_busy():
             self._restore_task_progress()
@@ -8060,7 +8096,7 @@ class OcrLanguageManagerDialog(QDialog):
         button.setEnabled(False)
         self._set_update_button_caption(button)
         try:
-            threading.Thread(target=self._check_update_worker, args=(table._package_engine,),
+            threading.Thread(target=self._check_update_worker, args=(table._package_engine, self._update_check_generation),
                              name='ComponentUpdateCheck', daemon=True).start()
         except Exception as error:
             from component_texts import error_text
@@ -8074,7 +8110,7 @@ class OcrLanguageManagerDialog(QDialog):
             self._verified_catalog = trusted_catalog(store.root)
         return self._verified_catalog
 
-    def _check_update_worker(self, engine):
+    def _check_update_worker(self, engine, generation):
         from component_catalog import component_store_path
         from component_store import ComponentStore
         from engine_center import compare_update
@@ -8085,6 +8121,7 @@ class OcrLanguageManagerDialog(QDialog):
                 catalog = self._refresh_catalog(store, previous)
                 result = compare_update(catalog, engine, store=store,
                     channel=os.environ.get('CLICKNTRANSLATE_COMPONENT_CHANNEL', 'stable'))
+                result['catalog_revision'] = catalog.get('revision')
             self._package_sizes_ready.emit(catalog)
         except Exception as error:
             from component_texts import error_text
@@ -8092,12 +8129,14 @@ class OcrLanguageManagerDialog(QDialog):
                        if getattr(error, 'code', '') == 'operation_busy' else error_text(self.lang, error))
             result = {'error': message}
         try:
-            self._update_plan_ready.emit(engine, result)
+            self._update_plan_ready.emit(engine, result, generation)
         except RuntimeError:
             pass
 
-    @QtCore.pyqtSlot(str, object)
-    def _on_update_plan_ready(self, engine, plan):
+    @QtCore.pyqtSlot(str, object, int)
+    def _on_update_plan_ready(self, engine, plan, generation=None):
+        if generation is not None and generation != self._update_check_generation:
+            return
         from engine_center import text as center_text
         table = next((item for item in (self.tesseract_table, self.easyocr_table, self.rapidocr_table,
                      self.hymt_table, self.argos_table) if item is not None and item._package_engine == engine), None)
@@ -8106,6 +8145,11 @@ class OcrLanguageManagerDialog(QDialog):
         for button in _package_controls(table):
             if button.property('packageAction') != 'update':
                 continue
+            revision = plan.get('catalog_revision')
+            current = self._package_sizes.catalog.get('revision') if self._package_sizes else None
+            if revision is not None and current is not None and revision < current:
+                self._clear_update_offer(table, button)
+                return
             button.setProperty('packageUpdateChecking', False)
             button.setEnabled(not self._packages_busy())
             if self._packages_busy() and button.property('packageBusyWasEnabled') is not None:
@@ -8723,6 +8767,7 @@ class OcrLanguageManagerDialog(QDialog):
         if bool(getattr(self.owner, in_progress_attr, False)):
             self._schedule_owner_refresh(in_progress_attr)
             return
+        self._invalidate_update_checks()
         self._windows_tags_cache = None
         self._windows_capabilities_cache = None
         self._windows_ready_codes_cache = None
@@ -9509,6 +9554,7 @@ class OcrLanguageManagerDialog(QDialog):
             refresh()
         self._install_in_progress = False
         self._set_package_actions_busy(False)
+        self._invalidate_update_checks()
         self._active_language_task_title = ""
         # Whoever sent the work to the background asked not to be interrupted by
         # it, and that has to hold for the result too — it is reported on the
