@@ -18482,14 +18482,15 @@ finally {
         msg_clear.setIcon(QMessageBox.Question)
         msg_clear.setWindowIcon(load_icon(resource_path("icons/icon.ico")))
         msg_clear.exec_()
+        history_errors = []
         if msg_clear.clickedButton() == yes_btn:
             from history_storage import update_records
-            for fname in ("translation_history.json", "copy_history.json"):
+            for kind in ("translation", "copy"):
                 try:
-                    path = get_data_file(fname)
+                    path = get_data_file(f"{kind}_history.json")
                     update_records(path, lambda _current: [], discard_older=True)
                 except Exception:
-                    pass
+                    history_errors.append(settings_text(lang, f"clear_{kind}_history_error"))
 
         done_text = settings_text(lang, "settings_reset_done")
         if autostart_warning:
@@ -18508,9 +18509,11 @@ finally {
                 'id': 'Mulai otomatis tidak dapat diselaraskan atau disimpan sepenuhnya. Periksa di aplikasi dan pengaturan sistem.',
             }
             done_text += '\n\n' + messages.get(lang, messages['en'])
+        if history_errors:
+            done_text += '\n\n' + '\n'.join(history_errors)
         info = QMessageBox(self)
         info.setWindowTitle(title)
         info.setText(done_text)
-        info.setIcon(QMessageBox.Warning if autostart_warning else QMessageBox.Information)
+        info.setIcon(QMessageBox.Warning if autostart_warning or history_errors else QMessageBox.Information)
         info.setWindowIcon(load_icon(resource_path("icons/icon.ico")))
         info.exec_()

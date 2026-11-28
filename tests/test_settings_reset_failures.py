@@ -154,9 +154,9 @@ def test_reset_history_clear_serializes_with_an_append_already_in_progress(impor
     worker = threading.Thread(target=lambda: mutate(str(histories[0]), append))
     worker.start()
     assert read.wait(3)
-    def clear(history, update):
+    def clear(history, update, **kwargs):
         release.set()
-        return mutate(history, update)
+        return mutate(history, update, **kwargs)
     try:
         with mock.patch.object(history_storage, 'update_records', side_effect=clear):
             sw.SettingsWindow.reset_settings(panel)
@@ -166,3 +166,31 @@ def test_reset_history_clear_serializes_with_an_append_already_in_progress(impor
     assert not worker.is_alive()
     assert all(json.loads(history.read_text(encoding='utf-8')) == [] for history in histories)
     assert all(history.with_name(history.name + '.lock').is_file() for history in histories)
+
+
+@pytest.mark.parametrize('damaged', [('copy',), ('translation',), ('copy', 'translation')])
+def test_reset_reports_each_history_that_could_not_be_cleared(import_context, monkeypatch, tmp_path, damaged):
+    owner, panel, _config, _warning, _information = import_context
+    owner.set_autostart.return_value = False
+    owner.current_interface_language = 'ar'
+    histories = {kind: tmp_path / (kind + '_history.json') for kind in ('copy', 'translation')}
+    previous = b'[{"text":"private pending recovery"}'
+    for kind, path in histories.items():
+        path.write_bytes(previous if kind in damaged else previous + b']')
+    ResetMessages.records = []
+    monkeypatch.setattr(sw, 'QMessageBox', ResetMessages)
+    monkeypatch.setattr(ResetMessages, 'clickedButton', lambda self: self.yes if self.index in (0, 1) else None)
+    monkeypatch.setattr(sw, 'get_data_file', lambda name: str(tmp_path / name))
+
+    sw.SettingsWindow.reset_settings(panel)
+
+    notice = ResetMessages.records[-1]
+    assert notice.icon == ResetMessages.Warning
+    assert sw.settings_text('ar', 'settings_reset_done') in notice.text
+    assert 'private pending recovery' not in notice.text
+    for kind, path in histories.items():
+        if kind in damaged:
+            assert path.read_bytes() == previous
+        else:
+            assert json.loads(path.read_text(encoding='utf-8')) == []
+        assert (sw.settings_text('ar', 'clear_' + kind + '_history_error') in notice.text) == (kind in damaged)
