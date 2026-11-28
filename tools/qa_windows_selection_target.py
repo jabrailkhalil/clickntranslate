@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 import ctypes
 from ctypes import wintypes
+import faulthandler
 import json
 import os
 from pathlib import Path
@@ -126,7 +127,7 @@ def exercise(report, directory, exchange):
     import pyperclip
     import translater
     import windows_selection
-    from PyQt5 import QtWidgets
+    from PyQt5 import QtCore, QtWidgets, sip
     from PyQt5.QtTest import QTest
 
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
@@ -210,7 +211,8 @@ def exercise(report, directory, exchange):
             restored = report['source_restored_from_result'] = command('state')
             assert restored['active'] and restored['firstFocused'] and restored['selected'][0] == SAMPLE, restored
             assert main._windows_foreground_window() == top and current_editor() == left
-            assert dialogs[0].isVisible() and menu.isVisible()
+            assert menu.isVisible()
+            report['result_visible_after_source_restoration'] = bool(main._live_translation_result_dialogs())
             resume.set()
             wait_until(lambda: len(finished) == 2, 'The replacement did not complete')
             replaced = report['replacement'] = command('state')
@@ -219,7 +221,8 @@ def exercise(report, directory, exchange):
             assert action_keys(replaced) == [('First', 'C'), ('First', 'C'), ('First', 'V')], replaced
             assert all(e['key'] in ('LeftCtrl', 'RightCtrl', 'C', 'V') for e in replaced['keys']), replaced
             assert menu.isVisible() and pyperclip.paste() == CLIPBOARD
-            dialogs[0].close()
+            for dialog in main._live_translation_result_dialogs():
+                dialog.close()
             QTest.qWait(100)
 
             original = command('reset-first')
@@ -265,13 +268,52 @@ def exercise(report, directory, exchange):
             refused = report['grid_replacement_refused'] = command('state')
             assert not finished[-1] and refused['gridFocused'] and refused['keys'] == [], refused
             assert main._clipboard_sequence_number() == before and len(requests) == 3
+
+            command('second')
+            command('clear-events')
+            entered.clear()
+            resume.clear()
+            window.config['replace_selection_select_all'] = False
+            press_panel_button(menu, 'replace')
+            wait_until(entered.is_set, 'The cancellable replacement did not reach its source')
+            captured_sequence = main._clipboard_sequence_number()
+            assert pyperclip.paste() == SAMPLE
+            # The external application copies the same characters independently.
+            # Its generation must survive cancellation of the companion request.
+            command('external-copy')
+            foreign_sequence = main._clipboard_sequence_number()
+            assert foreign_sequence is not None and foreign_sequence != captured_sequence
+            companion.request_action('hide')
+            resume.set()
+            wait_until(lambda: len(finished) == 5, 'The disposed companion request did not finish')
+            cancelled = report['cancelled_after_external_copy'] = command('state')
+            assert not finished[-1] and action_keys(cancelled) == [('Second', 'C')], cancelled
+            assert (cancelled['first'], cancelled['second']) == (original['first'], original['second'])
+            assert main._clipboard_sequence_number() == foreign_sequence and pyperclip.paste() == SAMPLE
             report.update(status='passed', provider_inputs=requests, completions=finished,
-                          grid_clipboard_sequence_preserved=True)
+                          grid_clipboard_sequence_preserved=True, external_copy_sequence=foreign_sequence)
     finally:
         resume.set()
+        # This probe starts these services explicitly on a no-background-services
+        # window. Its normal close handler leaves those test-owned services alone.
+        quick = getattr(window, '_selection_quick_translate', None)
+        if quick is not None:
+            quick.dispose()
+        assistant = getattr(window, '_desktop_assistant', None)
+        if assistant is not None and not sip.isdeleted(assistant):
+            assistant.dispose()
+        window.tray_icon.hide()
         window.force_quit = True
         window.close()
+        assert QtCore.QThreadPool.globalInstance().waitForDone(5000)
+        for widget in app.topLevelWidgets():
+            if not sip.isdeleted(widget) and widget.parentWidget() is None and widget.graphicsProxyWidget() is None:
+                widget.hide()
+                widget.deleteLater()
+        app.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)
         app.processEvents()
+        sip.delete(app)
+        report['shutdown'] = 'Stopped native pollers, disposed fixture windows, drained Qt workers and destroyed QApplication'
 
 
 if __name__ == '__main__':
@@ -281,6 +323,7 @@ if __name__ == '__main__':
     if (sys.platform != 'win32' or os.environ.get('RUNNER_ENVIRONMENT') != 'github-hosted'
             or os.environ.get('GITHUB_ACTIONS') != 'true'):
         parser.error('This probe requires a disposable GitHub-hosted Windows desktop')
+    faulthandler.enable()
     options.output.parent.mkdir(parents=True, exist_ok=True)
     result = dict(status='failed', sha=os.environ.get('GITHUB_SHA'), provider='deterministic fixture')
     try:

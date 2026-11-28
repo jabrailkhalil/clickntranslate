@@ -49,6 +49,7 @@ $timer.Add_Tick({
     try {
         $op = [IO.File]::ReadAllText($request) | ConvertFrom-Json
         if ($op -eq 'reset-first') { $first.Text = 'First: identical selection.' }
+        if ($op -eq 'external-copy') { [Windows.Clipboard]::SetText('identical selection') }
         if ($op -in @('first', 'second')) {
             $editor = if ($op -eq 'first') { $first } else { $second }
             $window.Activate() | Out-Null
