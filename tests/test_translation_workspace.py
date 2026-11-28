@@ -133,6 +133,25 @@ def test_clearing_source_clears_result_and_disables_empty_requests(workspace, re
     assert workspace.text_edit.toPlainText() == ''
 
 
+def test_empty_workspace_can_change_language_without_opening_offline_setup(workspace, requests, monkeypatch):
+    import translation_availability
+
+    workspace.source_edit.clear()
+    workspace.set_window_engine('argos')
+    unavailable = mock.Mock(return_value=translation_availability.MissingProvider('argos', 'en', 'de'))
+    recovery = mock.Mock(return_value=None)
+    monkeypatch.setattr(translation_availability, 'missing_provider', unavailable)
+    monkeypatch.setattr(main, '_resolve_translation_provider', recovery)
+    monkeypatch.setattr(workspace, '_remember_language_pair', mock.Mock())
+
+    workspace.target_combo.setCurrentIndex(workspace.target_combo.findData('de'))
+
+    assert workspace.target_code == 'de' and not workspace.translate_button.isEnabled()
+    assert not requests
+    recovery.assert_not_called()
+    unavailable.assert_not_called()
+
+
 def test_swap_exchanges_the_edited_texts_as_well_as_languages(workspace, requests, monkeypatch):
     workspace.source_edit.setPlainText('An edited original')
     workspace.text_edit.setPlainText('Отредактированный перевод')

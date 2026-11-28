@@ -20,6 +20,36 @@ def photo():
     return image
 
 
+def test_enter_during_image_ocr_only_submits_the_recognized_text(window, monkeypatch):
+    window.text_input.setPlainText('Draft from before the attachment')
+    submit = mock.Mock()
+    monkeypatch.setattr(window, '_start_main_translation', submit)
+    with mock.patch.object(image_input.threading, 'Thread'):
+        window._import_main_image(photo())
+    assert window._image_importer.busy and window.text_input.isReadOnly()
+    assert not window.translate_button.isEnabled()
+
+    QTest.keyClick(window.text_input, QtCore.Qt.Key_Return)
+    submit.assert_not_called()
+
+    window._image_importer._completed.emit(window._image_importer._revision, ('Text from the attachment', None, ''))
+    submit.assert_called_once()
+    assert submit.call_args.args[0] == window.text_input.toPlainText() == 'Text from the attachment'
+
+
+def test_cancelling_image_ocr_preserves_an_unavailable_reverse_direction(window, monkeypatch):
+    monkeypatch.setattr(window, '_available_main_translation_pairs', lambda: set())
+    window._update_main_language_swap()
+    assert not window.main_language_swap.isEnabled()
+    with mock.patch.object(image_input.threading, 'Thread'):
+        window._import_main_image(photo())
+    assert window._image_importer.busy
+    window.main_image_button.click()
+    assert not window._image_importer.busy
+    assert window.source_lang.isEnabled() and window.target_lang.isEnabled()
+    assert not window.main_language_swap.isEnabled()
+
+
 def finish(app, predicate):
     deadline = time.monotonic() + 3
     while not predicate() and time.monotonic() < deadline:

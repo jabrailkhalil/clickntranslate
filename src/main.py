@@ -7853,6 +7853,9 @@ class TranslationResultDialog(QDialog):
             self._translate_edited_result = False
         self._remember_language_pair()
         self._update_actions()
+        if not self.source_text.strip():
+            self._set_status(self.text["source_placeholder"])
+            return
         from translation_availability import missing_provider
         engine = self.engine_combo.currentData() or self.window_engine
         issue = missing_provider(engine, self.source_code, self.target_code)
@@ -7863,9 +7866,6 @@ class TranslationResultDialog(QDialog):
                 return
             self._engine_override = True
             self.set_window_engine(provider_display_name(chosen, self.lang))
-        if not self.source_text.strip():
-            self._set_status(self.text["source_placeholder"])
-            return
         self._request_id += 1
         request_id = self._request_id
         cancelled = threading.Event()
@@ -12001,7 +12001,8 @@ class DarkThemeApp(QMainWindow):
             target = language_code_from_name(
                 target_combo.currentText(), self.current_interface_language
             )
-            button.setEnabled((target, source) in self._available_main_translation_pairs())
+            image_busy = getattr(getattr(self, '_image_importer', None), 'busy', False)
+            button.setEnabled(not image_busy and (target, source) in self._available_main_translation_pairs())
         except RuntimeError:
             return
 
@@ -15562,7 +15563,7 @@ class DarkThemeApp(QMainWindow):
             progress = getattr(self, '_main_result_progress', None)
             error = getattr(self, '_main_result_error', '')
             if isinstance(status, QLabel):
-                if self._main_translation_running:
+                if self._main_translation_running and not self._argos_cancel_requested.is_set():
                     status.setText(_translation_progress_message(labels['live_translation'], *(progress or (0, 0))))
                 else:
                     status.clear()
@@ -15639,7 +15640,8 @@ class DarkThemeApp(QMainWindow):
 
     def _open_main_result_window(self):
         snapshot = getattr(self, '_main_result_snapshot', None)
-        if self._main_translation_running:
+        follow_request = self._main_translation_running and not self._argos_cancel_requested.is_set()
+        if follow_request:
             source_text, source_lang, target_lang = self._main_active_request
             text = getattr(self, '_main_streamed_text', '')
             snapshot = dict(translated_text=text, source_text=source_text,
@@ -15653,7 +15655,7 @@ class DarkThemeApp(QMainWindow):
         dialog = show_translation_dialog(self, auto_copy=False, lang=self.current_interface_language,
                                          theme=self.current_theme, result_mode='main', **snapshot)
         dialog.auto_copy = bool(get_cached_config().get('copy_translated_text', False))
-        if self._main_translation_running:
+        if follow_request:
             dialog.set_window_engine(self._main_active_engine)
             dialog._follow_main_translation(self._main_active_request, self._main_result_progress)
             self._main_preview_dialogs.append(dialog)
@@ -15827,8 +15829,9 @@ class DarkThemeApp(QMainWindow):
     def _main_image_busy_changed(self, busy):
         try:
             self.text_input.setReadOnly(busy)
-            for control in (self.source_lang, self.target_lang, self.main_language_swap):
+            for control in (self.source_lang, self.target_lang):
                 control.setEnabled(not busy)
+            self._update_main_language_swap()
             self.main_image_button.setToolTip(tooltip_text(image_text(self.current_interface_language, 'cancel') if busy
                                                          else attachment_text(self.current_interface_language, 'hint')))
             self.main_image_button.setAccessibleName(image_text(self.current_interface_language, 'cancel') if busy
@@ -16498,7 +16501,7 @@ class DarkThemeApp(QMainWindow):
         )
 
     def translate_input_text(self):
-        if self._main_translation_running:
+        if self._main_translation_running or getattr(getattr(self, '_image_importer', None), 'busy', False):
             return
         text = self.text_input.toPlainText()
         if text.strip():
