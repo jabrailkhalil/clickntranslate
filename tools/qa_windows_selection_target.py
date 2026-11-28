@@ -23,14 +23,17 @@ TRANSLATION = 'translated span'
 CLIPBOARD = 'Clipboard before the fixture action'
 
 
-def wait_until(check, message, timeout=12):
+def wait_until(check, message, timeout=12, *, process_qt=True):
     from PyQt5.QtTest import QTest
 
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         if check():
             return
-        QTest.qWait(15)
+        if process_qt:
+            QTest.qWait(15)
+        else:
+            time.sleep(.015)
     raise AssertionError(message)
 
 
@@ -44,7 +47,7 @@ def wpf_fixture(exchange, directory):
             stdout=log, stderr=subprocess.STDOUT, creationflags=subprocess.CREATE_NO_WINDOW)
         sequence = 0
 
-        def command(op):
+        def command(op, *, process_qt=True):
             nonlocal sequence
             request = exchange / f'request-{sequence}.json'
             reply = exchange / f'reply-{sequence}.json'
@@ -53,7 +56,7 @@ def wpf_fixture(exchange, directory):
             temporary.write_text(json.dumps(op), encoding='utf-8')
             temporary.replace(request)
             wait_until(lambda: reply.exists() or process.poll() is not None,
-                       f'WPF did not answer {op}', timeout=20)
+                       f'WPF did not answer {op}', timeout=20, process_qt=process_qt)
             if not reply.exists():
                 raise RuntimeError(f'WPF exited with {process.returncode} during {op}')
             state = json.loads(reply.read_text(encoding='utf-8-sig'))
@@ -117,6 +120,96 @@ def click_grid(state):
 def action_keys(state):
     return [(event['focus'], event['key']) for event in state['keys']
             if event['event'] == 'PreviewKeyDown' and event['key'] in ('A', 'C', 'V')]
+
+
+def check_global_hotkeys(window, command, top, requests, results, actions):
+    import main
+    import pyperclip
+    from assistant_text import assistant_text
+    from PyQt5 import QtCore
+
+    user = ctypes.WinDLL('user32', use_last_error=True)
+    received = threading.Event()
+    listener_threads = []
+    statuses = []
+    hidden = []
+
+    def received_on_listener(_callback):
+        listener_threads.append(threading.get_ident())
+        received.set()
+
+    def press():
+        assert main._windows_foreground_window() == top
+        received.clear()
+        # Generate a registered chord exclusively on the runner's WPF fixture.
+        chord = (0x11, 0x12, 0x86)  # Ctrl+Alt+F23
+        try:
+            for key in chord:
+                user.keybd_event(key, 0, 0, 0)
+        finally:
+            for key in reversed(chord):
+                user.keybd_event(key, 0, 2, 0)
+        assert received.wait(5), 'The registered global chord did not produce WM_HOTKEY'
+        assert listener_threads[-1] != threading.get_ident()
+
+    def status_hidden():
+        hidden.append(True)
+
+    def status_shown(message):
+        statuses.append(message)
+
+    window._show_status_signal.connect(status_shown)
+    window._hide_status_signal.connect(status_hidden)
+    main.hotkey_dispatcher.triggered.connect(received_on_listener, type=QtCore.Qt.DirectConnection)
+    try:
+        for identifier, name in ((4, 'launch_translate_selection'), (6, 'launch_translate_replace_selection')):
+            listener = main.HotkeyListenerThread('Ctrl+Alt+F23', getattr(window, name), hotkey_id=identifier)
+            listener.start()
+            try:
+                wait_until(lambda: listener._registered, 'The fixture chord could not register')
+                if identifier == 4:
+                    command('first')
+                    command('clear-events')
+                    count = len(results)
+                    request_count = len(requests)
+                    press()
+                    wait_until(lambda: len(results) == count + 1, 'The stable global selection did not complete')
+                    normal = actions['stable_window'] = command('state')
+                    assert action_keys(normal) == [('First', 'C')] and requests[request_count:] == [SAMPLE], normal
+                    assert results[-1][4] == SAMPLE and results[-1][0] == TRANSLATION
+                    for dialog in main._live_translation_result_dialogs():
+                        dialog.close()
+
+                command('first')
+                command('clear-events')
+                pyperclip.copy(CLIPBOARD)
+                before = main._clipboard_sequence_number()
+                assert before is not None
+                request_count = len(requests)
+                statuses.clear()
+                hidden.clear()
+                press()
+                # The listener has received WM_HOTKEY. Move to a second real
+                # HWND before letting Qt consume the queued application callback.
+                other = command('other-document', process_qt=False)
+                actions[name + '_before_dispatch'] = other
+                assert other['otherHwnd'] != top and other['otherFocused'], other
+                assert main._windows_foreground_window() == other['otherHwnd']
+                wait_until(lambda: assistant_text('en', 'selection_focus_lost') in statuses and hidden,
+                           'The global selection request did not finish after switching windows')
+                after = actions[name] = command('state')
+                assert action_keys(after) == [] and not any(e['focus'] == 'OtherDocument' for e in after['keys']), after
+                assert (after['first'], after['second'], after['other']) == (other['first'], other['second'], other['other'])
+                assert len(requests) == request_count
+                assert main._clipboard_sequence_number() == before and pyperclip.paste() == CLIPBOARD
+            finally:
+                listener.stop()
+                listener.join(timeout=2)
+                assert not listener.is_alive()
+    finally:
+        main.hotkey_dispatcher.triggered.disconnect(received_on_listener)
+        window._show_status_signal.disconnect(status_shown)
+        window._hide_status_signal.disconnect(status_hidden)
 
 
 def exercise(report, directory, exchange):
@@ -290,6 +383,9 @@ def exercise(report, directory, exchange):
             assert not finished[-1] and action_keys(cancelled) == [('Second', 'C')], cancelled
             assert (cancelled['first'], cancelled['second']) == (original['first'], original['second'])
             assert main._clipboard_sequence_number() == foreign_sequence and pyperclip.paste() == SAMPLE
+            delay = False
+            report['global_hotkeys'] = {}
+            check_global_hotkeys(window, command, top, requests, results, report['global_hotkeys'])
             report.update(status='passed', provider_inputs=requests, completions=finished,
                           grid_clipboard_sequence_preserved=True, external_copy_sequence=foreign_sequence)
     finally:

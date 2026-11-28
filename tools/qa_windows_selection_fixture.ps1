@@ -28,14 +28,27 @@ $second = $window.FindName('Second')
 $grid = $window.FindName('Grid')
 $row = [PSCustomObject]@{ Label = 'Table row without a text range' }
 $grid.Items.Add($row) | Out-Null
+$other = [Windows.Window]::new()
+$other.Title = 'ClicknTranslate second synthetic document'
+$other.Width = 330
+$other.Height = 110
+$other.Left = 550
+$other.Top = 32
+$other.WindowStartupLocation = 'Manual'
+$otherEditor = [Windows.Controls.TextBox]::new()
+$otherEditor.Name = 'OtherDocument'
+$otherEditor.Text = 'A separate document selection'
+$other.Content = $otherEditor
 $events = [Collections.Generic.List[object]]::new()
 foreach ($routedEvent in @([Windows.Input.Keyboard]::PreviewKeyDownEvent, [Windows.Input.Keyboard]::PreviewKeyUpEvent)) {
-    $window.AddHandler($routedEvent, [Windows.Input.KeyEventHandler]{
+    $recordKey = [Windows.Input.KeyEventHandler]{
         param($sender, $eventArgs)
         $key = if ($eventArgs.Key -eq 'System') { $eventArgs.SystemKey } else { $eventArgs.Key }
         $events.Add(@{ event = $eventArgs.RoutedEvent.Name; key = [string]$key
                        focus = $eventArgs.OriginalSource.Name; modifiers = [string]$eventArgs.KeyboardDevice.Modifiers })
-    }, $true)
+    }
+    $window.AddHandler($routedEvent, $recordKey, $true)
+    $other.AddHandler($routedEvent, $recordKey, $true)
 }
 
 $script:sequence = 0
@@ -50,6 +63,12 @@ $timer.Add_Tick({
         $op = [IO.File]::ReadAllText($request) | ConvertFrom-Json
         if ($op -eq 'reset-first') { $first.Text = 'First: identical selection.' }
         if ($op -eq 'external-copy') { [Windows.Clipboard]::SetText('identical selection') }
+        if ($op -eq 'other-document') {
+            $other.Show()
+            $other.Activate() | Out-Null
+            [Windows.Input.Keyboard]::Focus($otherEditor) | Out-Null
+            $otherEditor.SelectAll()
+        }
         if ($op -in @('first', 'second')) {
             $editor = if ($op -eq 'first') { $first } else { $second }
             $window.Activate() | Out-Null
@@ -66,6 +85,8 @@ $timer.Add_Tick({
         $focused = [Windows.Input.Keyboard]::FocusedElement
         $state = @{
             pid = $PID; hwnd = $handle.ToInt64(); active = $window.IsActive
+            otherHwnd = ([Windows.Interop.WindowInteropHelper]::new($other).Handle).ToInt64()
+            other = $otherEditor.Text; otherFocused = $otherEditor.IsKeyboardFocused
             first = $first.Text; second = $second.Text
             selected = @($first.SelectedText, $second.SelectedText)
             focus = if ($focused) { $focused.GetType().Name } else { '' }
@@ -80,6 +101,7 @@ $timer.Add_Tick({
     [IO.File]::Move("$reply.tmp", $reply)
     if ($op -eq 'quit') {
         $timer.Stop()
+        if ($other.IsLoaded) { $other.Close() }
         $window.Close()
     }
 })
