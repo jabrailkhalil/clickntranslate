@@ -340,7 +340,9 @@ def dropdown_screenshots(main, app, window, report_path, screenshots):
             assert bounds.contains(geometry), (name, geometry, bounds)
             below = anchor.bottom() + combo.POPUP_GAP
             if bounds.bottom() - below >= combo._popup_minimum_height:
-                assert geometry.top() == below, (name, anchor, geometry)
+                # Mapping a fractional scene transform can put 111 at
+                # 111.00000000000001 in the sheet's logical coordinates.
+                assert abs(geometry.top() - below) < 0.01, (name, anchor, geometry)
             else:
                 assert geometry.height() <= combo._popup_minimum_height, (name, anchor, geometry)
             if previous is not None:
@@ -354,7 +356,8 @@ def dropdown_screenshots(main, app, window, report_path, screenshots):
                                     'effective_percent': effective, 'width': picture.width(),
                                     'height': picture.height(), 'dpr': picture.devicePixelRatioF(),
                                     'anchor': anchor.getRect(), 'popup': geometry.getRect(),
-                                    'gap_below_field': geometry.top() - anchor.bottom()})
+                                    'gap_below_field': geometry.top() - anchor.bottom(),
+                                    'host': 'scene' if proxy is not None else 'native'})
             view.scrollToBottom()
             app.processEvents()
             last = combo.model().index(combo.count() - 1, combo.modelColumn(), combo.rootModelIndex())

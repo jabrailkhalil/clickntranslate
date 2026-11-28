@@ -7,6 +7,7 @@ from PyQt5 import QtCore, QtWidgets
 
 from engine_center import MAINTENANCE, MAINTENANCE_KEYS, text
 from settings_window import OcrLanguageManagerDialog
+from test_desktop_ux import app, window
 from test_language_package_manager import _AppParent, _ManagerOwner
 
 
@@ -36,25 +37,42 @@ def _rows():
 
 
 @pytest.mark.parametrize('direction', [QtCore.Qt.LeftToRight, QtCore.Qt.RightToLeft])
-def test_keyboard_focus_tracks_the_active_engine_section(center, direction, monkeypatch):
-    from PyQt5.QtTest import QTest
-    from keyboard_navigation import focus_control, install_keyboard_navigation
+def test_keyboard_focus_tracks_the_active_engine_section(app, window, direction, monkeypatch):
+    from PyQt5.QtTest import QSignalSpy, QTest
+    from keyboard_navigation import install_keyboard_navigation
     from package_presentation import text as package_text
 
-    dialog, _, parent = center
-    parent.config = {'translator_engine': 'google', 'ocr_engine': 'Windows'}
-    app = QtWidgets.QApplication.instance()
     monkeypatch.setattr('provider_secrets.get_key', lambda *_: '')
+    monkeypatch.setattr(OcrLanguageManagerDialog, '_start_runtime_probe', lambda *_: None)
+    monkeypatch.setattr(OcrLanguageManagerDialog, '_start_argos_catalog_refresh', lambda *_: None)
     install_keyboard_navigation(app)
+    window.show_settings()
+    settings = window.settings_window
+    QTest.mouseClick(settings.engines_button, QtCore.Qt.LeftButton)
+    dialog = settings._language_manager_dialog
     dialog.setLayoutDirection(direction)
-    dialog.show()
-    app.processEvents()
+    handle = dialog.windowHandle()
+    focus_windows = QSignalSpy(app.focusWindowChanged)
+    deadline = QtCore.QDeadlineTimer(3000)
+    # Qt can already report an active family of windows while keyboard input
+    # still belongs to the main window. Wait for the actual input destination.
+    while app.focusWindow() is not handle and not deadline.hasExpired():
+        focus_windows.wait(max(1, deadline.remainingTime()))
+    assert app.focusWindow() is handle, 'Opening Engines and API must activate its window'
     bar = dialog.tabs.tabBar()
     forward = QtCore.Qt.Key_Left if direction == QtCore.Qt.RightToLeft else QtCore.Qt.Key_Right
-    focus_control(bar)
+    seen = set()
+    while True:
+        QTest.keyClick(handle, QtCore.Qt.Key_Tab)
+        app.processEvents()
+        focus = app.focusWidget()
+        if focus is bar:
+            break
+        assert focus not in seen, 'The section tabs must be reachable by pressing Tab'
+        seen.add(focus)
     for index in range(dialog.tabs.count()):
         if index:
-            QTest.keyClick(bar, forward)
+            QTest.keyClick(handle, forward)
             app.processEvents()
         assert bar.currentIndex() == index
         assert bar.hasFocus()
@@ -68,6 +86,7 @@ def test_keyboard_focus_tracks_the_active_engine_section(center, direction, monk
             assert any(label.buddy() is picker for label in dialog.findChildren(QtWidgets.QLabel))
     QTest.mouseClick(bar, QtCore.Qt.LeftButton, pos=bar.tabRect(0).center())
     assert not dialog._keyboard_focus_ring.isVisible()
+    dialog.close()
 
 
 def test_withdrawn_engine_clears_stale_download_sizes_and_keeps_local_removal(center, monkeypatch):
