@@ -677,6 +677,7 @@ internal fun ProviderSheet(editor: ProviderEditSession, viewModel: MobileViewMod
     val engine = draft.translatorEngine
     val pending by editor.pending.collectAsState()
     val saveStatus by viewModel.providerSaveState.collectAsState()
+    val saveError = saveStatus.errorMessage
     val saving = pending != null || saveStatus == ProviderSaveStatus.SAVING
     LaunchedEffect(pending) {
         pending?.let { request -> editor.finish(request) { advance -> if (advance) onAdvanced() else onDismiss() } }
@@ -743,8 +744,8 @@ internal fun ProviderSheet(editor: ProviderEditSession, viewModel: MobileViewMod
             }
             item { connection?.let { Text(stringResource(if (it.success) R.string.mobile_test_ok else R.string.mobile_error),
                 color = if (it.success) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error) } }
-            if (saveStatus == ProviderSaveStatus.FAILED) item {
-                Text(stringResource(R.string.mobile_provider_save_error), color = MaterialTheme.colorScheme.error)
+            if (saveError != null) item {
+                Text(stringResource(saveError), color = MaterialTheme.colorScheme.error)
             }
             item { BoxWithConstraints(Modifier.fillMaxWidth()) {
                 val testLabel = stringResource(R.string.mobile_test)
@@ -776,7 +777,7 @@ internal fun ProviderSheet(editor: ProviderEditSession, viewModel: MobileViewMod
                         }
                         Text(when {
                             saving -> savingLabel
-                            saveStatus == ProviderSaveStatus.FAILED -> retryLabel
+                            saveError != null -> retryLabel
                             else -> saveLabel
                         })
                     }

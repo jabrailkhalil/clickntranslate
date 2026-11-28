@@ -405,11 +405,8 @@ class SettingsRepository internal constructor(
         var migrated = 0
         settingsStore.edit { prefs ->
             secureStringKeys.forEach { key ->
-                val raw = prefs[key]
-                if (secretCodec.needsMigration(raw)) {
-                    prefs.putSecure(key, raw.orEmpty())
-                    if (secretCodec.isEncrypted(prefs[key].orEmpty())) migrated++
-                }
+                val raw = prefs[key] ?: return@forEach
+                if (prefs.migrateLegacyValue(key, raw)) migrated++
             }
         }
         return migrated
@@ -577,10 +574,22 @@ class SettingsRepository internal constructor(
     private fun MutablePreferences.putSecure(key: Preferences.Key<String>, value: String) {
         val encoded = if (key in credentialStringKeys) secretCodec.encryptCredential(value)
             else secretCodec.encryptPlainText(value)
-        if (value.isNotEmpty() && secretCodec.isEncrypted(this[key].orEmpty()) && !secretCodec.isEncrypted(encoded)) {
+        if (value.isNotEmpty() && secretCodec.isEncrypted(this[key].orEmpty()) && encoded == value) {
             throw SecureSettingsUnavailableException()
         }
         this[key] = encoded
+    }
+
+    private fun MutablePreferences.migrateLegacyValue(key: Preferences.Key<String>, stored: String): Boolean {
+        if (!secretCodec.needsMigration(stored)) return false
+        try {
+            putSecure(key, stored)
+        } catch (_: SecureSettingsUnavailableException) {
+            // This value already existed in an older installation. Leave it in place
+            // until secure storage recovers, without blocking unrelated preferences.
+            return false
+        }
+        return this[key] != stored
     }
 
     // Kept outside both Settings and TranslationPreset: no export/diagnostic serializer sees these records.
@@ -829,6 +838,10 @@ class SettingsRepository internal constructor(
                 val stored = prefs[key]
                 val changed = read(current) != value
                 if (changed && hasUnreadableBinding) throw SecureSettingsUnavailableException()
+                if (!changed && stored != null && key in credentialStringKeys) {
+                    prefs.migrateLegacyValue(key, stored)
+                    return
+                }
                 if (stored != null && secretCodec.isEncrypted(stored)) {
                     // A locked Keystore makes reads return UI defaults. An edit to a different
                     // setting must leave the original ciphertext and its endpoint untouched.

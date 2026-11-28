@@ -1,6 +1,8 @@
 package dev.clickn.translate.ui
 
 import java.io.IOException
+import dev.clickn.translate.R
+import dev.clickn.translate.data.SecureSettingsUnavailableException
 import dev.clickn.translate.data.Settings
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -14,6 +16,16 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ProviderSaveCoordinatorTest {
+    @Test fun temporaryKeystoreFailureExplainsHowToRetryWithoutExposingCredentialDetails() = runTest {
+        val saves = ProviderSaveCoordinator(backgroundScope)
+        val failed = saves.save { throw SecureSettingsUnavailableException() }
+        runCurrent()
+        assertFalse(failed.await())
+        assertEquals(R.string.settings_secure_storage_unavailable, saves.status.value.errorMessage)
+        saves.clearFailure()
+        assertEquals(ProviderSaveStatus.IDLE, saves.status.value)
+    }
+
     @Test fun delayedWriteCannotConfirmNavigationEarlyOrStartAnotherCommit() = runTest {
         val saves = ProviderSaveCoordinator(backgroundScope)
         val editor = ProviderEditSession(Settings())

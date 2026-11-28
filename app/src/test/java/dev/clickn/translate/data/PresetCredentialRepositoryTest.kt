@@ -4,6 +4,7 @@ package dev.clickn.translate.data
 import android.content.Context
 import android.content.ContextWrapper
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import dev.clickn.translate.translate.CommunityTranslationClient
 import java.io.ByteArrayOutputStream
@@ -247,6 +248,27 @@ class PresetCredentialRepositoryTest {
     }
 
     @Test
+    fun legacyPlaintextSurvivesALockedUpgradeAndIsEncryptedWhenTheKeystoreReturns() = runBlocking {
+        val fixture = Fixture()
+        val repo = fixture.repo()
+        val original = "synthetic-value-from-old-release"
+        fixture.seedLegacyCredential(original)
+        fixture.cipher.fail = true
+        assertEquals(0, repo.migratePlaintextSecretsIfNeeded())
+        repo.update { it.copy(overlayAlpha = 0.59f) }
+        assertTrue(repo.get().apiKey == original)
+        val replacement = runCatching { repo.update { it.copy(apiKey = "synthetic-new-key", overlayAlpha = 0.1f) } }
+        assertTrue(replacement.exceptionOrNull() is SecureSettingsUnavailableException)
+        fixture.cipher.fail = false
+        assertTrue(repo.migratePlaintextSecretsIfNeeded() > 0)
+        assertEquals(0, repo.migratePlaintextSecretsIfNeeded())
+        assertFalse(fixture.encryptedValue("api_key").contains(original))
+        val reopened = fixture.repo().get()
+        assertTrue(reopened.apiKey == original)
+        assertEquals(0.59f, reopened.overlayAlpha, 0.001f)
+    }
+
+    @Test
     fun freshKeyWithNoKeystore_doesNotCommitAnUnusableProviderOrPlaintext() = runBlocking {
         val fixture = Fixture()
         val repo = fixture.repo()
@@ -345,6 +367,9 @@ class PresetCredentialRepositoryTest {
         private val store = PreferenceDataStoreFactory.create(
             scope = CoroutineScope(SupervisorJob() + Dispatchers.IO).also(storeScopes::add),
         ) { File(root, "datastore/clickntranslate_settings.preferences_pb") }
+        suspend fun seedLegacyCredential(value: String) {
+            store.edit { it[stringPreferencesKey("api_key")] = value }
+        }
         suspend fun encryptedValue(name: String): String =
             requireNotNull(store.data.first()[stringPreferencesKey(name)]).also {
                 assertTrue(it.startsWith(SettingsSecretCodec.PREFIX))

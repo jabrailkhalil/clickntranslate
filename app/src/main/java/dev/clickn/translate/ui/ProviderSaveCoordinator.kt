@@ -1,5 +1,7 @@
 package dev.clickn.translate.ui
 
+import dev.clickn.translate.R
+import dev.clickn.translate.data.SecureSettingsUnavailableException
 import dev.clickn.translate.data.Settings
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -11,7 +13,10 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-internal enum class ProviderSaveStatus { IDLE, SAVING, FAILED }
+internal enum class ProviderSaveStatus(val errorMessage: Int? = null) {
+    IDLE, SAVING, FAILED(R.string.mobile_provider_save_error),
+    KEYSTORE_UNAVAILABLE(R.string.settings_secure_storage_unavailable),
+}
 
 /** The activity's ViewModel retains the form across rotation. Draft credentials stay in memory. */
 internal class ProviderEditSession(initial: Settings) {
@@ -40,7 +45,8 @@ internal class ProviderSaveCoordinator(private val owner: CoroutineScope) {
     private var active: Deferred<Boolean>? = null
 
     fun clearFailure() {
-        mutableStatus.compareAndSet(ProviderSaveStatus.FAILED, ProviderSaveStatus.IDLE)
+        val previous = mutableStatus.value
+        if (previous.errorMessage != null) mutableStatus.compareAndSet(previous, ProviderSaveStatus.IDLE)
     }
 
     fun save(persist: suspend () -> Unit): Deferred<Boolean> = synchronized(lock) {
@@ -52,6 +58,9 @@ internal class ProviderSaveCoordinator(private val owner: CoroutineScope) {
                 true
             } catch (cancelled: CancellationException) {
                 throw cancelled
+            } catch (_: SecureSettingsUnavailableException) {
+                mutableStatus.value = ProviderSaveStatus.KEYSTORE_UNAVAILABLE
+                false
             } catch (_: Exception) {
                 // The UI gets no exception, request URL or credential-bearing details.
                 mutableStatus.value = ProviderSaveStatus.FAILED
