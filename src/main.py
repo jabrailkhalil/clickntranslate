@@ -12809,12 +12809,14 @@ class DarkThemeApp(QMainWindow):
                            self.hotkey_target_combo, self.hotkey_language_swap):
                 rect = rect.united(QtCore.QRect(widget.mapTo(root, QtCore.QPoint()), widget.size()))
             return rect
-        size = target.size()
+        rect = target.rect()
         if isinstance(target, QCheckBox):
             # A grid cell may span the whole window. Highlight the actual
             # checkbox and caption, leaving unused cell space for the card.
-            size.setWidth(min(size.width(), target.sizeHint().width()))
-        return QtCore.QRect(target.mapTo(getattr(self, 'ui_root', self), QtCore.QPoint(0, 0)), size)
+            rect.setWidth(min(rect.width(), target.sizeHint().width()))
+            if target.isRightToLeft():
+                rect.moveRight(target.rect().right())
+        return rect.translated(target.mapTo(getattr(self, 'ui_root', self), QtCore.QPoint()))
 
     def _highlight_guide_target(self, target, action):
         if self._guide_target_animation is not None:

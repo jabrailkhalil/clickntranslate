@@ -14,8 +14,8 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from PyQt5.QtCore import QRect, Qt  # noqa: E402
-from PyQt5.QtWidgets import QApplication, QPushButton, QWidget  # noqa: E402
+from PyQt5.QtCore import QPoint, QRect, Qt  # noqa: E402
+from PyQt5.QtWidgets import QApplication, QCheckBox, QPushButton, QStyle, QStyleOptionButton, QWidget  # noqa: E402
 
 import main  # noqa: E402
 
@@ -93,6 +93,26 @@ class GuideSpotlightTest(unittest.TestCase):
         # It covers the window, so without that attribute nothing could be
         # clicked and the guide could never advance.
         self.assertEqual(spotlight.size(), self.host.size())
+
+    def test_expanded_checkbox_spotlights_the_caption_and_indicator_in_both_directions(self):
+        # The companion option takes the whole grid column. Only the painted
+        # part of the checkbox is clickable and belongs inside the cutout.
+        from types import SimpleNamespace
+        guide = SimpleNamespace(ui_root=self.host, _guide_current_action=lambda: 'companion_settings')
+        checkbox = QCheckBox(self.host)
+        checkbox.setGeometry(20, 100, 360, 28)
+        checkbox.show()
+        for direction, label in ((Qt.LeftToRight, 'On desktop'), (Qt.RightToLeft, 'على سطح المكتب')):
+            with self.subTest(label=label):
+                checkbox.setText(label)
+                checkbox.setLayoutDirection(direction)
+                option = QStyleOptionButton()
+                checkbox.initStyleOption(option)
+                clickable = checkbox.style().subElementRect(QStyle.SE_CheckBoxClickRect, option, checkbox)
+                clickable.translate(checkbox.mapTo(self.host, QPoint()))
+                lit = main.DarkThemeApp._guide_target_rect(guide, checkbox)
+                self.assertTrue(lit.contains(clickable), (lit, clickable))
+                self.assertLess(lit.width(), checkbox.width())
 
     def test_clearing_removes_it(self):
         spotlight = main.GuideSpotlight(self.host)

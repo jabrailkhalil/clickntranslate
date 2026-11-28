@@ -4,9 +4,9 @@ from pathlib import Path
 from unittest import mock
 
 import pytest
-from PyQt5.QtCore import QEvent, QRect, Qt
+from PyQt5.QtCore import QEvent, QPoint, QRect, Qt
 from PyQt5.QtTest import QTest
-from PyQt5.QtWidgets import QApplication
+from PyQt5.QtWidgets import QApplication, QCheckBox, QStyle, QStyleOptionButton
 
 import main
 import ocr
@@ -283,6 +283,12 @@ def test_cards_are_rendered_inside_the_window_and_clear_the_target(window, theme
                               controller.map_widget_to_view(card, card.rect().bottomRight()))
         assert controller.view.viewport().rect().contains(rendered_rect), (action, rendered_rect)
         assert not card.geometry().intersects(window._guide_target_rect(target)), (action, card.geometry())
+        if isinstance(target, QCheckBox):
+            option = QStyleOptionButton()
+            target.initStyleOption(option)
+            indicator = target.style().subElementRect(QStyle.SE_CheckBoxIndicator, option, target)
+            indicator.translate(target.mapTo(window.ui_root, QPoint()))
+            assert window._guide_target_rect(target).contains(indicator), (locale, action, indicator)
         assert card.companion.isVisible()
         assert card.companion.pixmap() is not None and not card.companion.pixmap().isNull()
         for label in (card.title, card.body, card.hint):
