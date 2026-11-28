@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from typing import NamedTuple
 from xml.parsers.expat import ExpatError
 
 from platform_support import APP_ID
@@ -198,8 +199,14 @@ def ensure_permission(kind, parent=None, language="en"):
     return False
 
 
+class ForegroundTarget(NamedTuple):
+    pid: int
+    window: object
+    focused_element: object | None
+
+
 def foreground_target():
-    """Identify both the foreground process and its focused accessibility window."""
+    """Remember the accessibility control when its application exposes one."""
     import AppKit
     import ApplicationServices as AX
     application = AppKit.NSWorkspace.sharedWorkspace().frontmostApplication()
@@ -208,17 +215,25 @@ def foreground_target():
     pid = int(application.processIdentifier())
     element = AX.AXUIElementCreateApplication(pid)
     error, window = AX.AXUIElementCopyAttributeValue(element, AX.kAXFocusedWindowAttribute, None)
-    return (pid, window) if not error and window is not None else None
+    if error or window is None:
+        return None
+    error, focused = AX.AXUIElementCopyAttributeValue(element, AX.kAXFocusedUIElementAttribute, None)
+    return ForegroundTarget(pid, window, None if error else focused)
 
 
-def same_foreground_target(expected):
-    if expected is None:
+def same_foreground_target(expected, *, require_focused_element=False):
+    if expected is None or (require_focused_element and expected.focused_element is None):
         return False
     current = foreground_target()
-    if current is None or current[0] != expected[0]:
+    if current is None or current.pid != expected.pid:
         return False
     import CoreFoundation
-    return bool(CoreFoundation.CFEqual(current[1], expected[1]))
+    if not CoreFoundation.CFEqual(current.window, expected.window):
+        return False
+    if expected.focused_element is None:
+        return True
+    return current.focused_element is not None and bool(
+        CoreFoundation.CFEqual(current.focused_element, expected.focused_element))
 
 
 def clipboard_sequence():

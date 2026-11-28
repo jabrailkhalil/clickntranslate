@@ -8,6 +8,8 @@ import pytest
 import assistant_text
 import clipboard_preservation
 import main
+from main import simulate_copy as native_copy_action
+import macos_desktop
 import platform_support
 import translater
 from test_selection_clipboard_preservation import FakeClipboard
@@ -250,12 +252,19 @@ def test_select_all_revalidates_focus_before_copying(capture, monkeypatch):
 
 
 def setup_fake_mac(capture, monkeypatch, *, permission=True):
-    target = (1234, 'Fake accessibility window')
+    target = macos_desktop.ForegroundTarget(1234, 'Fake accessibility window', 'Source field')
     capture.foreground = target
     native = SimpleNamespace(
         ensure_permission=mock.Mock(return_value=permission),
-        same_foreground_target=mock.Mock(side_effect=lambda expected: capture.foreground == expected),
+        same_foreground_target=mock.Mock(side_effect=lambda expected, **_: capture.foreground == expected),
         foreground_target=mock.Mock(side_effect=lambda: capture.foreground))
+    def send_shortcut(key, validate_target=None):
+        if validate_target is not None and not validate_target():
+            return False
+        assert key == 'c'
+        capture.copy_shortcut()
+        return True
+    native.send_edit_shortcut = mock.Mock(side_effect=send_shortcut)
     monkeypatch.setattr(platform_support, 'IS_WINDOWS', False)
     monkeypatch.setattr(platform_support, 'IS_MAC', True)
     monkeypatch.setitem(sys.modules, 'macos_desktop', native)
@@ -279,6 +288,113 @@ def test_mac_focus_change_does_not_copy(capture, monkeypatch):
     owner.launch_translate_selection(expected_target=target)
     assert_focus_rejected(owner, capture)
     capture.copy_shortcut.assert_not_called()
+
+
+@pytest.mark.parametrize('replace', [False, True])
+def test_mac_hotkey_does_not_copy_from_the_window_activated_during_worker_start(capture, monkeypatch, replace):
+    owner = SelectionRequest()
+    _target, native = setup_fake_mac(capture, monkeypatch)
+    def change_window(seconds):
+        if seconds == .35:
+            capture.foreground = (9999, 'Other window')
+    monkeypatch.setattr(main.time, 'sleep', change_window)
+    action = owner.launch_translate_replace_selection if replace else owner.launch_translate_selection
+    assert action() is True
+    native.foreground_target.assert_called_once_with()
+    capture.copy_shortcut.assert_not_called()
+    capture.copy.assert_not_called()
+    capture.provider.assert_not_called()
+    assert owner.finished == []  # A hotkey is independent of the companion panel.
+
+
+@pytest.mark.parametrize('verification', [False, True])
+def test_mac_copy_rechecks_the_source_after_waiting_for_held_modifiers(capture, monkeypatch, verification):
+    owner = SelectionRequest()
+    target, native = setup_fake_mac(capture, monkeypatch)
+    monkeypatch.setattr(main, 'simulate_copy', native_copy_action)
+    delivered = []
+    def send_after_modifiers(key, validate_target=None):
+        capture.foreground = (9999, 'Other window')
+        if validate_target is not None and not validate_target():
+            return False
+        delivered.append((key, capture.foreground))
+        return True
+    native.send_edit_shortcut.side_effect = send_after_modifiers
+    if verification:
+        replaced, _reason = main.replace_selected_text_in_foreground('Source selection', 'Result', target)
+        assert not replaced
+    else:
+        owner.launch_translate_selection(expected_target=target)
+        assert capture.clipboard.text == 'Clipboard before selection'
+    native.send_edit_shortcut.assert_called_once()
+    assert delivered == []
+    capture.provider.assert_not_called()
+
+
+@pytest.fixture
+def ax_fields(capture, monkeypatch):
+    monkeypatch.setattr(platform_support, 'IS_WINDOWS', False)
+    monkeypatch.setattr(platform_support, 'IS_MAC', True)
+    state = SimpleNamespace(focused='Field A', delivered=[])
+    front = SimpleNamespace(processIdentifier=lambda: 1234)
+    workspace = SimpleNamespace(frontmostApplication=lambda: front)
+    appkit = SimpleNamespace(NSWorkspace=SimpleNamespace(sharedWorkspace=lambda: workspace))
+    def attribute(_application, name, _out):
+        if name == 'window':
+            return 0, 'Source window'
+        assert name == 'focused element'
+        return (0, state.focused) if state.focused is not None else (-25205, None)
+    accessibility = SimpleNamespace(AXUIElementCreateApplication=lambda pid: pid,
+                                    AXUIElementCopyAttributeValue=attribute,
+                                    kAXFocusedWindowAttribute='window', kAXFocusedUIElementAttribute='focused element')
+    monkeypatch.setitem(sys.modules, 'AppKit', appkit)
+    monkeypatch.setitem(sys.modules, 'ApplicationServices', accessibility)
+    monkeypatch.setitem(sys.modules, 'CoreFoundation', SimpleNamespace(CFEqual=lambda a, b: a == b))
+    monkeypatch.setattr(macos_desktop, 'ensure_permission', lambda *_: True)
+    def send(key, validate_target=None):
+        if validate_target is not None and not validate_target():
+            return False
+        state.delivered.append((key, state.focused))
+        if key == 'c':
+            # Both editors contain the same highlighted string.
+            capture.copy_shortcut()
+        return True
+    monkeypatch.setattr(macos_desktop, 'send_edit_shortcut', send)
+    return state
+
+
+@pytest.mark.parametrize('new_focus', ['Field B', None])
+@pytest.mark.parametrize('operation', ['select_all', 'replace'])
+def test_mac_replacement_never_targets_a_different_control_with_identical_text(capture, ax_fields, new_focus, operation):
+    original = macos_desktop.foreground_target()
+    ax_fields.focused = new_focus
+    if operation == 'select_all':
+        assert not main.select_all_text_in_foreground(original)
+    else:
+        replaced, _ = main.replace_selected_text_in_foreground('Source selection', 'Translation', original)
+        assert not replaced
+    assert ax_fields.delivered == []
+    capture.copy.assert_not_called()
+
+
+def test_mac_window_only_accessibility_preserves_reading_but_refuses_replacement(capture, ax_fields):
+    ax_fields.focused = None
+    owner = SelectionRequest()
+    owner.launch_translate_selection()
+    assert ax_fields.delivered == [('c', None)]
+    assert len(owner.shown_dialogs) == 1
+    ax_fields.delivered.clear()
+    capture.provider.reset_mock()
+    owner.launch_translate_replace_selection()
+    assert ax_fields.delivered == []
+    capture.provider.assert_not_called()
+
+
+def test_mac_replacement_still_verifies_selection_and_pastes_in_the_original_control(capture, ax_fields):
+    original = macos_desktop.foreground_target()
+    assert main.select_all_text_in_foreground(original)
+    assert main.replace_selected_text_in_foreground('Source selection', 'Translation', original) == (True, 'replaced')
+    assert ax_fields.delivered == [('a', 'Field A'), ('c', 'Field A'), ('v', 'Field A')]
 
 
 def test_mac_permission_denial_returns_false_without_starting_a_worker(capture, monkeypatch):
