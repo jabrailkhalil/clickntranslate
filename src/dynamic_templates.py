@@ -125,7 +125,8 @@ def decode_rect(value, screens):
 def validate_template(value):
     if not isinstance(value, dict):
         raise ValueError('Invalid template')
-    name = str(value.get('name', '')).strip()[:80]
+    raw_name = value.get('name')
+    name = raw_name.strip()[:80] if isinstance(raw_name, str) else ''
     source, target = value.get('source_language'), value.get('target_language')
     pairs = value.get('pairs')
     if not name or not all(isinstance(code, str) and 1 <= len(code) <= 20 for code in (source, target)):
@@ -165,7 +166,7 @@ class TemplateStore:
         data = json.loads(self.path.read_text(encoding='utf-8'))
         if not isinstance(data, dict) or data.get('version') != 1 or not isinstance(data.get('templates'), list):
             raise ValueError('Unsupported templates file')
-        return [validate_template(value) for value in data['templates'][:100]]
+        return [validate_template(value) for value in data['templates']]
 
     def _write(self, values):
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -178,8 +179,9 @@ class TemplateStore:
 
     def save(self, value):
         value = validate_template(value)
-        values = [item for item in self.load() if item['name'].casefold() != value['name'].casefold()]
-        if len(values) >= 100:
+        current = self.load()
+        values = [item for item in current if item['name'].casefold() != value['name'].casefold()]
+        if len(values) == len(current) and len(values) >= 100:
             raise ValueError('Too many templates')
         self._write(values + [value])
         return value

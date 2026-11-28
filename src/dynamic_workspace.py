@@ -1,5 +1,6 @@
 """Paired capture/output selection and compact controls for live text windows."""
 
+import html
 import logging
 
 from PyQt5 import QtCore, QtGui, QtWidgets, sip
@@ -457,8 +458,9 @@ class PairedRegionSelector(game_mode.GameRegionSelector):
             duplicate = next((item for item in values if item['name'].casefold() == name.casefold()), None)
             if duplicate:
                 from styled_dialogs import StyledMessageBox
+                question = text(self._language, 'replace_question').format(name=duplicate['name'])
                 answer = StyledMessageBox.question(self, text(self._language, 'replace_title'),
-                    text(self._language, 'replace_question').format(name=duplicate['name']),
+                    '<p>' + html.escape(question) + '</p>',
                     StyledMessageBox.Yes | StyledMessageBox.No, StyledMessageBox.No)
                 if answer != StyledMessageBox.Yes:
                     return
@@ -1115,19 +1117,25 @@ class OutputControls(QtWidgets.QFrame):
         name = self.template_name.currentText().strip()
         if name not in self._template_names:
             return
+        from ocr import get_cached_ocr_config, _write_ocr_config_updates
+        cleared = False
         try:
-            TemplateStore().delete(name)
-            self._refresh_templates()
-            self.notice.hide()
-            from ocr import get_cached_ocr_config, _write_ocr_config_updates
             if get_cached_ocr_config().get('game_last_template') == name:
                 if not _write_ocr_config_updates({'game_last_template': ''}):
-                    from capture_regions import text as region_text
-                    self.notice.setText(region_text(self.language, 'save_error'))
-                    self.notice.show()
+                    raise OSError('Could not clear the selected template preference')
+                cleared = True
+            TemplateStore().delete(name)
         except Exception:
-            self.notice.setText(text(self.language, 'save_error'))
+            logger = logging.getLogger('clickntranslate.game')
+            logger.exception('Unable to delete output layout')
+            if cleared and not get_cached_ocr_config().get('game_last_template'):
+                if not _write_ocr_config_updates({'game_last_template': name}):
+                    logger.error('Unable to restore the selected template preference')
+            self.notice.setText(text(self.language, 'delete_template_error'))
             self.notice.show()
+        else:
+            self._refresh_templates()
+            self.notice.hide()
         self._resize_panel()
 
     def detach(self, overlay):

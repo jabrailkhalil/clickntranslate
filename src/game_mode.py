@@ -653,6 +653,14 @@ def _prepare_game_ocr_variants(qimage):
 class GameRegionSelector(QtWidgets.QWidget):
     """One-time region and language selector for the continuous session."""
 
+    @property
+    def current_interface_language(self):
+        return self._language
+
+    @property
+    def current_theme(self):
+        return self._config.get('theme', 'Темная')
+
     def __init__(self, target_window=0):
         super().__init__()
         from ocr import (

@@ -209,6 +209,37 @@ def test_failed_active_template_save_never_changes_remembered_choice(isolated, m
         overlay.close()
 
 
+@pytest.mark.parametrize('failure', ['preference_write', 'template_write'])
+def test_failed_live_template_deletion_preserves_layout_and_choice(isolated, monkeypatch, failure):
+    config, store = isolated
+    original = [saved(store, 'First'), saved(store), saved(store, 'Third')]
+    config.update(game_remember_template=True, game_last_template='Dialogue')
+
+    def write(updates):
+        if failure == 'preference_write':
+            return False
+        config.update(updates)
+        return True
+
+    monkeypatch.setattr(ocr, '_write_ocr_config_updates', write)
+    if failure == 'template_write':
+        monkeypatch.setattr(store, '_write', mock.Mock(side_effect=OSError('disk full')))
+    overlay = make_overlay(QtCore.QRect(40, 300, 240, 80), 'en', 'ru',
+                           output_region=QtCore.QRect(400, 400, 300, 100))
+    try:
+        controls = overlay.controls
+        controls.gear.click()
+        controls.template_name.setCurrentIndex(controls.template_name.findText('Dialogue'))
+        controls.delete_button.click()
+        assert store.load() == original
+        assert config['game_last_template'] == 'Dialogue'
+        assert controls.template_name.currentText() == 'Dialogue'
+        assert controls.delete_button.isEnabled()
+        assert controls.notice.text() == dynamic_templates.text(config['interface_language'], 'delete_template_error')
+    finally:
+        overlay.close()
+
+
 def test_deleting_template_reads_current_preferences_after_config_cache_replacement(isolated, monkeypatch):
     config, store = isolated
     config.update(game_remember_template=True, game_last_template='Previous')

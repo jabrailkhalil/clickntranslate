@@ -3,7 +3,7 @@ import copy
 from unittest import mock
 
 import pytest
-from PyQt5 import QtCore, QtWidgets
+from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtTest import QTest
 
 import dynamic_templates
@@ -117,6 +117,42 @@ def test_failed_save_keeps_the_areas_and_form_open(isolated, monkeypatch):
         assert selector.isVisible() and selector._complete()
         assert selector.template_name.text() == 'Dialogue'
         assert not store.load()
+    finally:
+        selector.close()
+
+
+@pytest.mark.parametrize('locale', ['en', 'ar'])
+def test_confirmation_displays_the_literal_existing_name(isolated, app, monkeypatch, locale):
+    config, store = isolated
+    config['interface_language'] = locale
+    config['theme'] = 'Светлая' if locale == 'ar' else 'Темная'
+    name = '<b>Say</b> & رد'
+    previous = stored(store, name)
+    selector = workspace.PairedRegionSelector(template_builder=True)
+    shown = []
+
+    def inspect(dialog):
+        dialog.show()
+        app.processEvents()
+        label = dialog.message_label
+        document = QtGui.QTextDocument()
+        if label.textFormat() == QtCore.Qt.PlainText:
+            document.setPlainText(label.text())
+        else:
+            document.setHtml(label.text())
+        shown.append((document.toPlainText(), dialog.button(StyledMessageBox.Yes).text(),
+                      dialog.button(StyledMessageBox.No).text(), dialog._dark))
+        dialog.close()
+        return StyledMessageBox.No
+
+    monkeypatch.setattr(StyledMessageBox, 'exec_', inspect)
+    try:
+        areas(selector)
+        selector.template_name.setText(name)
+        selector.start_button.click()
+        actions = ('نعم', 'لا', False) if locale == 'ar' else ('Yes', 'No', True)
+        assert shown == [(dynamic_templates.text(locale, 'replace_question').format(name=name), *actions)]
+        assert store.load() == [previous]
     finally:
         selector.close()
 
