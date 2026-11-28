@@ -84,17 +84,19 @@ def translate_document_text(
                 pending_size += len(translated)
                 now = time.monotonic()
                 if len(results) == 1 or pending_size >= 65536 or now - last_delta >= .05:
-                    delta_callback(''.join(pending_deltas), len(results), total)
+                    delta = ''.join(pending_deltas)
                     pending_deltas.clear()
                     pending_size, last_delta = 0, now
+                    delta_callback(delta, len(results), total)
             if partial_callback:
                 partial_callback(''.join(translated_parts), len(results), total)
             _emit_progress(progress_callback, len(results), total, document_message(
                 interface_language, 'translated', current=index+1, total=total))
     except translater.TranslationCancelledError:
         pass
-    if delta_callback and pending_deltas:
-        delta_callback(''.join(pending_deltas), len(results), total)
+    finally:
+        if delta_callback and pending_deltas:
+            delta_callback(''.join(pending_deltas), len(results), total)
     return ''.join(translated_parts), results
 
 

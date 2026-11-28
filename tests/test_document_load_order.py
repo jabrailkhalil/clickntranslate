@@ -352,6 +352,7 @@ def test_late_translation_events_cannot_change_the_replacement_translation(loads
     dialog.translate_file_button.click()
     old_cancel = dialog._translation_cancel_event
     dialog.original_view.setPlainText('New draft')
+    new_target = dialog.target_combo.currentData()
     dialog.translate_file_button.click()
     new_cancel = dialog._translation_cancel_event
     with mock.patch.object(main.QMessageBox, 'warning') as warning:
@@ -364,8 +365,7 @@ def test_late_translation_events_cannot_change_the_replacement_translation(loads
     assert not dialog.translation_running
     assert dialog.original_view.toPlainText() == 'New draft'
     assert dialog.translated_text == 'Translation of New draft'
-    main.save_translation_history.assert_called_once_with('New draft', 'Translation of New draft',
-                                                        dialog._active_translation_target_code)
+    main.save_translation_history.assert_called_once_with('New draft', 'Translation of New draft', new_target)
 
 
 def test_already_queued_worker_events_are_discarded_after_editing(loads, monkeypatch):

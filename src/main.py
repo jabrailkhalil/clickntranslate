@@ -146,7 +146,7 @@ from document_parser import DocumentParseError, parse_document
 from document_parser import SUPPORTED_EXTENSIONS
 from document_storage import default_output_paths, load_session, save_session, save_text, translations_dir
 from atomic_storage import write_json
-from document_translation import translate_document_text
+from document_translation import TranslationChunkResult, translate_document_text
 from languages import (
     LANGUAGES as APP_LANGUAGES,
     default_target_for_source,
@@ -8641,7 +8641,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self._translation_cancel_event = None
         self._document_translation_generation = 0
         self._active_translation_source_text = ""
-        self._active_translation_target_code = ""
+        self._document_result_settings = {}
 
         self._document_loaded_signal.connect(self._on_document_loaded)
         self._document_load_error_signal.connect(self._on_document_load_error)
@@ -9312,8 +9312,9 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         from document_messages import localized_document_error
         message = localized_document_error(message, self.lang)
         if self.translation_running:
-            canceled = self._translation_cancel_event is not None and self._translation_cancel_event.is_set()
-            notify_activity(self.parent_app, 'idle' if canceled else 'error', f'document:{id(self)}')
+            # The provider may fail after delivering several completed chunks.
+            self.translated_text = self.translated_view.toPlainText()
+            notify_activity(self.parent_app, 'error', f'document:{id(self)}')
         self.translation_running = False
         self._translation_cancel_event = None
         self.progress_bar.setRange(0, 100)
@@ -9388,11 +9389,9 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self._set_busy(True)
         self._set_status('')
 
-        source_code = self._source_code()
-        target_code = language_code_from_name(self.target_combo.currentText(), self.lang)
-        provider_engine = self._provider_engine()
+        settings = self._document_translation_settings()
+        self._document_result_settings = settings
         self._active_translation_source_text = text
-        self._active_translation_target_code = target_code
         interface_language = self.lang
 
         def emit(kind, *values):
@@ -9408,9 +9407,9 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
             try:
                 translated, results = translate_document_text(
                     text,
-                    source_code,
-                    target_code,
-                    provider_engine=provider_engine,
+                    settings['source_language'],
+                    settings['target_language'],
+                    provider_engine=settings['provider_engine'],
                     progress_callback=progress,
                     cancel_event=cancel_event,
                     delta_callback=lambda *values: emit('delta', *values),
@@ -9497,7 +9496,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
                 save_translation_history(
                     self._active_translation_source_text,
                     self.translated_text,
-                    self._active_translation_target_code,
+                    self._document_result_settings.get('target_language', ''),
                 )
 
     def _friendly_provider_failure_text(self, results):
@@ -9588,7 +9587,10 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self.current_document = None
         self.session_payload = payload
         self.translated_text = payload.get("translated_text", "")
-        self.translation_results = []
+        self.translation_results = [
+            TranslationChunkResult(chunk['index'], chunk['source_text'], chunk['translated_text'], chunk.get('error', ''))
+            for chunk in payload.get('chunks', [])
+        ]
         self.translation_error_message_visible = False
         self.original_view.blockSignals(True)
         self.original_view.setPlainText(payload.get("original_text", ""))
@@ -9603,6 +9605,9 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         target_index = self.target_combo.findData(payload.get('target_language'))
         if target_index >= 0:
             self.target_combo.setCurrentIndex(target_index)
+        self._document_result_settings = {
+            field: payload.get(field) or value for field, value in self._document_translation_settings().items()
+        }
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(100 if self.translated_text else 0)
         self._set_status(doc_text(self.lang, "session_loaded"))
@@ -9834,19 +9839,22 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
             return self.session_payload.get("source_file_name") or "translation"
         return "translation"
 
+    def _document_translation_settings(self):
+        return {'source_language': self._source_code(), 'target_language': self.target_combo.currentData() or '',
+                'provider_engine': self._provider_engine()}
+
     def _session_payload(self):
-        source_code = self._source_code()
-        target_code = language_code_from_name(self.target_combo.currentText(), self.lang)
+        # The controls may already describe the next translation.
+        settings = self._document_result_settings if self.translated_text or self.translation_running else {}
+        settings = settings or self._document_translation_settings()
         document = self.current_document
         return {
             "source_file_name": self._source_file_name(),
             "source_path": document.path if document else self.session_payload.get("source_path", "") if self.session_payload else "",
             "source_size": document.size_bytes if document else self.session_payload.get("source_size", 0) if self.session_payload else 0,
             "detected_language": document.detected_language if document else self.session_payload.get("detected_language", "") if self.session_payload else "",
-            "source_language": source_code,
-            "target_language": target_code,
-            "provider": self._provider_name(),
-            "provider_engine": self._provider_engine(),
+            **settings,
+            "provider": provider_display_name(settings['provider_engine'], self.lang),
             "original_text": self.original_view.toPlainText(),
             "translated_text": (self.translated_view.toPlainText()
                                 if self.translation_running else self.translated_text),

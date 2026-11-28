@@ -47,12 +47,22 @@ def save_session(path, session):
 def load_session(path):
     with open(path, "r", encoding="utf-8-sig") as f:
         payload = json.load(f)
-    if not isinstance(payload, dict):
+    if not isinstance(payload, dict) or not ('original_text' in payload or 'translated_text' in payload):
         raise ValueError("Invalid translation session file.")
     for field in ('original_text', 'translated_text', 'source_file_name', 'source_path',
                   'detected_language', 'source_language', 'target_language', 'provider_engine', 'provider'):
         if field in payload and not isinstance(payload[field], str):
             raise ValueError(f"Invalid translation session field: {field}.")
+    chunks = payload.get('chunks', [])
+    if not isinstance(chunks, list):
+        raise ValueError("Invalid translation session field: chunks.")
+    for chunk in chunks:
+        if (not isinstance(chunk, dict)
+                or type(chunk.get('index')) is not int or chunk['index'] < 0
+                or not isinstance(chunk.get('source_text'), str)
+                or not isinstance(chunk.get('translated_text'), str)
+                or not isinstance(chunk.get('error', ''), str)):
+            raise ValueError("Invalid translation session chunk.")
     return payload
 
 

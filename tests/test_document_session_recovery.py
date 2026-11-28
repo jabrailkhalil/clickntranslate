@@ -8,6 +8,7 @@ from PyQt5 import QtCore, QtWidgets
 
 import main
 import document_storage
+import document_translation
 import portable_paths
 from qt_layout_test_support import ensure_layout_fonts
 
@@ -44,6 +45,31 @@ def test_saved_language_pair_and_provider_survive_reopening(document, tmp_path):
     assert document._source_code() == 'de'
     assert document.target_combo.currentData() == 'fr'
     assert document._provider_engine() == 'lingva'
+
+
+@pytest.mark.parametrize('payload', [{}, {'theme': 'light'}, {'translated_text': 'Damaged', 'chunks': [None]}])
+def test_unrelated_or_damaged_session_json_leaves_the_open_draft(document, tmp_path, payload):
+    path = tmp_path / 'other.json'
+    path.write_text(json.dumps(payload), encoding='utf-8')
+    with mock.patch.object(main.QMessageBox, 'warning') as warning:
+        open_session(document, path)
+    warning.assert_called_once()
+    assert document.original_view.toPlainText() == 'Existing draft'
+    assert document.session_payload is None
+
+
+def test_saving_a_reopened_session_preserves_partial_chunk_diagnostics(document, tmp_path):
+    chunks = [
+        dict(index=0, source_text='First', translated_text='Первый', error=''),
+        dict(index=1, source_text='Second', translated_text='[Incomplete]', error='Fixture failed'),
+    ]
+    original, exported = tmp_path / 'original.json', tmp_path / 'exported.json'
+    original.write_text(json.dumps(dict(original_text='First Second', translated_text='Первый [Incomplete]',
+                                        chunks=chunks)), encoding='utf-8')
+    open_session(document, original)
+    with mock.patch.object(main.QFileDialog, 'getSaveFileName', return_value=(str(exported), '')):
+        document.save_button.click()
+    assert json.loads(exported.read_text(encoding='utf-8'))['chunks'] == chunks
 
 
 @pytest.mark.parametrize('engine', ['argos', 'hymt'])
@@ -95,6 +121,63 @@ def deferred_document(document, monkeypatch):
     monkeypatch.setattr(main.threading, 'Thread', DeferredWorker)
     monkeypatch.setattr(main, '_resolve_translation_provider', lambda owner, engine, *args: engine)
     return document, pending
+
+
+def test_export_keeps_the_language_and_provider_that_produced_the_visible_translation(deferred_document, tmp_path, monkeypatch):
+    document, pending = deferred_document
+    document._populate_provider_combo('lingva')
+    document._refresh_document_provider_languages()
+    document.source_combo.setCurrentIndex(document.source_combo.findData('en'))
+    document.target_combo.setCurrentIndex(document.target_combo.findData('fr'))
+    translate = mock.Mock(return_value=('Bonjour', []))
+    monkeypatch.setattr(main, 'translate_document_text', translate)
+    monkeypatch.setattr(main, 'save_translation_history', mock.Mock())
+    document.translate_file_button.click()
+    pending.pop()()
+    assert translate.call_args.args[1:] == ('en', 'fr')
+    assert translate.call_args.kwargs['provider_engine'] == 'lingva'
+
+    for name in ('export.json', 'reopened.json'):
+        document.provider_combo.setCurrentIndex(document.provider_combo.findData('google'))
+        document.source_combo.setCurrentIndex(document.source_combo.findData('de'))
+        document.target_combo.setCurrentIndex(document.target_combo.findData('es'))
+        path = tmp_path / name
+        with mock.patch.object(main.QFileDialog, 'getSaveFileName', return_value=(str(path), '')):
+            document.save_button.click()
+        saved = json.loads(path.read_text(encoding='utf-8'))
+        assert saved['translated_text'] == 'Bonjour'
+        assert (saved['source_language'], saved['target_language'], saved['provider_engine']) == ('en', 'fr', 'lingva')
+        open_session(document, path)
+
+
+def test_unexpected_error_keeps_every_completed_chunk_exportable(deferred_document, tmp_path, monkeypatch):
+    document, pending = deferred_document
+    document.load_plain_text('First Second Third')
+    parts = [document_translation.TranslationChunk(i, text) for i, text in enumerate(('First ', 'Second ', 'Third'))]
+    monkeypatch.setattr(document_translation, 'split_text_chunks', lambda *_a, **_kw: parts)
+    # Two small chunks complete within one UI update interval.
+    monkeypatch.setattr(document_translation, 'time', mock.Mock(monotonic=lambda: 1.0))
+
+    def interrupted_provider(*args, **kwargs):
+        yield 0, 'Alpha', ''
+        yield 1, 'Beta', ''
+        raise RuntimeError('Fixture provider stopped before chunk three')
+
+    monkeypatch.setattr(main.translater, 'iter_translate_texts', interrupted_provider)
+    history = mock.Mock()
+    monkeypatch.setattr(main, 'save_translation_history', history)
+    with mock.patch.object(main.QMessageBox, 'warning') as warning:
+        document.translate_file_button.click()
+        pending.pop()()
+    warning.assert_called_once()
+    history.assert_not_called()
+    assert not document.translation_running
+    assert document.translated_text == document.translated_view.toPlainText() == 'Alpha Beta '
+    assert document.save_button.isEnabled()
+    path = tmp_path / 'recovered.txt'
+    with mock.patch.object(main.QFileDialog, 'getSaveFileName', return_value=(str(path), '')):
+        document.save_button.click()
+    assert path.read_text(encoding='utf-8') == 'Alpha Beta '
 
 
 @pytest.mark.parametrize('dismiss', ['close', 'reject'])
