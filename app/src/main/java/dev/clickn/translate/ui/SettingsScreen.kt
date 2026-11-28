@@ -10784,13 +10784,7 @@ private val APP_LANGUAGE_OPTIONS: List<AppLanguageOption> = listOf(
     AppLanguageOption("es", R.string.settings_app_lang_es),
 )
 
-/**
- * 应用专属语言切换。基于 [androidx.appcompat.app.AppCompatDelegate] 的 Per-App Languages，
- * 由系统持久化（LocaleManager），无需我们写本地存储；Android 13+ 切换后 framework 自动
- * 重建 Activity（[dev.clickn.translate.ui.MainActivity] 的 route 用 rememberSaveable 保持）。
- *
- * "跟随系统" = 写入空 LocaleListCompat。
- */
+/** A local override survives recreation. Follow system uses Android's language list for this app. */
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 private fun AppLanguageSelector(beforeChange: () -> Unit = {}) {

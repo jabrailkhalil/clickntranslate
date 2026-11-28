@@ -6,6 +6,7 @@ import android.content.ContextWrapper
 import android.content.SharedPreferences
 import android.content.res.Resources
 import android.content.res.Configuration
+import android.os.LocaleList
 import android.view.View
 import java.util.Locale
 
@@ -97,19 +98,17 @@ object AppLocalePrefs {
         UiPreferenceTransfer.write(context, UiPreferenceField.LANGUAGE, tag.trim())
     }
 
-    /**
-     * 用持久化的 locale 包装一个 Context（通常是 Activity 的 baseContext）。
-     * 空 tag 时原样返回（跟随系统）。
-     */
+    /** Follow Android's language list for this app unless the user explicitly chose an in-app override. */
     fun wrap(base: Context): Context {
         val tag = read(base)
-        val locale = if (tag.isBlank()) android.content.res.Resources.getSystem().configuration.locales[0]
-            else Locale.forLanguageTag(tag)
-        Locale.setDefault(locale)
-        val cfg = Configuration(base.resources.configuration).apply {
-            setLocale(locale)
-            setLayoutDirection(locale)
-        }
+        // The application context receives the framework's per-app locales. An Activity
+        // context may still carry an earlier manual choice during recreation.
+        val locales = if (tag.isBlank()) {
+            base.applicationContext?.resources?.configuration?.locales ?: base.resources.configuration.locales
+        } else LocaleList.forLanguageTags(tag)
+        if (locales.isEmpty) return base
+        Locale.setDefault(locales[0])
+        val cfg = Configuration(base.resources.configuration).apply { setLocales(locales) }
         return base.createConfigurationContext(cfg)
     }
 }

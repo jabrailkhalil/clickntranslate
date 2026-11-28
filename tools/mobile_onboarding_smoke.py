@@ -113,7 +113,7 @@ class Journey:
             point = action_point(tree, self.package, action) if needs_tap else None
             if set(expected) <= visible and (not needs_tap or point):
                 (self.output / f"{stage}.xml").write_bytes(self.last_xml)
-                if stage in {"step-1", "step-3", "settings"}:
+                if stage in {"step-1", "step-3", "settings", "os-language-french"}:
                     (self.output / f"{stage}.png").write_bytes(self.run("exec-out", "screencap", "-p"))
                 self.stages.append(stage)
                 if point:
@@ -162,6 +162,39 @@ class Journey:
                     completed=True, skip_action_when_visible=HOME_TITLE)
         self.screen("home-after-restart", home, completed=True)
         (self.output / "home-after-restart.png").write_bytes(self.run("exec-out", "screencap", "-p"))
+        self.check_system_app_language(home)
+
+    def check_system_app_language(self, english_home):
+        # The first-run fixture left the in-app language at Follow system. This changes
+        # Android's per-package setting without invoking the application's language picker.
+        self.stage = "read-os-language"
+        get_command = ("shell", "cmd", "locale", "get-app-locales", self.package)
+        set_command = ("shell", "cmd", "locale", "set-app-locales", self.package)
+        saved = re.search(r"\[([^\]]*)\]", self.run(*get_command).decode())
+        if saved is None:
+            raise RuntimeError("Android did not report the current app language")
+        french_home = ("Tout comprendre.", "Texte", "Historique", "Réglages")
+        try:
+            self.run(*set_command, "--locales", "fr")
+            if b"[fr]" not in self.run(*get_command):
+                raise RuntimeError("Android did not select French for the test app")
+            self.screen("os-language-french", french_home, completed=True)
+            self.stage = "os-language-cold-launch"
+            self.run("shell", "am", "force-stop", self.package)
+            self.launch()
+            self.screen("os-language-cold-home", french_home, completed=True)
+        except (OSError, RuntimeError, ET.ParseError, subprocess.SubprocessError):
+            if self.last_xml:
+                (self.output / "os-language-failure.xml").write_bytes(self.last_xml)
+            try:
+                (self.output / "os-language-failure.png").write_bytes(self.run("exec-out", "screencap", "-p"))
+            except (OSError, subprocess.SubprocessError):
+                pass
+            raise
+        finally:
+            restore = ("--locales", saved.group(1)) if saved.group(1) else ()
+            self.run(*set_command, *restore)
+        self.screen("os-language-restored", english_home, completed=True)
 
     def failure_evidence(self):
         if self.verified:
