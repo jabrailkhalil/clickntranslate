@@ -4,12 +4,83 @@ on:
   push:
     branches: [codex/ui-polish-20260923]
   workflow_dispatch:
+    inputs:
+      native_desktop:
+        description: Exercise the installed Qt platform plugin and keep rendered windows
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
+  native:
+    if: inputs.native_desktop
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: windows-2022, backend: windows, requirements: windows, label: windows-x64}
+          - {runner: ubuntu-24.04, backend: xcb, requirements: linux, label: linux-x11}
+          - {runner: macos-15, backend: cocoa, requirements: macos, label: macos-arm64}
+          - {runner: macos-15-intel, backend: cocoa, requirements: macos, label: macos-intel}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 35
+    env:
+      QT_QPA_PLATFORM: ${{ matrix.backend }}
+      PYTHONUTF8: '1'
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: tools/requirements/${{ matrix.requirements }}.txt
+      - name: Install X11 and OCR fixtures
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb xauth fonts-dejavu-core tesseract-ocr-eng tesseract-ocr \
+            libegl1 libgl1 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 \
+            libxcb-shape0 libxcb-xinerama0 libxcb-util1 libxcb-cursor0 libxkbcommon-x11-0
+      - id: deps
+        name: Install platform dependencies
+        run: |
+          python -m pip install -r tools/requirements/${{ matrix.requirements }}.txt pytest
+          if [[ "$RUNNER_OS" != "Windows" ]]; then
+            python -m pip install --no-deps 'argostranslate~=1.11.0'
+          fi
+      - name: Exercise and capture source application windows
+        run: |
+          prefix=()
+          if [[ "$RUNNER_OS" == "Linux" ]]; then prefix=(xvfb-run -a -s '-screen 0 1920x1200x24'); fi
+          "${prefix[@]}" python src/main.py --candidate-smoke-test build/ui-native/widgets/report.json
+      - name: Exercise language lists, package actions and fixed dialog layout
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
+        run: |
+          prefix=()
+          if [[ "$RUNNER_OS" == "Linux" ]]; then prefix=(xvfb-run -a -s '-screen 0 1920x1200x24'); fi
+          "${prefix[@]}" python tools/run_regression_tests.py --qt-platform "$QT_QPA_PLATFORM" \
+            --output build/ui-native/checks --basetemp build/ui-native/tmp \
+            tests/test_popup_design.py tests/test_language_search.py tests/test_package_presentation.py \
+            tests/test_engine_center_actions.py tests/test_engine_center_stationary_layout.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-ui-${{ matrix.label }}
+          path: |
+            build/ui-native/widgets/
+            build/ui-native/checks/results.xml
+            build/ui-native/checks/run.json
+            build/ui-native/tmp/**/*.png
+          if-no-files-found: warn
+          retention-days: 7
+
   source:
+    if: '!inputs.native_desktop'
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
@@ -28,6 +99,7 @@ jobs:
           if-no-files-found: error
 
   test:
+    if: '!inputs.native_desktop'
     timeout-minutes: 15
     strategy:
       fail-fast: false

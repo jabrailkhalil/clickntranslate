@@ -130,6 +130,7 @@ def _check_popup_host_scaling(window, app, directory, report):
     """Exercise the retained Qt auto-proxy that an ordinary first open misses."""
     from PyQt5 import QtCore, QtGui, QtWidgets
     import ocr
+    from language_search import SEARCH_TEXT, language_code_for_option_text
     from languages import LANGUAGES
     from combo_popup import popup_font
     from settings_sections import PAGE_DYNAMIC
@@ -165,24 +166,33 @@ def _check_popup_host_scaling(window, app, directory, report):
                         for _ in range(8):
                             app.processEvents()
                         assert popup.graphicsProxyWidget() is not None
+                        search = combo._language_search
+                        prompt, empty_text = SEARCH_TEXT[locale]
+                        assert search.placeholderText() == prompt, (locale, location, search.placeholderText())
+                        assert search.accessibleName() == prompt
                         field_factor = widget_global_rect(combo).width() / combo.width()
                         surface_factor = widget_global_rect(popup).width() / popup.width()
                         field_pixels = QtGui.QFontInfo(combo.font()).pixelSize() * field_factor
                         row_pixels = QtGui.QFontInfo(popup_font(combo)).pixelSize() * surface_factor
-                        search_pixels = QtGui.QFontInfo(combo._language_search.font()).pixelSize() * surface_factor
+                        search_pixels = QtGui.QFontInfo(search.font()).pixelSize() * surface_factor
                         assert .94 <= row_pixels / field_pixels <= 1.06, (locale, location, row_pixels, field_pixels)
                         assert .94 <= search_pixels / field_pixels <= 1.06, (locale, location, search_pixels, field_pixels)
                         if opening == 1:
                             name = f'popup-host-{locale}-{location}.png'
                             assert window.grab().save(str(directory / name))
                             report['screenshots'].append(name)
-                        combo._language_search.setText('Vietnamese')
+                        search.setText('Vietnamese')
                         app.processEvents()
-                        assert not combo.view().isRowHidden(combo.findData('vi'))
+                        visible = [combo.itemData(i) or language_code_for_option_text(combo.itemText(i))
+                                   for i in range(combo.count()) if not combo.view().isRowHidden(i)]
+                        assert visible == ['vi'], (locale, location, visible)
+                        search.setText('no-such-language')
+                        app.processEvents()
+                        assert combo._language_empty.isVisible() and combo._language_empty.text() == empty_text
                     finally:
                         combo.hidePopup()
     window.set_ui_scale_percent(previous_percent)
-    report['checks']['popup_host_scaling'] = 'retained proxy; main/dynamic, en/ar, 135%, two openings and search'
+    report['checks']['popup_host_scaling'] = 'retained proxy; main/dynamic, en/ar, 135%, localized search, results and empty state'
 
 
 def run(main, report_path):
@@ -212,6 +222,7 @@ def run(main, report_path):
                   mock.patch.object(main.DarkThemeApp, '_maybe_start_first_run_guide')):
                 app = main._ensure_startup_application()
                 app.setQuitOnLastWindowClosed(False)
+                report['qt_platform'] = app.platformName()
                 # The Windows offscreen plugin does not discover system fonts.
                 # Register the real faces before taking UI pictures or drawing
                 # the OCR fixture; otherwise the test image can be all white.
