@@ -1,6 +1,7 @@
 package dev.clickn.translate.ui
 
 import android.content.ClipData
+import android.content.Context
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
@@ -18,9 +19,19 @@ import androidx.test.platform.app.InstrumentationRegistry
 import dev.clickn.translate.R
 import dev.clickn.translate.data.AppLocalePrefs
 import dev.clickn.translate.gallery.GalleryExportDocumentsFixture
+import dev.clickn.translate.gallery.GalleryPrivateInputAccess
+import dev.clickn.translate.gallery.GalleryTranslationWorkPolicy
 import dev.clickn.translate.onboarding.OnboardingPrefs
 import java.io.File
 import kotlin.math.abs
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.*
 import org.junit.Assume.assumeTrue
 import org.junit.Rule
@@ -30,6 +41,89 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class SharedPhotoPreviewIntegrationTest {
     @get:Rule val compose = createEmptyComposeRule()
+
+    private fun withSharedPhotos(count: Int, verify: (Context, ActivityScenario<MainActivity>) -> Unit) {
+        assumeTrue(InstrumentationRegistry.getArguments().getString("sharedPreview") == "true")
+        val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext
+        val parent = GalleryExportDocumentsFixture.parentUri()
+        val photos = arrayListOf<Uri>()
+        try {
+            val bitmap = Bitmap.createBitmap(24, 24, Bitmap.Config.ARGB_8888)
+            try {
+                bitmap.eraseColor(Color.BLUE)
+                repeat(count) { index ->
+                    val uri = requireNotNull(DocumentsContract.createDocument(app.contentResolver, parent, "image/png", "rotate-$index.png"))
+                    photos += uri
+                    requireNotNull(app.contentResolver.openOutputStream(uri)).use {
+                        assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
+                    }
+                }
+            } finally { bitmap.recycle() }
+            val intent = Intent(app, MainActivity::class.java).apply {
+                action = Intent.ACTION_SEND_MULTIPLE
+                type = "image/png"
+                putParcelableArrayListExtra(Intent.EXTRA_STREAM, photos)
+                clipData = ClipData.newRawUri("images", photos.first()).apply {
+                    photos.drop(1).forEach { addItem(ClipData.Item(it)) }
+                }
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            ActivityScenario.launch<MainActivity>(intent).use { verify(AppLocalePrefs.wrap(app), it) }
+        } finally {
+            try { photos.forEach { DocumentsContract.deleteDocument(app.contentResolver, it) } }
+            finally { GalleryExportDocumentsFixture.revoke(parent) }
+        }
+    }
+
+    private fun display(matcher: SemanticsMatcher) {
+        compose.waitUntil(10_000) { compose.onAllNodes(matcher).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNode(matcher).assertIsDisplayed()
+    }
+
+    @Test fun largeBatchStillAsksForConfirmationAfterActivityRecreation() {
+        val count = GalleryTranslationWorkPolicy.FOREGROUND_IMAGE_THRESHOLD
+        withSharedPhotos(count) { strings, activity ->
+            val create = hasText(strings.getString(R.string.gallery_confirm_create)) and hasClickAction() and isEnabled()
+            display(create)
+            compose.onNode(create).performClick()
+            val summary = hasText(strings.getString(R.string.gallery_confirm_create_dialog_message, count)) and hasAnyAncestor(isDialog())
+            display(summary)
+            activity.recreate()
+            display(summary)
+            compose.onNode(hasText(strings.getString(android.R.string.cancel)) and hasAnyAncestor(isDialog())).performClick()
+            display(create)
+        }
+    }
+
+    @Test fun confirmedImportStaysInProgressAfterRecreationAndBackCanStillCancelIt() {
+        withSharedPhotos(1) { strings, activity ->
+            val create = hasText(strings.getString(R.string.gallery_confirm_create)) and hasClickAction() and isEnabled()
+            val busy = hasText(strings.getString(R.string.gallery_confirm_creating))
+            display(create)
+            val holding = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            val job = SupervisorJob()
+            CoroutineScope(job + Dispatchers.IO).launch {
+                GalleryPrivateInputAccess.rollback {
+                    holding.complete(Unit)
+                    release.await()
+                }
+            }
+            try {
+                runBlocking { withTimeout(10_000) { holding.await() } }
+                compose.onNode(create).performClick()
+                display(busy)
+                activity.recreate()
+                display(busy)
+                compose.onNode(create).assertDoesNotExist()
+                activity.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+                display(hasText(strings.getString(R.string.mobile_nav_screen)) and hasClickAction())
+            } finally {
+                release.complete(Unit)
+                runBlocking { job.cancelAndJoin() }
+            }
+        }
+    }
 
     @Test fun sharedPhotosKeepTheViewedPageOnRotationAndDiscardedSelectionStaysDiscarded() {
         assumeTrue(InstrumentationRegistry.getArguments().getString("sharedPreview") == "true")
