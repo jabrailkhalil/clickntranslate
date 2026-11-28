@@ -166,7 +166,14 @@ def test_modern_profile_pins_v5_and_local_paths_instead_of_upstream_defaults(
         engine = models.create_engine(Modern, code)
     assert seen['Rec.lang_type'] == group
     assert seen['Global.use_cls'] is use_cls
-    assert engine.detect_and_crop(np.empty((130, 900)), {}) == detector_min_side
+    line = np.full((130, 900, 3), 255, dtype=np.uint8)
+    line[32:62, 80:170] = 16
+    assert engine.detect_and_crop(line, {}) == detector_min_side
+    if code in ('ar', 'ar-SA'):
+        tiny = np.full_like(line, 255)
+        tiny[28:40, 20:50] = 16
+        tiny[59:71, 90:120] = 16
+        assert engine.detect_and_crop(tiny, {}) == 736
     assert engine.detect_and_crop(np.empty((256, 448)), {}) == 736
     assert engine.detect_and_crop(np.empty((140, 110)), {}) == 736
     assert engine.text_det.limit_side_len == 736

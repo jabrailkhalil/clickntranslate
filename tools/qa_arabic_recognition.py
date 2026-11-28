@@ -204,6 +204,9 @@ def main(path, calibrate=False):
                 assert any(case['text'] for case in rows.values())
         critical = ('angel-dark54', 'king-dark54', 'another-angel-dark54', 'another-king-dark54', 'mixed-dark54')
         assert all(report['engines']['rapidocr']['cases'][case]['exact_letters_and_marks'] for case in critical)
+        for row in report.get('independent_screens', ()):
+            if row['original']['exact_letters_and_marks']:
+                assert row['candidate']['exact_letters_and_marks'], (row['expected'], row['size'], row['background'])
     finally:
         path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
 

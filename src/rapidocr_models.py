@@ -86,6 +86,25 @@ def installed_languages(root_dir=''):
     return [code for code, group in LANGUAGE_MODELS.items() if group in available]
 
 
+def _arabic_needs_full_detector(image):
+    """Keep the original detector's enlargement for small print on a flat UI surface."""
+    import cv2
+
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if image.ndim == 3 else image
+    corners = (int(gray[0, 0]), int(gray[0, -1]), int(gray[-1, 0]), int(gray[-1, -1]))
+    if max(corners) - min(corners) > 24:
+        return True
+    background = sum(corners) // 4
+    background_mask = cv2.inRange(gray, max(0, background - 32), min(255, background + 32))
+    _, _, statistics, _ = cv2.connectedComponentsWithStats(cv2.bitwise_not(background_mask), connectivity=8)
+    components = statistics[1:]  # The first row describes the background.
+    if not len(components):
+        return True
+    areas = components[:, cv2.CC_STAT_AREA]
+    substantial = components[areas >= max(8, int(areas.max()) // 8)]
+    return not len(substantial) or int(substantial[:, cv2.CC_STAT_HEIGHT].max()) <= 18
+
+
 def create_engine(rapid_cls, language_code='en', root_dir=''):
     code = str(language_code or 'en').lower().replace('_', '-').split('-')[0]
     if rapid_cls.__module__.startswith('rapidocr_onnxruntime'):
@@ -129,6 +148,8 @@ def create_engine(rapid_cls, language_code='en', root_dir=''):
         def detect_and_crop(self, image, op_record):
             height, width = image.shape[:2]
             if height > 192 or width < 2 * height:
+                return super().detect_and_crop(image, op_record)
+            if code == 'ar' and _arabic_needs_full_detector(image):
                 return super().detect_and_crop(image, op_record)
             # Upscaling a shallow selection to 736 px can split or clip letters.
             # Share the loaded ONNX session but keep this call's scale private.
