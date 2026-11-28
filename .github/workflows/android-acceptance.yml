@@ -11,6 +11,41 @@ permissions:
   contents: read
 
 jobs:
+  runtime-ui:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    env:
+      CMAKE_BUILD_PARALLEL_LEVEL: 2
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: true
+      - name: Install Android build tools
+        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'ndk;28.2.13676358' 'cmake;3.22.1'
+      - name: Run unit tests including opt-in Compose runtime scenarios
+        run: >-
+          bash gradlew :app:testDebugUnitTest --console=plain --no-parallel --max-workers=2
+          -ParchiveCpuDebug=true -PruntimeUiTests
+          '-Dorg.gradle.jvmargs=-Xmx3072m -XX:ActiveProcessorCount=3 -Dfile.encoding=UTF-8'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-runtime-test-results
+          path: app/build/test-results/testDebugUnitTest/*.xml
+          if-no-files-found: warn
+          retention-days: 7
+
   android-15:
     runs-on: ubuntu-24.04
     timeout-minutes: 55

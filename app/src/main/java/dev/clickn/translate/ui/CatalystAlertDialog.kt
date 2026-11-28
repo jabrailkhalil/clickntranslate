@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -73,11 +74,13 @@ internal fun CatalystAlertDialog(
     ) {
         MaterialTheme(colorScheme = dialogColors) {
             Surface(
-                modifier = modifier
-                    .fillMaxWidth()
+                modifier = Modifier
+                    .wrapContentWidth()
+                    .padding(horizontal = 16.dp)
                     .widthIn(max = 560.dp)
+                    .fillMaxWidth()
                     .heightIn(max = maxHeight)
-                    .padding(horizontal = 16.dp),
+                    .then(modifier),
                 shape = RoundedCornerShape(8.dp),
                 color = surfaceColor,
                 contentColor = textColor,

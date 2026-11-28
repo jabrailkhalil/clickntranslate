@@ -1227,7 +1227,7 @@ internal fun ReleaseUpdateHost(updateVm: dev.clickn.translate.update.UpdateViewM
 }
 
 @Composable
-private fun UpdateResultDialog(
+internal fun UpdateResultDialog(
     state: dev.clickn.translate.update.UpdateViewModel.State,
     onDismiss: () -> Unit,
     onOpenRelease: (String) -> Unit,
@@ -1294,16 +1294,13 @@ private fun UpdateResultDialog(
                         }
                     }
                 },
-                // 有更新时把「跳过此版本」「稍后」并排塞进 dismissButton 槽位（AlertDialog 只有两个 button slot）
                 dismissButton = if (info.hasUpdate) {
                     {
-                        Row {
-                            TextButton(onClick = { onSkipVersion(info.latestVersion) }) {
-                                Text(stringResource(R.string.update_dialog_btn_skip))
-                            }
-                            TextButton(onClick = onDismiss) {
-                                Text(stringResource(R.string.update_dialog_btn_later))
-                            }
+                        TextButton(onClick = { onSkipVersion(info.latestVersion) }) {
+                            Text(stringResource(R.string.update_dialog_btn_skip))
+                        }
+                        TextButton(onClick = onDismiss) {
+                            Text(stringResource(R.string.update_dialog_btn_later))
                         }
                     }
                 } else null
