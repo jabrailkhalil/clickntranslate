@@ -17,11 +17,50 @@ on:
         description: Repeat navigation on native desktops and measure idle resources
         type: boolean
         default: false
+      arabic_ocr:
+        description: Compare Arabic vowel marks on dark and light synthetic images
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
+  arabic:
+    if: inputs.arabic_ocr
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: ubuntu-24.04, requirements: linux}
+          - {runner: windows-2022, requirements: windows}
+          - {runner: macos-15, requirements: macos}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    env:
+      PYTHONUTF8: '1'
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: tools/requirements/${{ matrix.requirements }}.txt
+      - if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 tesseract-ocr-ara
+      - run: python -m pip install -r tools/requirements/${{ matrix.requirements }}.txt
+      - run: python tools/prepare_rapidocr_models.py
+      - run: python tools/qa_arabic_recognition.py build/ocr-arabic/report.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ocr-arabic-${{ matrix.requirements }}
+          path: build/ocr-arabic/
+          retention-days: 7
+
   native:
     if: inputs.native_desktop || inputs.session_stability
     strategy:
@@ -161,7 +200,7 @@ jobs:
           retention-days: 7
 
   source:
-    if: '!inputs.native_desktop && !inputs.wayland && !inputs.session_stability'
+    if: '!inputs.native_desktop && !inputs.wayland && !inputs.session_stability && !inputs.arabic_ocr'
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
@@ -180,7 +219,7 @@ jobs:
           if-no-files-found: error
 
   test:
-    if: '!inputs.native_desktop && !inputs.wayland && !inputs.session_stability'
+    if: '!inputs.native_desktop && !inputs.wayland && !inputs.session_stability && !inputs.arabic_ocr'
     timeout-minutes: 15
     strategy:
       fail-fast: false
