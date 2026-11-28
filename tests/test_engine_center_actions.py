@@ -55,6 +55,72 @@ def test_language_buttons_require_the_matching_selection(center):
     assert all(button.toolTip().strip() for button in buttons.values())
 
 
+@pytest.mark.parametrize(('row', 'query', 'expected'), [
+    (0, 'French', []),
+    (1, 'German', ['en->de']),
+])
+def test_argos_filter_only_keeps_highlights_for_the_same_installed_direction(center, row, query, expected):
+    dialog, _, _ = center
+    table = dialog.argos_table
+    dialog._argos_catalog = [
+        dict(source_code='en', target_code=target, installed=True)
+        for target in ('ru', 'de', 'fr')
+    ]
+    dialog._populate_argos_table(table)
+    table.selectRow(row)
+    previous_code = table.item(row, 0).data(QtCore.Qt.UserRole)
+    assert dialog._highlighted_installed_codes(table) == [previous_code]
+    table._package_filter_edit.setText(query)
+    remove = next(b for b in table._package_action_buttons if b.property('packageAction') == 'remove')
+    assert dialog._highlighted_installed_codes(table) == expected
+    assert remove.isEnabled() == bool(expected)
+    assert table.currentRow() == (0 if expected else -1)
+
+
+def test_argos_download_caption_includes_checked_pairs_hidden_by_the_search(center):
+    from package_presentation import PackageSizes
+    dialog, _, _ = center
+    table = dialog.argos_table
+    files = {
+        'en__ru': [dict(sha256='russian', destination='models/russian.argosmodel')],
+        'en__de': [dict(sha256='german', destination='models/german.argosmodel')],
+    }
+    catalog = dict(
+        artifacts={name: dict(size=size) for name, size in
+                   [('runtime', 5000000), ('german', 7000000), ('russian', 11000000)]},
+        bundles=[dict(id='argos', component='translation.argos', channel='stable', revision=1,
+                      os='windows', arch='x86_64', contract=3, min_os='10', app='>=1.8.2,<2',
+                      files=[dict(sha256='runtime', destination='bin/argos')],
+                      languages=list(files), language_files=files)])
+    dialog._package_sizes = PackageSizes(catalog, target=dict(os='windows', arch='x86_64', os_version='10'))
+    dialog._argos_catalog = [dict(source_code='en', target_code=code, available=True) for code in ('ru', 'de')]
+    with mock.patch('component_runtime.managed_runtime', return_value=object()):
+        dialog._populate_argos_table(table)
+        for row in range(table.rowCount()):
+            table.item(row, 0).setCheckState(QtCore.Qt.Checked)
+        install = next(b for b in table._package_action_buttons if b.property('packageAction') == 'install')
+        assert '18.0 MB' in install.text()
+        for query in ('German', 'no matching language'):
+            table._package_filter_edit.setText(query)
+            assert install.isEnabled()
+            assert set(dialog._selected_codes(table)) == {'en->ru', 'en->de'}
+            assert '18.0 MB' in install.text()
+            assert '18.0 MB' in table._package_size_label.text()
+
+
+def test_catalog_refresh_keeps_user_choice_after_following_argos_install_link(center):
+    dialog, _, _ = center
+    table = dialog.argos_table
+    dialog.focus_translation_engine('argos', 'en', 'ru')
+    dialog._argos_catalog = [dict(source_code='en', target_code=target, installed=True)
+                             for target in ('ru', 'de')]
+    dialog._on_argos_catalog_ready('')
+    assert dialog._highlighted_codes(table) == ['en->ru']
+    table.selectRow(1)
+    dialog._on_argos_catalog_ready('')
+    assert dialog._highlighted_codes(table) == ['en->de']
+
+
 def test_engine_maintenance_is_only_in_current_engine_menu_and_respects_busy_state(center):
     dialog, _, _ = center
     table = dialog.easyocr_table

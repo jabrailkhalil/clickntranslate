@@ -7619,6 +7619,7 @@ class OcrLanguageManagerDialog(QDialog):
         for row in range(table.rowCount()):
             item = table.item(row, 0)
             if item is not None and item.data(Qt.UserRole) == direct:
+                self._requested_argos_pair = None
                 table.selectRow(row)
                 table.scrollToItem(item, QAbstractItemView.PositionAtCenter)
                 return
@@ -7771,11 +7772,31 @@ class OcrLanguageManagerDialog(QDialog):
         # explicitly disabled child even when its parent is also paint-frozen.
         sorting = table.isSortingEnabled()
         updates = not table.testAttribute(Qt.WA_ForceUpdatesDisabled)
+        highlighted = set(self._highlighted_codes(table))
+        current = table.item(table.currentRow(), 0)
+        current_code = current.data(Qt.UserRole) if current is not None else None
+        current_column = table.currentColumn()
         blocker = QtCore.QSignalBlocker(table)
         table.setUpdatesEnabled(False)
         table.setSortingEnabled(False)
         try:
             self._populate_language_rows(table, rows)
+            if highlighted or current_column >= 0:
+                # A search or refresh can put a different package at the same
+                # row number. Keep keyboard focus and removal tied to the ID.
+                selection = QtCore.QItemSelection()
+                new_current = QtCore.QModelIndex()
+                model = table.model()
+                for row in range(table.rowCount()):
+                    first = model.index(row, 0)
+                    code = first.data(Qt.UserRole)
+                    if code in highlighted:
+                        selection.select(first, first)
+                    if code and code == current_code:
+                        new_current = model.index(row, current_column)
+                selector = table.selectionModel()
+                selector.select(selection, selector.ClearAndSelect | selector.Rows)
+                selector.setCurrentIndex(new_current, selector.NoUpdate)
         finally:
             table.setSortingEnabled(sorting)
             table.setUpdatesEnabled(updates)
@@ -7949,6 +7970,15 @@ class OcrLanguageManagerDialog(QDialog):
                         else package_text(self.lang, 'size_help'))
                 size_item.setToolTip(tooltip_text(hint if supported else package_text(self.lang, 'unsupported')))
             del blocker
+            # The Argos search only populates matching rows. Checked packages
+            # which are now off screen still belong to the requested download.
+            for code in tuple(table._pending_package_codes):
+                codes = self._package_model_codes(engine, code)
+                if all(c in sizes.bundles[engine].get('language_files', {}) for c in codes):
+                    pending_codes.update(codes)
+                else:
+                    table._pending_package_codes.discard(code)
+            selected.update(pending_codes)
             runtime, models = sizes.breakdown(engine, selected)
             summary = (f"{package_text(self.lang, 'engine')}: {format_size(runtime)}"
                        f"   ·   {package_text(self.lang, 'models')}: {format_size(models)}")
