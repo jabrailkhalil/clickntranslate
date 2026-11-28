@@ -9,6 +9,10 @@ on:
         description: Exercise the installed Qt platform plugin and keep rendered windows
         type: boolean
         default: false
+      wayland:
+        description: Verify screen capture and clipboard on two isolated Sway outputs
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -80,8 +84,36 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
+  wayland:
+    if: inputs.wayland
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install the system Qt Wayland plugin and screenshot portal
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y sway swaybg grim wl-clipboard pipewire dbus-x11 \
+            xdg-desktop-portal xdg-desktop-portal-wlr xdg-desktop-portal-gtk \
+            qtwayland5 python3-pyqt5 python3-venv
+          /usr/bin/python3 -m venv --system-site-packages --without-pip "$RUNNER_TEMP/wayland-python"
+      - name: Check equal and mixed monitor scales on fresh Wayland sessions
+        run: |
+          export PATH="$RUNNER_TEMP/wayland-python/bin:$PATH"
+          for scale in 1 2; do
+            CNT_QA_WAYLAND_SCALE="$scale" dbus-run-session -- \
+              bash tools/qa_linux_wayland.sh "build/ui-wayland/scale-$scale"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-ui-wayland
+          path: build/ui-wayland/
+          if-no-files-found: warn
+          retention-days: 7
+
   source:
-    if: '!inputs.native_desktop'
+    if: '!inputs.native_desktop && !inputs.wayland'
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
@@ -100,7 +132,7 @@ jobs:
           if-no-files-found: error
 
   test:
-    if: '!inputs.native_desktop'
+    if: '!inputs.native_desktop && !inputs.wayland'
     timeout-minutes: 15
     strategy:
       fail-fast: false
