@@ -5,15 +5,39 @@ from concurrent.futures import Future, TimeoutError
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 
+MAX_SNAPSHOT_BYTES = 32 * 1024 * 1024  # Same byte budget as a desktop image import.
+
+
+def _check_types(kinds):
+    for kind in kinds:
+        name = str(kind).lower()
+        if ('filegroupdescriptor' in name or 'filecontents' in name
+                or ('file' in name and 'promise' in name)):
+            raise ValueError('Virtual file contents must remain with their clipboard owner')
+
+
+def _remaining_bytes(remaining, size):
+    if size > remaining:
+        raise ValueError('Clipboard representations exceed the in-memory budget')
+    return remaining - size
+
+
 def capture_cocoa_items(board):
     """Keep each pasteboard item and type separately, including an empty data payload."""
+    source = [(item, list(item.types())) for item in board.pasteboardItems() or ()]
+    _check_types(kind for _item, kinds in source for kind in kinds)
+    if len(source) <= 1 and all(str(kind) in ('public.utf8-plain-text', 'NSStringPboardType')
+                                for _item, kinds in source for kind in kinds):
+        return None
     items = []
-    for item in board.pasteboardItems() or ():
+    remaining = MAX_SNAPSHOT_BYTES
+    for item, kinds in source:
         representations = []
-        for kind in item.types():
+        for kind in kinds:
             value = item.dataForType_(kind)
             if value is None:
                 raise ValueError('Pasteboard representation unavailable')
+            remaining = _remaining_bytes(remaining, value.length())
             representations.append((str(kind), bytes(value)))
         items.append(representations)
     return items
@@ -79,22 +103,27 @@ class ClipboardFormats(QtCore.QObject):
             from AppKit import NSPasteboard
             return capture_cocoa_items(NSPasteboard.generalPasteboard())
         mime = QtWidgets.QApplication.clipboard().mimeData()
-        if mime is None or not any(kind != 'text/plain' for kind in mime.formats()):
+        kinds = mime.formats() if mime is not None else []
+        if not any(kind != 'text/plain' for kind in kinds):
             return None
+        _check_types(kinds)
         formats = []
         image = None
-        for kind in mime.formats():
+        remaining = MAX_SNAPSHOT_BYTES
+        for kind in kinds:
             if kind == 'application/x-qt-image':
                 value = mime.imageData()
                 if isinstance(value, QtGui.QPixmap):
                     value = value.toImage()
                 if not isinstance(value, QtGui.QImage) or value.isNull():
                     raise ValueError('Clipboard image unavailable')
-                image = value.copy()
+                remaining = _remaining_bytes(remaining, value.sizeInBytes())
+                image = QtGui.QImage(value)  # Implicitly shared until either image is written.
             else:
                 value = mime.data(kind)
                 if value.isNull():
                     raise ValueError('Clipboard representation unavailable')
+                remaining = _remaining_bytes(remaining, value.size())
                 formats.append((kind, bytes(value)))
         return formats, image
 

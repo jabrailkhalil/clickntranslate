@@ -13455,8 +13455,24 @@ class DarkThemeApp(QMainWindow):
                     if replace_selection and edit_target is None:
                         reject_editor_target()
                         return
-                if preloaded:
-                    text = preloaded
+                direct_text = preloaded
+                if (not direct_text and not replace_selection
+                        and (platform_support.IS_WINDOWS or platform_support.IS_MAC)
+                        and not self.config.get("restore_clipboard_after_selection", False)):
+                    # This path can complete without changing, rendering or backing up
+                    # an unrelated clipboard item, including an Office file promise.
+                    from selection_platform import read_selected_text
+                    if not capture_target_is_active():
+                        return
+                    try:
+                        direct_text = read_selected_text(allow_copy_fallback=False,
+                                                        validate_target=capture_target_is_active)
+                    except Exception:
+                        direct_text = ""
+                    if not capture_target_is_active():
+                        return
+                if direct_text:
+                    text = direct_text
                 elif platform_support.IS_LINUX:
                     # X11 and Wayland keep the highlighted text in the PRIMARY
                     # selection, so it can be read directly — no key simulation,
@@ -13477,6 +13493,16 @@ class DarkThemeApp(QMainWindow):
                         time.sleep(0.35)
                     if not expected_target_is_active():
                         return
+                    from clipboard_preservation import ClipboardPreservation
+                    snapshot_sequence = _clipboard_sequence_number()
+                    clipboard_preservation = ClipboardPreservation(
+                        pyperclip.paste, platform_support.copy_text, _clipboard_sequence_number,
+                        formats=clipboard_formats)
+                    if not clipboard_preservation.has_snapshot():
+                        notify_copy_failed(self.config)
+                        return
+                    if not capture_target_is_active():
+                        return
                     if (replace_selection and self.config.get("replace_selection_select_all") is True):
                         if not select_all_text_in_foreground(
                                 selection_window, **({'expected_edit_target': edit_target}
@@ -13487,15 +13513,7 @@ class DarkThemeApp(QMainWindow):
                         time.sleep(0.08)
                         if not expected_target_is_active():
                             return
-                    from clipboard_preservation import ClipboardPreservation
-                    snapshot_sequence = _clipboard_sequence_number()
-                    clipboard_preservation = ClipboardPreservation(
-                        pyperclip.paste, platform_support.copy_text, _clipboard_sequence_number,
-                        formats=clipboard_formats)
                     # Clear clipboard, then Ctrl+C to capture selection
-                    if not clipboard_preservation.has_snapshot():
-                        notify_copy_failed(self.config)
-                        return
                     if not capture_target_is_active():
                         return
                     if snapshot_sequence is not None and _clipboard_sequence_number() != snapshot_sequence:

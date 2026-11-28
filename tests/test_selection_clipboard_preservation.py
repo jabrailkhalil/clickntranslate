@@ -308,3 +308,62 @@ def test_delayed_gui_restoration_respects_the_copy_that_arrived_while_queued(app
     finally:
         service._requested.disconnect(scheduled)
     assert isolated_clipboard.text() == 'A newer user copy'
+
+
+def test_default_translation_reads_an_accessible_selection_without_rendering_the_clipboard(
+        app, clipboard, monkeypatch):
+    from clipboard_formats import application_clipboard_formats
+
+    formats = application_clipboard_formats()
+    snapshot = mock.Mock(side_effect=AssertionError('This clipboard must not be materialized'))
+    monkeypatch.setattr(formats, 'capture', snapshot)
+    monkeypatch.setattr(selection_platform, 'read_selected_text', lambda **_kwargs: 'Directly selected text')
+    shortcut = mock.Mock()
+    monkeypatch.setattr(main, 'simulate_copy', shortcut)
+    owner = _SelectionHarness({'restore_clipboard_after_selection': False, 'copy_translated_text': False})
+    provider = mock.Mock(return_value='Translation')
+    monkeypatch.setattr(translater, 'translate_text', provider)
+    owner.launch_translate_selection()
+    provider.assert_called_once_with('Directly selected text', 'es', 'en')
+    assert len(owner.shown_dialogs) == 1
+    shortcut.assert_not_called()
+    snapshot.assert_not_called()
+    assert clipboard.text == 'Clipboard before selection'
+
+
+@pytest.mark.parametrize('unavailable', ['file_promise', 'unreadable', 'over_budget'])
+def test_unavailable_rich_clipboard_stops_before_select_all_or_temporary_writes(
+        app, clipboard, isolated_clipboard, monkeypatch, unavailable):
+    from PyQt5 import QtCore
+    import clipboard_formats
+
+    reads = []
+    kind = ('application/x-qt-windows-mime;value="FileContents";index=0'
+            if unavailable == 'file_promise' else 'text/rtf')
+
+    class OfficeMime(QtCore.QMimeData):
+        def formats(self):
+            return ['text/plain', kind]
+
+        def data(self, requested):
+            reads.append(requested)
+            if requested == kind:
+                return QtCore.QByteArray() if unavailable == 'unreadable' else QtCore.QByteArray(b'large format')
+            return super().data(requested)
+
+    data = OfficeMime()
+    data.setText('cell')
+    isolated_clipboard.setMimeData(data)
+    if unavailable == 'over_budget':
+        monkeypatch.setattr(clipboard_formats, 'MAX_SNAPSHOT_BYTES', 8)
+    select_all, copy, provider = mock.Mock(), mock.Mock(), mock.Mock()
+    monkeypatch.setattr(main, 'select_all_text_in_foreground', select_all)
+    monkeypatch.setattr(main, 'simulate_copy', copy)
+    monkeypatch.setattr(translater, 'translate_text', provider)
+    owner = _SelectionHarness({'replace_selection_select_all': True, 'restore_clipboard_after_selection': True})
+    owner.launch_translate_replace_selection()
+    assert isolated_clipboard.mimeData() is data and clipboard.text == 'Clipboard before selection'
+    assert (kind in reads) is (unavailable != 'file_promise')
+    select_all.assert_not_called()
+    copy.assert_not_called()
+    provider.assert_not_called()
