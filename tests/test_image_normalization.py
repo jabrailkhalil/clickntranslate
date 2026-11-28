@@ -158,7 +158,9 @@ def test_loading_boundary_keeps_selected_provider_pixels_and_cancel_identity(tmp
     source = corners()
     path = tmp_path / 'loading.png'
     source.save(path)
-    entered, release, stopped = threading.Event(), threading.Event(), threading.Event()
+    entered, release = threading.Event(), threading.Event()
+    recognition_finished, allow_delivery = threading.Event(), threading.Event()
+    worker = None
     load, recognize = images.load_image, images.recognize_image
     seen, ready, failed = [], [], []
     def held_load(payload):
@@ -167,10 +169,13 @@ def test_loading_boundary_keeps_selected_provider_pixels_and_cancel_identity(tmp
         assert release.wait(3)
         return result
     def tracking(*args):
+        nonlocal worker
+        worker = threading.current_thread()
         try:
             return recognize(*args)
         finally:
-            stopped.set()
+            recognition_finished.set()
+            assert allow_delivery.wait(3)
     def provider(name, image, src, tgt, config, cancelled):
         seen.append((name, image.copy(), src, tgt, config))
         return SimpleNamespace(source='Owned image', translation=None)
@@ -191,7 +196,13 @@ def test_loading_boundary_keeps_selected_provider_pixels_and_cancel_identity(tmp
         if cancel:
             controller.cancel()
         release.set()
-        assert stopped.wait(3)
+        assert recognition_finished.wait(3)
+        # The GUI can process events before the worker posts the OCR result.
+        qt_app.processEvents()
+        assert not ready and not failed
+        allow_delivery.set()
+        worker.join(3)
+        assert not worker.is_alive()
         qt_app.processEvents()
         assert not failed
         if cancel:
@@ -203,7 +214,10 @@ def test_loading_boundary_keeps_selected_provider_pixels_and_cancel_identity(tmp
             assert seen[0][1].getpixel((10, 5)) == source.getpixel((10, 5))
     finally:
         release.set()
+        allow_delivery.set()
         controller.cancel()
+        if worker is not None:
+            worker.join(3)
         owner.deleteLater()
 
 
