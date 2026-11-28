@@ -1,10 +1,8 @@
 package dev.clickn.translate.ui
 
 import android.content.Context
-import android.graphics.Bitmap
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.SemanticsActions
@@ -20,7 +18,6 @@ import dev.clickn.translate.R
 import dev.clickn.translate.update.ReleaseApk
 import dev.clickn.translate.update.UpdateInfo
 import dev.clickn.translate.update.UpdateViewModel
-import java.io.File
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -86,11 +83,6 @@ class ReleaseUpdateDialogRuntimeTest {
     fun narrowScreenWithLargeRtlTextCanReadAndActivateEveryUpdateAction() {
         showUpdate(fontScale = 1.7f, direction = LayoutDirection.Rtl)
         val dialogNode = compose.onNodeWithTag(UPDATE_DIALOG_TAG)
-        val output = File("build/reports/ui-audit/update-320dp-large-rtl.png")
-        output.parentFile.mkdirs()
-        val bitmap = dialogNode.captureToImage().asAndroidBitmap()
-        output.outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
-
         val context = ApplicationProvider.getApplicationContext<Context>()
         val buttons = listOf(R.string.update_dialog_btn_skip, R.string.update_dialog_btn_later, R.string.update_dialog_btn_download)
         val minimumTouchSize = with(compose.density) { 48.dp.toPx() } - 1f
