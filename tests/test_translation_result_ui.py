@@ -277,14 +277,19 @@ class TranslationResultUiTest(unittest.TestCase):
         paste.assert_not_called()
 
     def test_selection_replacement_never_pastes_over_changed_text(self):
+        publications = ["Previous clipboard text"]
+
+        def publish(value):
+            publications.append(value)
+            return True
+
         with mock.patch.multiple(platform_support, IS_WINDOWS=True, IS_LINUX=False, IS_MAC=False), \
                 mock.patch.object(main, "_windows_foreground_window", return_value=42), \
-                mock.patch.object(platform_support, "copy_text", return_value=True), \
-                mock.patch.object(main, "_clipboard_sequence_number", return_value=7), \
-                mock.patch.object(main, "_wait_for_clipboard_change", return_value=True), \
-                mock.patch.object(main, "simulate_copy"), \
+                mock.patch.object(platform_support, "copy_text", side_effect=publish), \
+                mock.patch.object(main, "_clipboard_sequence_number", side_effect=lambda: len(publications)), \
+                mock.patch.object(main, "simulate_copy", side_effect=lambda: publish("Different text")), \
                 mock.patch.object(main, "simulate_paste") as paste, \
-                mock.patch.object(main.pyperclip, "paste", return_value="Different text"):
+                mock.patch.object(main.pyperclip, "paste", side_effect=lambda: publications[-1]):
             success, reason = main.replace_selected_text_in_foreground(
                 "Hello", "Привет", 42
             )

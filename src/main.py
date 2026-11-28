@@ -1243,32 +1243,54 @@ def replace_selected_text_in_foreground(original_text, translated_text,
 
     if cancel_callback is not None and cancel_callback():
         return False, "cancelled"
+    snapshot_sequence = _clipboard_sequence_number()
     if clipboard_preservation is None:
         from clipboard_preservation import ClipboardPreservation
         clipboard_preservation = ClipboardPreservation(
             pyperclip.paste, platform_support.copy_text, _clipboard_sequence_number)
     else:
         clipboard_preservation.preserve_current_if_changed()
+    if snapshot_sequence is not None and _clipboard_sequence_number() != snapshot_sequence:
+        return False, "clipboard_changed"
     marker = f"__CLICKNTRANSLATE_SELECTION_{time.time_ns()}__"
     if not platform_support.copy_text(marker):
         return False, "clipboard_unavailable"
-    clipboard_preservation.claim(marker)
+    if not clipboard_preservation.claim(marker):
+        return False, "clipboard_changed"
     previous = _clipboard_sequence_number()
-    if not _copy_from_focused_target(same_editor):
-        return False, "editor_changed"
-    changed = _wait_for_clipboard_change(previous)
+
+    def ready_to_verify():
+        return (clipboard_preservation.owns_text(marker) and same_editor()
+                and clipboard_preservation.owns_clipboard())
+
+    if not _copy_from_focused_target(ready_to_verify):
+        return False, "editor_changed" if clipboard_preservation.owns_text(marker) else "clipboard_changed"
+    published = _clipboard_sequence_number()
+    if published is None or published == previous:
+        if not _wait_for_clipboard_change(previous):
+            return False, "selection_lost"
+        published = _clipboard_sequence_number()
+
+    def refusal_after_copy():
+        if published is not None and _clipboard_sequence_number() != published:
+            return False, "clipboard_changed"
+        return False, "focus_changed"
 
     if not same_editor():
-        return False, "focus_changed"
+        return refusal_after_copy()
     try:
-        selected_now = str(pyperclip.paste() or "")
+        selected_now = clipboard_preservation.read_and_claim(same_editor, published)
     except Exception:
         return False, "clipboard_unavailable"
-    if not changed or selected_now == marker:
+    if selected_now is None:
+        return refusal_after_copy()
+    if selected_now == marker:
         return False, "selection_lost"
     if selected_now != str(original_text or ""):
         return False, "selection_changed"
 
+    if not clipboard_preservation.owns_clipboard():
+        return False, "clipboard_changed"
     if not platform_support.copy_text(translated_text):
         return False, "clipboard_unavailable"
     if not clipboard_preservation.claim(translated_text):

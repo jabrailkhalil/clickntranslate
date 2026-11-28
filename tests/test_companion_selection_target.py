@@ -517,3 +517,56 @@ def test_a_copy_made_while_preparing_capture_is_never_replaced_by_the_source(cap
     assert generations == [clipboard.sequence] and clipboard.text == external
     capture.copy_shortcut.assert_not_called()
     capture.provider.assert_not_called()
+
+
+@pytest.mark.parametrize('system', ['windows', 'macos'])
+@pytest.mark.parametrize('when', ['writing_marker', 'reading_verification'])
+@pytest.mark.parametrize('new_value', ['Another document', 'Source selection'])
+def test_external_copy_during_replacement_verification_keeps_its_generation(
+        capture, monkeypatch, system, when, new_value):
+    owner = SelectionRequest()
+    paste = mock.Mock()
+    monkeypatch.setattr(main, 'simulate_paste', paste)
+    target = 42
+    if system == 'macos':
+        target, native = setup_fake_mac(capture, monkeypatch)
+        original_send = native.send_edit_shortcut.side_effect
+
+        def send(key, validate_target=None):
+            if key == 'v':
+                if not validate_target():
+                    return False
+                paste()
+                return True
+            return original_send(key, validate_target)
+        native.send_edit_shortcut.side_effect = send
+
+    clipboard = capture.clipboard
+    verifying = []
+    foreign = []
+
+    def publish():
+        clipboard.copy(new_value)
+        foreign.append(clipboard.sequence)
+
+    def write(value):
+        clipboard.copy(value)
+        if str(value).startswith('__CLICKNTRANSLATE_SELECTION_'):
+            verifying.append(True)
+            if when == 'writing_marker':
+                publish()
+        return True
+
+    def read():
+        value = clipboard.paste()
+        if verifying and not foreign and when == 'reading_verification' and value == 'Source selection':
+            publish()
+        return value
+
+    capture.copy.side_effect = write
+    capture.read.side_effect = read
+    owner.launch_translate_replace_selection(expected_target=target)
+    assert foreign == [clipboard.sequence] and clipboard.text == new_value
+    paste.assert_not_called()
+    capture.provider.assert_called_once_with('Source selection', 'es', 'en')
+    assert len(owner.shown_dialogs) == 1 and owner.shown_dialogs[0][0] == 'Translated selection'

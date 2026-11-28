@@ -293,3 +293,30 @@ def test_plain_selection_can_still_read_a_document_without_a_writable_uia_editor
     owner.launch_translate_selection()
     capture.provider.assert_called_once_with('Source selection', 'es', 'en')
     assert len(owner.shown_dialogs) == 1 and owner.finished == []
+
+
+def test_replacement_does_not_send_its_verification_copy_after_a_slow_marker_read_changes_fields(
+        capture, editable_editor, monkeypatch):
+    first = editable_editor.return_value
+    focused = [first]
+    second = windows_selection.WindowsEditTarget(first.window, first.process_id, (42, 9))
+    editable_editor.side_effect = lambda _window: focused[0]
+    recipients = []
+
+    def copy():
+        recipients.append(focused[0])
+        capture.clipboard.copy('Source selection')
+
+    def read():
+        value = capture.clipboard.paste()
+        if value.startswith('__CLICKNTRANSLATE_SELECTION_'):
+            focused[0] = second
+        return value
+
+    capture.copy_shortcut.side_effect = copy
+    capture.read.side_effect = read
+    paste = mock.Mock()
+    monkeypatch.setattr(main, 'simulate_paste', paste)
+    SelectionRequest().launch_translate_replace_selection(expected_target=42)
+    assert focused[0] == second and recipients == [first]
+    paste.assert_not_called()
