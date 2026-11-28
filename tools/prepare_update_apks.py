@@ -13,7 +13,7 @@ def prepare(current, output):
     sdk = Path(os.environ["ANDROID_HOME"])
     tools = sdk / "build-tools" / "35.0.0"
     android = sdk / "platforms" / "android-35" / "android.jar"
-    keystore = Path.home() / ".android" / "debug.keystore"
+    keystore = Path(os.environ.get("CLICKN_ACCEPTANCE_DEBUG_KEYSTORE", Path.home() / ".android" / "debug.keystore"))
     badging = subprocess.check_output([tools / "aapt", "dump", "badging", current], text=True)
     identity = re.search(r"^package: name='dev\.clickn\.translate\.debug' versionCode='(\d+)' versionName='(\d+\.\d+\.\d+)'", badging, re.M)
     if not identity or int(identity[1]) < 2:

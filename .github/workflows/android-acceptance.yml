@@ -100,6 +100,15 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/android-release-updater' }}
       - name: Install Android build tools
         run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'ndk;28.2.13676358' 'cmake;3.22.1'
+      - name: Create the disposable debug certificate used by the installer test
+        shell: bash
+        run: |
+          directory="$(mktemp -d "$RUNNER_TEMP/clickn-debug.XXXXXX")"
+          store="$directory/debug.keystore"
+          keytool -genkeypair -storetype JKS -keystore "$store" -storepass android \
+            -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 \
+            -dname "CN=ClicknTranslate emulator acceptance" -validity 7
+          echo "CLICKN_ACCEPTANCE_DEBUG_KEYSTORE=$store" >> "$GITHUB_ENV"
       - name: Build the debug app and test package
         id: build
         run: >-
@@ -111,6 +120,14 @@ jobs:
           apk=app/build/outputs/apk/debug/app-debug.apk
           python3 tools/audit_apk.py --check-native-pages "$apk"
           "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -P 16 4 "$apk"
+      - name: Verify that the application and instrumentation use this runner's certificate
+        shell: bash
+        run: |
+          fingerprint="$(keytool -exportcert -keystore "$CLICKN_ACCEPTANCE_DEBUG_KEYSTORE" -storepass android -alias androiddebugkey | sha256sum | cut -d' ' -f1)"
+          for apk in app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk; do
+            actual="$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$apk" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')"
+            test "$actual" = "$fingerprint"
+          done
       - name: Enable hardware acceleration on the disposable runner
         id: kvm
         run: |

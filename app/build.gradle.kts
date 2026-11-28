@@ -82,6 +82,9 @@ android {
     val hasReleaseSigning = !releaseKeystorePath.isNullOrBlank() && file(releaseKeystorePath).exists()
 
     signingConfigs {
+        providers.environmentVariable("CLICKN_ACCEPTANCE_DEBUG_KEYSTORE").orNull?.let { path ->
+            getByName("debug").storeFile = file(path)
+        }
         if (hasReleaseSigning) {
             create("release") {
                 storeFile = file(releaseKeystorePath!!)
