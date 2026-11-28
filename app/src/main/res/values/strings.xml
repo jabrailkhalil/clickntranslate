@@ -2063,4 +2063,5 @@
     <string name="mobile_provider_saving">Saving…</string>
     <string name="mobile_provider_save_error">Could not save provider settings. Try again.</string>
     <string name="mobile_provider_save_retry">Retry save</string>
+    <string name="settings_secure_storage_unavailable">Secure storage is unavailable. Unlock the device and try saving again.</string>
 </resources>

@@ -220,6 +220,7 @@ import dev.clickn.translate.data.SettingsBundleTransfer
 import dev.clickn.translate.data.TranslationPreset
 import dev.clickn.translate.data.TranslationContextMode
 import dev.clickn.translate.data.TranslationPresetCatalog
+import dev.clickn.translate.data.SecureSettingsUnavailableException
 import dev.clickn.translate.data.TranslationPresetImportPlan
 import dev.clickn.translate.data.TranslationBlockInteractionMode
 import dev.clickn.translate.data.TranslationPresetTransfer
@@ -2089,6 +2090,8 @@ fun SettingsScreen(
                 SettingsEditingSnapshot(submittedDraft, buildSnapshot()), saved,
             )
             applyEditingSnapshot(continued)
+        } catch (_: SecureSettingsUnavailableException) {
+            Toast.makeText(context, R.string.settings_secure_storage_unavailable, Toast.LENGTH_LONG).show()
         } finally {
             savingEditor = false
         }
@@ -2146,7 +2149,7 @@ fun SettingsScreen(
                     )
                 },
                 onSaveUnsaved = { preset ->
-                    scope.launch {
+                    scope.launchPresetEdit(context) {
                         val saved = viewModel.saveTranslationPreset(preset, buildTranslationPresetSnapshot())
                         translationPresets = TranslationPresetCatalog.upsertCustom(translationPresets, saved)
                         activeTranslationPresetId = saved.id
@@ -2157,8 +2160,8 @@ fun SettingsScreen(
                     }
                 },
                 onApply = { preset ->
-                    scope.launch {
-                        val applied = viewModel.applyTranslationPreset(preset.id) ?: return@launch
+                    scope.launchPresetEdit(context) {
+                        val applied = viewModel.applyTranslationPreset(preset.id) ?: return@launchPresetEdit
                         applyCommittedPresetSettings(applied)
                         presetMessage = context.getString(
                             R.string.settings_translation_preset_applied_format,

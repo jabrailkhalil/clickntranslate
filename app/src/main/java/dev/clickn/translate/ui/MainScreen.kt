@@ -132,6 +132,7 @@ import dev.clickn.translate.shizuku.AppPermissionCoordinator
 import dev.clickn.translate.capture.RegionPickerActivity
 import dev.clickn.translate.data.Settings as AppSettings
 import dev.clickn.translate.data.SettingsRepository
+import dev.clickn.translate.data.SecureSettingsUnavailableException
 import dev.clickn.translate.data.TranslationPreset
 import dev.clickn.translate.data.TranslationPresetCatalog
 import dev.clickn.translate.gallery.GalleryTaskStatus
@@ -160,6 +161,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
 
@@ -386,7 +388,7 @@ fun MainScreen(
     }
 
     val applyPresetNow: (TranslationPreset) -> Unit = { preset ->
-        scope.launch {
+        scope.launchPresetEdit(context) {
             if (!viewModel.applyTranslationPreset(preset.id)) {
                 presetModelIssues = viewModel.presetModelIssues(presets)
                 snackbarHostState.showSnackbar(presetNotReadyMessage)
@@ -493,7 +495,7 @@ fun MainScreen(
                         } ?: return@TextButton
                         pendingSaveBeforePresetSwitch = null
                         pendingPresetSaveName = ""
-                        scope.launch {
+                        scope.launchPresetEdit(context) {
                             if (!viewModel.saveTranslationPresetAndApply(
                                     presetToSave = presetToSave,
                                     targetId = target.id,
@@ -2324,6 +2326,14 @@ internal fun PresetCarousel(
                     .size(width = 200.dp, height = 84.dp),
             )
         }
+    }
+}
+
+internal fun CoroutineScope.launchPresetEdit(context: Context, edit: suspend () -> Unit) = launch {
+    try {
+        edit()
+    } catch (_: SecureSettingsUnavailableException) {
+        Toast.makeText(context, R.string.settings_secure_storage_unavailable, Toast.LENGTH_LONG).show()
     }
 }
 

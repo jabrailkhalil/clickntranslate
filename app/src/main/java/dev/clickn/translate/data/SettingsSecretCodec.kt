@@ -1,17 +1,21 @@
 // Modified for Click'n'Translate on October 3, 2026.
 package dev.clickn.translate.data
 
+internal class SecureSettingsUnavailableException : IllegalStateException("Secure settings storage is unavailable")
+
 class SettingsSecretCodec(
     private val cipher: SettingsSecretCipher
 ) {
     /** Credentials must never fall back to plaintext or device-derived encryption. */
     fun encryptCredential(value: String): String {
         if (value.isEmpty()) return ""
-        return runCatching {
-            val encrypted = cipher.encrypt(value)
-            require(encrypted.isNotEmpty() && encrypted != value)
-            PREFIX + encrypted
-        }.getOrDefault("")
+        val encrypted = try {
+            cipher.encrypt(value)
+        } catch (_: Exception) {
+            throw SecureSettingsUnavailableException()
+        }
+        if (encrypted.isEmpty() || encrypted == value) throw SecureSettingsUnavailableException()
+        return PREFIX + encrypted
     }
 
     // Also used for non-secret addresses, prompts and credential-free preset metadata.

@@ -2027,4 +2027,5 @@
     <string name="mobile_provider_saving">Speichert…</string>
     <string name="mobile_provider_save_error">Die Übersetzereinstellungen konnten nicht gespeichert werden. Bitte erneut versuchen.</string>
     <string name="mobile_provider_save_retry">Erneut speichern</string>
+    <string name="settings_secure_storage_unavailable">Der sichere Speicher ist nicht verfügbar. Entsperre das Gerät und versuche erneut zu speichern.</string>
 </resources>

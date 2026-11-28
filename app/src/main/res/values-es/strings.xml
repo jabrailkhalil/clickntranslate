@@ -2027,4 +2027,5 @@
     <string name="mobile_provider_saving">Guardando…</string>
     <string name="mobile_provider_save_error">No se pudo guardar la configuración del traductor. Inténtalo de nuevo.</string>
     <string name="mobile_provider_save_retry">Reintentar</string>
+    <string name="settings_secure_storage_unavailable">El almacenamiento seguro no está disponible. Desbloquea el dispositivo e intenta guardar de nuevo.</string>
 </resources>

@@ -529,6 +529,7 @@ private fun GalleryPresetSwitcher(
     snackbarHostState: SnackbarHostState,
     enabled: Boolean = true,
 ) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val unsavedPresetName = stringResource(R.string.settings_translation_preset_unsaved_name)
     val plans = remember(settings, unsavedPresetName) {
@@ -549,7 +550,7 @@ private fun GalleryPresetSwitcher(
     }
 
     val applyPresetNow: (TranslationPreset) -> Unit = { preset ->
-        scope.launch {
+        scope.launchPresetEdit(context) {
             if (!viewModel.applyTranslationPreset(preset.id)) {
                 modelIssues = viewModel.presetModelIssues(presets)
                 snackbarHostState.showSnackbar(presetNotReadyMessage)
@@ -656,7 +657,7 @@ private fun GalleryPresetSwitcher(
                         } ?: return@TextButton
                         pendingSaveBeforePresetSwitch = null
                         pendingPresetSaveName = ""
-                        scope.launch {
+                        scope.launchPresetEdit(context) {
                             if (!viewModel.saveTranslationPresetAndApply(
                                     presetToSave = presetToSave,
                                     targetId = target.id,

@@ -404,7 +404,7 @@ class SettingsRepository internal constructor(
                 val raw = prefs[key]
                 if (secretCodec.needsMigration(raw)) {
                     prefs.putSecure(key, raw.orEmpty())
-                    migrated++
+                    if (secretCodec.isEncrypted(prefs[key].orEmpty())) migrated++
                 }
             }
         }
@@ -571,23 +571,36 @@ class SettingsRepository internal constructor(
     }
 
     private fun MutablePreferences.putSecure(key: Preferences.Key<String>, value: String) {
-        this[key] = if (key in credentialStringKeys) secretCodec.encryptCredential(value)
+        val encoded = if (key in credentialStringKeys) secretCodec.encryptCredential(value)
             else secretCodec.encryptPlainText(value)
+        if (value.isNotEmpty() && secretCodec.isEncrypted(this[key].orEmpty()) && !secretCodec.isEncrypted(encoded)) {
+            throw SecureSettingsUnavailableException()
+        }
+        this[key] = encoded
     }
 
     // Kept outside both Settings and TranslationPreset: no export/diagnostic serializer sees these records.
     private fun presetCredentialKey(id: String) = stringPreferencesKey("local_preset_credentials_v1_$id")
 
-    private fun Preferences.presetCredentials(id: String): PresetCredentialRecord? =
-        this[presetCredentialKey(id)]?.takeIf(secretCodec::isEncrypted)
-            ?.let(secretCodec::decodeStored)?.let { raw ->
-                runCatching { json.decodeFromString<PresetCredentialRecord>(raw) }.getOrNull()
-            }?.takeIf { it.ownerId == id }
+    private fun Preferences.presetCredentials(id: String, requireReadable: Boolean = false): PresetCredentialRecord? {
+        val stored = this[presetCredentialKey(id)]?.takeIf(secretCodec::isEncrypted) ?: return null
+        val raw = secretCodec.decodeStored(stored)
+        if (raw == null) {
+            if (requireReadable) throw SecureSettingsUnavailableException()
+            return null
+        }
+        return runCatching { json.decodeFromString<PresetCredentialRecord>(raw) }.getOrNull()?.takeIf { it.ownerId == id }
+    }
 
     private fun MutablePreferences.rememberCredentials(id: String, source: Settings) {
-        this[presetCredentialKey(id)] = secretCodec.encryptCredential(
-            json.encodeToString(PresetCredentialPolicy.capture(id, source)),
-        )
+        val record = PresetCredentialPolicy.capture(id, source)
+        if (presetCredentials(id, requireReadable = true) == record) return
+        val key = presetCredentialKey(id)
+        if (record.hasCredentials) {
+            this[key] = secretCodec.encryptCredential(json.encodeToString(record))
+        } else {
+            remove(key)
+        }
     }
 
     suspend fun saveTranslationPreset(
@@ -601,7 +614,7 @@ class SettingsRepository internal constructor(
                 translationPresets = TranslationPresetCatalog.upsertCustom(current.translationPresets, preset),
                 activeTranslationPresetId = preset.id,
             )
-            PresetCredentialPolicy.apply(preset.id, next, prefs.presetCredentials(preset.id))
+            PresetCredentialPolicy.apply(preset.id, next, prefs.presetCredentials(preset.id, requireReadable = true))
         }
         return preset
     }
@@ -614,7 +627,7 @@ class SettingsRepository internal constructor(
             val copy = source.copy(
                 id = "custom_${java.util.UUID.randomUUID()}", name = name, shortName = shortName,
             )
-            val credentials = prefs.presetCredentials(id)?.copy(ownerId = copy.id)
+            val credentials = prefs.presetCredentials(id, requireReadable = true)?.copy(ownerId = copy.id)
             prefs[presetCredentialKey(copy.id)] = credentials?.let {
                 secretCodec.encryptCredential(json.encodeToString(it))
             }.orEmpty()
@@ -639,7 +652,7 @@ class SettingsRepository internal constructor(
             val preset = requireNotNull(TranslationPresetCatalog.find(prepared.translationPresets, id))
             found = true
             PresetCredentialPolicy.apply(
-                id, preset.applyTo(prepared).copy(activeTranslationPresetId = id), prefs.presetCredentials(id),
+                id, preset.applyTo(prepared).copy(activeTranslationPresetId = id), prefs.presetCredentials(id, requireReadable = true),
             )
         }
         return committed.takeIf { found }
@@ -787,22 +800,39 @@ class SettingsRepository internal constructor(
                 requested
             }
             val next = MangaOcrSettingsPolicy.normalize(languageSafe)
+            val hasUnreadableCredential by lazy {
+                credentialStringKeys.any { key ->
+                    val stored = prefs[key]
+                    stored != null && secretCodec.isEncrypted(stored) && secretCodec.decodeStored(stored) == null
+                }
+            }
+            fun writeProtected(key: Preferences.Key<String>, read: (Settings) -> String) {
+                val value = read(next)
+                val stored = prefs[key]
+                val changed = read(current) != value
+                // Never pair an unreadable existing credential with a newly edited endpoint.
+                if (changed && hasUnreadableCredential) throw SecureSettingsUnavailableException()
+                if (stored != null && secretCodec.isEncrypted(stored)) {
+                    // A locked Keystore makes reads return UI defaults. An edit to a different
+                    // setting must leave the original ciphertext and its endpoint untouched.
+                    if (!changed) return
+                    if (secretCodec.decodeStored(stored) == null) throw SecureSettingsUnavailableException()
+                }
+                prefs.putSecure(key, value)
+            }
             val remainingPresetIds = next.translationPresets.mapTo(mutableSetOf()) { it.id }
             current.translationPresets.filterNot { it.id in remainingPresetIds }
                 .forEach { prefs.remove(presetCredentialKey(it.id)) }
-            prefs.putSecure(Keys.BaseUrl, next.baseUrl)
-            prefs.putSecure(Keys.ApiKey, next.apiKey)
+            writeProtected(Keys.BaseUrl, Settings::baseUrl)
+            writeProtected(Keys.ApiKey, Settings::apiKey)
             prefs[Keys.Model] = next.model
-            prefs.putSecure(Keys.AnthropicBaseUrl, next.anthropicBaseUrl)
-            prefs.putSecure(Keys.AnthropicApiKey, next.anthropicApiKey)
+            writeProtected(Keys.AnthropicBaseUrl, Settings::anthropicBaseUrl)
+            writeProtected(Keys.AnthropicApiKey, Settings::anthropicApiKey)
             prefs[Keys.AnthropicModel] = next.anthropicModel
             prefs[Keys.SourceLang] = next.sourceLang
             prefs[Keys.TargetLang] = next.targetLang
-            prefs.putSecure(Keys.Prompt, next.promptTemplate)
-            prefs.putSecure(
-                Keys.OpenAiRequestOptions,
-                json.encodeToString(next.openAiRequestOptions.normalized()),
-            )
+            writeProtected(Keys.Prompt, Settings::promptTemplate)
+            writeProtected(Keys.OpenAiRequestOptions) { json.encodeToString(it.openAiRequestOptions.normalized()) }
             prefs[Keys.OcrEngine] = next.ocrEngine.name
             prefs[Keys.AutoOcr] = json.encodeToString(AutoOcrSettings.serializer(), next.autoOcr.normalized())
             prefs[Keys.LoopInterval] = next.captureLoopIntervalMs
@@ -857,27 +887,27 @@ class SettingsRepository internal constructor(
                 MIN_TTS_PLAYBACK_GAIN_DB,
                 MAX_TTS_PLAYBACK_GAIN_DB,
             )
-            prefs.putSecure(Keys.TtsHttpBaseUrl, next.ttsHttpBaseUrl)
-            prefs.putSecure(Keys.TtsHttpBearerToken, next.ttsHttpBearerToken)
+            writeProtected(Keys.TtsHttpBaseUrl, Settings::ttsHttpBaseUrl)
+            writeProtected(Keys.TtsHttpBearerToken, Settings::ttsHttpBearerToken)
             prefs[Keys.TtsHttpResponseMode] = next.ttsHttpResponseMode.name
             prefs[Keys.TtsVolcengineResource] = next.ttsVolcengineResource.name
-            prefs.putSecure(Keys.TtsVolcengineBaseUrl, next.ttsVolcengineBaseUrl)
-            prefs.putSecure(Keys.TtsVolcengineApiKey, next.ttsVolcengineApiKey)
+            writeProtected(Keys.TtsVolcengineBaseUrl, Settings::ttsVolcengineBaseUrl)
+            writeProtected(Keys.TtsVolcengineApiKey, Settings::ttsVolcengineApiKey)
             prefs[Keys.TtsVolcengineSpeaker] = next.ttsVolcengineSpeaker
             prefs[Keys.TtsVolcengineModel] = next.ttsVolcengineModel
             prefs[Keys.TtsVolcengineContext] = next.ttsVolcengineContext
             prefs[Keys.TtsVolcenginePitch] = next.ttsVolcenginePitch.coerceIn(-12, 12)
             prefs[Keys.TtsVolcengineToneFidelity] = next.ttsVolcengineToneFidelity
             prefs[Keys.TtsMiniMaxModel] = next.ttsMiniMaxModel.name
-            prefs.putSecure(Keys.TtsMiniMaxBaseUrl, next.ttsMiniMaxBaseUrl)
-            prefs.putSecure(Keys.TtsMiniMaxApiKey, next.ttsMiniMaxApiKey)
+            writeProtected(Keys.TtsMiniMaxBaseUrl, Settings::ttsMiniMaxBaseUrl)
+            writeProtected(Keys.TtsMiniMaxApiKey, Settings::ttsMiniMaxApiKey)
             prefs[Keys.TtsMiniMaxVoice] = next.ttsMiniMaxVoice
             prefs[Keys.TtsMiniMaxEmotion] = next.ttsMiniMaxEmotion
             prefs[Keys.TtsMiniMaxSpeed] = next.ttsMiniMaxSpeed.coerceIn(0.5f, 2.0f)
             prefs[Keys.TtsMiniMaxPitch] = next.ttsMiniMaxPitch.coerceIn(-12, 12)
             prefs[Keys.TtsMimoModel] = next.ttsMimoModel.name
-            prefs.putSecure(Keys.TtsMimoBaseUrl, next.ttsMimoBaseUrl)
-            prefs.putSecure(Keys.TtsMimoApiKey, next.ttsMimoApiKey)
+            writeProtected(Keys.TtsMimoBaseUrl, Settings::ttsMimoBaseUrl)
+            writeProtected(Keys.TtsMimoApiKey, Settings::ttsMimoApiKey)
             prefs[Keys.TtsMimoVoice] = next.ttsMimoVoice
             prefs[Keys.TtsMimoPresetInstruction] = next.ttsMimoInstruction
             prefs[Keys.TtsMimoVoiceDesignPrompt] = next.ttsMimoVoiceDesignPrompt
@@ -889,18 +919,18 @@ class SettingsRepository internal constructor(
             prefs[Keys.Upscale] = next.preprocess.upscale2x
             prefs[Keys.Invert] = next.preprocess.invert
             prefs[Keys.Binarize] = next.preprocess.binarize
-            prefs.putSecure(Keys.BaiduKey, next.baiduOcrApiKey)
-            prefs.putSecure(Keys.BaiduSecret, next.baiduOcrSecretKey)
+            writeProtected(Keys.BaiduKey, Settings::baiduOcrApiKey)
+            writeProtected(Keys.BaiduSecret, Settings::baiduOcrSecretKey)
             prefs[Keys.A11yVolume] = next.a11yVolumeTrigger
-            prefs.putSecure(Keys.TencentId, next.tencentSecretId)
-            prefs.putSecure(Keys.TencentKey, next.tencentSecretKey)
+            writeProtected(Keys.TencentId, Settings::tencentSecretId)
+            writeProtected(Keys.TencentKey, Settings::tencentSecretKey)
             prefs[Keys.TencentRegion] = next.tencentRegion
             prefs[Keys.Placement] = next.overlayPlacement.name
             prefs[Keys.PaddleVersion] = next.paddleModelVersion.name
             prefs[Keys.PaddleDetectionProfile] = next.paddleDetectionProfile.name
-            prefs.putSecure(Keys.PaddleMirror, next.paddleModelMirrorUrl)
-            prefs.putSecure(Keys.MangaOcrMirror, next.mangaOcrModelMirrorUrl)
-            prefs.putSecure(Keys.OrientationModelMirror, next.orientationModelMirrorUrl)
+            writeProtected(Keys.PaddleMirror, Settings::paddleModelMirrorUrl)
+            writeProtected(Keys.MangaOcrMirror, Settings::mangaOcrModelMirrorUrl)
+            writeProtected(Keys.OrientationModelMirror, Settings::orientationModelMirrorUrl)
             prefs[Keys.OffsetX] = next.overlayOffsetX
             prefs[Keys.OffsetY] = next.overlayOffsetY
             prefs[Keys.ThemeKey] = next.overlayTheme.name
@@ -915,19 +945,19 @@ class SettingsRepository internal constructor(
             prefs[Keys.TranslationMemoryEnabled] = next.translationMemoryEnabled
             prefs[Keys.ForegroundAppDetectionMode] = next.foregroundAppDetectionMode.name
             prefs[Keys.SendAppNameToTranslator] = next.sendAppNameToTranslator
-            prefs.putSecure(Keys.LingvaUrl, next.lingvaBaseUrl)
-            prefs.putSecure(Keys.LibreUrl, next.libreTranslateBaseUrl)
-            prefs.putSecure(Keys.LibreKey, next.libreTranslateApiKey)
-            prefs.putSecure(Keys.MyMemoryEmail, next.myMemoryEmail)
-            prefs.putSecure(Keys.DeeplKey, next.deeplApiKey)
+            writeProtected(Keys.LingvaUrl, Settings::lingvaBaseUrl)
+            writeProtected(Keys.LibreUrl, Settings::libreTranslateBaseUrl)
+            writeProtected(Keys.LibreKey, Settings::libreTranslateApiKey)
+            writeProtected(Keys.MyMemoryEmail, Settings::myMemoryEmail)
+            writeProtected(Keys.DeeplKey, Settings::deeplApiKey)
             prefs[Keys.DeeplPro] = next.deeplPro
             prefs[Keys.DeeplProtocol] = next.deeplProtocol.name
-            prefs.putSecure(Keys.DeeplBaseUrl, next.deeplBaseUrl)
+            writeProtected(Keys.DeeplBaseUrl, Settings::deeplBaseUrl)
             prefs[Keys.DeeplBearerAuth] = next.deeplBearerAuth
-            prefs.putSecure(Keys.DeeplCustomToken, next.deeplCustomToken)
+            writeProtected(Keys.DeeplCustomToken, Settings::deeplCustomToken)
             prefs[Keys.NiuTransMode] = next.niuTransMode.name
-            prefs.putSecure(Keys.NiuTransApiKey, next.niuTransApiKey)
-            prefs.putSecure(Keys.NiuTransAppId, next.niuTransAppId)
+            writeProtected(Keys.NiuTransApiKey, Settings::niuTransApiKey)
+            writeProtected(Keys.NiuTransAppId, Settings::niuTransAppId)
             prefs[Keys.NiuTransTermLibraryId] = next.niuTransTermLibraryId
             prefs[Keys.NiuTransMemoryLibraryId] = next.niuTransMemoryLibraryId
             prefs[Keys.FloatingSize] = next.floatingButtonSizeDp
@@ -952,9 +982,9 @@ class SettingsRepository internal constructor(
             prefs[Keys.OverlayCollision] = next.overlayAvoidCollision
             prefs[Keys.BaiduEndpoint] = next.baiduOcrEndpoint.name
             prefs[Keys.BaiduLanguage] = next.baiduOcrLanguage.name
-            prefs.putSecure(Keys.UmiOcrBaseUrl, next.umiOcrBaseUrl)
-            prefs.putSecure(Keys.LunaOcrBaseUrl, next.lunaOcrBaseUrl)
-            prefs.putSecure(Keys.PaddleAiStudioToken, next.paddleAiStudioToken)
+            writeProtected(Keys.UmiOcrBaseUrl, Settings::umiOcrBaseUrl)
+            writeProtected(Keys.LunaOcrBaseUrl, Settings::lunaOcrBaseUrl)
+            writeProtected(Keys.PaddleAiStudioToken, Settings::paddleAiStudioToken)
             prefs[Keys.TencentEndpoint] = next.tencentOcrEndpoint.name
             prefs[Keys.TencentLanguage] = next.tencentOcrLanguage.name
             prefs[Keys.ApiTimeoutSec] = next.apiTimeoutSeconds
@@ -974,27 +1004,23 @@ class SettingsRepository internal constructor(
             prefs[Keys.TranslationOutputFollowRecognition] = translationOutput.followRecognition
             prefs[Keys.TranslationOutputLayout] = translationOutput.layout.name
             prefs[Keys.TranslationOutputDirection] = translationOutput.direction.name
-            prefs.putSecure(Keys.YoudaoAppKey, next.youdaoAppKey)
-            prefs.putSecure(Keys.YoudaoAppSecret, next.youdaoAppSecret)
-            prefs.putSecure(Keys.VolcAccessKeyId, next.volcAccessKeyId)
-            prefs.putSecure(Keys.VolcSecretAccessKey, next.volcSecretAccessKey)
+            writeProtected(Keys.YoudaoAppKey, Settings::youdaoAppKey)
+            writeProtected(Keys.YoudaoAppSecret, Settings::youdaoAppSecret)
+            writeProtected(Keys.VolcAccessKeyId, Settings::volcAccessKeyId)
+            writeProtected(Keys.VolcSecretAccessKey, Settings::volcSecretAccessKey)
             prefs[Keys.VolcRegion] = next.volcRegion
-            prefs.putSecure(Keys.BaiduFanyiAppId, next.baiduFanyiAppId)
-            prefs.putSecure(Keys.BaiduFanyiSecretKey, next.baiduFanyiSecretKey)
-            prefs.putSecure(
-                Keys.CleartextHosts,
-                CleartextHostPolicy.normalize(next.cleartextAllowedHosts).joinToString("\n")
-            )
+            writeProtected(Keys.BaiduFanyiAppId, Settings::baiduFanyiAppId)
+            writeProtected(Keys.BaiduFanyiSecretKey, Settings::baiduFanyiSecretKey)
+            writeProtected(Keys.CleartextHosts) { CleartextHostPolicy.normalize(it.cleartextAllowedHosts).joinToString("\n") }
             prefs[Keys.FloatingMenuOrder] = next.floatingMenuItemOrder.joinToString(",") { it.name }
             prefs[Keys.ArcMenuPageSize] = FloatingMenu.coercePageSize(next.arcMenuPageSize)
-            prefs.putSecure(
-                Keys.TranslationPresets,
+            writeProtected(Keys.TranslationPresets) { settings ->
                 json.encodeToString(
-                    next.translationPresets
+                    settings.translationPresets
                         .map(MangaOcrAdvancedSettingsPolicy::normalize)
                         .filterNot { TranslationPresetCatalog.isBuiltIn(it.id) }
                 )
-            )
+            }
             prefs[Keys.ActiveTranslationPresetId] = next.activeTranslationPresetId
             prefs[Keys.FloatingSkillKey] = next.floatingButtonSkill.name
             prefs[Keys.InputTranslationDoubleAction] = next.inputTranslationDoubleAction.name
@@ -1007,11 +1033,11 @@ class SettingsRepository internal constructor(
             prefs[Keys.WordSelectLastRegionSavedH] = next.wordSelectLastRegionSavedScreenH
             prefs[Keys.DictionaryLookupMode] = next.dictionaryLookupMode.name
             prefs[Keys.DictionaryTapLookupEnabled] = next.dictionaryTapLookupEnabled
-            prefs.putSecure(Keys.DictionaryPrompt, next.dictionaryPrompt)
+            writeProtected(Keys.DictionaryPrompt, Settings::dictionaryPrompt)
             prefs[Keys.LocalLlmCtxSize] = next.localLlmContextSize
             prefs[Keys.LocalLlmMaxNewTokens] = next.localLlmMaxNewTokens
             prefs[Keys.LocalLlmMirrorChoice] = next.localLlmMirror.name
-            prefs.putSecure(Keys.LocalLlmMirror, next.localLlmMirrorUrl)
+            writeProtected(Keys.LocalLlmMirror, Settings::localLlmMirrorUrl)
             prefs[Keys.DbnetProbThresh] = next.dbnetProbThresh
             prefs[Keys.DbnetBoxScoreThresh] = next.dbnetBoxScoreThresh
             prefs[Keys.DbnetUnclipRatio] = next.dbnetUnclipRatio

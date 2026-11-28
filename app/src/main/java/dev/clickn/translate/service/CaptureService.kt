@@ -80,6 +80,7 @@ import dev.clickn.translate.data.effectiveOverlayRenderSettings
 import dev.clickn.translate.data.RenderMode
 import dev.clickn.translate.data.Settings
 import dev.clickn.translate.data.SettingsRepository
+import dev.clickn.translate.data.SecureSettingsUnavailableException
 import dev.clickn.translate.data.TranslationPreset
 import dev.clickn.translate.data.TranslationPresetCatalog
 import dev.clickn.translate.data.translationLanguageCodesConflict
@@ -1658,15 +1659,15 @@ class CaptureService : Service() {
             val settings = settingsRepository.get()
             mainScope.launch {
                 panel.show(settings) { preset ->
-                    scope.launch {
-                        settingsRepository.applyTranslationPreset(preset.id)
+                    scope.launch switch@{
+                        val message = try {
+                            settingsRepository.applyTranslationPreset(preset.id) ?: return@switch
+                            getString(R.string.preset_quick_applied_format, presetDisplayName(preset))
+                        } catch (_: SecureSettingsUnavailableException) {
+                            getString(R.string.settings_secure_storage_unavailable)
+                        }
+                        mainScope.launch { overlay?.showInfoHint(message) }
                     }
-                    overlay?.showInfoHint(
-                        getString(
-                            R.string.preset_quick_applied_format,
-                            presetDisplayName(preset)
-                        )
-                    )
                 }
             }
         }

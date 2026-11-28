@@ -9,6 +9,7 @@ internal data class PresetCredentialRecord(
     val ownerId: String,
     val groups: Map<String, PresetCredentialGroup>,
 ) {
+    val hasCredentials: Boolean get() = groups.values.any { group -> group.values.values.any(String::isNotEmpty) }
     override fun toString(): String = "PresetCredentialRecord(<redacted>)"
 }
 
@@ -100,7 +101,7 @@ internal object PresetCredentialPolicy {
 
     fun matches(id: String, settings: Settings, record: PresetCredentialRecord?): Boolean {
         val expected = capture(id, settings)
-        if (record == null) return expected.groups.values.all { group -> group.values.values.all(String::isEmpty) }
+        if (record == null) return !expected.hasCredentials
         return expected == record
     }
 

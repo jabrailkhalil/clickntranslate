@@ -2027,4 +2027,5 @@
     <string name="mobile_provider_saving">Сохраняем…</string>
     <string name="mobile_provider_save_error">Не удалось сохранить настройки переводчика. Повторите попытку.</string>
     <string name="mobile_provider_save_retry">Повторить</string>
+    <string name="settings_secure_storage_unavailable">Защищённое хранилище недоступно. Разблокируйте устройство и попробуйте сохранить ещё раз.</string>
 </resources>

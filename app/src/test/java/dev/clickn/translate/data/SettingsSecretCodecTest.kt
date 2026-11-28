@@ -61,9 +61,12 @@ class SettingsSecretCodecTest {
         )
         cases.forEachIndexed { index, (cipher, value) ->
             val codec = SettingsSecretCodec(cipher)
-            val stored = codec.encryptCredential(value)
-            if (index == 0) assertEquals(value, codec.decodeStored(stored))
-            else assertEquals("case $index", "", stored)
+            val result = runCatching { codec.encryptCredential(value) }
+            when {
+                index == 0 -> assertTrue(codec.decodeStored(result.getOrThrow()) == value)
+                value.isEmpty() -> assertEquals("", result.getOrThrow())
+                else -> assertTrue("case $index", result.exceptionOrNull() is SecureSettingsUnavailableException)
+            }
         }
     }
 

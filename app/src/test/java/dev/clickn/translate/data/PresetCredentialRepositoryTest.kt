@@ -4,6 +4,7 @@ package dev.clickn.translate.data
 import android.content.Context
 import android.content.ContextWrapper
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.stringPreferencesKey
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.nio.file.Files
@@ -19,10 +20,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.encodeToJsonElement
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.After
@@ -94,27 +94,76 @@ class PresetCredentialRepositoryTest {
     }
 
     @Test
-    fun encryptionFailure_clearsCredentialsButKeepsPresetAndOtherSettings() = runBlocking {
+    fun encryptionFailure_preservesLastWorkingPresetAndRejectsReplacementAtomically() = runBlocking {
         val fixture = Fixture()
         val repo = fixture.repo()
-        val source = PresetCredentialPolicyTest().withCredentials(Settings(model = "keep-model", promptTemplate = "keep-prompt"), "never-plaintext")
+        val source = Settings(apiKey = "never-plaintext", model = "keep-model", promptTemplate = "keep-prompt")
         val p = preset("failure", source)
         repo.saveTranslationPreset(p, source)
+        val before = fixture.protectedValues(p.id)
         fixture.cipher.fail = true
-        repo.saveTranslationPreset(p, source.copy(apiKey = "replacement-secret"))
-        val saved = repo.get()
+        val edited = source.copy(apiKey = "replacement-secret", model = "replacement-model")
+        val failed = runCatching { repo.saveTranslationPreset(preset(p.id, edited), edited) }
+        assertTrue(failed.exceptionOrNull() is SecureSettingsUnavailableException)
+        repo.update { it.copy(overlayAlpha = 0.63f) }
+        assertTrue(before == fixture.protectedValues(p.id))
+        fixture.cipher.fail = false
+        val saved = fixture.repo().get()
+        assertEquals(0.63f, saved.overlayAlpha, 0.001f)
         assertEquals("keep-model", saved.model)
         assertEquals("keep-prompt", saved.promptTemplate)
         assertEquals(p.id, saved.translationPresets.single().id)
-        assertEquals("", saved.apiKey)
-        repo.update { source.copy(translationPresets = listOf(p)) }
-        val values = json.encodeToJsonElement(repo.get()).jsonObject
-        PresetCredentialPolicy.credentialFields.forEach { assertEquals(it, "", values[it]?.jsonPrimitive?.content) }
-        fixture.cipher.fail = false
-        assertEquals("", repo.applyTranslationPreset(p.id)?.apiKey)
+        assertTrue(saved.apiKey == source.apiKey)
+        assertTrue(repo.applyTranslationPreset(p.id)?.apiKey == source.apiKey)
+        repo.saveTranslationPreset(preset(p.id, edited), edited)
+        assertTrue(repo.applyTranslationPreset(p.id)?.apiKey == edited.apiKey)
         val raw = File(fixture.root, "datastore/clickntranslate_settings.preferences_pb").readBytes().toString(Charsets.ISO_8859_1)
         assertFalse(raw.contains("replacement-secret"))
         assertFalse(raw.contains("never-plaintext"))
+        repo.saveTranslationPreset(p, source.copy(apiKey = ""))
+        assertEquals("", repo.applyTranslationPreset(p.id)?.apiKey)
+    }
+
+    @Test
+    fun unavailableDecryption_allowsAppearanceChangesWithoutReplacingKeysTheirEndpointOrPreset() = runBlocking {
+        val fixture = Fixture()
+        val repo = fixture.repo()
+        val source = Settings(apiKey = "isolated-test-credential", baseUrl = "https://keystore-fixture.example/v1")
+        val p = preset("locked", source)
+        repo.saveTranslationPreset(p, source)
+        val before = fixture.protectedValues(p.id)
+        fixture.cipher.fail = true
+        fixture.cipher.failRead = true
+        assertEquals("", repo.get().apiKey)
+        repo.update { it.copy(overlayAlpha = 0.71f) }
+        val failed = runCatching { repo.update { it.copy(baseUrl = "https://other.example/v1", overlayAlpha = 0.15f) } }
+        assertTrue(failed.exceptionOrNull() is SecureSettingsUnavailableException)
+        assertTrue(before == fixture.protectedValues(p.id))
+        fixture.cipher.fail = false
+        fixture.cipher.failRead = false
+        val reopened = fixture.repo().get()
+        assertEquals(0.71f, reopened.overlayAlpha, 0.001f)
+        assertEquals(source.baseUrl, reopened.baseUrl)
+        assertTrue(reopened.apiKey == source.apiKey)
+        assertEquals(p.id, reopened.translationPresets.single().id)
+        assertTrue(repo.applyTranslationPreset(p.id)?.apiKey == source.apiKey)
+    }
+
+    @Test
+    fun freshKeyWithNoKeystore_doesNotCommitAnUnusableProviderOrPlaintext() = runBlocking {
+        val fixture = Fixture()
+        val repo = fixture.repo()
+        fixture.cipher.fail = true
+        val original = repo.get()
+        val dummy = "synthetic-new-key"
+        val failed = runCatching {
+            repo.update { it.copy(translatorEngine = TranslatorEngine.LIBRETRANSLATE, libreTranslateApiKey = dummy) }
+        }
+        assertTrue(failed.exceptionOrNull() is SecureSettingsUnavailableException)
+        assertEquals(original.translatorEngine, repo.get().translatorEngine)
+        assertEquals("", repo.get().libreTranslateApiKey)
+        val file = File(fixture.root, "datastore/clickntranslate_settings.preferences_pb")
+        assertFalse(file.exists() && file.readBytes().toString(Charsets.ISO_8859_1).contains(dummy))
     }
 
     @Test
@@ -199,6 +248,14 @@ class PresetCredentialRepositoryTest {
         private val store = PreferenceDataStoreFactory.create(
             scope = CoroutineScope(SupervisorJob() + Dispatchers.IO).also(storeScopes::add),
         ) { File(root, "datastore/clickntranslate_settings.preferences_pb") }
+        suspend fun protectedValues(id: String): List<String> {
+            val prefs = store.data.first()
+            return listOf("api_key", "base_url", "translation_presets_json", "local_preset_credentials_v1_$id").map {
+                requireNotNull(prefs[stringPreferencesKey(it)]).also { stored ->
+                    assertTrue(stored.startsWith(SettingsSecretCodec.PREFIX))
+                }
+            }
+        }
         fun repo() = SettingsRepository(object : ContextWrapper(null) {
             override fun getApplicationContext(): Context = this
             override fun getFilesDir(): File = root
@@ -208,6 +265,7 @@ class PresetCredentialRepositoryTest {
 
     private class TestCipher : SettingsSecretCipher {
         var fail = false
+        var failRead = false
         val ciphertexts = mutableListOf<String>()
         private val key = KeyGenerator.getInstance("AES").apply { init(256) }.generateKey()
         override fun encrypt(plainText: String): String {
@@ -216,6 +274,7 @@ class PresetCredentialRepositoryTest {
             return Base64.getEncoder().encodeToString(cipher.iv + cipher.doFinal(plainText.toByteArray())).also(ciphertexts::add)
         }
         override fun decrypt(cipherText: String): String {
+            check(!failRead)
             val bytes = Base64.getDecoder().decode(cipherText)
             val cipher = Cipher.getInstance("AES/GCM/NoPadding").apply { init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(128, bytes.copyOfRange(0, 12))) }
             return cipher.doFinal(bytes.copyOfRange(12, bytes.size)).toString(Charsets.UTF_8)

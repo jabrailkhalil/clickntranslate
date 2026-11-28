@@ -2062,4 +2062,5 @@
     <string name="mobile_provider_saving">正在保存…</string>
     <string name="mobile_provider_save_error">无法保存翻译服务设置。请重试。</string>
     <string name="mobile_provider_save_retry">重新保存</string>
+    <string name="settings_secure_storage_unavailable">安全存储暂不可用。请解锁设备，然后重试保存。</string>
 </resources>

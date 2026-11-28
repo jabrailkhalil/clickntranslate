@@ -2027,4 +2027,5 @@
     <string name="mobile_provider_saving">Enregistrement…</string>
     <string name="mobile_provider_save_error">Impossible d’enregistrer les paramètres du traducteur. Réessayez.</string>
     <string name="mobile_provider_save_retry">Réessayer</string>
+    <string name="settings_secure_storage_unavailable">Le stockage sécurisé est indisponible. Déverrouillez l’appareil et réessayez d’enregistrer.</string>
 </resources>
