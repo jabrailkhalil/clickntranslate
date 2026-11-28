@@ -55,6 +55,23 @@ def test_us_flag_renders_all_fifty_stars_not_just_an_empty_canton(app):
     assert components == 50
 
 
+@pytest.mark.parametrize(('tag', 'expected'), [
+    ('pt-BR', 'br'), ('pt-PT', 'pt'), ('en-US', 'us'), ('zh-Hant', 'cn'),
+    ('yue-Hans', 'cn'), ('es-419', ''), ('en-ZZ', ''), ('en-x-us', 'us'),
+])
+def test_os_locale_icon_matches_the_named_region_or_script(app, tag, expected):
+    from languages import locale_icon_path
+    path = locale_icon_path(tag)
+    if not expected:
+        assert not path
+        return
+    assert path == f'icons/flags/{expected}.svg'
+    icon = resource_root() / path
+    assert QtSvg.QSvgRenderer(str(icon)).isValid()
+    sources = json.loads((icon.parent / 'vector-sources.json').read_text())
+    assert hashlib.sha256(icon.read_bytes()).hexdigest() == sources['files'][expected]['bundled_sha256']
+
+
 class RecordingIcon(QtGui.QIconEngine):
     def __init__(self, sizes):
         super().__init__()

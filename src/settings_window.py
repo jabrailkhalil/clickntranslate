@@ -66,6 +66,7 @@ from languages import (
     easyocr_language_codes,
     language_display_name,
     language_icon_path,
+    locale_icon_path,
     tesseract_language_code,
     windows_ocr_tag,
 )
@@ -8557,10 +8558,9 @@ class OcrLanguageManagerDialog(QDialog):
         from macos_ocr import localized_languages
         rows = []
         for tag, name in localized_languages(self.lang):
-            base = tag.split('-')[0]
             rows.append({
                 "code": tag, "name": name, "package": f"Apple Vision · {tag}",
-                "icon": language_icon_path('zh' if base == 'yue' else base),
+                "icon": locale_icon_path(tag),
                 "status": self._status_installed(), "checked": True,
                 "selectable": False, "show_checkbox": False,
             })

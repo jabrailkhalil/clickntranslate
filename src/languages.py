@@ -246,6 +246,22 @@ def language_icon_path(code):
     return "icons/" + language.flag_icon if language.flag_icon else ''
 
 
+def locale_icon_path(tag):
+    """Use the named region for an OS locale and the language flag for a script."""
+    from project_paths import resource_root
+
+    language, *subtags = tag.split('-')
+    for part in subtags:
+        if len(part) == 1:
+            break  # Extensions and private subtags do not identify a country.
+        if len(part) == 3 and part.isdigit():
+            return ''  # UN regions like Latin America span multiple countries.
+        if len(part) == 2 and part.isascii() and part.isalpha():
+            icon = f'icons/flags/{part.lower()}.svg'
+            return icon if (resource_root() / icon).is_file() else ''
+    return language_icon_path('zh' if language.lower() == 'yue' else language)
+
+
 def language_names(interface_language="en"):
     return [language.display_name(interface_language) for language in LANGUAGES]
 

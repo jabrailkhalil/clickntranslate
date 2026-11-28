@@ -27,6 +27,10 @@
       "upstream_sha256": "b6d979fc96dc6b46c1697a5e05ecfe1fac1fa912ed480ca7a2a9b450f087faf6",
       "bundled_sha256": "0c63a8154033f16b8809499ec473c4844d59990ba2ae5baa3844e164f0822fe9"
     },
+    "br": {
+      "upstream_sha256": "d079a828be244afbfefccae98370ae404766e62e4716cb3e0ef2d9eed487b390",
+      "bundled_sha256": "5b40de4681232567c5644a2370c9f4551fa2b65f2040fe5f52acb51c02686ed7"
+    },
     "by": {
       "upstream_sha256": "a1efa44ad1167d6d77abbe59ce85aa3a68ff4bd57af79454c08a3ade5c178578",
       "bundled_sha256": "dd2efff8e6420633fe947f3f68de11da148297b1a3b249b441990423f621f771"

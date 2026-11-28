@@ -15,7 +15,7 @@ from extended_languages import EXTRA_FLAG_COUNTRIES
 VERSION = 'v7.3.2'
 UPSTREAM = f'https://raw.githubusercontent.com/lipis/flag-icons/{VERSION}'
 COUNTRIES = set(EXTRA_FLAG_COUNTRIES.values()) | {
-    'us', 'ru', 'de', 'fr', 'es', 'it', 'pt', 'pl', 'ua', 'tr', 'nl', 'cn', 'jp', 'kr', 'sa', 'in'}
+    'us', 'ru', 'de', 'fr', 'es', 'it', 'pt', 'br', 'pl', 'ua', 'tr', 'nl', 'cn', 'jp', 'kr', 'sa', 'in'}
 SVG = 'http://www.w3.org/2000/svg'
 ET.register_namespace('', SVG)
 ET.register_namespace('xlink', 'http://www.w3.org/1999/xlink')
