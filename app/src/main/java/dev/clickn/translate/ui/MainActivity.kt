@@ -332,6 +332,7 @@ private fun AppRoot(
             ) }
             Route.Onboarding -> screenState.SaveableStateProvider("setup") { MobileSetupScreen(
                 firstRun = onboardingFirstRun,
+                openedFromHelp = onboardingOpenedFromHelp,
                 onAdvanced = { section -> settingsSection = section; settingsReturn = Route.Onboarding.name; routeName = Route.Settings.name },
                 onFinished = {
                     val decision = FloatingTourRerunPolicy.onOnboardingExit(

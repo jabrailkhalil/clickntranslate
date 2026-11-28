@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import dev.clickn.translate.BuildConfig
 import dev.clickn.translate.R
 import dev.clickn.translate.data.Settings
 import dev.clickn.translate.data.AppLocalePrefs
@@ -48,7 +49,7 @@ internal fun openSetupAndroidSettings(context: Context, primary: Intent, fallbac
 
 @Composable
 fun MobileSetupScreen(onFinished: () -> Unit, onAdvanced: (String) -> Unit, firstRun: Boolean = false,
-    viewModel: MobileViewModel = hiltViewModel()) {
+    viewModel: MobileViewModel = hiltViewModel(), openedFromHelp: Boolean = false) {
     val settings by viewModel.settings.collectAsState()
     val captureModeInitialized by viewModel.captureModeInitialized.collectAsState()
     val context = LocalContext.current
@@ -95,6 +96,11 @@ fun MobileSetupScreen(onFinished: () -> Unit, onAdvanced: (String) -> Unit, firs
                         setupLanguagePairReady(settings) && captureModeInitialized),
                         modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).testTag("setup-next")) {
                         Text(stringResource(if (step < MobileSetupSteps.LANGUAGES) R.string.setup_next else R.string.setup_finish))
+                    }
+                    if (openedFromHelp && !firstRun) {
+                        Text(stringResource(R.string.settings_about_version_format, BuildConfig.VERSION_NAME),
+                            modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 8.dp),
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }

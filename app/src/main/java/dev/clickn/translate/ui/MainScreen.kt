@@ -119,7 +119,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import dev.clickn.translate.BuildConfig
 import dev.clickn.translate.AppBrand
 import dev.clickn.translate.R
 import dev.clickn.translate.capture.CaptureRegion
@@ -945,7 +944,6 @@ fun MainScreen(
                 }
             }
 
-            // 关于：放在主屏底部，方便用户一眼看到版本号 / GitHub
             ActionCard(title = stringResource(R.string.settings_section_about)) {
                 AboutContent(
                     onShareApp = onShareApp,
@@ -980,11 +978,6 @@ private fun AboutContent(
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
-    Text(
-        text = stringResource(R.string.settings_about_version_format, BuildConfig.VERSION_NAME),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
 
     OutlinedButton(
         enabled = updateState !is dev.clickn.translate.update.UpdateViewModel.State.Checking,
@@ -998,7 +991,7 @@ private fun AboutContent(
     ) {
         Text(
             stringResource(
-                if (!AppBrand.updatesEnabled) R.string.brand_downloads_label
+                if (!AppBrand.updatesEnabled) R.string.update_dialog_btn_open_release
                 else if (updateState is dev.clickn.translate.update.UpdateViewModel.State.Checking)
                     R.string.update_btn_checking
                 else R.string.update_btn_check

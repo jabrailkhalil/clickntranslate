@@ -59,6 +59,7 @@ class Journey:
         self.stage = "device"
         self.verified = False
         self.last_xml = b""
+        self.installed_version = ""
 
     def run(self, *args):
         cmd = self.adb + list(args)
@@ -112,8 +113,10 @@ class Journey:
             needs_tap = action is not None and skip_action_when_visible not in visible
             point = action_point(tree, self.package, action) if needs_tap else None
             if set(expected) <= visible and (not needs_tap or point):
+                if stage != "help-version" and any(self.installed_version in label for label in visible):
+                    raise RuntimeError(f"Installed version appeared outside help on {stage}")
                 (self.output / f"{stage}.xml").write_bytes(self.last_xml)
-                if stage in {"step-1", "step-3", "settings", "os-language-french"}:
+                if stage in {"step-1", "step-3", "settings", "os-language-french", "help-version"}:
                     (self.output / f"{stage}.png").write_bytes(self.run("exec-out", "screencap", "-p"))
                 self.stages.append(stage)
                 if point:
@@ -147,6 +150,11 @@ class Journey:
         if self.run("shell", "getprop", "ro.build.version.sdk").strip() != b"35":
             raise ValueError("This journey targets the English API 35 AVD")
         self.verified = True
+        package = self.run("shell", "dumpsys", "package", self.package).decode()
+        version = re.search(r"^\s*versionName=(\S+)", package, re.M)
+        if not version:
+            raise RuntimeError("Android did not report the installed application version")
+        self.installed_version = version[1]
         self.stage = "first-launch"
         self.launch()
         for index, title in enumerate(STEPS, start=1):
@@ -163,6 +171,9 @@ class Journey:
         self.screen("home-after-restart", home, completed=True)
         (self.output / "home-after-restart.png").write_bytes(self.run("exec-out", "screencap", "-p"))
         self.check_system_app_language(home)
+        self.screen("open-help", home, "How it works", completed=True)
+        self.screen("help-version", ("Set up your translator", f"Version {self.installed_version}"))
+        self.run("shell", "am", "force-stop", self.package)
 
     def check_system_app_language(self, english_home):
         # The first-run fixture left the in-app language at Follow system. This changes

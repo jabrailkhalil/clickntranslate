@@ -46,7 +46,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import dev.clickn.translate.AppBrand
-import dev.clickn.translate.BuildConfig
 import dev.clickn.translate.R
 import dev.clickn.translate.capture.CaptureStartRequestActivity
 import dev.clickn.translate.data.*
@@ -555,9 +554,9 @@ internal fun SettingsHub(settings: Settings, onProvider: () -> Unit, onAppearanc
                 is dev.clickn.translate.update.UpdateViewModel.State.Ready -> stringResource(R.string.update_ready, current.apk.version)
                 is dev.clickn.translate.update.UpdateViewModel.State.Failed -> current.errorMessage
                 else -> if (status is dev.clickn.translate.update.UpdateViewModel.State.Checking) stringResource(R.string.update_btn_checking)
-                    else "${stringResource(R.string.mobile_version)} ${BuildConfig.VERSION_NAME}"
+                    else ""
             }
-            SettingsRow(Icons.Outlined.SystemUpdate, stringResource(if (AppBrand.updatesEnabled) R.string.update_btn_check else R.string.brand_downloads_label),
+            SettingsRow(Icons.Outlined.SystemUpdate, stringResource(if (AppBrand.updatesEnabled) R.string.update_btn_check else R.string.update_dialog_btn_open_release),
                 subtitle, {
                     if (AppBrand.updatesEnabled && updater != null) updater.check()
                     else browse(dev.clickn.translate.update.UpdateChecker.RELEASE_PAGE_URL)

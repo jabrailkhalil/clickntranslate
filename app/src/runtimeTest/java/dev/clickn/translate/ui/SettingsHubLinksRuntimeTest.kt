@@ -11,9 +11,11 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.core.app.ApplicationProvider
 import dev.clickn.translate.AppBrand
+import dev.clickn.translate.BuildConfig
 import dev.clickn.translate.ClickTranslateApp
 import dev.clickn.translate.R
 import dev.clickn.translate.data.Settings
+import dev.clickn.translate.update.UpdateChecker
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -49,12 +51,13 @@ class SettingsHubLinksRuntimeTest {
                 }
             }
         }
-        for (id in listOf(R.string.mobile_website, R.string.mobile_community)) {
+        for (id in listOf(R.string.update_dialog_btn_open_release, R.string.mobile_website, R.string.mobile_community)) {
             val title = base.getString(id)
             compose.onNodeWithTag("settings-hub").performScrollToNode(hasText(title))
+            compose.onAllNodes(hasText(BuildConfig.VERSION_NAME, substring = true)).assertCountEquals(0)
             compose.onNodeWithText(title).performClick()
             assertEquals(base.getString(R.string.settings_external_browser_unavailable), ShadowToast.getTextOfLatestToast())
         }
-        assertEquals(listOf(AppBrand.WEBSITE_URL, AppBrand.COMMUNITY_URL), requests)
+        assertEquals(listOf(UpdateChecker.RELEASE_PAGE_URL, AppBrand.WEBSITE_URL, AppBrand.COMMUNITY_URL), requests)
     }
 }
