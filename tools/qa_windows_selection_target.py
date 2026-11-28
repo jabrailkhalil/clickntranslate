@@ -72,7 +72,9 @@ def wpf_fixture(exchange, directory):
             if process.poll() is None:
                 try:
                     command('quit')
-                    process.wait(timeout=5)
+                    # WPF may release an OLE data object owned by this Qt window.
+                    # Keep the owning STA pumping messages until the fixture exits.
+                    wait_until(lambda: process.poll() is not None, 'The WPF fixture did not close', timeout=8)
                 finally:
                     if process.poll() is None:
                         process.kill()

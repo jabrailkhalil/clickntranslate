@@ -70,6 +70,7 @@ class ClipboardFormats(QtCore.QObject):
         super().__init__(app)
         self._requested.connect(self._execute, QtCore.Qt.QueuedConnection)
         self._cocoa = app.platformName() == 'cocoa'
+        self._windows = app.platformName() == 'windows'
 
     @QtCore.pyqtSlot(object)
     def _execute(self, operation):
@@ -124,6 +125,13 @@ class ClipboardFormats(QtCore.QObject):
                 if value.isNull():
                     raise ValueError('Clipboard representation unavailable')
                 remaining = _remaining_bytes(remaining, value.size())
+                # Qt 5 reads registered Windows formats through this wrapper, but
+                # registers the name supplied to setData() verbatim when writing.
+                prefix = 'application/x-qt-windows-mime;value="'
+                if self._windows and kind.lower().startswith(prefix):
+                    if not kind.endswith('"'):
+                        raise ValueError('Indexed Windows clipboard formats must remain with their owner')
+                    kind = kind[len(prefix):-1]
                 formats.append((kind, bytes(value)))
         return formats, image
 

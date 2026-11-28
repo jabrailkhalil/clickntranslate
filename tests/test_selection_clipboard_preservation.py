@@ -367,3 +367,25 @@ def test_unavailable_rich_clipboard_stops_before_select_all_or_temporary_writes(
     select_all.assert_not_called()
     copy.assert_not_called()
     provider.assert_not_called()
+
+
+def test_qt_five_restores_office_data_under_its_original_windows_registration(app, isolated_clipboard, monkeypatch):
+    from PyQt5 import QtCore
+    from clipboard_formats import application_clipboard_formats
+
+    service = application_clipboard_formats()
+    monkeypatch.setattr(service, '_windows', True)
+    original = QtCore.QMimeData()
+    original.setText('Cell')
+    first = 'application/x-qt-windows-mime;value="Rich Text Format"'
+    second = 'application/x-qt-windows-mime;value="Custom Spreadsheet Row"'
+    original.setData(first, b'{RTF}')
+    original.setData(second, bytes((0, 13, 20)))
+    isolated_clipboard.setMimeData(original)
+    snapshot = service.capture()
+    isolated_clipboard.setText('Temporary')
+    assert service.restore(snapshot, lambda: True)
+    restored = isolated_clipboard.mimeData()
+    assert restored.formats() == ['text/plain', 'Rich Text Format', 'Custom Spreadsheet Row']
+    assert bytes(restored.data('Rich Text Format')) == b'{RTF}'
+    assert bytes(restored.data('Custom Spreadsheet Row')) == bytes((0, 13, 20))
