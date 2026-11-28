@@ -3,12 +3,14 @@ package dev.clickn.translate.update
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.SystemClock
 import androidx.core.app.NotificationCompat
+import androidx.core.content.FileProvider
 import androidx.core.content.pm.PackageInfoCompat
 import androidx.hilt.work.HiltWorker
 import androidx.work.ForegroundInfo
@@ -55,6 +57,16 @@ internal fun ByteArray.hex() = joinToString("") { "%02x".format(it) }
 
 internal fun verifiedApkFile(context: Context, apk: ReleaseApk) =
     File(context.cacheDir, "app-updates/ready/${apk.sha256}.apk")
+
+internal fun verifiedInstallerIntent(context: Context, apk: ReleaseApk): Intent {
+    val file = verifiedApkFile(context, apk)
+    if (!file.isFile) throw InvalidApk()
+    file.inputStream().buffered().use { copyVerified(it, null, apk) {} }
+    verifyArchive(context, file, apk)
+    val uri = FileProvider.getUriForFile(context, "${context.packageName}.logfileprovider", file)
+    return Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/vnd.android.package-archive")
+        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+}
 
 internal data class ApkIdentity(val packageName: String, val version: String?, val code: Long, val signers: Set<String>)
 

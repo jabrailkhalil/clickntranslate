@@ -2,7 +2,6 @@ package dev.clickn.translate.update
 
 import android.content.Context
 import android.content.Intent
-import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.Constraints
@@ -229,15 +228,7 @@ class UpdateViewModel @Inject constructor(
         installing = true
         viewModelScope.launch {
             try {
-                val intent = withContext(Dispatchers.IO) {
-                    val file = verifiedApkFile(appContext, apk)
-                    if (!file.isFile) throw InvalidApk()
-                    file.inputStream().buffered().use { copyVerified(it, null, apk) {} }
-                    verifyArchive(appContext, file, apk)
-                    val uri = FileProvider.getUriForFile(appContext, "${appContext.packageName}.logfileprovider", file)
-                    Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/vnd.android.package-archive")
-                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                }
+                val intent = withContext(Dispatchers.IO) { verifiedInstallerIntent(appContext, apk) }
                 if (dialogOpen && _state.value == State.Ready(apk)) { launchInstaller(intent); reset() }
             } catch (cancelled: CancellationException) {
                 throw cancelled

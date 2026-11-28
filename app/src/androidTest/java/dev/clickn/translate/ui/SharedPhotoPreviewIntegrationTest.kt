@@ -80,6 +80,18 @@ class SharedPhotoPreviewIntegrationTest {
         compose.onNode(matcher).assertIsDisplayed()
     }
 
+    private fun saveFrame(name: String) {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        compose.waitForIdle()
+        instrumentation.waitForIdleSync()
+        val frame = requireNotNull(instrumentation.uiAutomation.takeScreenshot())
+        try {
+            File(instrumentation.targetContext.filesDir, "qa-$name.png").outputStream().use {
+                assertTrue(frame.compress(Bitmap.CompressFormat.PNG, 100, it))
+            }
+        } finally { frame.recycle() }
+    }
+
     @Test fun largeBatchStillAsksForConfirmationAfterActivityRecreation() {
         val count = GalleryTranslationWorkPolicy.FOREGROUND_IMAGE_THRESHOLD
         withSharedPhotos(count) { strings, activity ->
@@ -89,7 +101,7 @@ class SharedPhotoPreviewIntegrationTest {
             val summary = hasText(strings.getString(R.string.gallery_confirm_create_dialog_message, count)) and hasAnyAncestor(isDialog())
             display(summary)
             activity.recreate()
-            display(summary)
+            try { display(summary) } finally { saveFrame("gallery-review-recreated") }
             compose.onNode(hasText(strings.getString(android.R.string.cancel)) and hasAnyAncestor(isDialog())).performClick()
             display(create)
         }
@@ -114,10 +126,11 @@ class SharedPhotoPreviewIntegrationTest {
                 compose.onNode(create).performClick()
                 display(busy)
                 activity.recreate()
-                display(busy)
+                try { display(busy) } finally { saveFrame("gallery-preparing-recreated") }
                 compose.onNode(create).assertDoesNotExist()
                 activity.onActivity { it.onBackPressedDispatcher.onBackPressed() }
                 display(hasText(strings.getString(R.string.mobile_nav_screen)) and hasClickAction())
+                saveFrame("gallery-import-cancelled")
             } finally {
                 release.complete(Unit)
                 runBlocking { job.cancelAndJoin() }
