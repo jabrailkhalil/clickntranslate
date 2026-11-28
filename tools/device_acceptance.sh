@@ -7,8 +7,22 @@ if [[ ! "$serial" =~ ^emulator-[0-9]+$ ]] || [[ "$(adb -s "$serial" shell getpro
   echo "Device acceptance requires an emulator" >&2
   exit 2
 fi
+mode=${2:-full}
 report=build/device-acceptance
+case "$mode" in
+  full) ;;
+  native-16k) report="$report/native-16k" ;;
+  *) echo "Unknown acceptance mode: $mode" >&2; exit 2 ;;
+esac
 mkdir -p "$report"
+page_size=$(adb -s "$serial" shell getconf PAGE_SIZE | tr -d '\r')
+sdk=$(adb -s "$serial" shell getprop ro.build.version.sdk | tr -d '\r')
+printf 'page_size=%s\nsdk=%s\n' "$page_size" "$sdk" > "$report/memory-pages.txt"
+if [[ "$mode" == native-16k && "$page_size" != 16384 ]]; then
+  echo "The native acceptance device reported $page_size bytes per page" >&2
+  exit 1
+fi
+sha256sum app/build/outputs/apk/debug/app-debug.apk > "$report/apk.sha256"
 adb -s "$serial" shell getprop ro.build.fingerprint > "$report/system.txt"
 adb -s "$serial" shell getprop ro.product.cpu.abilist >> "$report/system.txt"
 adb -s "$serial" shell wm size >> "$report/system.txt"
@@ -50,8 +64,27 @@ if result["passed"] == 0 or (name != "device-suite" and result["skipped"]):
 PY
 }
 
+run_native_ocr() {
+  local ocr paddle_checks device_files file
+  run_tests arabic-ocr -e class dev.clickn.translate.ocr.TesseractArabicOcrIntegrationTest -e downloadModels true -e stageOwnedProbe true || failure=1
+  run_tests native-page -e class dev.clickn.translate.ocr.TesseractOwnedScreenProbeTest -e tessProbe true || failure=1
+  ocr=dev.clickn.translate.ocr
+  paddle_checks="$ocr.PaddleArabicParagraphIntegrationTest,$ocr.DBPostprocessorIntegrationTest"
+  paddle_checks+=",$ocr.ArabicMarksIntegrationTest#aSecondDetachedMarkBelowAFathaPreventsShaddaRemoval"
+  run_tests paddle-arabic -e class "$paddle_checks" -e paddleArabic true -e downloadModels true || failure=1
+  device_files=/sdcard/Android/data/dev.clickn.translate.debug/files
+  for file in "qa/arabic-english-ocr-result-api${sdk}.json" tess-probe-result/result.json paddle-arabic-qa/result.json; do
+    adb -s "$serial" pull "$device_files/$file" "$report/${file%/*}-blocks.json" || echo "OCR diagnostic unavailable: $file" >&2
+  done
+}
+
 # Retain independent results even if one scenario fails.
 failure=0
+if [[ "$mode" == native-16k ]]; then
+  run_tests onnx-identity -e class dev.clickn.translate.ocr.OnnxRuntimeIdentityIntegrationTest || failure=1
+  run_native_ocr
+  exit "$failure"
+fi
 python3 tools/mobile_onboarding_smoke.py --serial "$serial" --output "$report/onboarding" || failure=1
 run_tests update-dialog -e class dev.clickn.translate.ui.UpdateDialogSurfaceIntegrationTest -e updateSurface true || failure=1
 if adb -s "$serial" shell run-as dev.clickn.translate.debug test -f files/qa-update-320dp-large-rtl.png; then
@@ -89,14 +122,5 @@ adb -s "$serial" logcat -d -s ProjectionConsentTest:I > "$report/consent-timing.
 if [[ -f "$report/screen-consent.json" ]]; then
   adb -s "$serial" exec-out run-as dev.clickn.translate.debug cat files/qa-projection-restart.png > "$report/projection-restart.png"
 fi
-run_tests arabic-ocr -e class dev.clickn.translate.ocr.TesseractArabicOcrIntegrationTest -e downloadModels true -e stageOwnedProbe true || failure=1
-run_tests native-page -e class dev.clickn.translate.ocr.TesseractOwnedScreenProbeTest -e tessProbe true || failure=1
-ocr=dev.clickn.translate.ocr
-paddle_checks="$ocr.PaddleArabicParagraphIntegrationTest,$ocr.DBPostprocessorIntegrationTest"
-paddle_checks+=",$ocr.ArabicMarksIntegrationTest#aSecondDetachedMarkBelowAFathaPreventsShaddaRemoval"
-run_tests paddle-arabic -e class "$paddle_checks" -e paddleArabic true -e downloadModels true || failure=1
-device_files=/sdcard/Android/data/dev.clickn.translate.debug/files
-for file in qa/arabic-english-ocr-result-api35.json tess-probe-result/result.json paddle-arabic-qa/result.json; do
-  adb -s "$serial" pull "$device_files/$file" "$report/${file%/*}-blocks.json" || echo "OCR diagnostic unavailable: $file" >&2
-done
+run_native_ocr
 exit "$failure"
