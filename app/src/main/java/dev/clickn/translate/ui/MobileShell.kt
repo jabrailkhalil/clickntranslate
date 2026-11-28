@@ -782,7 +782,9 @@ internal fun ProviderSheet(editor: ProviderEditSession, viewModel: MobileViewMod
                     }
                 }
             } }
-            item { TextButton(onClick = { saveAndConfirm(openAdvanced = true) }, enabled = !saving && !testing,
+            item { TextButton(onClick = {
+                if (validConfig) saveAndConfirm(openAdvanced = true) else onAdvanced()
+            }, enabled = !saving && !testing,
                 modifier = Modifier.fillMaxWidth().testTag("provider-advanced")) {
                 Text(stringResource(if (local) R.string.mobile_manage_models else R.string.mobile_advanced))
             } }
