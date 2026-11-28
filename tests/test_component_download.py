@@ -7,6 +7,7 @@ import threading
 
 import pytest
 
+import component_store
 from component_catalog import ComponentError
 from component_download import ComponentDownloader
 from component_store import ComponentStore
@@ -62,6 +63,56 @@ def artifact_server(data, mode='normal'):
 
 def specification(data, *urls):
     return hashlib.sha256(data).hexdigest(), {'size':len(data), 'urls':list(urls)}
+
+
+@pytest.mark.parametrize('location', ['verified-object', 'complete-partial', 'fresh-download'])
+def test_cancellation_while_hashing_stops_reading_and_reuses_complete_bytes(tmp_path, monkeypatch, location):
+    from pathlib import Path
+
+    store = ComponentStore(tmp_path)
+    chunk = 1024 * 1024
+    data = b'01234567' * (3 * chunk // 8)
+    digest, item = specification(data, 'https://example.org/one', 'https://example.org/two')
+    cached = store.object_path(digest)
+    partial = store.root / 'downloads' / digest
+    target = cached if location == 'verified-object' else partial
+    if location != 'fresh-download':
+        target.parent.mkdir(parents=True)
+        target.write_bytes(data)
+    reads, downloads = [], []
+
+    @contextmanager
+    def observe_open(path, mode):
+        with open(path, mode) as stream:
+            if Path(path) != target or mode != 'rb':
+                yield stream
+                return
+            class Reader:
+                def read(self, count):
+                    block = stream.read(count)
+                    if block:
+                        reads.append(len(block))
+                    return block
+            yield Reader()
+
+    def download(url, destination):
+        downloads.append(url)
+        Path(destination).write_bytes(data)
+
+    def check_cancel():
+        if reads:
+            raise InterruptedError('stop verifying this model')
+
+    with store.lock():
+        monkeypatch.setattr(component_store, 'open', observe_open, raising=False)
+        with pytest.raises(InterruptedError, match='stop verifying'):
+            store.obtain(digest, item, download, check_cancel)
+        assert sum(reads) <= chunk and reads
+        assert target.is_file()
+        assert cached.exists() == (location == 'verified-object')
+        result = store.obtain(digest, item, download, lambda: None)
+    assert result.read_bytes() == data
+    assert downloads == (item['urls'][:1] if location == 'fresh-download' else [])
 
 
 def test_canceled_download_resumes_exact_prefix_and_checks_full_digest(tmp_path):

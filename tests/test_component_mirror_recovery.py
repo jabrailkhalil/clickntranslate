@@ -1,4 +1,4 @@
-"""A failed mirror's unverified prefix cannot disable a healthy approved mirror."""
+"""A failed mirror's unverified bytes cannot disable a healthy approved mirror."""
 from contextlib import contextmanager
 import hashlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -9,7 +9,38 @@ from unittest import mock
 import pytest
 
 from component_download import ComponentDownloader
+from component_catalog import ComponentError
 from component_store import ComponentStore
+
+
+@pytest.mark.parametrize('second_current', [True, False], ids=['mirror-has-approved-model', 'both-out-of-date'])
+def test_full_outdated_file_can_be_retried_only_against_another_approved_mirror(tmp_path, second_current):
+    from pathlib import Path
+
+    approved = b'model-current'
+    outdated = b'model-archive'
+    assert len(approved) == len(outdated)
+    digest = hashlib.sha256(approved).hexdigest()
+    urls = ['https://primary.example/model', 'https://secondary.example/model']
+    store = ComponentStore(tmp_path)
+    called = []
+
+    def download(url, destination):
+        called.append(url)
+        assert not Path(destination).exists()
+        data = approved if second_current and url == urls[1] else outdated
+        Path(destination).write_bytes(data)
+
+    with store.lock():
+        item = {'size': len(approved), 'urls': urls}
+        if second_current:
+            result = store.obtain(digest, item, download, lambda: None)
+            assert result.read_bytes() == approved
+        else:
+            with pytest.raises(ComponentError, match='checksum_mismatch'):
+                store.obtain(digest, item, download, lambda: None)
+            assert not store.object_path(digest).exists()
+    assert called == urls
 
 
 @contextmanager

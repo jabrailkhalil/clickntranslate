@@ -143,7 +143,7 @@ def install(download, *, root=None, channel=None, legacy_model=None, check_cance
         if not old and legacy_model and not legacy_disabled(store.root):
             source = Path(legacy_model)
             expected = catalog['artifacts'][model['sha256']]
-            if source.stat().st_size != expected['size'] or file_digest(source) != model['sha256']:
+            if source.stat().st_size != expected['size'] or file_digest(source, check_cancel) != model['sha256']:
                 raise ComponentError('custom_model_not_approved', 'Hy-MT')
             store.obtain(model['sha256'], expected, lambda _, path: _copy(source, path, check_cancel), check_cancel)
         return store.install(catalog, bundle, download,

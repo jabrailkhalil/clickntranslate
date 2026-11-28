@@ -96,10 +96,14 @@ def _file_lock(path, shared=False):
         stream.close()
 
 
-def file_digest(path):
+def file_digest(path, check_cancel=lambda: None):
     digest = hashlib.sha256()
     with open(path, 'rb') as stream:
-        for block in iter(lambda: stream.read(1024 * 1024), b''):
+        while True:
+            check_cancel()
+            block = stream.read(1024 * 1024)
+            if not block:
+                break
             digest.update(block)
     return digest.hexdigest()
 
@@ -258,7 +262,7 @@ class ComponentStore:
         path = self.object_path(digest)
         if path.is_symlink():
             raise ComponentError('invalid_artifact', 'cache link')
-        if path.is_file() and path.stat().st_size == artifact['size'] and file_digest(path) == digest:
+        if path.is_file() and path.stat().st_size == artifact['size'] and file_digest(path, check_cancel) == digest:
             return path
         path.parent.mkdir(parents=True, exist_ok=True)
         partial = self.root / 'downloads' / digest
@@ -266,13 +270,14 @@ class ComponentStore:
         if partial.is_symlink():
             raise ComponentError('invalid_artifact', 'download link')
         if partial.is_file() and partial.stat().st_size == artifact['size']:
-            if file_digest(partial) == digest:
+            if file_digest(partial, check_cancel) == digest:
                 os.replace(partial, path)
                 ComponentDownloader.complete(partial)
                 return path
             partial.unlink()
             ComponentDownloader.complete(partial)
         last_error = None
+        verification_failed = False
         for url in artifact['urls']:
             check_cancel()
             try:
@@ -280,17 +285,25 @@ class ComponentStore:
                     download.artifact(url, str(partial), artifact)
                 else:
                     download(url, str(partial))
-                check_cancel()
-                if partial.stat().st_size != artifact['size'] or file_digest(partial) != digest:
-                    partial.unlink(missing_ok=True)
-                    raise ComponentError('checksum_mismatch', digest)
-                os.replace(partial, path)
-                return path
             except ComponentError:
                 raise
             except Exception as exc:
                 check_cancel()  # cancellation is never swallowed as a mirror error
                 last_error = exc
+                continue
+            check_cancel()
+            if not partial.is_file():
+                last_error = FileNotFoundError(partial)
+                continue
+            if partial.stat().st_size != artifact['size'] or file_digest(partial, check_cancel) != digest:
+                partial.unlink(missing_ok=True)
+                ComponentDownloader.complete(partial)
+                verification_failed = True
+                continue
+            os.replace(partial, path)
+            return path
+        if verification_failed:
+            raise ComponentError('checksum_mismatch', digest)
         raise ComponentError('download_failed', type(last_error).__name__) from last_error
 
     @staticmethod
