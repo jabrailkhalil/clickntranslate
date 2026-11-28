@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import ctypes
 import difflib
+from functools import partial
 import logging
 import os
 import re
@@ -2404,14 +2405,13 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
             self._scan_once()
 
     def _layout_translation_blocks(self):
-        from ocr import FullScreenTranslateOverlay
+        from ocr import FullScreenTranslateOverlay, _layout_screen_translation_blocks
         signature = (tuple(self._blocks), self.width(), self.height(), self._ocr_scale_x,
                      self._ocr_scale_y, self.logicalDpiX(), self.logicalDpiY(),
                      self.devicePixelRatioF(), self.config.get('game_show_original_text', False))
         if getattr(self, '_render_plan_signature', None) == signature:
             return self._render_plan
         rendered_blocks = []
-        source_rects = []
         for x, y, width, height, source, translated in self._blocks:
             source_rect = QtCore.QRectF(
                 x / self._ocr_scale_x,
@@ -2419,27 +2419,11 @@ class GameFullscreenOverlay(QtWidgets.QWidget):
                 width / self._ocr_scale_x,
                 height / self._ocr_scale_y,
             )
-            source_rects.append(source_rect)
             display = f'{source}  →  {translated}' if self.config.get('game_show_original_text', False) else translated
             rendered_blocks.append((source_rect, source, display))
 
-        occupied = []
-        painted_blocks = []
-        for block_index, (source_rect, source, translated) in enumerate(rendered_blocks):
-            layout = FullScreenTranslateOverlay._translation_block_layout(
-                self,
-                source_rect,
-                source,
-                translated,
-                occupied=occupied,
-                obstacles=[
-                    obstacle
-                    for obstacle_index, obstacle in enumerate(source_rects)
-                    if obstacle_index != block_index
-                ],
-            )
-            occupied.append(layout[0])
-            painted_blocks.append((source_rect, source, translated, layout))
+        painted_blocks = _layout_screen_translation_blocks(
+            rendered_blocks, self.height(), partial(FullScreenTranslateOverlay._translation_block_layout, self))
         self._render_plan_signature, self._render_plan = signature, painted_blocks
         return painted_blocks
 

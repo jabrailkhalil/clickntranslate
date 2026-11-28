@@ -98,6 +98,66 @@ def test_failed_windows_bitmap_conversion_completes_with_an_initialization_error
     assert worker.error_message == ocr.ocr_ui_text('en', 'ocr_init_failed')
 
 
+def test_unchanged_fullscreen_repaints_reuse_the_layout_and_identical_pixels(controlled_overlay, monkeypatch):
+    from PyQt5 import QtGui
+    overlay = controlled_overlay
+    overlay.tgt_lang = 'ar'
+    overlay.resize(640, 360)
+    blocks = [(QtCore.QRectF(18, 36 + row * 26, 92, 18), 'Source', 'بغداد ' + str(row)) for row in range(6)]
+    overlay._apply_translation_result(overlay._translation_run_id, blocks, '')
+    layout = mock.Mock(wraps=overlay._translation_block_layout)
+    monkeypatch.setattr(overlay, '_translation_block_layout', layout)
+
+    def render():
+        image = QtGui.QImage(overlay.size(), QtGui.QImage.Format_ARGB32_Premultiplied)
+        image.fill(QtCore.Qt.transparent)
+        overlay.render(image, flags=QtWidgets.QWidget.DrawWindowBackground)
+        return image
+
+    first = render()
+    assert layout.call_count == len(blocks)
+    assert render() == first
+    assert layout.call_count == len(blocks)
+    overlay.resize(550, 340)
+    render()
+    assert layout.call_count == 2 * len(blocks)
+    changed = [(rect, original, 'A new translation') for rect, original, _text in blocks]
+    before = render()
+    overlay._apply_translation_result(overlay._translation_run_id, changed, '')
+    assert render() != before
+    assert layout.call_count == 3 * len(blocks)
+    old_dpi = overlay.logicalDpiX()
+    monkeypatch.setattr(overlay, 'logicalDpiX', lambda: old_dpi + 24)
+    render()
+    assert layout.call_count == 4 * len(blocks)
+
+
+def test_indexed_layout_matches_the_full_obstacle_scan_across_fractional_rows(controlled_overlay):
+    overlay = controlled_overlay
+    overlay.resize(770, 500)
+    rects = [QtCore.QRectF(18 + col * 144.25, 26.25 + row * 29.8, 81.5, 15.3)
+             for row in range(14) for col in range(5)]
+    rects.extend([QtCore.QRectF(421.5, 25.5, 30.2, 145.5), QtCore.QRectF(-22, 30.1, 92, 16),
+                  QtCore.QRectF(600, 169, 50, 220), QtCore.QRectF(901, -220, 45, 31),
+                  QtCore.QRectF(9, 31.9, 75, 13.2), QtCore.QRectF(10, 32, 0, 15)])
+    blocks = [(rect, 'Source', ('ترجمة عربية طويلة', 'A longer translation')[i % 2]) for i, rect in enumerate(rects)]
+    occupied, expected = [], []
+    for i, (rect, source, text) in enumerate(blocks):
+        layout = overlay._translation_block_layout(rect, source, text, occupied=occupied,
+                                                   obstacles=rects[:i] + rects[i + 1:])
+        occupied.append(layout[0])
+        expected.append((rect, source, text, layout))
+
+    counts = []
+
+    def layout_with_neighbours(rect, source, text, *, obstacles):
+        counts.append(len(obstacles))
+        return overlay._translation_block_layout(rect, source, text, obstacles=obstacles)
+
+    assert ocr._layout_screen_translation_blocks(blocks, overlay.height(), layout_with_neighbours) == expected
+    assert sum(counts) < len(blocks) * (len(blocks) - 1) // 2
+
+
 def test_fullscreen_provider_finishing_after_close_exits_without_touching_the_deleted_overlay(
         application, controlled_overlay, monkeypatch):
     overlay = controlled_overlay

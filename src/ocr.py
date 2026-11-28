@@ -6624,6 +6624,46 @@ def create_position_ocr_worker(qimage, language_code, engine, *, cancel_check=No
     return FullScreenOCRWorker(QtGui.QImage(qimage), language_code, engine=engine, cancel_check=cancel_check)
 
 
+_SCREEN_TEXT_PADDING = 2.0
+
+
+def _layout_screen_translation_blocks(blocks, viewport_height, layout_block):
+    """Check only nearby rows when expanding a translated label horizontally."""
+    band_height = 32
+    rows = {}
+    rectangles = []
+
+    def row_numbers(rect, padding=0.0):
+        top, bottom = rect.top() - padding, rect.bottom() + padding
+        if rect.isEmpty() or not math.isfinite(top) or not math.isfinite(bottom):
+            return ()
+        top = max(0.0, top)
+        bottom = min(float(viewport_height), bottom)
+        if top > bottom:
+            return ()
+        return range(int(top) // band_height, int(bottom) // band_height + 1)
+
+    def add(rect):
+        index = len(rectangles)
+        rect = QtCore.QRectF(rect).normalized()
+        rectangles.append(rect)
+        for row in row_numbers(rect):
+            rows.setdefault(row, []).append(index)
+
+    for rect, _source, _translated in blocks:
+        add(rect)
+    painted = []
+    for index, (rect, source, translated) in enumerate(blocks):
+        neighbours = set()
+        for row in row_numbers(rect, _SCREEN_TEXT_PADDING):
+            neighbours.update(rows.get(row, ()))
+        neighbours.discard(index)
+        layout = layout_block(rect, source, translated, obstacles=[rectangles[i] for i in neighbours])
+        add(layout[0])
+        painted.append((rect, source, translated, layout))
+    return painted
+
+
 class FullScreenTranslateOverlay(QWidget):
     """Overlay that translates all visible text on screen and shows translations at original positions."""
 
@@ -6636,6 +6676,7 @@ class FullScreenTranslateOverlay(QWidget):
         self.setCursor(QtCore.Qt.ArrowCursor)
 
         self.translated_blocks = []  # list of (QRectF, original, translated)
+        self._layout_cache = None
         self.loading = False
         self.error_message = None
         self._lines_data = []
@@ -6839,6 +6880,7 @@ class FullScreenTranslateOverlay(QWidget):
         self._translation_run_id += 1
         self._pending_translation_pair = None
         self.translated_blocks.clear()
+        self._layout_cache = None
         for worker in list(self._ocr_workers):
             try:
                 worker.requestInterruption()
@@ -7024,6 +7066,7 @@ class FullScreenTranslateOverlay(QWidget):
         if run_id != self._translation_run_id:
             return
         self.translated_blocks = list(blocks or [])
+        self._layout_cache = None
         self.error_message = str(error_message or "") or None
         self.loading = False
         notify_current_activity('error' if self.error_message or not self.translated_blocks else 'success',
@@ -7054,26 +7097,12 @@ class FullScreenTranslateOverlay(QWidget):
         elif self.error_message:
             self._paint_center_msg(painter, self.error_message, QtGui.QColor(80, 20, 20, 230))
         elif self.translated_blocks:
-            source_rects = [
-                QtCore.QRectF(block[0]).normalized()
-                for block in self.translated_blocks
-            ]
-            occupied = []
-            painted_blocks = []
-            for block_index, (rect_f, original, translated) in enumerate(self.translated_blocks):
-                layout = self._translation_block_layout(
-                    rect_f,
-                    original,
-                    translated,
-                    occupied=occupied,
-                    obstacles=[
-                        source_rect
-                        for source_index, source_rect in enumerate(source_rects)
-                        if source_index != block_index
-                    ],
-                )
-                occupied.append(layout[0])
-                painted_blocks.append((rect_f, original, translated, layout))
+            metrics = (self.width(), self.height(), self.logicalDpiX(), self.logicalDpiY(),
+                       self.devicePixelRatioF(), self.font().key())
+            if self._layout_cache is None or self._layout_cache[0] != metrics:
+                self._layout_cache = metrics, _layout_screen_translation_blocks(
+                    self.translated_blocks, self.height(), self._translation_block_layout)
+            painted_blocks = self._layout_cache[1]
 
             # Paint every replacement background first.  Text is painted in a
             # second pass so an adjacent background can never erase glyphs that
@@ -7135,7 +7164,7 @@ class FullScreenTranslateOverlay(QWidget):
         # or translated block exists.
         from text_direction import directional_text_flags, single_line_text
         text = single_line_text(text)
-        pad = 2.0
+        pad = _SCREEN_TEXT_PADDING
         screen_margin = 8.0
         bounds = QtCore.QRectF(
             screen_margin,
