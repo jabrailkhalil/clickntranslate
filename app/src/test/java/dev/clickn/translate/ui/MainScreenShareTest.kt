@@ -85,8 +85,8 @@ class MainScreenShareTest {
     fun oneTimePrompt_isDeferredAndConsumedBeforeDisplay() {
         val source = sourceFile("src/main/java/dev/clickn/translate/ui/MainScreen.kt").readText()
         val promptDialog = source
-            .substringAfter("private fun SharePromptDialog(")
-            .substringBefore("private fun UpdateResultDialog(")
+            .substringAfter("fun SharePromptDialog(", "")
+            .substringBefore("\n}")
 
         data class Case(
             val name: String,

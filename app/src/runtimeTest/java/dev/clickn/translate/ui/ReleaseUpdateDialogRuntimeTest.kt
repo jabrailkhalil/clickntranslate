@@ -1,7 +1,10 @@
 package dev.clickn.translate.ui
 
+import android.content.Context
+import android.graphics.Bitmap
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.SemanticsActions
@@ -12,12 +15,12 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
-import android.content.Context
 import dev.clickn.translate.ClickTranslateApp
 import dev.clickn.translate.R
 import dev.clickn.translate.update.ReleaseApk
 import dev.clickn.translate.update.UpdateInfo
 import dev.clickn.translate.update.UpdateViewModel
+import java.io.File
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -82,27 +85,51 @@ class ReleaseUpdateDialogRuntimeTest {
     @Config(qualifiers = "ru-rRU-w320dp-h800dp")
     fun narrowScreenWithLargeRtlTextCanReadAndActivateEveryUpdateAction() {
         showUpdate(fontScale = 1.7f, direction = LayoutDirection.Rtl)
+        val dialogNode = compose.onNodeWithTag(UPDATE_DIALOG_TAG)
+        val output = File("build/reports/ui-audit/update-320dp-large-rtl.png")
+        output.parentFile.mkdirs()
+        val bitmap = dialogNode.captureToImage().asAndroidBitmap()
+        output.outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+
         val context = ApplicationProvider.getApplicationContext<Context>()
         val buttons = listOf(R.string.update_dialog_btn_skip, R.string.update_dialog_btn_later, R.string.update_dialog_btn_download)
+        val minimumTouchSize = with(compose.density) { 48.dp.toPx() } - 1f
         val bounds = buttons.map { resource ->
             val label = context.getString(resource)
             val button = compose.onNodeWithText(label).assertIsDisplayed().assertHasClickAction()
+            val touchBounds = button.fetchSemanticsNode().touchBoundsInRoot
+            assertTrue("Small touch target for $label: $touchBounds",
+                touchBounds.height >= minimumTouchSize && touchBounds.width >= minimumTouchSize)
             compose.onNodeWithText(label, useUnmergedTree = true)
                 .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { read ->
                     val results = mutableListOf<TextLayoutResult>()
                     assertTrue(read(results))
                     val text = results.single()
-                    assertFalse("$label overflows its bounds", text.hasVisualOverflow)
-                    assertTrue("$label was compressed into a column of letters", text.lineCount <= 2)
+                    val detail = "$label: size=${text.size}, paragraph=${text.multiParagraph.width}x${text.multiParagraph.height}, " +
+                        "lines=${text.lineCount}, constraints=${text.layoutInput.constraints}"
+                    assertFalse("Clipped vertically: $detail", text.didOverflowHeight)
+                    assertTrue("Too many lines: $detail", text.lineCount <= 2)
+                    for (line in 0 until text.lineCount) assertFalse("Ellipsis: $detail", text.isLineEllipsized(line))
+                    // The String semantics path can remeasure its paragraph at the parent width.
+                    // Inspect the ink positions against the actual measurement of this Text.
+                    label.forEachIndexed { offset, char ->
+                        if (!char.isWhitespace()) {
+                            val glyph = text.getBoundingBox(offset)
+                            assertTrue("Clipped glyph $offset at $glyph: $detail", glyph.left >= -0.5f &&
+                                glyph.right <= text.size.width + 0.5f && glyph.top >= -0.5f &&
+                                glyph.bottom <= text.size.height + 0.5f)
+                        }
+                    }
                 }
-            button.performClick()
-            button.fetchSemanticsNode().boundsInRoot
+            button.performTouchInput { click() }
+            touchBounds
         }
-        val dialog = compose.onNodeWithTag(UPDATE_DIALOG_TAG).fetchSemanticsNode().boundsInRoot
-        bounds.forEach { box ->
+        val dialog = dialogNode.fetchSemanticsNode().boundsInRoot
+        bounds.forEachIndexed { index, box ->
             assertTrue("Action outside the dialog: $box", box.width > 0f && box.height > 0f &&
                 box.left >= dialog.left - 1 && box.right <= dialog.right + 1 &&
                 box.top >= dialog.top - 1 && box.bottom <= dialog.bottom + 1)
+            bounds.take(index).forEach { other -> assertFalse("Overlapping actions: $box and $other", box.overlaps(other)) }
         }
         assertTrue("Expected actions to flow onto more than one row", bounds.map { it.top }.distinct().size > 1)
         assertEquals(listOf("skip:1.8.3", "later", "download"), actions)
