@@ -19,18 +19,26 @@ PORTAL = '/org/freedesktop/portal/desktop'
 
 
 def dbus_call(destination, path, method, *arguments):
-    return subprocess.check_output(['gdbus', 'call', '--session', '--dest', destination,
-                                    '--object-path', path, '--method', method, *arguments],
-                                   text=True, timeout=35).strip()
+    reply = subprocess.run(['gdbus', 'call', '--session', '--dest', destination,
+                            '--object-path', path, '--method', method, *arguments],
+                           text=True, capture_output=True, timeout=35)
+    if reply.returncode:
+        raise RuntimeError(f'{destination} {method}: {reply.stderr.strip()}')
+    return reply.stdout.strip()
 
 
 def private_check(output, report):
+    # The private bus launches GNOME's real backend on Xvfb. On Wayland
+    # that backend requires Mutter's privileged service-connection protocol.
+    # The tested Qt client still connects to the synthetic Sway desktop.
+    os.environ['XDG_SESSION_TYPE'] = 'wayland'
     sys.path.insert(0, str(ROOT / 'src'))
     from PyQt5.QtWidgets import QApplication
     import linux_capture
 
     app = QApplication([])
     report['qt_platform'] = app.platformName()
+    report['backend_display'] = 'GNOME Screenshot on private Xvfb'
     assert app.platformName().startswith('wayland')
     report['backend_version'] = dbus_call('org.freedesktop.impl.portal.desktop.gnome', PORTAL,
                                           'org.freedesktop.DBus.Properties.Get',
@@ -92,8 +100,8 @@ def launch_private_session(output):
         raise RuntimeError('Run this probe within the disposable Wayland QA session')
     with tempfile.TemporaryDirectory(prefix='cnt-portal-denied-') as temporary:
         root = Path(temporary)
-        env = dict(os.environ, XDG_CURRENT_DESKTOP='GNOME', XDG_SESSION_TYPE='wayland',
-                   GDK_BACKEND='wayland', QT_QPA_PLATFORM='wayland', WAYLAND_DISPLAY='wayland-qa')
+        env = dict(os.environ, XDG_CURRENT_DESKTOP='GNOME', XDG_SESSION_TYPE='x11',
+                   GDK_BACKEND='x11', QT_QPA_PLATFORM='wayland', WAYLAND_DISPLAY='wayland-qa')
         for name in ('XDG_CONFIG_HOME', 'XDG_DATA_HOME', 'XDG_CACHE_HOME', 'XDG_RUNTIME_DIR', 'HOME'):
             folder = root / name.lower()
             folder.mkdir(mode=0o700)
@@ -107,7 +115,8 @@ def launch_private_session(output):
             '[preferred]\ndefault=gtk\norg.freedesktop.impl.portal.Screenshot=gnome\n'
             'org.freedesktop.impl.portal.Access=gtk\n', encoding='utf-8')
         try:
-            return subprocess.run(['dbus-run-session', '--', sys.executable, __file__,
+            return subprocess.run(['xvfb-run', '-a', '-s', '-screen 0 640x480x24',
+                                   'dbus-run-session', '--', sys.executable, __file__,
                                    '--private-check', '--output', str(output)], env=env, timeout=100).returncode
         finally:
             # A D-Bus-activated document portal can momentarily outlive the private bus.

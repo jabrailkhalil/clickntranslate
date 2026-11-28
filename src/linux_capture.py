@@ -331,17 +331,24 @@ def crop_to_screen(pixmap, screen):
         return pixmap
     if ratio <= 0:
         return pixmap
-    expected_width = int(round(geometry.width() * ratio))
-    expected_height = int(round(geometry.height() * ratio))
-    if pixmap.width() <= expected_width and pixmap.height() <= expected_height:
+    # A compositor can round 853.33 logical pixels to 853. Dividing the
+    # composite width by that integer changes which physical pixels are
+    # selected. Fractional Wayland scales use units of 1/120. Accept that
+    # scale only when both dimensions agree within one physical pixel.
+    candidate = round(ratio * 120) / 120
+    if (candidate > 0 and abs(desktop.width() * candidate - pixmap.width()) <= 1
+            and abs(desktop.height() * candidate - pixmap.height()) <= 1):
+        ratio = candidate
+    from capture_regions import scaled_pixel_rect
+    region = scaled_pixel_rect(geometry.translated(-desktop.topLeft()), ratio)
+    region = region.intersected(pixmap.rect())
+    if region.isEmpty():
+        from PyQt5.QtGui import QPixmap
+        return QPixmap()
+    if region == pixmap.rect():
         pixmap.setDevicePixelRatio(ratio)
         return pixmap
-    result = pixmap.copy(
-        int(round((geometry.x() - desktop.x()) * ratio)),
-        int(round((geometry.y() - desktop.y()) * ratio)),
-        expected_width,
-        expected_height,
-    )
+    result = pixmap.copy(region)
     # PNG has no Qt DPR metadata. Selection overlays use that metadata to map
     # logical coordinates back to pixels. A compositor may capture every output
     # at its highest scale, so screen.devicePixelRatio() is not sufficient.

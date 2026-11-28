@@ -25,7 +25,7 @@ def controlled_overlay(application, monkeypatch):
     from PyQt5 import QtGui
     pixels = QtGui.QPixmap(160, 90)
     pixels.fill(QtCore.Qt.white)
-    monkeypatch.setattr(ocr, 'grab_screen_pixmap', lambda *_: pixels)
+    monkeypatch.setattr(ocr, 'grab_screen_pixmap', mock.Mock(return_value=pixels))
     monkeypatch.setattr(ocr, 'installed_ocr_language_codes', lambda **_: ['en', 'ru'])
     monkeypatch.setattr(ocr, 'get_cached_ocr_config', lambda: dict(
         interface_language='en', translator_engine='Google',
@@ -194,7 +194,7 @@ def test_right_click_closes_fullscreen_translation_and_releases_mode(application
     from PyQt5 import QtGui
     screenshot = QtGui.QPixmap(800, 600)
     screenshot.fill(QtCore.Qt.black)
-    monkeypatch.setattr(ocr, 'grab_screen_pixmap', lambda *_args: screenshot)
+    monkeypatch.setattr(ocr, 'grab_screen_pixmap', mock.Mock(return_value=screenshot))
     release = mock.Mock()
     monkeypatch.setattr(mode_coordinator, 'release_mode', release)
     monkeypatch.setattr(ocr, 'get_cached_ocr_config', lambda: {

@@ -1,5 +1,17 @@
 """Optional last-area geometry, independent of OCR languages and UI scale."""
+from math import floor
+
 from PyQt5 import QtCore, QtWidgets
+
+
+def scaled_pixel_rect(rect, scale):
+    """Map a clipped screen-local rectangle to a half-open interval of pixels."""
+    left = floor(rect.x() * scale + 0.5)
+    top = floor(rect.y() * scale + 0.5)
+    right = floor((rect.x() + rect.width()) * scale + 0.5)
+    bottom = floor((rect.y() + rect.height()) * scale + 0.5)
+    return QtCore.QRect(left, top, right - left, bottom - top)
+
 
 LANGUAGES = ('en', 'ru', 'es', 'de', 'fr', 'zh', 'pt', 'it', 'ar', 'tr', 'hi', 'id')
 TEXT = {

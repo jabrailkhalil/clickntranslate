@@ -7,6 +7,7 @@ This probe writes a synthetic string into the test desktop's clipboard.
 
 import argparse
 import json
+from math import floor
 from pathlib import Path
 import subprocess
 import sys
@@ -66,7 +67,9 @@ def check_marker_regions(screen, full, check, item):
         live_image, frozen_image = live.toImage(), frozen.toImage()
         key = f'{screen.name()}_marker_{index}'
         ratio = full.devicePixelRatioF()
-        check(key + '_size', live_image.size() == QtCore.QSize(round(area.width() * ratio), round(area.height() * ratio)))
+        left, top = floor(area.x() * ratio + .5), floor(area.y() * ratio + .5)
+        right, bottom = floor((area.right() + 1) * ratio + .5), floor((area.bottom() + 1) * ratio + .5)
+        check(key + '_size', live_image.size() == QtCore.QSize(right - left, bottom - top))
         check(key + '_live_and_frozen', live_image == frozen_image)
         if live_image.isNull():
             continue

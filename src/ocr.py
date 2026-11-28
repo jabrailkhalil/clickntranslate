@@ -2625,7 +2625,11 @@ def usable_ocr_engine(engine):
     return default
 
 
-def grab_screen_pixmap(screen, x=0, y=0, width=-1, height=-1):
+class _CaptureRequestDeclined(Exception):
+    """The current capture must close after a desktop permission decision."""
+
+
+def grab_screen_pixmap(screen, x=0, y=0, width=-1, height=-1, *, abort_on_denial=False):
     """Grab (part of) `screen`.
 
     Windows and X11 read the root window through Qt. Wayland refuses that, so
@@ -2637,6 +2641,8 @@ def grab_screen_pixmap(screen, x=0, y=0, width=-1, height=-1):
     if platform_support.IS_MAC:
         from macos_desktop import permission_granted
         if not permission_granted("screen"):
+            if abort_on_denial:
+                raise _CaptureRequestDeclined("macOS Screen Recording permission is unavailable")
             return QtGui.QPixmap()
     wants_region = width > 0 and height > 0
     if platform_support.IS_LINUX and platform_support.is_wayland():
@@ -2645,20 +2651,13 @@ def grab_screen_pixmap(screen, x=0, y=0, width=-1, height=-1):
         try:
             pixmap = linux_capture.grab_screen(screen)
         except linux_capture.CaptureError as exc:
-            # Never raise into a Qt callback: an escaping exception is what left
-            # the 1.5.4 full-screen overlay spinning forever. Callers already
-            # handle a null pixmap and report it.
+            if abort_on_denial and isinstance(exc, linux_capture.CaptureDeclined):
+                raise _CaptureRequestDeclined(str(exc)) from exc
             logging.error(f"Screen capture is unavailable: {exc}")
             return QtGui.QPixmap()
         if pixmap.isNull() or not wants_region:
             return pixmap
-        ratio = pixmap.width() / max(1, screen.geometry().width())
-        return pixmap.copy(
-            int(round(x * ratio)),
-            int(round(y * ratio)),
-            int(round(width * ratio)),
-            int(round(height * ratio)),
-        )
+        return crop_frozen_pixmap(pixmap, QtCore.QRect(x, y, width, height))
     if wants_region:
         return screen.grabWindow(0, x, y, width, height)
     return screen.grabWindow(0)
@@ -2666,13 +2665,14 @@ def grab_screen_pixmap(screen, x=0, y=0, width=-1, height=-1):
 
 def crop_frozen_pixmap(pixmap, logical_rect):
     """Convert overlay coordinates to device pixels without losing Retina detail."""
+    from capture_regions import scaled_pixel_rect
     ratio = float(pixmap.devicePixelRatioF() or 1.0)
     logical_bounds = QtCore.QRect(0, 0, round(pixmap.width() / ratio), round(pixmap.height() / ratio))
     clipped = logical_rect.intersected(logical_bounds)
     if clipped.isEmpty():
         return QtGui.QPixmap()
-    return pixmap.copy(QtCore.QRect(round(clipped.x() * ratio), round(clipped.y() * ratio),
-                                    round(clipped.width() * ratio), round(clipped.height() * ratio)))
+    pixels = scaled_pixel_rect(clipped, ratio).intersected(pixmap.rect())
+    return pixmap.copy(pixels) if not pixels.isEmpty() else QtGui.QPixmap()
 
 
 def load_image_from_pil(pil_image):
@@ -4571,7 +4571,7 @@ class ScreenCaptureOverlay(QWidget):
             drawn_any = False
             target_screen = self._active_screen or self._get_active_screen()
             if target_screen is not None:
-                shot = grab_screen_pixmap(target_screen)
+                shot = grab_screen_pixmap(target_screen, abort_on_denial=True)
                 logging.debug(
                     f"[OCR:{session_id}] Frozen grab attempt full screen; screen={_screen_to_text(target_screen)}, "
                     f"shot_null={shot.isNull()}, shot_size={shot.width()}x{shot.height()}, dpr={shot.devicePixelRatio():.3f}"
@@ -4580,7 +4580,8 @@ class ScreenCaptureOverlay(QWidget):
                 # Retrying it would reopen a permission dialog just cancelled
                 # by the user, without changing the capture strategy.
                 if shot.isNull() and not (platform_support.IS_LINUX and platform_support.is_wayland()):
-                    shot = grab_screen_pixmap(target_screen, 0, 0, screen_rect.width(), screen_rect.height())
+                    shot = grab_screen_pixmap(target_screen, 0, 0, screen_rect.width(), screen_rect.height(),
+                                              abort_on_denial=True)
                     logging.debug(
                         f"[OCR:{session_id}] Frozen grab retry; shot_null={shot.isNull()}, "
                         f"shot_size={shot.width()}x{shot.height()}, dpr={shot.devicePixelRatio():.3f}"
@@ -4600,6 +4601,10 @@ class ScreenCaptureOverlay(QWidget):
                 self._frozen_background = None
                 self._frozen_background_rect = QtCore.QRect()
                 logging.warning(f"[OCR:{session_id}] Frozen background not captured; drawn_any=False")
+        except _CaptureRequestDeclined:
+            self._frozen_background = None
+            self._frozen_background_rect = QtCore.QRect()
+            raise
         except Exception as e:
             logging.exception(f"[OCR:{session_id}] Failed to capture frozen OCR background: {e}")
             self._frozen_background = None
@@ -4649,7 +4654,7 @@ class ScreenCaptureOverlay(QWidget):
             self._restore_area(config)
             logging.info(
                 f"[OCR:{self._session_id}] Active screen: {_screen_to_text(self._active_screen)}; "
-                f"overlay_rect=({_rect_to_text(overlay_rect)}); freeze={self._freeze_screen_on_ocr}; "
+                f"overlay_rect=({_rect_to_text(overlay_rect)}); freeze={self._freeze_required()}; "
                 f"all_screens={[ _screen_to_text(scr) for scr in QApplication.screens() ]}"
             )
             self._capture_frozen_background(overlay_rect)
@@ -4687,6 +4692,8 @@ class ScreenCaptureOverlay(QWidget):
 
             self.update()
             logging.info(f"[OCR:{self._session_id}] Overlay show command executed.")
+        except _CaptureRequestDeclined:
+            raise
         except Exception as e:
             logging.exception(f"[OCR:{getattr(self, '_session_id', 'unknown')}] Error showing overlay: {e}")
 
@@ -4808,7 +4815,7 @@ class ScreenCaptureOverlay(QWidget):
             QApplication.processEvents(QtCore.QEventLoop.ExcludeUserInputEvents)
             # On Windows the compositor can lag one frame behind the widget state.
             # A tiny wait prevents capturing our own selection rectangle on small snippets.
-            if not self._freeze_screen_on_ocr:
+            if self._frozen_background is None:
                 QtCore.QThread.msleep(16)
                 QApplication.processEvents(QtCore.QEventLoop.ExcludeUserInputEvents)
             elapsed_ms = (time.perf_counter() - started) * 1000.0
@@ -4876,10 +4883,9 @@ class ScreenCaptureOverlay(QWidget):
         # чтобы сохранить привычное поведение существующих установок.
         no_dimming = not self._dim_screen_during_ocr
 
-        # Если включена заморозка экрана — рисуем заготовленный кадр
-        if self._freeze_screen_on_ocr and (self._frozen_background is None or self._frozen_background.isNull()):
-            self._capture_frozen_background(self.geometry())
-        if self._freeze_screen_on_ocr and self._frozen_background is not None and not self._frozen_background.isNull():
+        # Only the explicit capture action can acquire a frame or open a portal.
+        has_frozen_frame = self._frozen_background is not None and not self._frozen_background.isNull()
+        if has_frozen_frame:
             painter.drawPixmap(0, 0, self._frozen_background)
 
         # Если не требуется затемнение, рисуем минимальный невидимый фон для перехвата мыши
@@ -4899,9 +4905,9 @@ class ScreenCaptureOverlay(QWidget):
             if not no_dimming:
                 painter.setCompositionMode(QtGui.QPainter.CompositionMode_Clear)
                 painter.fillRect(rect, QtGui.QColor(0, 0, 0, 0))
-                if self._freeze_screen_on_ocr and self._frozen_background is not None and not self._frozen_background.isNull():
-                    painter.drawPixmap(rect, crop_frozen_pixmap(self._frozen_background, rect))
                 painter.setCompositionMode(QtGui.QPainter.CompositionMode_SourceOver)
+                if has_frozen_frame:
+                    painter.drawPixmap(rect, crop_frozen_pixmap(self._frozen_background, rect))
             else:
                 # В режиме без затемнения добавляем легкий полупрозрачный белый фон
                 # чтобы область выделения была видна
@@ -5338,10 +5344,9 @@ class ScreenCaptureOverlay(QWidget):
 
         local_rect = QtCore.QRect(clipped_global_rect)
         local_rect.translate(-screen_geo.x(), -screen_geo.y())
-        attempts = [
-            ("screen-local", local_rect),
-            ("global-fallback", clipped_global_rect),
-        ]
+        attempts = [("screen-local", local_rect)]
+        if not (platform_support.IS_LINUX and platform_support.is_wayland()):
+            attempts.append(("global-fallback", clipped_global_rect))
 
         for attempt_name, attempt_rect in attempts:
             if attempt_rect.width() <= 0 or attempt_rect.height() <= 0:
@@ -5490,11 +5495,7 @@ class ScreenCaptureOverlay(QWidget):
         screenshot = QtGui.QPixmap()
         grab_attempt = ""
         captured_global_rect = global_rect
-        if (
-            self._freeze_screen_on_ocr
-            and self._frozen_background is not None
-            and not self._frozen_background.isNull()
-        ):
+        if self._frozen_background is not None and not self._frozen_background.isNull():
             ratio = float(self._frozen_background.devicePixelRatioF() or 1.0)
             bounds = QtCore.QRect(0, 0, round(self._frozen_background.width() / ratio),
                                  round(self._frozen_background.height() / ratio))
@@ -5546,7 +5547,7 @@ class ScreenCaptureOverlay(QWidget):
             "global_rect": _rect_to_text(global_rect),
             "grab_attempt": grab_attempt,
             "target_screen": _screen_to_text(target_screen),
-            "frozen": bool(self._freeze_screen_on_ocr),
+            "frozen": grab_attempt == "frozen-background",
         }
         _save_pixmap_debug(screenshot, session_id, "raw_capture")
 
@@ -6282,6 +6283,9 @@ def run_screen_capture(mode="ocr"):
             app.exec_()
         else:
             get_or_show_overlay(mode)
+    except _CaptureRequestDeclined as exc:
+        release_mode(mode_name)
+        logging.info("Area capture stopped: %s", exc)
     except Exception:
         release_mode(mode_name)
         raise
@@ -6708,7 +6712,7 @@ class FullScreenTranslateOverlay(QWidget):
         target_screen = QApplication.screenAt(cursor_pos) or QApplication.primaryScreen()
         geo = target_screen.geometry()
 
-        self.screenshot = grab_screen_pixmap(target_screen, 0, 0, geo.width(), geo.height())
+        self.screenshot = grab_screen_pixmap(target_screen, 0, 0, geo.width(), geo.height(), abort_on_denial=True)
         self._ocr_scale_x = (self.screenshot.width() / geo.width()) if geo.width() and not self.screenshot.isNull() else 1.0
         self._ocr_scale_y = (self.screenshot.height() / geo.height()) if geo.height() and not self.screenshot.isNull() else 1.0
         self.setGeometry(geo)
@@ -7455,6 +7459,9 @@ def run_fullscreen_translate():
     _fullscreen_translate_busy = True
     try:
         _fullscreen_overlay_ref = FullScreenTranslateOverlay()
+    except _CaptureRequestDeclined as exc:
+        release_mode("fullscreen")
+        logging.info("Fullscreen capture stopped: %s", exc)
     except Exception:
         release_mode("fullscreen")
         raise

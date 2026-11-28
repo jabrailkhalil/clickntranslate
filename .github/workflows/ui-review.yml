@@ -78,6 +78,12 @@ jobs:
         run: |
           xvfb-run -a -s '-screen 0 1280x800x24' dbus-run-session -- \
             python tools/qa_linux_shadow_launch.py --output build/ui-native/shadow-login
+      - name: Verify that selecting a changing X11 document submits the displayed pixels
+        if: ${{ !cancelled() && runner.os == 'Linux' && steps.deps.outcome == 'success' }}
+        run: |
+          CNT_QA_PRIVATE_X11=1 xvfb-run -a -s '-screen 0 1280x800x24' \
+            python tools/run_regression_tests.py --qt-platform xcb --output build/ui-native/frozen-frame \
+            --basetemp build/ui-native/frozen-frame/cases tests/test_native_x11_frozen_frame.py
       - name: Verify replacement targets in two native Cocoa fields when Accessibility is available
         if: ${{ !cancelled() && runner.os == 'macOS' && steps.deps.outcome == 'success' }}
         run: python tools/qa_macos_selection_target.py --output build/ui-native/selection-target/report.json
@@ -91,6 +97,9 @@ jobs:
             build/ui-native/checks/run.json
             build/ui-native/tmp/**/*.png
             build/ui-native/shadow-login/
+            build/ui-native/frozen-frame/results.xml
+            build/ui-native/frozen-frame/run.json
+            build/ui-native/frozen-frame/cases/**/*.png
             build/ui-native/selection-target/
           if-no-files-found: warn
           retention-days: 7
@@ -104,7 +113,7 @@ jobs:
       - name: Install the system Qt Wayland plugin and screenshot portal
         run: |
           sudo apt-get update
-          sudo apt-get install -y sway swaybg grim wl-clipboard pipewire dbus-x11 \
+          sudo apt-get install -y sway swaybg grim wl-clipboard pipewire dbus-x11 xvfb xauth \
             xdg-desktop-portal xdg-desktop-portal-wlr xdg-desktop-portal-gtk \
             qtwayland5 python3-pyqt5 python3-venv python3-requests python3-pil
           sudo apt-get install -y --no-install-recommends xdg-desktop-portal-gnome

@@ -67,6 +67,38 @@ def test_partial_screenshot_is_removed_when_helper_times_out(tmp_path, monkeypat
     assert not path.exists()
 
 
+def test_fractional_portal_matches_live_and_frozen_crops_on_both_monitors(app, monkeypatch):
+    import ocr
+    # wlroots delivers a 2816x1152 composite of an 853x480 logical primary
+    # and a 1024x768 secondary to its left and above. Width/1877 is not 1.5.
+    geometries = [QtCore.QRect(0, 0, 853, 480), QtCore.QRect(-1024, -96, 1024, 768)]
+    screens = [SimpleNamespace(geometry=lambda rect=rect: rect) for rect in geometries]
+    monkeypatch.setattr(QtWidgets.QApplication, 'screens', lambda: screens)
+    monkeypatch.setattr(platform_support, 'IS_MAC', False)
+    monkeypatch.setattr(platform_support, 'IS_LINUX', True)
+    monkeypatch.setattr(platform_support, 'is_wayland', lambda: True)
+    composite = QtGui.QPixmap(2816, 1152)
+    composite.fill(QtGui.QColor('navy'))
+    painter = QtGui.QPainter(composite)
+    for x in range(0, 2816, 7):
+        painter.fillRect(x, 0, 2, 1152, QtGui.QColor('yellow'))
+    painter.end()
+    for screen in screens:
+        full = capture.crop_to_screen(composite, screen)
+        assert full.devicePixelRatioF() == pytest.approx(1.5, abs=0.00002)
+        monkeypatch.setattr(capture, 'grab_screen', lambda _screen: full)
+        for x, y in [(137, 88), (159, 446), (379, 279)]:
+            selected = QtCore.QRect(x, y, 15, 11)
+            frozen = ocr.crop_frozen_pixmap(full, selected)
+            live = ocr.grab_screen_pixmap(screen, *selected.getRect())
+            assert live.toImage() == frozen.toImage()
+            left = ocr.crop_frozen_pixmap(full, QtCore.QRect(x, y, 1, 11))
+            right = ocr.crop_frozen_pixmap(full, QtCore.QRect(x + 1, y, 14, 11))
+            assert left.width() + right.width() == frozen.width()
+            assert left.toImage() == frozen.copy(0, 0, left.width(), frozen.height()).toImage()
+            assert right.toImage() == frozen.copy(left.width(), 0, right.width(), frozen.height()).toImage()
+
+
 @pytest.mark.parametrize('response', [0, 1, 2, None])
 def test_portal_handles_immediate_response_and_closes_timed_out_request(app, tmp_path, monkeypatch, response):
     from PyQt5 import QtDBus
