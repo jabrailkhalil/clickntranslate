@@ -1,12 +1,11 @@
 """Searchable interface languages in the existing app panel."""
-import unicodedata
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 from button_styles import button_qss
 from classic_style import classic_palette
 from styled_dialogs import tooltip_text
 from languages import LANGUAGES, LOCALIZED_LANGUAGE_NAMES
-from language_search import SEARCH_TEXT
+from language_search import SEARCH_TEXT, language_search_key
 
 
 _PICKER_LABELS = {
@@ -26,13 +25,6 @@ _PICKER_LABELS = {
 # Keep title and close at indexes 0/3 for the title-bar flag's accessible label.
 PICKER_TEXT = {code: (title, *SEARCH_TEXT[code], close)
                for code, (title, close) in _PICKER_LABELS.items()}
-
-
-
-def _search_key(value):
-    return ''.join(char for char in unicodedata.normalize('NFKD', str(value).casefold())
-                   if not unicodedata.combining(char))
-
 
 class _PickerOutline(QtWidgets.QWidget):
     """Paint the one outer boundary after the catalog and its cell fills."""
@@ -108,7 +100,7 @@ class InterfaceLanguagePicker(QtWidgets.QFrame):
                 aliases += [language.english_name, language.russian_name]
             # Changing UI language must not invalidate an existing search.
             aliases += [names.get(code, '') for names in LOCALIZED_LANGUAGE_NAMES.values()]
-            self._search_terms[code] = _search_key('\n'.join(aliases))
+            self._search_terms[code] = language_search_key('\n'.join(aliases))
 
         body = QtWidgets.QVBoxLayout(self)
         # The styled frame already reserves its one-pixel outer boundary.
@@ -241,9 +233,11 @@ class InterfaceLanguagePicker(QtWidgets.QFrame):
                     control.update()
 
     def _apply_filter(self, *_args):
-        terms = _search_key(self.search.text()).split()
-        visible = tuple(code for code in self._codes
-                        if all(term in self._search_terms[code] for term in terms))
+        query = language_search_key(self.search.text())
+        terms = query.split()
+        visible = ((query,) if query in self._codes else
+                   tuple(code for code in self._codes
+                         if all(term in self._search_terms[code] for term in terms)))
         old_focus = self.focusWidget()
         while self.grid.count():
             self.grid.takeAt(0)

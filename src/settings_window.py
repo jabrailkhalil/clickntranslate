@@ -533,6 +533,7 @@ class DropDownCombo(QComboBox):
         self.setStyle(self._drop_down_style)
         self._laying_out_popup = False
         self._popup_model = None
+        self._popup_model_changed = False
         self._language_popup_origin = None
         self._language_popup_anchor = None
         self._language_popup_bounds = None
@@ -642,10 +643,10 @@ class DropDownCombo(QComboBox):
         if model is not self._popup_model:
             if self._popup_model is not None and not sip.isdeleted(self._popup_model):
                 for name in ('rowsInserted', 'rowsRemoved', 'modelReset', 'dataChanged', 'layoutChanged'):
-                    getattr(self._popup_model, name).disconnect(self._queue_popup_layout)
+                    getattr(self._popup_model, name).disconnect(self._on_popup_model_change)
             self._popup_model = model
             for name in ('rowsInserted', 'rowsRemoved', 'modelReset', 'dataChanged', 'layoutChanged'):
-                getattr(model, name).connect(self._queue_popup_layout)
+                getattr(model, name).connect(self._on_popup_model_change)
         return popup
 
     def showPopup(self):
@@ -718,6 +719,7 @@ class DropDownCombo(QComboBox):
         super().hidePopup()
 
     def _clear_popup_session(self):
+        self._popup_model_changed = False
         self._language_popup_size = None
         self._language_popup_origin = None
         self._language_popup_anchor = None
@@ -821,6 +823,11 @@ class DropDownCombo(QComboBox):
         if not self._laying_out_popup and self.view().window().isVisible():
             self._popup_layout_timer.start(0)
 
+    def _on_popup_model_change(self, *args):
+        if self.view().window().isVisible():
+            self._popup_model_changed = True
+            self._queue_popup_layout()
+
     def _popup_content_size(self):
         view = self.view()
         heights, widest = [], 0
@@ -873,6 +880,10 @@ class DropDownCombo(QComboBox):
         self._laying_out_popup = True
         try:
             self._sync_popup_host_metrics()
+            if self._popup_model_changed:
+                self._popup_model_changed = False
+                from language_search import prepare_language_search
+                prepare_language_search(self, model_changed=True)
             popup = self.view().window()
             desired = self._popup_content_size()
             from language_search import stable_search_popup_size

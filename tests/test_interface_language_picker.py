@@ -134,6 +134,18 @@ def test_filter_supports_native_english_localized_code_and_accents(make_picker, 
     assert picker.buttons[expected].isChecked()
 
 
+def test_exact_interface_language_code_overrides_substring_matches(make_picker, app):
+    picker = make_picker()
+    picker.set_language('zh')
+    selected = QSignalSpy(picker.languageSelected)
+    picker.search.setFocus()
+    picker.search.setText('AR')
+    settle(app)
+    assert picker.visible_codes == ('ar',)
+    QTest.keyClick(picker.search, QtCore.Qt.Key_Return)
+    assert list(selected) == [['ar']]
+
+
 def test_no_matches_keeps_search_and_close_accessible_then_recovers(make_picker, app):
     picker = make_picker(40)
     picker._focus_search()
