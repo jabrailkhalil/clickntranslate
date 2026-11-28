@@ -21,11 +21,42 @@ on:
         description: Compare Arabic vowel marks on dark and light synthetic images
         type: boolean
         default: false
+      native_selection:
+        description: Run only the native clipboard, shortcut and source-window checks
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
+  selection:
+    if: inputs.native_selection
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: windows-2022, requirements: windows, driver: windows}
+          - {runner: macos-15, requirements: macos, driver: macos}
+          - {runner: macos-15-intel, requirements: macos, driver: macos}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: tools/requirements/${{ matrix.requirements }}.txt
+      - run: python -m pip install -r tools/requirements/${{ matrix.requirements }}.txt
+      - run: python -X faulthandler tools/qa_${{ matrix.driver }}_selection_target.py --output build/selection/report.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: selection-${{ matrix.runner }}
+          path: build/selection/
+          retention-days: 7
+
   arabic:
     if: inputs.arabic_ocr
     strategy:
@@ -210,7 +241,7 @@ jobs:
           retention-days: 7
 
   source:
-    if: '!inputs.native_desktop && !inputs.wayland && !inputs.session_stability && !inputs.arabic_ocr'
+    if: '!inputs.native_desktop && !inputs.wayland && !inputs.session_stability && !inputs.arabic_ocr && !inputs.native_selection'
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
@@ -229,7 +260,7 @@ jobs:
           if-no-files-found: error
 
   test:
-    if: '!inputs.native_desktop && !inputs.wayland && !inputs.session_stability && !inputs.arabic_ocr'
+    if: '!inputs.native_desktop && !inputs.wayland && !inputs.session_stability && !inputs.arabic_ocr && !inputs.native_selection'
     timeout-minutes: 15
     strategy:
       fail-fast: false
