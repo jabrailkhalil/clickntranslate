@@ -102,7 +102,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y sway swaybg grim wl-clipboard pipewire dbus-x11 \
             xdg-desktop-portal xdg-desktop-portal-wlr xdg-desktop-portal-gtk \
-            qtwayland5 python3-pyqt5 python3-venv
+            qtwayland5 python3-pyqt5 python3-venv python3-requests python3-pil
           /usr/bin/python3 -m venv --system-site-packages --without-pip "$RUNNER_TEMP/wayland-python"
       - name: Check equal and mixed monitor scales on fresh Wayland sessions
         run: |
