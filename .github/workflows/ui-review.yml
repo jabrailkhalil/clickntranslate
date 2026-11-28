@@ -51,6 +51,16 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libegl1 tesseract-ocr-ara
+      - name: Enable Windows Arabic OCR when the hosted image offers it
+        if: runner.os == 'Windows'
+        timeout-minutes: 3
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $capability = Get-WindowsCapability -Online -Name 'Language.OCR~~~ar-SA~*'
+          if ($capability -and $capability.State -ne 'Installed') {
+            Add-WindowsCapability -Online -Name $capability.Name -ErrorAction Stop
+          }
       - run: python -m pip install -r tools/requirements/${{ matrix.requirements }}.txt
       - run: python tools/prepare_rapidocr_models.py
       - run: python tools/qa_arabic_recognition.py build/ocr-arabic/report.json

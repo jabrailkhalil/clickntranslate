@@ -51,6 +51,48 @@ def rapidocr(cards):
     return dict(cases=rows, elapsed_including_initialization=time.monotonic()-started)
 
 
+def geometry_comparison(cards):
+    """Separate detector crop errors from recognizer errors using the same pinned model."""
+    from copy import copy
+    from PIL import Image, ImageChops, ImageOps
+    import pytesseract
+    from ocr_worker import _rapidocr_class
+    from rapidocr_models import create_engine
+
+    base = create_engine(_rapidocr_class(), 'ar')
+    pieces = {}
+    for name, (path, reference) in cards.items():
+        with Image.open(path) as opened:
+            original = opened.convert('RGB')
+        gray = original.convert('L')
+        background = gray.getpixel((0, 0))
+        mask = ImageChops.difference(gray, Image.new('L', gray.size, background))
+        left, top, right, bottom = mask.point(lambda pixel: 255 if pixel > 32 else 0).getbbox()
+        positive = ImageOps.invert(original) if background < 128 else original
+        trials = []
+        for limit in (192, 320, 448):
+            for treatment, image in (('original', original), ('dark-on-light', positive)):
+                engine = copy(base)
+                engine.text_det = copy(base._load_det_model())
+                engine.text_det.limit_side_len = limit
+                trials.append((f'det-{limit}-{treatment}', lambda e=engine, im=image: e(im).txts))
+        for padding in (2, 6, 12):
+            for treatment, image in (('original', original), ('dark-on-light', positive)):
+                box = (max(0, left-padding), max(0, top-padding),
+                       min(original.width, right+padding), min(original.height, bottom+padding))
+                line = image.crop(box)
+                trials.append((f'rec-{padding}-{treatment}',
+                               lambda im=line: copy(base)(im, use_det=False).txts))
+        for psm in (6, 7):
+            trials.append((f'tesseract-psm-{psm}',
+                           lambda mode=psm: [pytesseract.image_to_string(original, lang='ara', config=f'--psm {mode}')]))
+        for setting, probe in trials:
+            start = time.monotonic()
+            value = ' '.join(probe() or ()).strip()
+            pieces.setdefault(setting, {})[name] = dict(compare(reference, value), elapsed_ms=round((time.monotonic()-start)*1000, 1))
+    return pieces
+
+
 def platform_ocr(cards):
     from PIL import Image
     import ocr
@@ -100,7 +142,13 @@ def main(path):
                 cards = fixtures(Path(temp))
                 report['expected'] = {key: ref for key, (_, ref) in cards.items()}
                 report['engines']['rapidocr'] = rapidocr(cards)
-                report['engines']['platform'] = platform_ocr(cards)
+                try:
+                    report['engines']['platform'] = platform_ocr(cards)
+                    if sys.platform.startswith('linux'):
+                        report['geometry_comparison'] = geometry_comparison(cards)
+                finally:
+                    if 'ocr' in sys.modules:
+                        sys.modules['ocr'].close_ocr_diagnostics_logging()
         for result in report['engines'].values():
             if rows := result.get('cases'):
                 result['exact_count'] = sum(case['exact_letters_and_marks'] for case in rows.values())
