@@ -182,7 +182,7 @@ class GalleryTaskListStyleTest {
             source.indexOf("private fun GalleryTaskCard("),
         )
         val resultItem = source.substring(
-            source.indexOf("private fun GalleryResultItem("),
+            source.indexOf("fun GalleryResultItem("),
             source.indexOf("private fun GalleryResultTextSection("),
         )
         fun containerBefore(call: String): String {

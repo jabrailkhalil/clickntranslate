@@ -13,7 +13,7 @@ class GalleryResultTextPanelTest {
         val source = sourceFile(
             "src/main/java/dev/clickn/translate/ui/GalleryTranslationScreens.kt"
         ).readText()
-        val start = source.indexOf("private fun GalleryResultItem(")
+        val start = source.indexOf("fun GalleryResultItem(")
         val end = source.indexOf("private fun GalleryResultThumbnail(", start)
         assertTrue("result item block exists", start >= 0 && end > start)
         val resultItem = source.substring(start, end)

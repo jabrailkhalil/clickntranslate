@@ -16,7 +16,7 @@ class GalleryTranslationProgressCopyTest {
         val chinese = sourceFile("src/main/res/values-zh-rCN/strings.xml").readText()
         val component = screen.substring(
             screen.indexOf("private fun GalleryTaskProgressSummary("),
-            screen.indexOf("private fun GalleryResultItem("),
+            screen.indexOf("fun GalleryResultItem("),
         )
 
         data class Case(

@@ -1582,7 +1582,7 @@ internal fun galleryResultFilterMatches(
 }
 
 @Composable
-private fun GalleryResultItem(
+internal fun GalleryResultItem(
     item: GalleryTranslationItemEntity,
     thumbnailLoader: suspend (GalleryTranslationItemEntity) -> android.graphics.Bitmap?,
     onPreview: () -> Unit,
@@ -1594,6 +1594,7 @@ private fun GalleryResultItem(
     val textPaneHeight = galleryResultTextPaneHeightDp(thumbnailRatio, LocalDensity.current.fontScale).dp
     val hasResult = item.status == GalleryItemStatus.SUCCEEDED ||
         (item.status == GalleryItemStatus.FAILED && item.translatedText.isNotBlank())
+    val showText = hasResult || (item.status == GalleryItemStatus.FAILED && item.sourceText.isNotBlank())
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
@@ -1623,7 +1624,7 @@ private fun GalleryResultItem(
                     modifier = Modifier
                         .weight(1f)
                         .then(
-                            if (hasResult) {
+                            if (showText) {
                                 Modifier.height(textPaneHeight + if (item.status == GalleryItemStatus.FAILED) 80.dp else 0.dp)
                             } else {
                                 Modifier
@@ -1655,7 +1656,7 @@ private fun GalleryResultItem(
                             color = MaterialTheme.colorScheme.error,
                         )
                     }
-                    if (hasResult) {
+                    if (showText) {
                         Column(
                             modifier = Modifier.weight(1f),
                         ) {
@@ -1670,9 +1671,8 @@ private fun GalleryResultItem(
                             )
                             GalleryResultTextSection(
                                 title = stringResource(R.string.gallery_item_translation),
-                                text = item.translatedText.ifBlank {
-                                    stringResource(R.string.gallery_item_no_translation)
-                                },
+                                text = item.translatedText,
+                                emptyText = stringResource(R.string.gallery_item_no_translation),
                                 modifier = Modifier.weight(1f),
                             )
                         }
@@ -1688,6 +1688,7 @@ private fun GalleryResultTextSection(
     title: String,
     text: String,
     modifier: Modifier = Modifier,
+    emptyText: String = "",
 ) {
     val context = LocalContext.current
     var textActions by remember(text) { mutableStateOf(false) }
@@ -1726,11 +1727,10 @@ private fun GalleryResultTextSection(
                 .weight(1f)
                 .verticalScroll(scrollState),
         ) {
-            SelectionContainer {
-                Text(
-                    text,
-                    style = MaterialTheme.typography.bodySmall,
-                )
+            if (text.isBlank()) {
+                Text(emptyText, style = MaterialTheme.typography.bodySmall)
+            } else SelectionContainer {
+                Text(text, style = MaterialTheme.typography.bodySmall)
             }
         }
     }
