@@ -35,6 +35,41 @@ def _rows():
                                                   ('fr', 'French', 'Missing', False)]]
 
 
+@pytest.mark.parametrize('direction', [QtCore.Qt.LeftToRight, QtCore.Qt.RightToLeft])
+def test_keyboard_focus_tracks_the_active_engine_section(center, direction, monkeypatch):
+    from PyQt5.QtTest import QTest
+    from keyboard_navigation import focus_control, install_keyboard_navigation
+    from package_presentation import text as package_text
+
+    dialog, _, parent = center
+    parent.config = {'translator_engine': 'google', 'ocr_engine': 'Windows'}
+    app = QtWidgets.QApplication.instance()
+    monkeypatch.setattr('provider_secrets.get_key', lambda *_: '')
+    install_keyboard_navigation(app)
+    dialog.setLayoutDirection(direction)
+    dialog.show()
+    app.processEvents()
+    bar = dialog.tabs.tabBar()
+    forward = QtCore.Qt.Key_Left if direction == QtCore.Qt.RightToLeft else QtCore.Qt.Key_Right
+    focus_control(bar)
+    for index in range(dialog.tabs.count()):
+        if index:
+            QTest.keyClick(bar, forward)
+            app.processEvents()
+        assert bar.currentIndex() == index
+        assert bar.hasFocus()
+        selected = bar.tabRect(index)
+        selected.moveTopLeft(bar.mapTo(dialog, selected.topLeft()))
+        assert dialog._keyboard_focus_ring.isVisible()
+        assert dialog._keyboard_focus_ring.geometry() == selected.adjusted(3, 3, -3, -3)
+        if index < 2:
+            picker = dialog._engine_selectors[index]
+            assert picker.accessibleName() == package_text(dialog.lang, 'engine')
+            assert any(label.buddy() is picker for label in dialog.findChildren(QtWidgets.QLabel))
+    QTest.mouseClick(bar, QtCore.Qt.LeftButton, pos=bar.tabRect(0).center())
+    assert not dialog._keyboard_focus_ring.isVisible()
+
+
 def test_withdrawn_engine_clears_stale_download_sizes_and_keeps_local_removal(center, monkeypatch):
     from package_presentation import text as package_text
     from test_package_presentation import platform_size_catalog

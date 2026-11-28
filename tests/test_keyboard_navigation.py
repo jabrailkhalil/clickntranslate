@@ -86,6 +86,44 @@ def test_keyboard_focus_ring_disappears_on_mouse_input(app):
         dialog.deleteLater()
 
 
+def test_api_style_clear_field_and_unscrollable_form_do_not_trap_tab(app):
+    keyboard.install_keyboard_navigation(app)
+    dialog = QtWidgets.QDialog()
+    layout = QtWidgets.QVBoxLayout(dialog)
+    scroll = QtWidgets.QScrollArea(dialog)
+    scroll.setWidgetResizable(True)
+    panel = QtWidgets.QWidget(scroll)
+    form = QtWidgets.QVBoxLayout(panel)
+    key = QtWidgets.QLineEdit(panel)
+    key.setClearButtonEnabled(True)
+    key.setText('temporary test key')
+    model = QtWidgets.QLineEdit(panel)
+    form.addWidget(key)
+    form.addWidget(model)
+    scroll.setWidget(panel)
+    layout.addWidget(scroll)
+    save = QtWidgets.QPushButton('Save', dialog)
+    layout.addWidget(save)
+    dialog.resize(440, 250)
+    dialog.show()
+    app.processEvents()
+    try:
+        keyboard.focus_control(key)
+        QTest.keyClick(key, QtCore.Qt.Key_Tab)
+        assert dialog.focusWidget() is model
+        QTest.keyClick(model, QtCore.Qt.Key_Tab)
+        assert dialog.focusWidget() is save
+        QTest.keyClick(save, QtCore.Qt.Key_Backtab)
+        assert dialog.focusWidget() is model
+        assert key.text() == 'temporary test key'
+        panel.setMinimumHeight(scroll.height() + 200)
+        app.processEvents()
+        assert scroll in keyboard.tab_stops(dialog)
+    finally:
+        dialog.close()
+        dialog.deleteLater()
+
+
 def test_radio_group_has_one_tab_stop_and_arrows_select_the_other_option(app):
     keyboard.install_keyboard_navigation(app)
     dialog = QtWidgets.QDialog()

@@ -85,6 +85,10 @@ def tab_stops(root):
         if (not isinstance(widget, _CONTROLS) or not widget.focusPolicy() & QtCore.Qt.TabFocus
                 or not widget.isVisibleTo(root) or not widget.isEnabled() or widget.window() is not root):
             continue
+        if (isinstance(widget, QtWidgets.QScrollArea)
+                and all(bar.minimum() == bar.maximum() for bar in
+                        (widget.horizontalScrollBar(), widget.verticalScrollBar()))):
+            continue
         if isinstance(widget, QtWidgets.QAbstractButton) and _inside(widget, 'keyboardTabs') is not None and not widget.isChecked():
             continue
         if isinstance(widget, QtWidgets.QRadioButton):
@@ -273,6 +277,7 @@ class KeyboardNavigation(QtCore.QObject):
         self.keyboard = False
         self._focused = lambda: None
         self._ring = lambda: None
+        self._watched_tab_bars = weakref.WeakSet()
         self._help_dialog = None
         self._help_pending = False
         self._popup_closing_key = None
@@ -307,7 +312,15 @@ class KeyboardNavigation(QtCore.QObject):
             ring = root._keyboard_focus_ring = _FocusRing(overlay_parent)
         elif ring.parentWidget() is not overlay_parent:
             ring.setParent(overlay_parent)
-        geometry = QtCore.QRect(widget.mapTo(overlay_parent, QtCore.QPoint()), widget.size())
+        geometry = widget.rect()
+        if isinstance(widget, QtWidgets.QTabBar):
+            if widget not in self._watched_tab_bars:
+                self._watched_tab_bars.add(widget)
+                widget.currentChanged.connect(self._tab_focus_changed)
+            geometry = widget.tabRect(widget.currentIndex()).intersected(geometry)
+            if geometry.isEmpty():
+                return
+        geometry.moveTopLeft(widget.mapTo(overlay_parent, geometry.topLeft()))
         # One inset cue fits square tabs, rounded controls and joined buttons
         # without drawing over their outer frame or neighbouring controls.
         geometry.adjust(3, 3, -3, -3)
@@ -315,6 +328,11 @@ class KeyboardNavigation(QtCore.QObject):
         ring.show()
         ring.raise_()
         self._focused, self._ring = weakref.ref(widget), weakref.ref(ring)
+
+    def _tab_focus_changed(self, _index):
+        bar = self.sender()
+        if self.keyboard and self._focused() is bar and bar.hasFocus():
+            self._show_ring(bar)
 
     def note_key_input(self, widget, event):
         """Only focus-navigation keys enable the keyboard focus decoration."""
@@ -459,7 +477,8 @@ class KeyboardNavigation(QtCore.QObject):
             elif not combo.view().window().isVisible() and _root(widget) is combo.window():
                 return True
         if kind == QtCore.QEvent.Polish:
-            if isinstance(widget, QtWidgets.QAbstractButton) and widget.focusPolicy() == QtCore.Qt.NoFocus:
+            if (isinstance(widget, QtWidgets.QAbstractButton) and widget.focusPolicy() == QtCore.Qt.NoFocus
+                    and not isinstance(widget.parentWidget(), QtWidgets.QLineEdit)):
                 widget.setFocusPolicy(QtCore.Qt.TabFocus)
             elif isinstance(widget, (QtWidgets.QTextEdit, QtWidgets.QPlainTextEdit)):
                 widget.setTabChangesFocus(True)

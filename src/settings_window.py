@@ -6779,6 +6779,8 @@ class OcrLanguageManagerDialog(QDialog):
             form.setSpacing(10)
             label = QLabel(package_text(self.lang, 'engine') + ':', row)
             picker = DropDownCombo(row)
+            label.setBuddy(picker)
+            picker.setAccessibleName(package_text(self.lang, 'engine'))
             picker.setFixedHeight(30)
             for index in range(inner.count()):
                 picker.addItem(inner.tabText(index), index)
