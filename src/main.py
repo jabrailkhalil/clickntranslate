@@ -9138,8 +9138,6 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
 
     def refresh_language(self, language_code):
         old_lang = self.lang
-        source_code = self._source_code()
-        target_code = language_code_from_name(self.target_combo.currentText(), old_lang)
         self.lang = normalize_interface_language(language_code)
 
         self.setWindowTitle(doc_text(self.lang, "title"))
@@ -9162,48 +9160,27 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         self.translated_label.setText(doc_text(self.lang, "translated"))
         self.original_view.setPlaceholderText(doc_text(self.lang, "drop_hint"))
 
-        self.source_combo.blockSignals(True)
-        self.source_combo.clear()
-        self.source_combo.addItems(LANGUAGES[self.lang])
-        self.source_combo.setCurrentIndex(0)
-        if source_code == 'auto' and supports_auto_source(self._provider_engine()):
-            self.source_combo.insertItem(0, language_display_name('auto', self.lang), 'auto')
-        self._set_combo_to_language_code(self.source_combo, source_code)
-        _apply_language_flags(self.source_combo, self.lang)
-        self.source_combo.blockSignals(False)
-
-        self.target_combo.blockSignals(True)
-        self.target_combo.clear()
-        self.target_combo.addItems(LANGUAGES[self.lang])
-        self._set_combo_to_language_code(self.target_combo, target_code)
-        _apply_language_flags(self.target_combo, self.lang)
-        self.target_combo.blockSignals(False)
-
         self.provider_field_label.setText(doc_text(self.lang, "provider"))
         provider_engine = self._provider_engine()
         self._populate_provider_combo(provider_engine)
+        self._refresh_document_provider_languages()
         if self.translation_running:
             canceling = self._translation_cancel_event is not None and self._translation_cancel_event.is_set()
             self.current_status = doc_text(self.lang, "canceling_translation" if canceling else "translating")
         elif self._document_loading:
             self.current_status = doc_text(self.lang, 'loading')
-        elif self.current_document:
-            self.current_status = doc_text(self.lang, "loaded")
-        elif self.session_payload:
-            self.current_status = doc_text(self.lang, "session_loaded")
         else:
-            self.current_status = doc_text(self.lang, "no_file")
+            for key in ('no_file', 'loaded', 'session_loaded', 'done', 'translation_canceled',
+                        'provider_unavailable_title', 'translate_failed', 'saved'):
+                previous = doc_text(old_lang, key)
+                if self.current_status == previous or self.current_status.startswith(previous + ': '):
+                    self.current_status = doc_text(self.lang, key) + self.current_status[len(previous):]
+                    break
         self._set_status(self.current_status)
         # Relanguaging changes several complex controls in place. Re-polish the
         # complete dialog afterwards so their pane/window borders cannot keep
         # a partially invalidated stylesheet state.
         self.refresh_theme(self.theme_name)
-
-    def _set_combo_to_language_code(self, combo, language_code):
-        for index in range(combo.count()):
-            if language_code_from_name(combo.itemText(index), self.lang) == language_code:
-                combo.setCurrentIndex(index)
-                return
 
     def _on_original_text_changed(self):
         if self._document_loading or (self._initial_load_timer is not None and self._initial_load_timer.isActive()):
@@ -9539,15 +9516,18 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         if not self.translated_text.strip():
             QMessageBox.information(self, doc_text(self.lang, "title"), doc_text(self.lang, "no_translation"))
             return
+        session_error = None
         try:
             paths = default_output_paths(self._data_dir(), self._source_file_name())
+            suggested = paths["txt"]
         except OSError as exc:
-            QMessageBox.warning(self, doc_text(self.lang, "error"), str(exc))
-            return
+            paths = None
+            session_error = exc
+            suggested = os.path.splitext(os.path.basename(self._source_file_name()))[0] + '.txt'
         path, selected_filter = QFileDialog.getSaveFileName(
             self,
             doc_text(self.lang, "save_translation"),
-            paths["txt"],
+            suggested,
             translation_save_filter(self.lang),
         )
         if not path:
@@ -9562,19 +9542,33 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         elif not ext:
             path = root + ".txt"
 
+        session_file = path.lower().endswith('.json')
         try:
-            if path.lower().endswith(".json"):
+            if session_file:
                 save_session(path, self._session_payload())
             else:
                 save_text(path, self.translated_text)
-                save_session(paths["session"], self._session_payload())
         except (OSError, ValueError, TypeError) as exc:
             QMessageBox.warning(self, doc_text(self.lang, "error"), str(exc))
             return
-        self._set_status(f"{doc_text(self.lang, 'saved')}: {path}")
+        saved = f"{doc_text(self.lang, 'saved')}: {path}"
+        self._set_status(saved)
+        if session_file:
+            return
+        if paths is not None:
+            try:
+                save_session(paths["session"], self._session_payload(), unique=True)
+            except (OSError, ValueError, TypeError) as exc:
+                session_error = exc
+        if session_error is not None:
+            QMessageBox.warning(self, doc_text(self.lang, "error"),
+                                f"{saved}\n\n{doc_text(self.lang, 'session_file_filter')}: {session_error}")
 
     def open_session(self):
-        root = translations_dir(self._data_dir())
+        try:
+            root = translations_dir(self._data_dir())
+        except OSError:
+            root = ''
         path, _ = QFileDialog.getOpenFileName(
             self,
             doc_text(self.lang, "open_session"),
@@ -9716,7 +9710,7 @@ class DocumentTranslationDialog(CenteredFramelessDialog):
         if previous_source == "auto" and not supports_auto_source(self._provider_engine()):
             previous_source = configured_source
         previous_target = (
-            language_code_from_name(self.target_combo.currentText(), self.lang)
+            self.target_combo.currentData() or language_code_from_name(self.target_combo.currentText(), self.lang)
             if self.target_combo.count() else
             str(get_cached_config().get("main_translation_target_language", "ru") or "ru")
         )

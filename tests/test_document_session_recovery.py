@@ -47,6 +47,37 @@ def test_saved_language_pair_and_provider_survive_reopening(document, tmp_path):
     assert document._provider_engine() == 'lingva'
 
 
+@pytest.mark.parametrize('engine', ['google', 'argos'])
+def test_changing_ui_language_preserves_valid_document_directions_and_translates_the_selected_pair(
+        deferred_document, monkeypatch, engine):
+    document, pending = deferred_document
+    monkeypatch.setattr(main.translater, 'argos_installed_translation_pairs_fast', lambda: {('ar', 'de')})
+    document._populate_provider_combo(engine)
+    document._refresh_document_provider_languages()
+    document.source_combo.setCurrentIndex(document.source_combo.findData('ar'))
+    document.target_combo.setCurrentIndex(document.target_combo.findData('de'))
+    source_codes = [document.source_combo.itemData(i) for i in range(document.source_combo.count())]
+    target_codes = [document.target_combo.itemData(i) for i in range(document.target_combo.count())]
+    if engine == 'argos':
+        assert source_codes == ['ar'] and target_codes == ['de']
+    else:
+        assert 'auto' in source_codes
+    document.refresh_language('ar')
+    assert [document.source_combo.itemData(i) for i in range(document.source_combo.count())] == source_codes
+    assert [document.target_combo.itemData(i) for i in range(document.target_combo.count())] == target_codes
+    assert document.source_combo.currentText() == main.language_display_name('ar', 'ar')
+    assert document.target_combo.currentText() == main.language_display_name('de', 'ar')
+    assert document.current_status == main.doc_text('ar', 'loaded')
+    translate = mock.Mock(return_value=('Result', []))
+    monkeypatch.setattr(main, 'translate_document_text', translate)
+    monkeypatch.setattr(main, 'save_translation_history', mock.Mock())
+    document.translate_file_button.click()
+    pending.pop()()
+    assert translate.call_args.args[1:] == ('ar', 'de')
+    document.refresh_language('fr')
+    assert document.current_status == main.doc_text('fr', 'done')
+
+
 @pytest.mark.parametrize('payload', [{}, {'theme': 'light'}, {'translated_text': 'Damaged', 'chunks': [None]}])
 def test_unrelated_or_damaged_session_json_leaves_the_open_draft(document, tmp_path, payload):
     path = tmp_path / 'other.json'
@@ -298,3 +329,94 @@ def test_exporting_twice_in_one_second_preserves_each_automatic_session(document
     assert first_path.read_bytes() == first_bytes
     assert {json.loads(path.read_text(encoding='utf-8'))['original_text'] for path in sessions} == {'First source', 'Second source'}
     assert [path.read_text(encoding='utf-8') for path in targets] == ['Translation 0', 'Translation 1']
+
+
+def test_export_never_overwrites_a_session_created_while_the_save_dialog_was_open(document, tmp_path, monkeypatch):
+    original = b'{"original_text":"Another export already finished"}'
+    claimed = tmp_path / 'sessions' / 'translation.json'
+    claimed.parent.mkdir()
+    requested = tmp_path / 'my-result.txt'
+    monkeypatch.setattr(main, 'default_output_paths', lambda *_: {
+        'txt': str(claimed.with_suffix('.txt')), 'session': str(claimed)})
+
+    def choose(*_):
+        claimed.write_bytes(original)
+        return str(requested), ''
+
+    document.translated_view.setPlainText('Visible answer')
+    document.translated_text = 'Visible answer'
+    with mock.patch.object(main.QFileDialog, 'getSaveFileName', side_effect=choose), \
+         mock.patch.object(main.QMessageBox, 'warning') as warning:
+        document.save_translation()
+    warning.assert_not_called()
+    assert requested.read_text(encoding='utf-8') == 'Visible answer'
+    assert claimed.read_bytes() == original
+    sessions = list(claimed.parent.glob('*.json'))
+    assert len(sessions) == 2
+    assert any(document_storage.load_session(path).get('translated_text') == 'Visible answer' for path in sessions)
+
+
+@pytest.mark.parametrize('extension', ['json', 'txt'])
+def test_user_can_export_to_a_writable_location_when_the_default_folder_is_unavailable(
+        document, tmp_path, monkeypatch, extension):
+    target = tmp_path / ('recovered.' + extension)
+    monkeypatch.setattr(main, 'default_output_paths', mock.Mock(side_effect=PermissionError('default folder unavailable')))
+    document.translated_view.setPlainText('Completed translation')
+    document.translated_text = 'Completed translation'
+    with mock.patch.object(main.QFileDialog, 'getSaveFileName', return_value=(str(target), '')), \
+         mock.patch.object(main.QMessageBox, 'warning') as warning:
+        document.save_translation()
+    if extension == 'json':
+        warning.assert_not_called()
+        assert document_storage.load_session(target)['translated_text'] == 'Completed translation'
+    else:
+        warning.assert_called_once()
+        assert str(target) in document.current_status
+        assert target.read_text(encoding='utf-8') == 'Completed translation'
+
+
+def test_open_session_allows_an_external_file_when_the_default_folder_is_unavailable(document, tmp_path, monkeypatch):
+    chosen = tmp_path / 'working-session.json'
+    chosen.write_text('{"original_text":"Keeps working from another directory"}', encoding='utf-8')
+    monkeypatch.setattr(main, 'translations_dir', mock.Mock(side_effect=PermissionError('default folder unavailable')))
+    open_session(document, chosen)
+    assert document.original_view.toPlainText() == 'Keeps working from another directory'
+
+
+def test_concurrent_automatic_exports_publish_every_snapshot(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+    import threading
+    path = tmp_path / 'same-name.json'
+    ready = threading.Barrier(4)
+
+    def export(index):
+        ready.wait(3)
+        return document_storage.save_session(path, {'translated_text': str(index)}, unique=True)
+
+    with ThreadPoolExecutor(max_workers=4) as workers:
+        saved = list(workers.map(export, range(4)))
+    assert len(set(saved)) == 4
+    assert [document_storage.load_session(output)['translated_text'] for output in saved] == ['0', '1', '2', '3']
+    assert not list(tmp_path.glob('.cnt-save-*.tmp'))
+
+
+def test_automatic_session_on_a_drive_without_hardlinks_preserves_an_existing_file(tmp_path, monkeypatch):
+    import atomic_storage
+    import errno
+    import os
+
+    class PortableVolume:
+        name = 'posix'
+
+        def __getattr__(self, name):
+            return getattr(os, name)
+
+        def link(self, *_):
+            raise OSError(errno.EOPNOTSUPP, 'no hard links on this volume')
+
+    monkeypatch.setattr(atomic_storage, 'os', PortableVolume())
+    old = tmp_path / 'snapshot.json'
+    old.write_bytes(b'previous export')
+    new_path = document_storage.save_session(old, {'translated_text': 'Another result'}, unique=True)
+    assert old.read_bytes() == b'previous export'
+    assert document_storage.load_session(new_path)['translated_text'] == 'Another result'

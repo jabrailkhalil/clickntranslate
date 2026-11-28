@@ -1,14 +1,17 @@
 """Publish complete UTF-8 files without truncating an existing user document."""
+import errno
+from itertools import count
 import json
 import os
 import tempfile
 import time
 
 
-def _replace_complete_file(source, target):
+def _replace_complete_file(source, target, *, overwrite=True):
+    move = os.replace if overwrite else os.rename
     for attempt in range(8):
         try:
-            os.replace(source, target)
+            move(source, target)
             return
         except OSError as error:
             # AV/indexers and readers can briefly deny replacement on Windows.
@@ -20,7 +23,35 @@ def _replace_complete_file(source, target):
             time.sleep(min(0.01 * 2 ** attempt, 0.1))
 
 
-def write_text(path, text):
+def _publish_new_file(source, target):
+    if os.name == 'nt':
+        # Windows rename fails rather than replacing an existing destination.
+        _replace_complete_file(source, target, overwrite=False)
+        return
+    try:
+        os.link(source, target)
+        return
+    except OSError as error:
+        if error.errno not in {errno.EPERM, errno.EOPNOTSUPP, errno.ENOSYS}:
+            raise
+    # Some portable drives lack hard links. Create exclusively and write
+    # through that descriptor so another export can never be overwritten.
+    import shutil
+    with open(source, 'rb') as ready, open(target, 'xb') as created:
+        try:
+            shutil.copyfileobj(ready, created)
+            created.flush()
+            os.fsync(created.fileno())
+        except BaseException:
+            try:
+                if os.path.samestat(os.stat(target, follow_symlinks=False), os.fstat(created.fileno())):
+                    os.unlink(target)
+            except OSError:
+                pass
+            raise
+
+
+def write_text(path, text, *, unique=False):
     path = os.path.abspath(path)
     parent = os.path.dirname(path)
     os.makedirs(parent, exist_ok=True)
@@ -33,6 +64,15 @@ def write_text(path, text):
             stream.flush()
             os.fsync(stream.fileno())
         # Same-directory replacement stays on the same filesystem.
+        if unique:
+            base, extension = os.path.splitext(path)
+            for index in count(1):
+                candidate = path if index == 1 else f'{base}_{index}{extension}'
+                try:
+                    _publish_new_file(temporary, candidate)
+                except FileExistsError:
+                    continue
+                return candidate
         _replace_complete_file(temporary, path)
     finally:
         if temporary is not None:
@@ -42,6 +82,6 @@ def write_text(path, text):
                 pass
 
 
-def write_json(path, payload, *, indent=None):
+def write_json(path, payload, *, indent=None, unique=False):
     # Serialization failures must also leave the previous file intact.
-    write_text(path, json.dumps(payload, ensure_ascii=False, indent=indent))
+    return write_text(path, json.dumps(payload, ensure_ascii=False, indent=indent), unique=unique)

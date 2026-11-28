@@ -37,9 +37,11 @@ def save_text(path, text):
     return path
 
 
-def save_session(path, session):
+def save_session(path, session, *, unique=False):
     payload = dict(session or {})
     payload.setdefault("saved_at", datetime.now().isoformat(timespec="seconds"))
+    if unique:
+        return write_json(path, payload, indent=2, unique=True)
     write_json(path, payload, indent=2)
     return path
 
