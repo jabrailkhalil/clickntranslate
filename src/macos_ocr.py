@@ -19,6 +19,22 @@ def supported_languages():
         return tuple(str(language) for language in languages or ())
 
 
+def localized_languages(interface_language):
+    """Present the exact recognition locales supplied by this version of Vision."""
+    from Foundation import NSLocale
+    from languages import get_language
+
+    locale = NSLocale.localeWithLocaleIdentifier_(interface_language)
+    for tag in supported_languages():
+        name = locale.localizedStringForLocaleIdentifier_(tag)
+        if not name or name == tag:
+            language = get_language(tag.split('-')[0])
+            name = language.display_name(interface_language) if language else tag
+            if language and tag.lower() != language.code:
+                name = f'{name} ({tag})'
+        yield tag, str(name)
+
+
 def language_codes():
     # Language availability depends on macOS, not on an invented fixed list.
     from languages import LANGUAGES as APP_LANGUAGES

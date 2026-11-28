@@ -65,6 +65,19 @@ def _check_engine_center(window, app, directory, report):
                         if index == 2:
                             assert dialog.api_page.isVisible()
                             assert not dialog.api_page.key.text(), 'smoke must not read stored credentials'
+                        if index == 0 and sys.platform == 'darwin':
+                            table = dialog.apple_vision_table
+                            labels = {table.item(row, 0).data(QtCore.Qt.UserRole): table.item(row, 1)
+                                      for row in range(table.rowCount())}
+                            known = {tag: item for tag, item in labels.items()
+                                     if tag.split('-')[0] in ('en', 'zh', 'yue')}
+                            assert any(tag.startswith('en') for tag in known), list(labels)
+                            assert all(item.text() != tag and not item.icon().isNull()
+                                       for tag, item in known.items())
+                            if 'zh-Hans' in known and 'zh-Hant' in known:
+                                assert known['zh-Hans'].text() != known['zh-Hant'].text()
+                            report['checks'].setdefault('apple_vision_languages', {})[locale] = {
+                                tag: item.text() for tag, item in known.items()}
                         name = f'center-{locale}-{"dark" if theme == "Темная" else "light"}-{index}.png'
                         assert dialog.grab().save(str(directory/name))
                         if name not in report['screenshots']:

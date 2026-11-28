@@ -270,6 +270,31 @@ def test_vision_does_not_silently_change_an_unsupported_language():
         vision.recognition_languages('ru', ['en-US'])
 
 
+@pytest.mark.parametrize('locale', ['en', 'ru', 'ar'])
+def test_vision_inventory_uses_the_interface_locale_and_keeps_native_variants(monkeypatch, locale):
+    from settings_window import OcrLanguageManagerDialog
+
+    labels = {
+        'en': ('English (United States)', 'Simplified Chinese', 'Traditional Chinese', 'Cantonese'),
+        'ru': ('Английский (США)', 'Китайский (упрощённый)', 'Китайский (традиционный)', 'Кантонский'),
+        'ar': ('الإنجليزية (الولايات المتحدة)', 'الصينية المبسطة', 'الصينية التقليدية', 'الكانتونية'),
+    }
+    tags = ('en-US', 'zh-Hans', 'zh-Hant', 'yue-Hant')
+    names = dict(zip(tags, labels[locale]))
+    native = mock.Mock()
+    native.localeWithLocaleIdentifier_.return_value.localizedStringForLocaleIdentifier_.side_effect = names.get
+    monkeypatch.setitem(sys.modules, 'Foundation', SimpleNamespace(NSLocale=native))
+    monkeypatch.setattr(vision, 'supported_languages', lambda: (*tags, 'x-fixture'))
+    manager = SimpleNamespace(lang=locale, _status_installed=lambda: 'OK', _set_language_rows=mock.Mock())
+    OcrLanguageManagerDialog._populate_apple_vision_table(manager, object())
+    rows = manager._set_language_rows.call_args.args[1]
+    assert [row['code'] for row in rows] == [*tags, 'x-fixture']
+    assert [row['name'] for row in rows] == [*labels[locale], 'x-fixture']
+    assert [row['icon'] for row in rows] == ['icons/flags/us.svg', *['icons/flags/cn.svg'] * 3, '']
+    assert all(row['code'] in row['package'] for row in rows)
+    assert all(call.args == (locale,) for call in native.localeWithLocaleIdentifier_.call_args_list)
+
+
 def test_retina_frozen_region_preserves_resolution_and_position(app):
     from PyQt5 import QtCore, QtGui
     import ocr

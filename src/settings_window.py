@@ -8542,11 +8542,16 @@ class OcrLanguageManagerDialog(QDialog):
         self._set_language_rows(table, rows)
 
     def _populate_apple_vision_table(self, table):
-        from macos_ocr import supported_languages
-        rows = [{"code": tag, "name": tag, "package": "macOS / Apple Vision",
-                 "status": self._status_installed(), "checked": True,
-                 "selectable": False, "show_checkbox": False}
-                for tag in supported_languages()]
+        from macos_ocr import localized_languages
+        rows = []
+        for tag, name in localized_languages(self.lang):
+            base = tag.split('-')[0]
+            rows.append({
+                "code": tag, "name": name, "package": f"Apple Vision · {tag}",
+                "icon": language_icon_path('zh' if base == 'yue' else base),
+                "status": self._status_installed(), "checked": True,
+                "selectable": False, "show_checkbox": False,
+            })
         self._set_language_rows(table, rows)
 
     def _populate_rapidocr_table(self, table):
