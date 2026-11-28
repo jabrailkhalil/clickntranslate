@@ -63,6 +63,15 @@ import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.flow.update
 
+private enum class SetupExplanation(val message: Int) {
+    START_CAPTURE(R.string.setup_overlay_body),
+    OVERLAY(R.string.setup_overlay_body),
+    OCR(R.string.setup_recognition_body),
+    ACCESSIBILITY(R.string.setup_accessibility_body),
+    NOTIFICATIONS(R.string.setup_notifications_body),
+    BATTERY(R.string.setup_background_body),
+}
+
 internal enum class MobileTab(val title: Int, val icon: ImageVector) {
     SCREEN(R.string.mobile_nav_screen, Icons.Outlined.CropFree),
     TEXT(R.string.mobile_nav_text, Icons.Outlined.Translate),
@@ -108,8 +117,7 @@ fun MobileShell(
         val stop = CompanionPrefs.observe(context) { heroSelected = CompanionPrefs.hasSelection(context) }
         onDispose { stop() }
     }
-    var pendingStart by rememberSaveable { mutableStateOf(false) }
-    var explanation by remember { mutableStateOf<Pair<Int, () -> Unit>?>(null) }
+    var explanation by rememberSaveable { mutableStateOf<SetupExplanation?>(null) }
     var accessibility by remember { mutableStateOf(dev.clickn.translate.trigger.AccessibilityServiceStatus.isEnabled(context)) }
     var notifications by remember { mutableStateOf(hasMobileNotifications(context)) }
     var battery by remember { mutableStateOf(hasMobileBatteryExemption(context)) }
@@ -140,7 +148,6 @@ fun MobileShell(
     val tab = MobileTab.valueOf(tabName)
     fun openService() { sheet = "services" }
     fun editInput(value: String) { input = value; viewModel.resetTranslation() }
-    fun grantOverlay() { explanation = R.string.setup_overlay_body to { openOverlayPermissionSettings(context) } }
     val readinessItems = settings?.let { current -> mobileReadinessItems(current, modelState, overlayAllowed,
         captureMode, shizukuReady, heroSelected, notifications, battery, accessibility) }.orEmpty()
     fun openReadinessItem(item: MobileReadinessKey) {
@@ -148,23 +155,34 @@ fun MobileShell(
         when (item) {
             MobileReadinessKey.LANGUAGES -> sheet = if (settings?.targetLang.isNullOrBlank() || settings?.targetLang == "auto") "target" else "source"
             MobileReadinessKey.SERVICE -> openService()
-            MobileReadinessKey.OCR -> explanation = R.string.setup_recognition_body to { onAdvancedSection("ocr") }
+            MobileReadinessKey.OCR -> explanation = SetupExplanation.OCR
             MobileReadinessKey.TRANSLATION_MODELS -> sheet = "offline"
-            MobileReadinessKey.OVERLAY -> grantOverlay()
+            MobileReadinessKey.OVERLAY -> explanation = SetupExplanation.OVERLAY
             MobileReadinessKey.CAPTURE -> sheet = "capture"
             MobileReadinessKey.HERO -> sheet = "floating"
-            MobileReadinessKey.ACCESSIBILITY -> explanation = R.string.setup_accessibility_body to {
+            MobileReadinessKey.ACCESSIBILITY -> explanation = SetupExplanation.ACCESSIBILITY
+            MobileReadinessKey.NOTIFICATIONS -> explanation = SetupExplanation.NOTIFICATIONS
+            MobileReadinessKey.BATTERY -> explanation = SetupExplanation.BATTERY
+        }
+    }
+    fun configure(prompt: SetupExplanation) {
+        explanation = null
+        when (prompt) {
+            SetupExplanation.START_CAPTURE -> context.startActivity(CaptureStartRequestActivity.newIntent(context))
+            SetupExplanation.OVERLAY -> openOverlayPermissionSettings(context)
+            SetupExplanation.OCR -> onAdvancedSection("ocr")
+            SetupExplanation.ACCESSIBILITY -> {
                 openSetupAndroidSettings(context, Intent("android.settings.ACCESSIBILITY_DETAILS_SETTINGS")
                     .putExtra("android.intent.extra.COMPONENT_NAME", android.content.ComponentName(context, dev.clickn.translate.trigger.ClickTranslateAccessibilityService::class.java)),
                     Intent(AndroidSettings.ACTION_ACCESSIBILITY_SETTINGS))
             }
-            MobileReadinessKey.NOTIFICATIONS -> explanation = R.string.setup_notifications_body to {
+            SetupExplanation.NOTIFICATIONS -> {
                 if (android.os.Build.VERSION.SDK_INT >= 33 && !notifications && !permissionPrefs.getBoolean("notifications_requested", false)) {
                     permissionPrefs.edit().putBoolean("notifications_requested", true).apply()
                     notificationRequest.launch(android.Manifest.permission.POST_NOTIFICATIONS)
                 } else openSetupAndroidSettings(context, Intent(AndroidSettings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(AndroidSettings.EXTRA_APP_PACKAGE, context.packageName))
             }
-            MobileReadinessKey.BATTERY -> explanation = R.string.setup_background_body to {
+            SetupExplanation.BATTERY -> {
                 openSetupAndroidSettings(context, Intent(AndroidSettings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")),
                     Intent(AndroidSettings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
             }
@@ -177,15 +195,8 @@ fun MobileShell(
         if (current.translatorEngine in offlineTranslationEngines && modelState.translationReady != true) { sheet = "offline"; return false }
         if (screen && modelState.ocrReady != true) { onAdvancedSection("ocr"); return false }
         if (screen && (captureMode == null || captureMode == CaptureStartMode.SHIZUKU && shizukuReady != true)) { sheet = "capture"; return false }
-        if (screen && !overlayAllowed) { pendingStart = true; grantOverlay(); return false }
+        if (screen && !overlayAllowed) { explanation = SetupExplanation.START_CAPTURE; return false }
         return true
-    }
-    LaunchedEffect(pendingStart, overlayAllowed, modelState, settings) {
-        val current = settings
-        if (pendingStart && overlayAllowed && current != null && !modelState.checking) {
-            pendingStart = false
-            if (preflight(current, true)) context.startActivity(CaptureStartRequestActivity.newIntent(context))
-        }
     }
     Scaffold(
         containerColor = Color.Transparent,
@@ -228,7 +239,7 @@ fun MobileShell(
                             if (running) context.startService(Intent(context, CaptureService::class.java).setAction(CaptureService.ACTION_STOP))
                             else if (preflight(current, true)) context.startActivity(CaptureStartRequestActivity.newIntent(context))
                         },
-                        onPermission = ::grantOverlay,
+                        onPermission = { explanation = SetupExplanation.OVERLAY },
                         onPhoto = { gallery.launch("image/*") }, onText = { tabName = MobileTab.TEXT.name },
                         checking = modelState.checking,
                         ready = mobileScreenReady(current, modelState, overlayAllowed, captureMode, shizukuReady),
@@ -295,14 +306,15 @@ fun MobileShell(
                 viewModel.closeProvider(); onAdvanced()
             })
     }
-    explanation?.let { (body, action) ->
+    explanation?.let { prompt ->
+        val body = prompt.message
         val message = if (body == R.string.setup_overlay_body) {
             stringResource(body, context.applicationInfo.loadLabel(context.packageManager).toString())
         } else stringResource(body)
-        AlertDialog(onDismissRequest = { explanation = null; pendingStart = false },
+        AlertDialog(onDismissRequest = { explanation = null },
             title = { Text(stringResource(R.string.refine_readiness)) }, text = { Text(message) },
-            confirmButton = { TextButton(onClick = { explanation = null; action() }) { Text(stringResource(R.string.mobile_configure)) } },
-            dismissButton = { TextButton(onClick = { explanation = null; pendingStart = false }) { Text(stringResource(R.string.mobile_cancel)) } })
+            confirmButton = { TextButton(onClick = { configure(prompt) }) { Text(stringResource(R.string.mobile_configure)) } },
+            dismissButton = { TextButton(onClick = { explanation = null }) { Text(stringResource(R.string.mobile_cancel)) } })
     }
     if (confirmClear) AlertDialog(onDismissRequest = { confirmClear = false },
         title = { Text(stringResource(R.string.mobile_clear_history)) },
