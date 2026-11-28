@@ -176,6 +176,7 @@ def _read_html_file(path):
     charset.feed(raw[:8192].decode('ascii', errors='ignore'))
     parser = _HTMLTextExtractor()
     parser.feed(_decode_text(raw, charset.encoding))
+    parser.close()
     return parser.text()
 
 
@@ -320,7 +321,21 @@ def _read_docx_file(path):
         raise DocumentParseError("Invalid DOCX file.") from exc
 
     root = ElementTree.fromstring(xml_data)
-    namespace = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+    strict = "{http://purl.oclc.org/ooxml/wordprocessingml/main}"
+    namespace = strict if root.tag == strict + "document" else "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+    compatibility = "{http://schemas.openxmlformats.org/markup-compatibility/2006}"
+    # Word can embed both a modern shape and a VML copy of the same textbox.
+    # Resolve nested alternatives first so a pruned branch cannot count as text.
+    for alternative in reversed(list(root.iter(compatibility + "AlternateContent"))):
+        choices = alternative.findall(compatibility + "Choice")
+        selected = next((choice for choice in choices if
+                         any(node.text and node.text.strip() for node in choice.iter(namespace + "t"))), None)
+        if selected is None:
+            selected = alternative.find(compatibility + "Fallback")
+        if selected is None and choices:
+            selected = choices[0]
+        if selected is not None:
+            alternative[:] = [selected]
     paragraphs = []
     for paragraph in root.iter(namespace + "p"):
         parts = []

@@ -96,3 +96,46 @@ def test_docx_run_control_preserves_its_plain_text_content(tmp_path, control, ex
     with zipfile.ZipFile(path, 'w') as archive:
         archive.writestr('word/document.xml', xml)
     assert parse_document(path).text == expected
+
+
+@pytest.mark.parametrize('markup,expected', [
+    ('<p>Contact AT&T', 'Contact AT&T'),
+    ('<div>Compare A &amp', 'Compare A &'),
+    ('<p>Prefix <', 'Prefix <'),
+])
+def test_html_end_of_file_flushes_the_last_paragraph(tmp_path, markup, expected):
+    path = tmp_path / 'last-paragraph.html'
+    path.write_text(markup, encoding='utf-8')
+    assert parse_document(path).text == expected
+
+
+def test_word_strict_ooxml_uses_its_own_paragraph_and_run_namespace(tmp_path):
+    xml = ('<w:document xmlns:w="http://purl.oclc.org/ooxml/wordprocessingml/main">'
+           '<w:body><w:p><w:r><w:t>Strict документ</w:t><w:tab/><w:t>مرحبا</w:t></w:r></w:p>'
+           '<w:p><w:r><w:t>Next paragraph</w:t></w:r></w:p></w:body></w:document>')
+    path = tmp_path / 'strict.docx'
+    with zipfile.ZipFile(path, 'w') as archive:
+        archive.writestr('word/document.xml', xml)
+    assert parse_document(path).text == 'Strict документ\tمرحبا\n\nNext paragraph'
+
+
+@pytest.mark.parametrize('readable_choice', [True, False])
+def test_docx_chooses_a_single_readable_textbox_representation(tmp_path, readable_choice):
+    def paragraph(text):
+        return '<w:p><w:r><w:t>' + text + '</w:t></w:r></w:p>'
+
+    choice = '<w:txbxContent>' + paragraph('Current caption') + '</w:txbxContent>' if readable_choice else ''
+    fallback = '<w:txbxContent>' + paragraph('Legacy caption') + '</w:txbxContent>'
+    xml = ('<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '
+           'xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" '
+           'xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" '
+           'xmlns:v="urn:schemas-microsoft-com:vml"><w:body>' + paragraph('Total') +
+           '<w:p><w:r><mc:AlternateContent><mc:Choice Requires="wps"><w:drawing><wps:wsp><wps:txbx>' +
+           choice + '</wps:txbx></wps:wsp></w:drawing></mc:Choice><mc:Fallback><w:pict><v:shape><v:textbox>' +
+           fallback + '</v:textbox></v:shape></w:pict></mc:Fallback></mc:AlternateContent></w:r></w:p>' +
+           paragraph('Total') + '</w:body></w:document>')
+    path = tmp_path / 'textbox-compatibility.docx'
+    with zipfile.ZipFile(path, 'w') as archive:
+        archive.writestr('word/document.xml', xml)
+    caption = 'Current caption' if readable_choice else 'Legacy caption'
+    assert parse_document(path).text == 'Total\n\n' + caption + '\n\nTotal'
