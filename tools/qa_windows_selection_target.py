@@ -147,9 +147,10 @@ def release_fixture_profile():
         assert not folder.exists()
 
 
-def check_global_hotkeys(window, command, top, requests, results, actions):
+def check_global_hotkeys(window, command, top, requests, results, actions, mta):
     import main
     import pyperclip
+    import windows_selection
     from assistant_text import assistant_text
     from PyQt5 import QtCore
 
@@ -256,24 +257,29 @@ def check_global_hotkeys(window, command, top, requests, results, actions):
             try:
                 wait_until(lambda: listener._registered, 'The fixture chord could not register')
                 if identifier == 4:
-                    # WPF can publish several formats while the copy shortcut is
-                    # returning. Repeat the actual registered chord to observe both schedules.
+                    # The accessible editor supplies its range without touching
+                    # either the system clipboard or the physical copy shortcut.
                     for attempt in range(4):
                         label = 'stable_window' if attempt == 0 else f'stable_window_repeat_{attempt + 1}'
                         with scenario(label, listener) as observation:
                             count = len(results)
                             request_count = len(requests)
+                            before_sequence = main._clipboard_sequence_number()
                             press(listener)
                             observation['before_dispatch'] = command('state', process_qt=False)
                             wait_until(lambda: len(results) == count + 1, 'The stable global selection did not complete')
                             normal = command('state')
-                            assert action_keys(normal) == [('First', 'C')] and requests[request_count:] == [SAMPLE], normal
+                            assert action_keys(normal) == [] and requests[request_count:] == [SAMPLE], normal
+                            assert main._clipboard_sequence_number() == before_sequence
                             assert results[-1][4] == SAMPLE and results[-1][0] == TRANSLATION
                         for dialog in main._live_translation_result_dialogs():
                             dialog.close()
 
                     with scenario('different_field_during_copy', listener) as observation:
                         command('switch-on-copy')
+                        observation['direct_uia_text'] = mta.submit(windows_selection.read_windows_selected_text).result(5)
+                        editor = mta.submit(windows_selection.read_windows_edit_target, top).result(5)
+                        assert observation['direct_uia_text'] == '' and editor and editor.window == top
                         request_count = len(requests)
                         press(listener)
                         observation['before_dispatch'] = command('state', process_qt=False)
@@ -283,6 +289,7 @@ def check_global_hotkeys(window, command, top, requests, results, actions):
                         assert moved['secondFocused'] and moved['selected'][1] == 'Second', moved
                         assert action_keys(moved) == [('First', 'C')] and len(requests) == request_count, moved
                         assert pyperclip.paste() == 'Second'
+                    command('restore-text-range')
 
                 with scenario(name, listener) as observation:
                     pyperclip.copy(CLIPBOARD)
@@ -387,8 +394,7 @@ def exercise(report, directory, exchange):
             assert finished == [True] and results and results[-1][0] == TRANSLATION
             assert results[-1][4] == SAMPLE and requests == [SAMPLE]
             read = report['selection'] = command('state')
-            assert action_keys(read) == [('First', 'C')], read
-            assert all(e['key'] in ('LeftCtrl', 'RightCtrl', 'C') for e in read['keys']), read
+            assert read['keys'] == [], read
             assert (read['first'], read['second']) == (first['first'], first['second'])
             assert pyperclip.paste() == CLIPBOARD and menu.isVisible()
             report['office_after_selection'] = command('office-state')['office']
@@ -493,7 +499,7 @@ def exercise(report, directory, exchange):
             check_office_clipboard(external, report['office_after_cancel'])
             delay = False
             report['global_hotkeys'] = {}
-            check_global_hotkeys(window, command, top, requests, results, report['global_hotkeys'])
+            check_global_hotkeys(window, command, top, requests, results, report['global_hotkeys'], mta)
             report.update(status='passed', provider_inputs=requests, completions=finished,
                           grid_clipboard_sequence_preserved=True, external_copy_sequence=foreign_sequence)
     finally:

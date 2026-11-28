@@ -5,6 +5,30 @@ if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hoste
     throw 'This fixture requires a disposable GitHub-hosted desktop.'
 }
 Add-Type -AssemblyName PresentationFramework
+Add-Type -AssemblyName UIAutomationProvider,UIAutomationTypes,System.Xaml
+$references = @([Windows.Controls.TextBox].Assembly.Location, [Windows.Media.Visual].Assembly.Location,
+                [Windows.DependencyObject].Assembly.Location, [Windows.Automation.Provider.IValueProvider].Assembly.Location,
+                [Windows.Automation.AutomationProperty].Assembly.Location, [System.Xaml.XamlReader].Assembly.Location,
+                [ComponentModel.Component].Assembly.Location)
+Add-Type -ReferencedAssemblies $references -TypeDefinition @'
+using System.Windows.Automation.Peers;
+using System.Windows.Controls;
+
+public class FixtureTextBox : TextBox {
+    public bool HideTextRange { get; set; }
+    protected override AutomationPeer OnCreateAutomationPeer() {
+        return new FixtureTextBoxPeer(this);
+    }
+}
+public class FixtureTextBoxPeer : TextBoxAutomationPeer {
+    private readonly FixtureTextBox editor;
+    public FixtureTextBoxPeer(FixtureTextBox editor) : base(editor) { this.editor = editor; }
+    public override object GetPattern(PatternInterface pattern) {
+        if (editor.HideTextRange && pattern.ToString().StartsWith("Text")) return null;
+        return base.GetPattern(pattern);
+    }
+}
+'@
 $xaml = @'
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -12,7 +36,7 @@ $xaml = @'
         Left="24" Top="32" WindowStartupLocation="Manual">
   <StackPanel Margin="12">
     <TextBlock Text="First editor"/>
-    <TextBox x:Name="First" Text="First: identical selection."/>
+    <ContentControl x:Name="FirstHost" HorizontalContentAlignment="Stretch"/>
     <TextBlock Text="Second editor"/>
     <TextBox x:Name="Second" Text="Second: identical selection."/>
     <DataGrid x:Name="Grid" Margin="0,12,0,0" Height="84" IsReadOnly="True"
@@ -23,7 +47,10 @@ $xaml = @'
 </Window>
 '@
 $window = [Windows.Markup.XamlReader]::Parse($xaml)
-$first = $window.FindName('First')
+$first = [FixtureTextBox]::new()
+$first.Name = 'First'
+$first.Text = 'First: identical selection.'
+$window.FindName('FirstHost').Content = $first
 $second = $window.FindName('Second')
 $grid = $window.FindName('Grid')
 $row = [PSCustomObject]@{ Label = 'Table row without a text range' }
@@ -113,7 +140,11 @@ $timer.Add_Tick({
         if ($op -eq 'reset-first') { $first.Text = 'First: identical selection.' }
         if ($op -eq 'office-copy') { Set-OfficeClipboard 'Clipboard before the fixture action' }
         if ($op -eq 'external-copy') { Set-OfficeClipboard 'identical selection' }
-        if ($op -eq 'switch-on-copy') { $script:switchOnCopy = $true }
+        if ($op -eq 'switch-on-copy') {
+            $first.HideTextRange = $true
+            $script:switchOnCopy = $true
+        }
+        if ($op -eq 'restore-text-range') { $first.HideTextRange = $false; $script:switchOnCopy = $false }
         if ($op -eq 'other-document') {
             $other.Show()
             $other.Activate() | Out-Null

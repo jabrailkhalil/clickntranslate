@@ -32,6 +32,33 @@ def test_releasing_the_mouse_during_a_foreground_handoff_ignores_the_missing_own
     assert activity == [] and not poller._left_down
 
 
+@pytest.mark.parametrize('new_text', ['Source selection', 'Independent new copy'])
+@pytest.mark.parametrize('can_read_selection', [True, False])
+def test_two_clipboard_publications_from_one_editor_keep_the_newest_even_with_matching_text(
+        capture, monkeypatch, new_text, can_read_selection):
+    # A real WPF copy publishes twice. A user copying the same letters in the
+    # same editor produces the same ambiguity, so the clipboard cannot decide.
+    clipboard = capture.clipboard
+    final_sequence = []
+    direct = mock.Mock(side_effect=['', 'Source selection' if can_read_selection else ''])
+    monkeypatch.setattr('selection_platform.read_selected_text', direct)
+
+    def finish_publication(seconds):
+        if seconds == .25 and not final_sequence:
+            clipboard.copy(new_text)
+            final_sequence.append(clipboard.sequence)
+
+    monkeypatch.setattr(main.time, 'sleep', finish_publication)
+    owner = SelectionRequest(copy_translated_text=True, result_window_hidden_modes=['selection'])
+    owner.launch_translate_selection(_hotkey_window=42)
+    assert clipboard.text == new_text and clipboard.sequence == final_sequence[0]
+    assert bool(capture.provider.called) == can_read_selection
+    assert len(owner.shown_dialogs) == int(can_read_selection)
+    if can_read_selection:
+        capture.provider.assert_called_once_with('Source selection', 'es', 'en')
+        assert owner.shown_dialogs[0][:2] == ('Translated selection', False)
+
+
 @pytest.mark.parametrize('second,paste_expected', [
     ('\tSource selection ', True), ('Source selection ', False), ('\tSource selection', False)])
 def test_replacement_requires_the_exact_original_whitespace(capture, monkeypatch, second, paste_expected):

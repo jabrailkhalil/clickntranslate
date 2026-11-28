@@ -310,8 +310,9 @@ def test_delayed_gui_restoration_respects_the_copy_that_arrived_while_queued(app
     assert isolated_clipboard.text() == 'A newer user copy'
 
 
-def test_default_translation_reads_an_accessible_selection_without_rendering_the_clipboard(
-        app, clipboard, monkeypatch):
+@pytest.mark.parametrize('restore', [False, True])
+def test_translation_reads_an_accessible_selection_without_rendering_the_clipboard(
+        app, clipboard, monkeypatch, restore):
     from clipboard_formats import application_clipboard_formats
 
     formats = application_clipboard_formats()
@@ -320,7 +321,7 @@ def test_default_translation_reads_an_accessible_selection_without_rendering_the
     monkeypatch.setattr(selection_platform, 'read_selected_text', lambda **_kwargs: 'Directly selected text')
     shortcut = mock.Mock()
     monkeypatch.setattr(main, 'simulate_copy', shortcut)
-    owner = _SelectionHarness({'restore_clipboard_after_selection': False, 'copy_translated_text': False})
+    owner = _SelectionHarness({'restore_clipboard_after_selection': restore, 'copy_translated_text': False})
     provider = mock.Mock(return_value='Translation')
     monkeypatch.setattr(translater, 'translate_text', provider)
     owner.launch_translate_selection()

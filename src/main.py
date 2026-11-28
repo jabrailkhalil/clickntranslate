@@ -13345,6 +13345,7 @@ class DarkThemeApp(QMainWindow):
             published_sequence = None
             translation_received = False
             edit_target = None
+            keep_newer_clipboard = False
 
             def owner_deleted():
                 return isinstance(self, QtCore.QObject) and sip.isdeleted(self)
@@ -13427,6 +13428,30 @@ class DarkThemeApp(QMainWindow):
             def capture_target_is_active():
                 return expected_target_is_active() and editor_is_active()
 
+            def read_direct_selection():
+                from selection_platform import read_selected_text
+                try:
+                    return read_selected_text(allow_copy_fallback=False, validate_target=capture_target_is_active)
+                except Exception:
+                    return ""
+
+            def read_copied_selection():
+                nonlocal keep_newer_clipboard
+                selected = clipboard_preservation.read_and_claim(capture_target_is_active, published_sequence)
+                if selected is not None:
+                    return selected
+                if (not platform_support.IS_WINDOWS or replace_selection or edit_target is None
+                        or published_sequence is None or _clipboard_sequence_number() == published_sequence
+                        or not capture_target_is_active()):
+                    return None
+                # WPF publishes a copy in two steps. A second user copy from
+                # the same editor can look identical. Only trust the UIA range.
+                selected = read_direct_selection()
+                if selected and capture_target_is_active():
+                    keep_newer_clipboard = True
+                    return selected
+                return None
+
             try:
                 if request_cancelled():
                     return
@@ -13443,19 +13468,14 @@ class DarkThemeApp(QMainWindow):
                         reject_editor_target()
                         return
                 direct_text = preloaded
-                if (not direct_text and not replace_selection
-                        and (platform_support.IS_WINDOWS or platform_support.IS_MAC)
-                        and not self.config.get("restore_clipboard_after_selection", False)):
+                if (not direct_text and not replace_selection and
+                        (platform_support.IS_WINDOWS or (platform_support.IS_MAC and
+                         not self.config.get("restore_clipboard_after_selection", False)))):
                     # This path can complete without changing, rendering or backing up
                     # an unrelated clipboard item, including an Office file promise.
-                    from selection_platform import read_selected_text
                     if not capture_target_is_active():
                         return
-                    try:
-                        direct_text = read_selected_text(allow_copy_fallback=False,
-                                                        validate_target=capture_target_is_active)
-                    except Exception:
-                        direct_text = ""
+                    direct_text = read_direct_selection()
                     if not capture_target_is_active():
                         return
                 if direct_text:
@@ -13533,7 +13553,7 @@ class DarkThemeApp(QMainWindow):
                     time.sleep(0.25)
                     if not capture_target_is_active():
                         return
-                    text = clipboard_preservation.read_and_claim(capture_target_is_active, published_sequence)
+                    text = read_copied_selection()
                     if text is None:
                         return
                 if not text or not text.strip():
@@ -13548,7 +13568,7 @@ class DarkThemeApp(QMainWindow):
                             if not capture_target_is_active():
                                 return
                         else:
-                            text = clipboard_preservation.read_and_claim(capture_target_is_active, published_sequence)
+                            text = read_copied_selection()
                             if text is None:
                                 return
                 if not text or not text.strip():
@@ -13587,6 +13607,11 @@ class DarkThemeApp(QMainWindow):
                 translation_received = True
 
                 save_translation_history(text, translated, target_code)
+
+                if keep_newer_clipboard:
+                    show_result(translated, False, lang, self.config.get('theme', 'Темная'),
+                                text, source_code, target_code)
+                    return
 
                 replacement_attempted = replace_selection
                 replacement_succeeded = False
