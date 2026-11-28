@@ -10701,12 +10701,20 @@ class HotkeyReferenceRow(QPushButton):
         super().keyPressEvent(event)
 
 
-class HotkeyLanguageDialog(QDialog):
-    """Compact, non-resizing editor opened from the main language-pair hint."""
+def _hotkey_source_codes(pairs):
+    available = {source for source, _ in pairs}
+    return (["auto"] if "auto" in available else []) + [
+        language.code for language in APP_LANGUAGES if language.code in available
+    ]
 
-    def __init__(self, owner):
+
+class HotkeyLanguageDialog(QDialog):
+    """Language and activation choices for a translation shortcut."""
+
+    def __init__(self, owner, anchor=None, mode=None):
         super().__init__(owner, Qt.Popup | Qt.FramelessWindowHint)
         self.owner = owner
+        self._anchor = anchor or getattr(owner, "hotkey_language_bar", None) or owner
         self.lang = owner.current_interface_language
         self._loading = False
         self.setAttribute(Qt.WA_TranslucentBackground, True)
@@ -10715,6 +10723,7 @@ class HotkeyLanguageDialog(QDialog):
 
         root = QFrame(self)
         root.setObjectName("hotkeyLanguageCard")
+        self._card = root
         from rounded_windows import clip_rounded_window
         clip_rounded_window(self, root, 7)
         root.setGeometry(self.rect())
@@ -10739,16 +10748,18 @@ class HotkeyLanguageDialog(QDialog):
 
         body = QLabel(hotkey_language_text(self.lang, "body"))
         body.setObjectName("hotkeyLanguageBody")
+        body.setWordWrap(True)
         layout.addWidget(body)
 
         self.mode_combo = DropDownCombo()
         self.mode_combo.setObjectName("hotkeyLanguageCombo")
-        for mode in HOTKEY_LANGUAGE_MODES:
-            hotkey = owner._hotkey_for_translation_mode(mode)
+        self.mode_combo.setAccessibleName(hotkey_language_text(self.lang, "mode"))
+        for action in HOTKEY_LANGUAGE_MODES:
+            hotkey = owner._hotkey_for_translation_mode(action)
             self.mode_combo.addItem(
-                f"{hotkey_language_text(self.lang, mode)}  ·  {hotkey}", mode
+                f"{hotkey_language_text(self.lang, action)}  ·  {hotkey}", action
             )
-        preferred_mode = owner._hotkey_language_editor_mode()
+        preferred_mode = mode or owner._hotkey_language_editor_mode()
         self.mode_combo.setCurrentIndex(
             max(0, self.mode_combo.findData(preferred_mode))
         )
@@ -10816,19 +10827,37 @@ class HotkeyLanguageDialog(QDialog):
     def current_mode(self):
         return str(self.mode_combo.currentData() or "selection")
 
-    def _load_mode(self):
+    def _position_at_anchor(self):
+        from ui_scaling import combo_popup_geometry
+        anchor = widget_global_rect(self._anchor)
+        screen = QApplication.screenAt(anchor.center()) or self.owner.screen()
+        bounds = screen.availableGeometry().adjusted(6, 6, -6, -6)
+        self.setFixedSize(min(520, max(1, bounds.width())),
+                          min(self._preferred_height, max(1, bounds.height())))
+        prepare_native_popup(self, anchor.center())
+        anchor.moveLeft(anchor.center().x() - self.width() // 2)
+        geometry = combo_popup_geometry(anchor, self.size(), bounds, 3)
+        y = max(bounds.top(), min(geometry.top(), bounds.bottom() - self.height() + 1))
+        self.move(geometry.left(), y)
+        self._card.setGeometry(self.rect())
+
+    def showEvent(self, event):
+        self._position_at_anchor()
+        super().showEvent(event)
+
+    def _load_mode(self, pairs=None):
         mode = self.current_mode()
         self.selection_trigger.setVisible(mode == 'selection')
-        self.setFixedHeight(302 if mode == 'selection' else 258)
-        self.findChild(QFrame, 'hotkeyLanguageCard').setGeometry(self.rect())
-        pairs = self.owner._available_hotkey_translation_pairs(mode)
-        source, target = self.owner._configured_hotkey_translation_pair(mode)
-        source_codes = [
-            language.code for language in APP_LANGUAGES
-            if any(pair_source == language.code for pair_source, _ in pairs)
-        ]
-        if any(source == 'auto' for source, _ in pairs):
-            source_codes.insert(0, 'auto')
+        self._preferred_height = 302 if mode == 'selection' else 258
+        if self.isVisible():
+            self._position_at_anchor()
+        else:
+            self.setFixedHeight(self._preferred_height)
+            self._card.setGeometry(self.rect())
+        if pairs is None:
+            pairs = self.owner._available_hotkey_translation_pairs(mode)
+        source, target = self.owner._configured_hotkey_translation_pair(mode, pairs)
+        source_codes = _hotkey_source_codes(pairs)
         self._loading = True
         try:
             self.source_combo.clear()
@@ -10847,20 +10876,19 @@ class HotkeyLanguageDialog(QDialog):
         ready = self.source_combo.count() > 0 and self.target_combo.count() > 0
         self.source_combo.setEnabled(ready)
         self.target_combo.setEnabled(ready)
-        self.swap_button.setEnabled(ready)
+        self.swap_button.setEnabled((self.target_combo.currentData(), self.source_combo.currentData()) in pairs)
+        self.mode_combo.setToolTip(tooltip_text(main_hotkey_tooltip(self.lang, mode)))
         self.status_label.setText(
             "" if ready else hotkey_language_text(self.lang, "no_pairs")
         )
-        self.owner.config["hotkey_language_editor_mode"] = mode
         # Loading a mode has the same read-only pair semantics as the inline
         # selector. Only edits to source/target may save a replacement pair.
-        self.owner.save_config()
-        self.owner._refresh_selection_pair_hint()
+        if mode != self.owner._hotkey_language_editor_mode():
+            self.owner.config["hotkey_language_editor_mode"] = mode
+            self.owner.save_config()
+            self.owner._refresh_selection_pair_hint(pairs)
 
-    def _fill_targets(self, preferred, pairs=None):
-        pairs = pairs or self.owner._available_hotkey_translation_pairs(
-            self.current_mode()
-        )
+    def _fill_targets(self, preferred, pairs):
         source = self.source_combo.currentData()
         targets = [
             language.code for language in APP_LANGUAGES
@@ -10884,28 +10912,34 @@ class HotkeyLanguageDialog(QDialog):
         if self._loading:
             return
         preferred = self.target_combo.currentData()
+        pairs = self.owner._available_hotkey_translation_pairs(self.current_mode())
         self._loading = True
         try:
-            self._fill_targets(preferred)
+            self._fill_targets(preferred, pairs)
         finally:
             self._loading = False
-        self._persist_pair()
+        self._persist_pair(pairs=pairs)
 
-    def _persist_pair(self, *_args):
+    def _persist_pair(self, *_args, pairs=None):
         if self._loading:
             return
+        mode = self.current_mode()
+        if pairs is None:
+            pairs = self.owner._available_hotkey_translation_pairs(mode)
         source = self.source_combo.currentData()
         target = self.target_combo.currentData()
-        if source and target:
-            self.owner._set_hotkey_translation_pair(
-                self.current_mode(), str(source), str(target)
-            )
+        if (source, target) not in pairs:
+            self._load_mode(pairs)
+            return
+        self.swap_button.setEnabled((target, source) in pairs)
+        self.owner._set_hotkey_translation_pair(mode, source, target, pairs)
 
     def _swap_languages(self):
         source = self.source_combo.currentData()
         target = self.target_combo.currentData()
         pairs = self.owner._available_hotkey_translation_pairs(self.current_mode())
         if not source or not target or (target, source) not in pairs:
+            self._load_mode(pairs)
             return
         self._loading = True
         try:
@@ -10913,7 +10947,7 @@ class HotkeyLanguageDialog(QDialog):
             self._fill_targets(source, pairs)
         finally:
             self._loading = False
-        self._persist_pair()
+        self._persist_pair(pairs=pairs)
 
     def closeEvent(self, event):
         if getattr(self.owner, "_hotkey_language_dialog", None) is self:
@@ -11686,7 +11720,7 @@ class DarkThemeApp(QMainWindow):
             logging.exception("Could not inspect hotkey language availability")
             return set()
 
-    def _configured_hotkey_translation_pair(self, mode):
+    def _configured_hotkey_translation_pair(self, mode, pairs=None):
         source_key, target_key = HOTKEY_LANGUAGE_CONFIG_KEYS.get(
             mode, HOTKEY_LANGUAGE_CONFIG_KEYS["selection"]
         )
@@ -11695,26 +11729,30 @@ class DarkThemeApp(QMainWindow):
             self.config.get(target_key, default_target_for_source(source))
             or default_target_for_source(source)
         ).lower()
-        pairs = self._available_hotkey_translation_pairs(mode)
+        if pairs is None:
+            pairs = self._available_hotkey_translation_pairs(mode)
         if (source, target) in pairs:
             return source, target
-        for source_language in APP_LANGUAGES:
-            for target_language in APP_LANGUAGES:
-                candidate = (source_language.code, target_language.code)
-                if candidate in pairs:
-                    return candidate
+        if pairs:
+            for source_language in APP_LANGUAGES:
+                for target_language in APP_LANGUAGES:
+                    candidate = (source_language.code, target_language.code)
+                    if candidate in pairs:
+                        return candidate
         if get_language(source) is None:
             source = "en"
         if get_language(target) is None or target == source:
             target = default_target_for_source(source)
         return source, target
 
-    def _set_hotkey_translation_pair(self, mode, source, target):
+    def _set_hotkey_translation_pair(self, mode, source, target, pairs=None):
         if mode not in HOTKEY_LANGUAGE_CONFIG_KEYS:
             return False
         source = str(source or "").lower()
         target = str(target or "").lower()
-        if (source, target) not in self._available_hotkey_translation_pairs(mode):
+        if pairs is None:
+            pairs = self._available_hotkey_translation_pairs(mode)
+        if (source, target) not in pairs:
             return False
         source_key, target_key = HOTKEY_LANGUAGE_CONFIG_KEYS[mode]
         source_changed = self.config.get(source_key) != source
@@ -11725,7 +11763,7 @@ class DarkThemeApp(QMainWindow):
         if source_changed and mode in {'ocr', 'fullscreen', 'game'}:
             from ocr_readiness import selected
             selected(self.config, language=source)
-        self._refresh_selection_pair_hint()
+        self._refresh_selection_pair_hint(pairs)
         return True
 
     def _fill_hotkey_target_control(self, preferred_target=None, pairs=None):
@@ -11733,8 +11771,8 @@ class DarkThemeApp(QMainWindow):
         target_combo = getattr(self, "hotkey_target_combo", None)
         if source_combo is None or target_combo is None:
             return
-        mode = self._hotkey_language_editor_mode()
-        pairs = pairs or self._available_hotkey_translation_pairs(mode)
+        if pairs is None:
+            pairs = self._available_hotkey_translation_pairs(self._hotkey_language_editor_mode())
         source = source_combo.currentData()
         targets = [
             language.code
@@ -11753,7 +11791,7 @@ class DarkThemeApp(QMainWindow):
             target_combo.findData(preferred_target) if preferred_target in targets else -1
         )
 
-    def _refresh_hotkey_language_controls(self):
+    def _refresh_hotkey_language_controls(self, pairs=None):
         mode_combo = getattr(self, "hotkey_mode_combo", None)
         source_combo = getattr(self, "hotkey_source_combo", None)
         target_combo = getattr(self, "hotkey_target_combo", None)
@@ -11761,8 +11799,9 @@ class DarkThemeApp(QMainWindow):
             return False
         try:
             mode = self._hotkey_language_editor_mode()
-            pairs = self._available_hotkey_translation_pairs(mode)
-            source, target = self._configured_hotkey_translation_pair(mode)
+            if pairs is None:
+                pairs = self._available_hotkey_translation_pairs(mode)
+            source, target = self._configured_hotkey_translation_pair(mode, pairs)
             self._hotkey_language_controls_loading = True
             mode_index = mode_combo.findData(mode)
             if mode_index >= 0 and mode_combo.currentIndex() != mode_index:
@@ -11770,13 +11809,7 @@ class DarkThemeApp(QMainWindow):
             mode_combo.setToolTip(
                 tooltip_text(main_hotkey_tooltip(self.current_interface_language, mode))
             )
-            source_codes = [
-                language.code
-                for language in APP_LANGUAGES
-                if any(pair_source == language.code for pair_source, _ in pairs)
-            ]
-            if any(source == 'auto' for source, _ in pairs):
-                source_codes.insert(0, 'auto')
+            source_codes = _hotkey_source_codes(pairs)
             source_combo.clear()
             for code in source_codes:
                 source_combo.addItem(
@@ -11829,14 +11862,15 @@ class DarkThemeApp(QMainWindow):
             return
         target_combo = getattr(self, "hotkey_target_combo", None)
         preferred = target_combo.currentData() if target_combo is not None else None
+        pairs = self._available_hotkey_translation_pairs(self._hotkey_language_editor_mode())
         self._hotkey_language_controls_loading = True
         try:
-            self._fill_hotkey_target_control(preferred)
+            self._fill_hotkey_target_control(preferred, pairs)
         finally:
             self._hotkey_language_controls_loading = False
-        self._persist_hotkey_language_controls()
+        self._persist_hotkey_language_controls(pairs=pairs)
 
-    def _persist_hotkey_language_controls(self, *_args):
+    def _persist_hotkey_language_controls(self, *_args, pairs=None):
         if getattr(self, "_hotkey_language_controls_loading", False):
             return
         source_combo = getattr(self, "hotkey_source_combo", None)
@@ -11845,22 +11879,11 @@ class DarkThemeApp(QMainWindow):
             return
         source = source_combo.currentData()
         target = target_combo.currentData()
-        if source and target:
-            self._set_hotkey_translation_pair(
-                self._hotkey_language_editor_mode(), str(source), str(target)
-            )
-        self._update_hotkey_language_swap()
-
-    def _update_hotkey_language_swap(self):
-        button = getattr(self, "hotkey_language_swap", None)
-        source_combo = getattr(self, "hotkey_source_combo", None)
-        target_combo = getattr(self, "hotkey_target_combo", None)
-        if not isinstance(button, QToolButton) or source_combo is None or target_combo is None:
-            return
-        source = source_combo.currentData()
-        target = target_combo.currentData()
-        pairs = self._available_hotkey_translation_pairs(self._hotkey_language_editor_mode())
-        button.setEnabled(bool(source and target and (str(target), str(source)) in pairs))
+        mode = self._hotkey_language_editor_mode()
+        if pairs is None:
+            pairs = self._available_hotkey_translation_pairs(mode)
+        if not self._set_hotkey_translation_pair(mode, source, target, pairs):
+            self._refresh_hotkey_language_controls(pairs)
 
     def _swap_hotkey_language_controls(self):
         source_combo = getattr(self, "hotkey_source_combo", None)
@@ -11873,34 +11896,16 @@ class DarkThemeApp(QMainWindow):
         if not source or not target:
             return
         pairs = self._available_hotkey_translation_pairs(mode)
-        if (str(target), str(source)) not in pairs:
-            self._update_hotkey_language_swap()
-            return
-        self._set_hotkey_translation_pair(mode, str(target), str(source))
-        self._refresh_hotkey_language_controls()
+        if not self._set_hotkey_translation_pair(mode, target, source, pairs):
+            self._refresh_hotkey_language_controls(pairs)
 
-    def show_hotkey_language_dialog(self):
+    def show_hotkey_language_dialog(self, anchor=None, mode=None):
         existing = getattr(self, "_hotkey_language_dialog", None)
         if existing is not None and existing.isVisible():
             existing.close()
             return
-        dialog = HotkeyLanguageDialog(self)
+        dialog = HotkeyLanguageDialog(self, anchor, mode)
         self._hotkey_language_dialog = dialog
-        anchor = getattr(self, "label", None)
-        if anchor is not None:
-            point = widget_global_point(anchor,
-                QtCore.QPoint((anchor.width() - dialog.width()) // 2, anchor.height() + 3)
-            )
-        else:
-            point = self.mapToGlobal(
-                QtCore.QPoint((self.width() - dialog.width()) // 2, 60)
-            )
-        screen = QApplication.screenAt(point) or QApplication.primaryScreen()
-        if screen is not None:
-            area = screen.availableGeometry()
-            point.setX(max(area.left() + 8, min(point.x(), area.right() - dialog.width() - 8)))
-            point.setY(max(area.top() + 8, min(point.y(), area.bottom() - dialog.height() - 8)))
-        dialog.move(point)
         dialog.show()
         dialog.raise_()
         dialog.activateWindow()
@@ -11997,16 +12002,16 @@ class DarkThemeApp(QMainWindow):
         except RuntimeError:
             return
 
-    def _refresh_selection_pair_hint(self):
+    def _refresh_selection_pair_hint(self, pairs=None):
         self._refresh_direction_summary()
-        if self._refresh_hotkey_language_controls():
+        if self._refresh_hotkey_language_controls(pairs):
             return
         label = getattr(self, "label", None)
         if label is None:
             return
         try:
             mode = self._hotkey_language_editor_mode()
-            source_code, target_code = self._configured_hotkey_translation_pair(mode)
+            source_code, target_code = self._configured_hotkey_translation_pair(mode, pairs)
             label.setText(
                 hotkey_language_text(self.current_interface_language, "hint").format(
                     mode=hotkey_language_text(self.current_interface_language, mode),

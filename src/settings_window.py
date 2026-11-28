@@ -13556,8 +13556,7 @@ class SettingsWindow(QWidget):
             self.parent._complete_guide_step("hotkeys")
 
     def _show_selection_mode_options(self):
-        self.parent.config['hotkey_language_editor_mode'] = 'selection'
-        self.parent.show_hotkey_language_dialog()
+        self.parent.show_hotkey_language_dialog(anchor=self.selection_mode_button, mode='selection')
 
     def focus_hotkey_setting(self, config_key):
         """Open the hotkey page and focus the field named by its config key."""
