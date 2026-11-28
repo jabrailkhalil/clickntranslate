@@ -14052,17 +14052,19 @@ class DarkThemeApp(QMainWindow):
                     "QFrame#mainTextSection {"
                     f" background:{background}; border:1px solid {border}; border-radius:10px; }}"
                     "QFrame#mainTextToolbar { background:transparent; border:0; }"
-                    "QLabel#mainTextSectionTitle {"
-                    f" color:{input_text}; background:transparent; border:none; font-size:12px; font-weight:600; }}"
                 )
             shortcuts = getattr(self, "main_shortcut_section", None)
             if isinstance(shortcuts, QFrame):
                 shortcuts.setStyleSheet(
                     "QFrame#mainShortcutSection {"
                     f" background:{background}; border:1px solid {border}; border-radius:10px; }}"
-                    "QLabel#mainShortcutSectionTitle {"
-                    f" color:{input_text}; background:transparent; border:none; font-size:12px; font-weight:600; }}"
                 )
+            from styled_dialogs import set_widget_stylesheet
+            title_style = f"color:{input_text}; background:transparent; border:none; font-size:12px; font-weight:600;"
+            for title in (getattr(self, 'main_text_section_title', None),
+                          getattr(self, 'main_shortcut_section_title', None)):
+                if isinstance(title, QLabel):
+                    set_widget_stylesheet(title, title_style)
             if isinstance(composer, QFrame):
                 composer.setStyleSheet(
                     "QFrame#mainComposer {"

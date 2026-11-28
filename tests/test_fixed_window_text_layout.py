@@ -196,12 +196,23 @@ class FixedWindowTextLayoutTest(unittest.TestCase):
             a, b = sorted((luminance(first), luminance(second)))
             return (b + .05) / (a + .05)
 
-        for theme in ("Темная", "Светлая"):
-            self.window.current_theme = theme
-            self.window.show_main_screen()
+        self.window.show_main_screen()
+        self.window.set_interface_language('ru')
+        for theme in ("Светлая", "Темная", "Светлая"):
+            if self.window.current_theme != theme:
+                self.window.toggle_theme()
             self.settle()
             screenshot = self.window.ui_root.grab().toImage()
             scale = screenshot.devicePixelRatio()
+            for label in (self.window.main_text_section_title, self.window.main_shortcut_section_title):
+                origin = label.mapTo(self.window.ui_root, QPoint())
+                left, top = round(origin.x() * scale), round(origin.y() * scale)
+                width, height = round(label.width() * scale), round(label.height() * scale)
+                surface = screenshot.pixelColor(left + 2, top + height // 2)
+                text_contrast = max(contrast(screenshot.pixelColor(x, y), surface)
+                                    for x in range(left + width // 3, left + 2 * width // 3)
+                                    for y in range(top + 1, top + height - 1))
+                self.assertGreaterEqual(text_contrast, 4.5, (theme, label.objectName()))
             for panel in (self.window.main_text_section, self.window.main_shortcut_section,
                           self.window.start_button):
                 edge = panel.mapTo(self.window.ui_root, QPoint(0, panel.height() // 2))
