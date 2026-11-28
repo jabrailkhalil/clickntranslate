@@ -582,6 +582,11 @@ class SettingsRepository internal constructor(
     // Kept outside both Settings and TranslationPreset: no export/diagnostic serializer sees these records.
     private fun presetCredentialKey(id: String) = stringPreferencesKey("local_preset_credentials_v1_$id")
 
+    private fun Preferences.hasUnreadableCredential() = credentialStringKeys.any { key ->
+        val stored = this[key]
+        stored != null && secretCodec.isEncrypted(stored) && secretCodec.decodeStored(stored) == null
+    }
+
     private fun Preferences.presetCredentials(id: String, requireReadable: Boolean = false): PresetCredentialRecord? {
         val stored = this[presetCredentialKey(id)]?.takeIf(secretCodec::isEncrypted) ?: return null
         val raw = secretCodec.decodeStored(stored)
@@ -594,7 +599,11 @@ class SettingsRepository internal constructor(
 
     private fun MutablePreferences.rememberCredentials(id: String, source: Settings) {
         val record = PresetCredentialPolicy.capture(id, source)
-        if (presetCredentials(id, requireReadable = true) == record) return
+        val previous = presetCredentials(id, requireReadable = true)
+        if (previous == record) return
+        if ((previous != null || record.groups.isNotEmpty()) && hasUnreadableCredential()) {
+            throw SecureSettingsUnavailableException()
+        }
         val key = presetCredentialKey(id)
         if (record.hasCredentials) {
             this[key] = secretCodec.encryptCredential(json.encodeToString(record))
@@ -800,12 +809,7 @@ class SettingsRepository internal constructor(
                 requested
             }
             val next = MangaOcrSettingsPolicy.normalize(languageSafe)
-            val hasUnreadableCredential by lazy {
-                credentialStringKeys.any { key ->
-                    val stored = prefs[key]
-                    stored != null && secretCodec.isEncrypted(stored) && secretCodec.decodeStored(stored) == null
-                }
-            }
+            val hasUnreadableCredential by lazy { prefs.hasUnreadableCredential() }
             fun writeProtected(key: Preferences.Key<String>, read: (Settings) -> String) {
                 val value = read(next)
                 val stored = prefs[key]

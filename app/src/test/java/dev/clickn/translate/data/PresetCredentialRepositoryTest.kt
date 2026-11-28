@@ -150,6 +150,24 @@ class PresetCredentialRepositoryTest {
     }
 
     @Test
+    fun editingAPresetCannotEraseItsReadableKeyWhenOnlyTheGlobalKeyIsUnavailable() = runBlocking {
+        val fixture = Fixture()
+        val repo = fixture.repo()
+        val source = Settings(apiKey = "synthetic-preset-key", baseUrl = "https://preset.example/v1")
+        val p = preset("partially-locked", source)
+        repo.saveTranslationPreset(p, source)
+        val before = fixture.protectedValues(p.id)
+        fixture.cipher.unreadableCiphertext = before.first().removePrefix(SettingsSecretCodec.PREFIX)
+        assertEquals("", repo.get().apiKey)
+        assertEquals(source.baseUrl, repo.get().baseUrl)
+        val failed = runCatching { repo.saveTranslationPreset(p) }
+        assertTrue(failed.exceptionOrNull() is SecureSettingsUnavailableException)
+        assertTrue(before == fixture.protectedValues(p.id))
+        fixture.cipher.unreadableCiphertext = null
+        assertTrue(repo.applyTranslationPreset(p.id)?.apiKey == source.apiKey)
+    }
+
+    @Test
     fun freshKeyWithNoKeystore_doesNotCommitAnUnusableProviderOrPlaintext() = runBlocking {
         val fixture = Fixture()
         val repo = fixture.repo()
@@ -266,6 +284,7 @@ class PresetCredentialRepositoryTest {
     private class TestCipher : SettingsSecretCipher {
         var fail = false
         var failRead = false
+        var unreadableCiphertext: String? = null
         val ciphertexts = mutableListOf<String>()
         private val key = KeyGenerator.getInstance("AES").apply { init(256) }.generateKey()
         override fun encrypt(plainText: String): String {
@@ -274,7 +293,7 @@ class PresetCredentialRepositoryTest {
             return Base64.getEncoder().encodeToString(cipher.iv + cipher.doFinal(plainText.toByteArray())).also(ciphertexts::add)
         }
         override fun decrypt(cipherText: String): String {
-            check(!failRead)
+            check(!failRead && cipherText != unreadableCiphertext)
             val bytes = Base64.getDecoder().decode(cipherText)
             val cipher = Cipher.getInstance("AES/GCM/NoPadding").apply { init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(128, bytes.copyOfRange(0, 12))) }
             return cipher.doFinal(bytes.copyOfRange(12, bytes.size)).toString(Charsets.UTF_8)
