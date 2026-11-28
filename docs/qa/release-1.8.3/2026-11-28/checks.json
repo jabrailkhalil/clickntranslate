@@ -1,0 +1,101 @@
+{
+  "date": "2026-11-28",
+  "desktop_regression": {
+    "commit": "15deff5e3fc7813c62acf3aabb1a6a74bd8c145d",
+    "github_run_id": 46145092732,
+    "windows": {"passed": 9026, "skipped": 101, "failed": 0, "errors": 0},
+    "linux": {"passed": 8938, "skipped": 189, "failed": 0, "errors": 0}
+  },
+  "native_desktop": {
+    "commit": "15deff5e3fc7813c62acf3aabb1a6a74bd8c145d",
+    "github_run_id": 46145094831,
+    "platforms": ["windows-x64", "linux-x11", "macos-intel", "macos-arm64"],
+    "passed_per_platform": 485,
+    "failed": 0,
+    "skipped": 0
+  },
+  "targeted_windows_ui": {
+    "test_cases": {
+      "test_desktop_ux": 37,
+      "test_first_run_defaults": 51,
+      "test_startup_news": 8,
+      "test_styled_dialogs": 17,
+      "test_welcome_content_fit": 100
+    },
+    "passed": 213,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "user_data_unchanged": true
+  },
+  "physical_mac": {
+    "model": "MacBook Air",
+    "os": "macOS Sonoma 14.3",
+    "architecture": "arm64",
+    "popup_direction": {
+      "commit": "f7c6fd61dd660556c286b321a962f7a3a2d2c176",
+      "coordinates": "Qt logical pixels",
+      "before": {"field_y": 446, "field_height": 24, "hotkey_mode_popup_y": 327, "hotkey_source_popup_y": 256, "hotkey_target_popup_y": 256},
+      "after_same_window_position": {"field_y": 446, "field_height": 24, "all_three_popup_y": 473},
+      "first_paint_openings": 40,
+      "first_paint_gap": 3,
+      "all_last_rows_fully_visible_after_scroll": true,
+      "placements": ["center at 100% EN", "bottom right at 80% RU", "bottom right at 135% AR", "top left at 150% EN"],
+      "source_smoke": {"cases": 96, "openings": 192, "both_themes": true, "gap": 3},
+      "welcome_picker": {"commit": "15deff5e3fc7813c62acf3aabb1a6a74bd8c145d", "locales": ["en", "ar"], "space_under_flag": [499, 268, 79], "old_bottom_gap": -420, "new_gap": 3, "last_row_reachable": true, "pointer_choices_persisted": ["en->ar", "ar->fr"], "escape_and_outside_click_preserve_language": true},
+      "short_result_menu": {"commit": "06261adfde186e305dcb9aa3af658cfbb84191dd", "scale_percent": 150, "space_below_field": 95, "locales": ["ru", "ar"], "complete_rows_after_scroll_per_locale": 5},
+      "gesture_checks": {"passed": 21, "locales": ["en", "ru", "ar"]},
+      "native_popup_surfaces": {"tested_scales": [80, 100, 135], "opaque": false, "native_background_alpha": 0, "corner_alpha": [0, 0, 0, 0]}
+    },
+    "app": {
+      "commit": "15deff5e3fc7813c62acf3aabb1a6a74bd8c145d",
+      "github_run_id": 46145090462,
+      "github_job_id": 140979261722,
+      "dmg_sha256": "1f57fa8bfb81b0aa36df620dcf275b557c0fa7c8bcdafcdd69a534391bb59bbc",
+      "dropdowns": {"cases": 96, "openings": 192, "anchor_gap": 3, "both_themes": true},
+      "window_placement_cases": 48,
+      "rendered_screenshots": 966,
+      "launchservices": "ok",
+      "gui": "ok",
+      "settings": "ok",
+      "vision": "ok",
+      "rapidocr_helper": "ok",
+      "argos_helper": "ok",
+      "screen_recording_permission": true,
+      "accessibility_permission": true,
+      "signature_integrity": "passed",
+      "gatekeeper_assessment": "rejected"
+    },
+    "ssh_python_selection": {
+      "accessibility_permission": false,
+      "private_pasteboard_checks": "passed",
+      "cross_app_selection": "skipped"
+    },
+    "window_headers": {
+      "commit": "0ced7ce6bd957857e133de0830ce601a50e846e8",
+      "qt_platform": "cocoa",
+      "cases": [
+        {"locale": "ru", "theme": "dark", "os_title": "Click'n'Translate", "settings": "Click'n'Translate", "faq": "V1.8.3"},
+        {"locale": "en", "theme": "light", "os_title": "Click'n'Translate", "settings": "Click'n'Translate", "faq": "V1.8.3"},
+        {"locale": "ar", "theme": "dark", "os_title": "Click'n'Translate", "settings": "Click'n'Translate", "faq": "V1.8.3"}
+      ]
+    }
+  },
+  "android_15": {
+    "commit": "e29e0dd6e4e6c828a99475d3aa67d913ce6c0e9c",
+    "github_run_id": 46140073563,
+    "environment": "emulator",
+    "onboarding_stages_passed": 13,
+    "version_in_layout_dumps": {"help-version": "Version 1.8.3"},
+    "jvm": {"passed": 2014, "failed": 0, "errors": 0, "skipped": 0},
+    "installer_scenario": {"system_confirmation_opened": true, "damaged_file_rejected": true, "in_place_upgrade": [45, 46], "preferences_and_model_job_preserved": true, "signer": "ephemeral QA certificate"}
+  },
+  "linux_rapidocr": {
+    "commit": "deca3593f98ec5ee893aeecc91c173374e4f91e7",
+    "github_run_id": 46137566069,
+    "github_job_id": 140956187304,
+    "independent_images": 36,
+    "exact_letters_and_marks": {"original": 7, "candidate": 23, "retained": 7},
+    "median_recognition_ms": {"original": 1043.1, "candidate": 266.2}
+  }
+}
