@@ -5,12 +5,20 @@ columns and visible paragraph gaps remain separate translation blocks.
 """
 import math
 import re
+import unicodedata
 
 
 # Bidi formatting can precede a visible marker without changing list identity.
 # Recognize the prefix without removing those controls from the source text.
 _LIST_START = re.compile(r'^[\s\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]*(?:[-*•●▪‣–—]|\d+[.)]|[A-Za-z][.)])\s+')
 _PARAGRAPH_BREAK = re.compile(r'\n[ \t]*\n+')
+
+
+def _cjk_wrap_character(char):
+    if unicodedata.east_asian_width(char) not in {'W', 'F', 'H'}:
+        return False
+    return (unicodedata.category(char).startswith('P') or unicodedata.name(char, '').startswith(
+        ('CJK UNIFIED IDEOGRAPH-', 'CJK COMPATIBILITY IDEOGRAPH-', 'HIRAGANA', 'KATAKANA', 'HALFWIDTH KATAKANA')))
 
 
 def _join(left, right):
@@ -24,8 +32,15 @@ def _join(left, right):
         return left[:-1] + right
     if len(left)>1 and left.endswith(('-', '\u2010')) and left[-2].isalpha() and right[0].isalpha():
         return left + right
-    cjk = lambda c: '\u3400' <= c <= '\u9fff' or '\u3040' <= c <= '\u30ff'
-    return left + ('' if cjk(left[-1]) and cjk(right[0]) else ' ') + right
+    if unicodedata.category(right[0]).startswith('M'):
+        return left + right
+    if _cjk_wrap_character(right[0]):
+        # Find the preceding base character underneath any combining marks or
+        # variation selectors. Korean words normally retain their spaces.
+        previous = next((c for c in reversed(left) if not unicodedata.category(c).startswith('M')), '')
+        if previous and _cjk_wrap_character(previous):
+            return left + right
+    return left + ' ' + right
 
 
 def merge_text_lines(text):

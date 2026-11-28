@@ -61,3 +61,17 @@ def test_mixed_explicit_paragraphs_and_bidi_lists_reflow_only_their_wraps():
     source = 'Introduction\r\ncontinues\u2029\u200f1. First item\u2028wraps\u2028\u200f2. Second item'
     assert ocr_paragraphs.merge_text_lines(source) == (
         'Introduction continues\n\n\u200f1. First item wraps\n\n\u200f2. Second item')
+
+
+@pytest.mark.parametrize(('left', 'right', 'joined'), [
+    ('庭に花が咲いた。', '春です。', '庭に花が咲いた。春です。'),
+    ('「', '日本語」', '「日本語」'), ('本を読む', '。', '本を読む。'),
+    ('大家好，', '欢迎！', '大家好，欢迎！'),
+    ('𠮷', '野家', '𠮷野家'), ('第一', '𠀀', '第一𠀀'),
+    ('مَلَك', '\u064c', 'مَلَكٌ'), ('cafe', '\u0301', 'cafe\u0301'),
+    ('꽃이', '핀다', '꽃이 핀다'), ('Version 1.', 'Next line', 'Version 1. Next line'),
+])
+def test_soft_wraps_keep_cjk_punctuation_and_combining_marks_attached(left, right, joined):
+    assert ocr_paragraphs.merge_text_lines(left + '\n' + right) == joined
+    rows = [(0, 0, 180, 20, left), (0, 25, 180, 20, right)]
+    assert ocr_paragraphs.paragraph_text(rows) == joined

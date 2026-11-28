@@ -47,6 +47,14 @@ def test_unrepresentable_row_coordinate_retains_text_as_an_unpositioned_block(co
     assert ocr_paragraphs.paragraph_text(rows) == 'Known\n\nUnknown'
 
 
+@pytest.mark.parametrize('joined', [False, True])
+def test_a_bad_coordinate_does_not_discard_other_visible_screen_translations(joined):
+    import ocr
+    known = (10, 10, 110, 20, 'Visible caption')
+    assert ocr._group_screen_ocr_lines([(10 ** 1000, 5, 75, 15, 'Bad coordinate'), known],
+                                       join_paragraphs=joined) == [known]
+
+
 @pytest.mark.parametrize('point', range(4))
 def test_unrepresentable_sdk_box_does_not_drop_the_recognized_text(point):
     box = [[10, 10], [90, 10], [90, 26], [10, 26]]

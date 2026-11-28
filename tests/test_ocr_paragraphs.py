@@ -72,6 +72,19 @@ def test_tilted_word_boxes_are_joined_before_the_column_reader_runs():
     assert ocr_text_from_items(items(rectangles), join_paragraphs=True) == 'A B C D E F'
 
 
+@pytest.mark.parametrize(('words', 'expected'), [
+    (['open', 'the', 'door'], 'open the door'),
+    (['الآن', 'الباب', 'افتح'], 'افتح الباب الآن'),
+])
+def test_screen_line_mode_keeps_a_slightly_lower_middle_word_with_its_neighbors(words, expected):
+    import ocr
+    line = [(0, 0, 14, 20, words[0]), (20, 2, 14, 20, words[1]), (41, 0, 14, 20, words[2])]
+    distant_column = (120, 0, 40, 20, 'Other')
+    next_baseline = (0, 30, 55, 20, 'Next')
+    assert ocr._group_screen_ocr_lines(line + [distant_column, next_baseline]) == [
+        (0, 0, 55, 22, expected), distant_column, next_baseline]
+
+
 def test_list_items_and_blank_lines_are_not_flattened():
     assert merge_text_lines('A wrapped\nparagraph.\n\n1. First item\ncontinues\n2. Second item')==(
         'A wrapped paragraph.\n\n1. First item continues\n\n2. Second item')

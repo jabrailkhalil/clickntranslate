@@ -95,6 +95,20 @@ def test_plain_vision_explicitly_preserves_visual_breaks_for_copy_and_unjoined_t
     assert 'preserve the visual line breaks' in request.call_args.args[3].lower()
 
 
+@pytest.mark.parametrize(('recognize', 'answer'), [
+    (api.recognize, '{"source":"","translation":null}'),
+    (api.recognize_regions, '{"regions":[]}'),
+])
+@pytest.mark.parametrize(('source', 'expected_hint'), [
+    ('ar', 'source language is Arabic'), ('ja', 'source language is Japanese'),
+    ('auto', 'Detect the source language'), ('universal', 'Detect the source language'),
+])
+def test_vision_respects_the_selected_source_language_for_copy(config, recognize, answer, source, expected_hint):
+    with mock.patch.object(api, '_text_response', return_value=answer) as request:
+        recognize('openai', Image.new('RGB', (40, 20)), source, None, config)
+    assert expected_hint in request.call_args.args[3]
+
+
 @pytest.mark.parametrize('box', [[0,0,1001,30],[10,10,5,30],[0,0,float('nan'),10],[True,0,10,10]])
 def test_invalid_model_boxes_are_rejected(config, box):
     with mock.patch.object(api, '_text_response', return_value=json.dumps({'regions':[{'source':'Hi','box':box,'translation':'Привет'}]})):

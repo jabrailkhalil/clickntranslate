@@ -6303,6 +6303,26 @@ def warm_up():
 # Fullscreen Translate — OCR all text on screen and overlay translations
 # ============================================================
 
+def _bridged_screen_group(groups, candidates, closest, x, y, right_edge, bottom_edge):
+    # A slightly lower middle word can arrive after both ends of a line.
+    # Join its neighbors only for ordinary word spacing and aligned glyphs.
+    left_neighbor = right_neighbor = None
+    for index in candidates:
+        _, left, right, top, bottom = groups[index]
+        height = min(bottom - top, bottom_edge - y)
+        if max(abs(y - top), abs(bottom_edge - bottom)) > height / 8:
+            continue
+        if 0 <= x - right <= height / 2 and (left_neighbor is None or right > groups[left_neighbor][2]):
+            left_neighbor = index
+        elif 0 <= left - right_edge <= height / 2 and (right_neighbor is None or left < groups[right_neighbor][1]):
+            right_neighbor = index
+    if closest == left_neighbor:
+        return right_neighbor
+    if closest == right_neighbor:
+        return left_neighbor
+    return None
+
+
 def _group_screen_ocr_lines(lines_data, *, join_paragraphs=False):
     """Return stable visual lines, merging only fragments on the same baseline.
 
@@ -6322,7 +6342,7 @@ def _group_screen_ocr_lines(lines_data, *, join_paragraphs=False):
             continue
         try:
             x, y, width, height = (float(item[0]), float(item[1]), float(item[2]), float(item[3]))
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             continue
         text = str(item[4] or "").strip()
         if not text or not all(math.isfinite(value) for value in (x, y, width, height)) or width <= 0 or height <= 0:
@@ -6334,37 +6354,54 @@ def _group_screen_ocr_lines(lines_data, *, join_paragraphs=False):
     active = []
     for line in lines:
         x, y, width, height, _text = line
+        right_edge, bottom_edge = x + width, y + height
         best_group = None
         best_gap = None
+        competing_groups = None
         # Finished baselines cannot match this or any following box. Cache
         # bounds instead of repeatedly scanning all members of every group.
         active = [index for index in active if groups[index][4] > y]
         for group_index in active:
             _members, left, right, top, bottom = groups[group_index]
-            vertical_overlap = max(0.0, min(y + height, bottom) - max(y, top))
+            vertical_overlap = max(0.0, min(bottom_edge, bottom) - max(y, top))
             vertical_ratio = vertical_overlap / max(1.0, min(height, bottom - top))
-            horizontal_gap = max(0.0, max(left, x) - min(right, x + width))
+            horizontal_gap = max(0.0, max(left, x) - min(right, right_edge))
             same_baseline = vertical_ratio >= 0.58
             close_fragment = horizontal_gap <= max(18.0, 1.25 * max(height, bottom - top))
             if not (same_baseline and close_fragment):
                 continue
+            if best_group is not None:
+                if competing_groups is None:
+                    competing_groups = [best_group]
+                competing_groups.append(group_index)
             if best_gap is None or horizontal_gap < best_gap:
                 best_group = group_index
                 best_gap = horizontal_gap
         if best_group is None:
             active.append(len(groups))
-            groups.append([[line], x, x + width, y, y + height])
+            groups.append([[line], x, right_edge, y, bottom_edge])
         else:
             group = groups[best_group]
             group[0].append(line)
+            if competing_groups:
+                other_index = _bridged_screen_group(groups, competing_groups, best_group, x, y, right_edge, bottom_edge)
+                if other_index is not None:
+                    members, left, right, top, bottom = groups[other_index]
+                    group[0].extend(members)
+                    members.clear()
+                    active.remove(other_index)
+                    x, right_edge = min(x, left), max(right_edge, right)
+                    y, bottom_edge = min(y, top), max(bottom_edge, bottom)
             group[1] = min(group[1], x)
-            group[2] = max(group[2], x + width)
+            group[2] = max(group[2], right_edge)
             group[3] = min(group[3], y)
-            group[4] = max(group[4], y + height)
+            group[4] = max(group[4], bottom_edge)
 
     blocks = []
     from ocr_text_layout import inline_reading_order
     for group, min_x, max_x, min_y, max_y in groups:
+        if not group:
+            continue
         ordered = inline_reading_order(group, position=lambda item: item[0],
                                        text=lambda item: item[4])
         text = " ".join(item[4] for item in ordered)
