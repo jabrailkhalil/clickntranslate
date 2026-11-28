@@ -29,7 +29,7 @@ class CaptureError(RuntimeError):
 
 
 class CaptureDeclined(CaptureError):
-    """The portal ended or refused the request. Do not start another capture."""
+    """A screenshot permission request ended without authorization to capture."""
 
 
 class CaptureCancelled(CaptureDeclined):
@@ -107,7 +107,7 @@ def portal_available():
         return False
 
 
-def capture_with_portal():
+def capture_with_portal(*, capture_mode=None):
     """Ask the desktop portal for a screenshot. Returns a PNG path.
 
     The portal answers asynchronously: the method call returns the object path
@@ -145,6 +145,8 @@ def capture_with_portal():
         rejects it at runtime.  Unit tests did not expose that distinction;
         wlroots' real ``Response(uint, a{sv})`` signal does.
         """
+
+        owner_changed = QtCore.pyqtSignal()
 
         @QtCore.pyqtSlot("uint", "QVariantMap")
         def receive(self, response_code, results):
@@ -220,14 +222,40 @@ def capture_with_portal():
         ):
             raise CaptureError("Could not listen for the portal response.")
 
+    def close_request():
+        message = QtDBus.QDBusMessage.createMethodCall(
+            "org.freedesktop.portal.Desktop", request_path,
+            "org.freedesktop.portal.Request", "Close",
+        )
+        try:
+            bus.asyncCall(message)
+        except RuntimeError as exc:
+            logging.debug("Could not close the pending portal request: %s", exc)
+
+    superseded = False
+    def stop_waiting():
+        nonlocal superseded
+        if result["response"] is None and not superseded:
+            superseded = True
+            close_request()
+            # A closed portal request sends no Response.
+            loop.quit()
+
+    from mode_coordinator import active_mode, subscribe
+    unsubscribe = None
+    if result["response"] is None and capture_mode is not None and active_mode() == capture_mode:
+        receiver.owner_changed.connect(stop_waiting)
+        unsubscribe = subscribe(receiver.owner_changed.emit)
     timer = QtCore.QTimer()
     timer.setSingleShot(True)
     timer.timeout.connect(loop.quit)
     timer.start(_PORTAL_TIMEOUT_MS)
     try:
-        if result["response"] is None:
+        if result["response"] is None and not superseded:
             loop.exec_()
     finally:
+        if unsubscribe is not None:
+            unsubscribe()
         timer.stop()
         bus.disconnect(
             "org.freedesktop.portal.Desktop",
@@ -237,15 +265,13 @@ def capture_with_portal():
             receiver.receive,
         )
 
+    if superseded:
+        raise CaptureCancelled("The capture mode was stopped while waiting for the screenshot.")
     if result["response"] is None:
         # A timeout only ends our wait. Explicitly dismiss the outstanding
         # request so its permission dialog cannot remain on the desktop.
-        message = QtDBus.QDBusMessage.createMethodCall(
-            "org.freedesktop.portal.Desktop", request_path,
-            "org.freedesktop.portal.Request", "Close",
-        )
-        bus.asyncCall(message)
-        raise CaptureError("The desktop portal did not answer the screenshot request.")
+        close_request()
+        raise CaptureDeclined("The desktop portal did not answer the screenshot request.")
     if result["response"] == 1:
         raise CaptureCancelled("The screenshot request was cancelled.")
     if result["response"] != 0:
@@ -407,7 +433,7 @@ def qt_platform_name():
         return ""
 
 
-def grab_screen(screen):
+def grab_screen(screen, *, capture_mode=None):
     """Full-screen pixmap for `screen`, using the best available backend.
 
     Raises CaptureError when nothing on this system can produce a screenshot.
@@ -445,7 +471,7 @@ def grab_screen(screen):
 
     if portal_available():
         try:
-            path = capture_with_portal()
+            path = capture_with_portal(capture_mode=capture_mode)
             try:
                 pixmap = QtGui.QPixmap(path)
                 if not pixmap.isNull():

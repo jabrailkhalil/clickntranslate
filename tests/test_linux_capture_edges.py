@@ -86,7 +86,7 @@ def test_fractional_portal_matches_live_and_frozen_crops_on_both_monitors(app, m
     for screen in screens:
         full = capture.crop_to_screen(composite, screen)
         assert full.devicePixelRatioF() == pytest.approx(1.5, abs=0.00002)
-        monkeypatch.setattr(capture, 'grab_screen', lambda _screen: full)
+        monkeypatch.setattr(capture, 'grab_screen', mock.Mock(return_value=full))
         for x, y in [(137, 88), (159, 446), (379, 279)]:
             selected = QtCore.QRect(x, y, 15, 11)
             frozen = ocr.crop_frozen_pixmap(full, selected)

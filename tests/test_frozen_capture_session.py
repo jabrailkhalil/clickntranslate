@@ -162,13 +162,11 @@ def test_denied_fullscreen_capture_stops_before_constructing_visible_controls(fr
     monkeypatch.setattr(ocr, 'DropDownCombo', controls)
     monkeypatch.setattr(QtWidgets.QWidget, 'show', mock.Mock())
     monkeypatch.setattr(ocr, '_fullscreen_overlay_ref', None)
-    monkeypatch.setattr(ocr, '_fullscreen_translate_busy', False)
     mode_coordinator._reset_for_tests()
     try:
         ocr.run_fullscreen_translate()
         assert mode_coordinator.active_mode() is None
         assert ocr._fullscreen_overlay_ref is None
-        assert ocr._fullscreen_translate_busy is False
         controls.assert_not_called()
         grab.assert_called_once()
     finally:

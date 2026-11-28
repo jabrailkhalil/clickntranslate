@@ -2629,7 +2629,7 @@ class _CaptureRequestDeclined(Exception):
     """The current capture must close after a desktop permission decision."""
 
 
-def grab_screen_pixmap(screen, x=0, y=0, width=-1, height=-1, *, abort_on_denial=False):
+def grab_screen_pixmap(screen, x=0, y=0, width=-1, height=-1, *, capture_mode=None):
     """Grab (part of) `screen`.
 
     Windows and X11 read the root window through Qt. Wayland refuses that, so
@@ -2641,7 +2641,7 @@ def grab_screen_pixmap(screen, x=0, y=0, width=-1, height=-1, *, abort_on_denial
     if platform_support.IS_MAC:
         from macos_desktop import permission_granted
         if not permission_granted("screen"):
-            if abort_on_denial:
+            if capture_mode is not None:
                 raise _CaptureRequestDeclined("macOS Screen Recording permission is unavailable")
             return QtGui.QPixmap()
     wants_region = width > 0 and height > 0
@@ -2649,9 +2649,9 @@ def grab_screen_pixmap(screen, x=0, y=0, width=-1, height=-1, *, abort_on_denial
         import linux_capture
 
         try:
-            pixmap = linux_capture.grab_screen(screen)
+            pixmap = linux_capture.grab_screen(screen, capture_mode=capture_mode)
         except linux_capture.CaptureError as exc:
-            if abort_on_denial and isinstance(exc, linux_capture.CaptureDeclined):
+            if capture_mode is not None and isinstance(exc, linux_capture.CaptureDeclined):
                 raise _CaptureRequestDeclined(str(exc)) from exc
             logging.error(f"Screen capture is unavailable: {exc}")
             return QtGui.QPixmap()
@@ -4571,7 +4571,8 @@ class ScreenCaptureOverlay(QWidget):
             drawn_any = False
             target_screen = self._active_screen or self._get_active_screen()
             if target_screen is not None:
-                shot = grab_screen_pixmap(target_screen, abort_on_denial=True)
+                capture_mode = f"capture:{self.mode}"
+                shot = grab_screen_pixmap(target_screen, capture_mode=capture_mode)
                 logging.debug(
                     f"[OCR:{session_id}] Frozen grab attempt full screen; screen={_screen_to_text(target_screen)}, "
                     f"shot_null={shot.isNull()}, shot_size={shot.width()}x{shot.height()}, dpr={shot.devicePixelRatio():.3f}"
@@ -4581,7 +4582,7 @@ class ScreenCaptureOverlay(QWidget):
                 # by the user, without changing the capture strategy.
                 if shot.isNull() and not (platform_support.IS_LINUX and platform_support.is_wayland()):
                     shot = grab_screen_pixmap(target_screen, 0, 0, screen_rect.width(), screen_rect.height(),
-                                              abort_on_denial=True)
+                                              capture_mode=capture_mode)
                     logging.debug(
                         f"[OCR:{session_id}] Frozen grab retry; shot_null={shot.isNull()}, "
                         f"shot_size={shot.width()}x{shot.height()}, dpr={shot.devicePixelRatio():.3f}"
@@ -6176,6 +6177,38 @@ def _is_gui_thread():
     return app is not None and QtCore.QThread.currentThread() == app.thread()
 
 
+class _CaptureDispatcher(QtCore.QObject):
+    @QtCore.pyqtSlot(object)
+    def dispatch(self, callback):
+        try:
+            callback()
+        except Exception:
+            logging.exception("Could not start the queued screen capture")
+
+
+_capture_dispatch_lock = threading.Lock()
+
+
+def _queue_capture_outside_gui(callback):
+    app = QApplication.instance()
+    if app is None:
+        if threading.current_thread() is threading.main_thread():
+            return False  # The standalone entry point creates its own QApplication.
+        logging.warning("A worker cannot start screen capture before the GUI is available")
+        return True
+    if QtCore.QThread.currentThread() == app.thread():
+        return False
+    with _capture_dispatch_lock:
+        dispatcher = getattr(app, '_ocr_capture_dispatcher', None)
+        if dispatcher is None:
+            dispatcher = _CaptureDispatcher()
+            dispatcher.moveToThread(app.thread())
+            app._ocr_capture_dispatcher = dispatcher
+    QtCore.QMetaObject.invokeMethod(dispatcher, 'dispatch', QtCore.Qt.QueuedConnection,
+                                     QtCore.Q_ARG(object, callback))
+    return True
+
+
 def prepare_overlay(mode="ocr"):
     """Cache an overlay without ever constructing QWidget objects off-thread."""
     if not _is_gui_thread():
@@ -6244,7 +6277,7 @@ def get_or_show_overlay(mode="ocr"):
             pass
 
     # Создаем или показываем оверлей
-    ov = _OVERLAY_POOL.get(mode)
+    ov = _OVERLAY_POOL.pop(mode, None)
     app = QApplication.instance()
     if ov is not None and app is not None and ov.thread() != app.thread():
         logging.warning(f"Ignoring cached {mode} OCR overlay created outside the GUI thread")
@@ -6257,13 +6290,20 @@ def get_or_show_overlay(mode="ocr"):
 
     # Keep reference to prevent garbage collection
     _ACTIVE_OVERLAYS[mode] = ov
-    _OVERLAY_POOL[mode] = None
 
 def run_screen_capture(mode="ocr"):
+    if _queue_capture_outside_gui(functools.partial(run_screen_capture, mode)):
+        return
     from mode_coordinator import release_mode, request_mode
 
     mode_name = f"capture:{mode}"
-    if not request_mode(mode_name, stop_screen_capture_modes):
+    stopped = False
+    def stop_area():
+        nonlocal stopped
+        stopped = True
+        stop_screen_capture_modes()
+
+    if not request_mode(mode_name, stop_area):
         return
     app = QApplication.instance()
     try:
@@ -6284,10 +6324,12 @@ def run_screen_capture(mode="ocr"):
         else:
             get_or_show_overlay(mode)
     except _CaptureRequestDeclined as exc:
-        release_mode(mode_name)
+        if not stopped:
+            release_mode(mode_name)
         logging.info("Area capture stopped: %s", exc)
     except Exception:
-        release_mode(mode_name)
+        if not stopped:
+            release_mode(mode_name)
         raise
 
 def warm_up():
@@ -6749,7 +6791,7 @@ class FullScreenTranslateOverlay(QWidget):
         target_screen = QApplication.screenAt(cursor_pos) or QApplication.primaryScreen()
         geo = target_screen.geometry()
 
-        self.screenshot = grab_screen_pixmap(target_screen, 0, 0, geo.width(), geo.height(), abort_on_denial=True)
+        self.screenshot = grab_screen_pixmap(target_screen, 0, 0, geo.width(), geo.height(), capture_mode="fullscreen")
         self._ocr_scale_x = (self.screenshot.width() / geo.width()) if geo.width() and not self.screenshot.isNull() else 1.0
         self._ocr_scale_y = (self.screenshot.height() / geo.height()) if geo.height() and not self.screenshot.isNull() else 1.0
         self.setGeometry(geo)
@@ -7467,18 +7509,20 @@ class FullScreenTranslateOverlay(QWidget):
 
 
 _fullscreen_overlay_ref = None
-_fullscreen_translate_busy = False
 
 
 def run_fullscreen_translate():
     """Launch (or toggle) the fullscreen translate overlay."""
-    global _fullscreen_overlay_ref, _fullscreen_translate_busy
-    if _fullscreen_translate_busy:
+    global _fullscreen_overlay_ref
+    if _queue_capture_outside_gui(run_fullscreen_translate):
         return
     from mode_coordinator import release_mode, request_mode
 
+    stopped = False
     def stop_fullscreen():
         global _fullscreen_overlay_ref
+        nonlocal stopped
+        stopped = True
         overlay = _fullscreen_overlay_ref
         _fullscreen_overlay_ref = None
         if overlay is not None:
@@ -7493,17 +7537,16 @@ def run_fullscreen_translate():
     if app is None:
         release_mode("fullscreen")
         return
-    _fullscreen_translate_busy = True
     try:
         _fullscreen_overlay_ref = FullScreenTranslateOverlay()
     except _CaptureRequestDeclined as exc:
-        release_mode("fullscreen")
+        if not stopped:
+            release_mode("fullscreen")
         logging.info("Fullscreen capture stopped: %s", exc)
     except Exception:
-        release_mode("fullscreen")
+        if not stopped:
+            release_mode("fullscreen")
         raise
-    finally:
-        _fullscreen_translate_busy = False
 
 
 if __name__ == "__main__":
