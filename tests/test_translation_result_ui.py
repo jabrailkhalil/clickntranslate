@@ -189,7 +189,8 @@ class TranslationResultUiTest(unittest.TestCase):
         dialog = mock.Mock()
         dialog.isVisible.return_value = True
         main._translation_result_dialogs.clear()
-        with mock.patch.object(platform_support, "copy_text") as copy:
+        with mock.patch.object(platform_support, "copy_text") as copy, \
+                mock.patch.object(main, "save_copy_history") as history:
             with mock.patch.object(main, "TranslationResultDialog", return_value=dialog) as dialog_class:
                 result = main.show_translation_dialog(
                     None,
@@ -200,6 +201,7 @@ class TranslationResultUiTest(unittest.TestCase):
                 )
 
         copy.assert_called_once_with("Coreano")
+        history.assert_called_once_with("Coreano")
         dialog_class.assert_called_once_with(
             None,
             "Coreano",
@@ -393,12 +395,12 @@ class TranslationResultUiTest(unittest.TestCase):
     def test_regular_selection_hotkey_never_attempts_replacement(self):
         harness = _SelectionHarness({"result_window_hidden_modes": ["selection"]})
 
-        with mock.patch.object(
-            main, "replace_selected_text_in_foreground"
-        ) as replace:
+        with mock.patch.object(main, "replace_selected_text_in_foreground") as replace, \
+                mock.patch.object(main, "save_copy_history") as history:
             harness.run_selection_worker("Hola mundo", "Hello world")
 
         replace.assert_not_called()
+        history.assert_called_once_with("Hello world")
 
     def test_visible_selection_with_auto_copy_off_restores_previous_clipboard(self):
         harness = _SelectionHarness({

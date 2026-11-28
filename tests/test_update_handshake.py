@@ -10,38 +10,38 @@ import psutil
 import zipfile
 import base64
 import uuid
+from unittest import mock
 
+import update_handshake
 from update_handshake import acknowledge_ready
 from release_manifest import write_manifest, verify_manifest
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_application_ack_is_atomic_and_uses_runtime_version(tmp_path, monkeypatch):
-    import update_handshake
+def test_application_ack_is_atomic_and_uses_runtime_version(tmp_path):
     ack = tmp_path / 'with spaces' / 'ready.txt'
-    replace = os.replace
     published = []
 
     def check_publish(source, destination):
         assert not ack.exists()
         published.append(Path(source).read_text(encoding='utf-8'))
-        replace(source, destination)
+        os.replace(source, destination)
 
-    monkeypatch.setattr(update_handshake.os, 'replace', check_publish)
-    assert acknowledge_ready(['--show-after-update', f'--update-ack={ack}'], '1.7.2')
+    # Only observe this module. Other writers may also publish via os.replace.
+    with mock.patch.object(update_handshake, 'os', wraps=os) as handshake_os:
+        handshake_os.replace.side_effect = check_publish
+        assert acknowledge_ready(['--show-after-update', f'--update-ack={ack}'], '1.7.2')
     assert published == ['1.7.2']
     assert ack.read_text(encoding='utf-8') == '1.7.2'
     assert list(ack.parent.iterdir()) == [ack]
 
 
-def test_failed_ack_does_not_leave_an_empty_confirmation(tmp_path, monkeypatch):
-    import update_handshake
+def test_failed_ack_does_not_leave_an_empty_confirmation(tmp_path):
     ack = tmp_path / 'ready.txt'
-    def fail(*args):
-        raise PermissionError('simulated publication failure')
-    monkeypatch.setattr(update_handshake.os, 'replace', fail)
-    assert not acknowledge_ready([f'--update-ack={ack}'], '1.7.2')
+    with mock.patch.object(update_handshake, 'os', wraps=os) as handshake_os:
+        handshake_os.replace.side_effect = PermissionError('simulated publication failure')
+        assert not acknowledge_ready([f'--update-ack={ack}'], '1.7.2')
     assert not list(tmp_path.iterdir())
     assert not acknowledge_ready([], '1.7.2')
 
