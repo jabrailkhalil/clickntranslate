@@ -56,7 +56,8 @@ def geometry_comparison(cards):
     from copy import copy
     from PIL import Image, ImageChops, ImageOps
     import pytesseract
-    from ocr_worker import _rapidocr_class
+    from ocr_worker import _parse_rapidocr_output, _rapidocr_class
+    from ocr_text_layout import ocr_text_from_items
     from rapidocr_models import create_engine
 
     base = create_engine(_rapidocr_class(), 'ar')
@@ -70,12 +71,13 @@ def geometry_comparison(cards):
         left, top, right, bottom = mask.point(lambda pixel: 255 if pixel > 32 else 0).getbbox()
         positive = ImageOps.invert(original) if background < 128 else original
         trials = []
-        for limit in (192, 320, 448):
+        for limit in (96, 128, 160, 192, 224, 320, 448):
             for treatment, image in (('original', original), ('dark-on-light', positive)):
                 engine = copy(base)
                 engine.text_det = copy(base._load_det_model())
                 engine.text_det.limit_side_len = limit
-                trials.append((f'det-{limit}-{treatment}', lambda e=engine, im=image: e(im).txts))
+                trials.append((f'det-{limit}-{treatment}',
+                               lambda e=engine, im=image: [ocr_text_from_items(_parse_rapidocr_output(e(im)))]))
         for padding in (2, 6, 12):
             for treatment, image in (('original', original), ('dark-on-light', positive)):
                 box = (max(0, left-padding), max(0, top-padding),
