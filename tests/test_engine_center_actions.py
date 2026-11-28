@@ -55,6 +55,22 @@ def test_language_buttons_require_the_matching_selection(center):
     assert all(button.toolTip().strip() for button in buttons.values())
 
 
+def test_installed_checkmark_can_receive_row_selection_without_requesting_a_download(center):
+    dialog, _, _ = center
+    table = dialog.easyocr_table
+    dialog._set_language_rows(table, _rows())
+    mark = table.item(0, 0)
+    assert mark.flags() & QtCore.Qt.ItemIsSelectable
+    assert mark.flags() & QtCore.Qt.ItemIsEnabled
+    assert not mark.flags() & QtCore.Qt.ItemIsUserCheckable
+    table.selectRow(0)
+    dialog._on_package_row_clicked(table, 0, 1)
+    assert mark.checkState() == QtCore.Qt.Checked
+    assert dialog._highlighted_installed_codes(table) == ['en']
+    assert dialog._selected_codes(table) == []
+    assert not table._pending_package_codes
+
+
 @pytest.mark.parametrize(('row', 'query', 'expected'), [
     (0, 'French', []),
     (1, 'German', ['en->de']),

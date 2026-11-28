@@ -7754,7 +7754,7 @@ class OcrLanguageManagerDialog(QDialog):
         if item is None or item.column() != 0:
             return
         code = item.data(Qt.UserRole)
-        if not code or not (item.flags() & Qt.ItemIsEnabled):
+        if not code or item.data(Qt.UserRole + 1) or not (item.flags() & Qt.ItemIsEnabled):
             return
         pending = table._pending_package_codes
         if item.checkState() == Qt.Checked:
@@ -7855,7 +7855,11 @@ class OcrLanguageManagerDialog(QDialog):
                     else Qt.Unchecked
                 )
             flags = Qt.ItemIsUserCheckable if show_checkbox else Qt.NoItemFlags
-            if show_checkbox and selectable:
+            if show_checkbox and data.get('checked'):
+                # Qt starts a full-row selection at column zero on some platforms.
+                # An installed checkmark can select its row, but cannot be toggled.
+                flags = Qt.ItemIsEnabled | Qt.ItemIsSelectable
+            elif show_checkbox and selectable:
                 flags |= Qt.ItemIsEnabled | Qt.ItemIsSelectable
             check_item.setFlags(flags)
             check_item.setData(Qt.UserRole + 2, int(flags))
@@ -8671,7 +8675,7 @@ class OcrLanguageManagerDialog(QDialog):
         codes = []
         for row in range(table.rowCount()):
             item = table.item(row, 0)
-            if item is None:
+            if item is None or item.data(Qt.UserRole + 1):
                 continue
             if not (item.flags() & Qt.ItemIsEnabled):
                 continue
