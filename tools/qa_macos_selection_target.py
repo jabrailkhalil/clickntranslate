@@ -22,13 +22,40 @@ def write_private_text(board, text):
     return int(board.changeCount())
 
 
+def office_records(label):
+    return [{
+        'public.utf8-plain-text': f'{label} {row}'.encode(),
+        'public.html': f'<table><tr><td><b>{label} {row}</b></td></tr></table>'.encode(),
+        'public.rtf': (r'{\rtf1\ansi\b ' + f'{label} {row}' + '}').encode(),
+        'com.clickntranslate.qa-office-row': bytes((0, 13, 20, row)),
+    } for row in (1, 2)]
+
+
+def write_private_office(board, label):
+    from AppKit import NSPasteboardItem
+    from Foundation import NSData
+
+    items = []
+    for record in office_records(label):
+        item = NSPasteboardItem.alloc().init()
+        for kind, value in record.items():
+            assert item.setData_forType_(NSData.dataWithBytes_length_(value, len(value)), kind)
+        items.append(item)
+    board.clearContents()
+    assert board.writeObjects_(items)
+    return int(board.changeCount())
+
+
 def pasteboard_writer(pipe, name):
     from AppKit import NSPasteboard
 
     board = NSPasteboard.pasteboardWithName_(name)
     try:
         while (text := pipe.recv()) is not None:
-            pipe.send(write_private_text(board, text))
+            if isinstance(text, tuple):
+                pipe.send(write_private_office(board, text[1]))
+            else:
+                pipe.send(write_private_text(board, text))
     finally:
         pipe.close()
 
@@ -36,7 +63,9 @@ def pasteboard_writer(pipe, name):
 def exercise_private_clipboard():
     """Test real Cocoa change counts and an independent writer without AX or the general pasteboard."""
     from AppKit import NSPasteboard, NSPasteboardTypeString
+    from clipboard_formats import capture_cocoa_items, restore_cocoa_items
     from clipboard_preservation import ClipboardPreservation
+    from types import SimpleNamespace
 
     board = NSPasteboard.pasteboardWithUniqueName()
     context = multiprocessing.get_context('spawn')
@@ -86,8 +115,43 @@ def exercise_private_clipboard():
                 records.append(dict(timing=timing, identical_text=value == SAMPLE, restored=restored,
                                     source_sequence=source_sequence, foreign_sequence=newer,
                                     final_sequence=final_sequence))
+        rich_results = []
+        formats = SimpleNamespace(capture=lambda: capture_cocoa_items(board),
+                                  restore=lambda data, owned: restore_cocoa_items(board, data, owned))
+
+        def observed_items():
+            return [{str(kind): bytes(item.dataForType_(kind)) for kind in item.types()}
+                    for item in board.pasteboardItems()]
+
+        for scenario in ('restore_original', 'restore_newer_before_replacement', 'cancel_after_newer'):
+            label = 'Original spreadsheet'
+            publish(('office', label))
+            baseline = observed_items()
+            guard = ClipboardPreservation(read, copy, lambda: int(board.changeCount()), formats=formats)
+            copy('Temporarily selected source')
+            assert guard.claim('Temporarily selected source')
+            other = None
+            if scenario != 'restore_original':
+                label = 'Newer spreadsheet'
+                other = publish(('office', label))
+                baseline = observed_items()
+            if scenario == 'restore_newer_before_replacement':
+                assert guard.preserve_current_if_changed()
+                copy('Translated result')
+                assert guard.claim('Translated result')
+            restored = guard.restore()
+            assert restored == (scenario != 'cancel_after_newer')
+            if not restored:
+                assert int(board.changeCount()) == other
+            items = observed_items()
+            expected = office_records(label)
+            assert items == baseline and len(items) == len(expected)
+            for item, record in zip(items, expected):
+                assert all(item[kind] == value for kind, value in record.items())
+            rich_results.append(dict(scenario=scenario, item_count=len(items), formats=sorted(expected[0]),
+                                     restored=restored, final_sequence=int(board.changeCount())))
         return dict(status='passed', private_board=True, reader_pid=os.getpid(),
-                    external_writer_pid=process.pid, cases=records)
+                    external_writer_pid=process.pid, cases=records, office=rich_results)
     finally:
         if process.is_alive():
             control.send(None)

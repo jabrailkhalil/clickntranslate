@@ -9,6 +9,7 @@ import main
 import platform_support
 import selection_platform
 import translater
+from test_desktop_ux import app
 from test_translation_result_ui import _SelectionHarness, _immediate_thread
 from selection_test_support import editable_editor
 
@@ -227,3 +228,83 @@ def test_replacement_preserves_a_copy_made_before_the_paste_transaction(clipboar
     owner.launch_translate_replace_selection()
     main.simulate_paste.assert_called_once_with()
     assert clipboard.text == "A newer user copy"
+
+
+@pytest.mark.parametrize('scenario', ['visible_result', 'successful_replace', 'provider_error',
+                                      'new_rich_copy_before_replace', 'new_rich_copy_before_result'])
+def test_office_formats_survive_selection_while_their_text_representation_remains_available(
+        app, clipboard, isolated_clipboard, monkeypatch, scenario):
+    from PyQt5 import QtCore
+
+    board = isolated_clipboard
+    generation = [1]
+    board.dataChanged.connect(lambda: generation.__setitem__(0, generation[0] + 1))
+
+    def rich(text):
+        data = QtCore.QMimeData()
+        data.setText(text)
+        data.setHtml('<table><tr><td><b>' + text + '</b></td></tr></table>')
+        data.setData('text/rtf', ('{\\rtf1\\ansi\\b ' + text + '}').encode())
+        data.setData('application/x-synthetic-office-row', b'\x00\x0d\x14' + text.encode())
+        board.setMimeData(data)
+        return {kind: bytes(data.data(kind)) for kind in data.formats()}
+
+    expected = [rich('First office cell')]
+    monkeypatch.setattr(main, '_clipboard_sequence_number', lambda: generation[0])
+    monkeypatch.setattr(clipboard_preservation, 'clipboard_sequence_number', lambda: generation[0])
+    monkeypatch.setattr(platform_support, 'copy_text', lambda text: (board.setText(text) or True))
+    monkeypatch.setattr(main.pyperclip, 'paste', board.text)
+    monkeypatch.setattr(main, 'simulate_copy', lambda: board.setText('Selected source text'))
+    monkeypatch.setattr(main, 'simulate_paste', mock.Mock())
+    owner = _SelectionHarness({'copy_translated_text': False, 'restore_clipboard_after_selection': True})
+
+    def translate(*_args, **_kwargs):
+        if scenario.startswith('new_rich_copy'):
+            expected[0] = rich('Later office cell')
+        if scenario == 'provider_error':
+            raise RuntimeError('synthetic provider failure')
+        return 'Selected translation'
+
+    monkeypatch.setattr(translater, 'translate_text', translate)
+    if 'replace' in scenario:
+        owner.launch_translate_replace_selection()
+        main.simulate_paste.assert_called_once_with()
+    else:
+        owner.launch_translate_selection()
+    actual = board.mimeData()
+    assert {kind: bytes(actual.data(kind)) for kind in actual.formats()} == expected[0]
+
+
+def test_delayed_gui_restoration_respects_the_copy_that_arrived_while_queued(app, isolated_clipboard):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Event
+    from PyQt5 import QtCore
+    from PyQt5.QtTest import QTest
+    from clipboard_formats import application_clipboard_formats
+
+    data = QtCore.QMimeData()
+    data.setText('Spreadsheet cell')
+    data.setHtml('<b>Spreadsheet cell</b>')
+    isolated_clipboard.setMimeData(data)
+    service = application_clipboard_formats()
+    snapshot = service.capture()
+    queued = Event()
+
+    def scheduled(_operation):
+        queued.set()
+
+    service._requested.connect(scheduled, type=QtCore.Qt.DirectConnection)
+    try:
+        with ThreadPoolExecutor(max_workers=1) as worker:
+            isolated_clipboard.setText('Temporary translation')
+            result = worker.submit(service.restore, snapshot, lambda: isolated_clipboard.text() == 'Temporary translation')
+            assert queued.wait(2)
+            isolated_clipboard.setText('A newer user copy')
+            for _ in range(100):
+                if result.done():
+                    break
+                QTest.qWait(10)
+            assert result.result(1) is False
+    finally:
+        service._requested.disconnect(scheduled)
+    assert isolated_clipboard.text() == 'A newer user copy'

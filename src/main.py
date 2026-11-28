@@ -1245,11 +1245,15 @@ def replace_selected_text_in_foreground(original_text, translated_text,
         return False, "cancelled"
     snapshot_sequence = _clipboard_sequence_number()
     if clipboard_preservation is None:
+        from clipboard_formats import application_clipboard_formats
         from clipboard_preservation import ClipboardPreservation
         clipboard_preservation = ClipboardPreservation(
-            pyperclip.paste, platform_support.copy_text, _clipboard_sequence_number)
-    else:
-        clipboard_preservation.preserve_current_if_changed()
+            pyperclip.paste, platform_support.copy_text, _clipboard_sequence_number,
+            formats=application_clipboard_formats())
+    elif not clipboard_preservation.preserve_current_if_changed():
+        return False, "clipboard_changed"
+    if not clipboard_preservation.has_snapshot():
+        return False, "clipboard_changed"
     if snapshot_sequence is not None and _clipboard_sequence_number() != snapshot_sequence:
         return False, "clipboard_changed"
     marker = f"__CLICKNTRANSLATE_SELECTION_{time.time_ns()}__"
@@ -13333,6 +13337,10 @@ class DarkThemeApp(QMainWindow):
             prepare_windows_selection()
         # Pin the source of a hotkey before its worker starts waiting for modifiers.
         selection_window = expected_target if expected_target is not None else _hotkey_window
+        clipboard_formats = None
+        if (platform_support.IS_WINDOWS or platform_support.IS_MAC) and (replace_selection or not preloaded):
+            from clipboard_formats import application_clipboard_formats
+            clipboard_formats = application_clipboard_formats()
         if selection_window is None and (replace_selection or not preloaded):
             if platform_support.IS_WINDOWS:
                 selection_window = _windows_foreground_window()
@@ -13482,8 +13490,12 @@ class DarkThemeApp(QMainWindow):
                     from clipboard_preservation import ClipboardPreservation
                     snapshot_sequence = _clipboard_sequence_number()
                     clipboard_preservation = ClipboardPreservation(
-                        pyperclip.paste, platform_support.copy_text, _clipboard_sequence_number)
+                        pyperclip.paste, platform_support.copy_text, _clipboard_sequence_number,
+                        formats=clipboard_formats)
                     # Clear clipboard, then Ctrl+C to capture selection
+                    if not clipboard_preservation.has_snapshot():
+                        notify_copy_failed(self.config)
+                        return
                     if not capture_target_is_active():
                         return
                     if snapshot_sequence is not None and _clipboard_sequence_number() != snapshot_sequence:

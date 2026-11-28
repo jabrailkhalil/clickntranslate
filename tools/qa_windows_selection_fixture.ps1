@@ -51,6 +51,43 @@ foreach ($routedEvent in @([Windows.Input.Keyboard]::PreviewKeyDownEvent, [Windo
     $other.AddHandler($routedEvent, $recordKey, $true)
 }
 $script:switchOnCopy = $false
+
+function Set-OfficeClipboard([string]$text) {
+    $data = [Windows.DataObject]::new()
+    $data.SetData([Windows.DataFormats]::UnicodeText, $text, $false)
+    $data.SetData([Windows.DataFormats]::Rtf, ('{\rtf1\ansi\b ' + $text + '}'), $false)
+    $fragment = '<table><tr><td><b>' + $text + '</b></td></tr></table>'
+    $prefix = '<html><body><!--StartFragment-->'
+    $html = $prefix + $fragment + '<!--EndFragment--></body></html>'
+    $fields = @('Version:1.0','StartHTML:{0:D10}','EndHTML:{1:D10}','StartFragment:{2:D10}','EndFragment:{3:D10}','')
+    $template = $fields -join [Environment]::NewLine
+    $start = ($template -f 0,0,0,0).Length
+    $header = $template -f $start,($start+$html.Length),($start+$prefix.Length),($start+$prefix.Length+$fragment.Length)
+    $data.SetData([Windows.DataFormats]::Html, ($header + $html), $false)
+    $data.SetData('ClicknTranslate Office Row', [IO.MemoryStream]::new([byte[]](0,13,20,25)), $false)
+    [Windows.Clipboard]::SetDataObject($data, $true)
+}
+
+function Get-OfficeClipboard {
+    $data = [Windows.Clipboard]::GetDataObject()
+    $raw = $data.GetData('ClicknTranslate Office Row', $false)
+    function Read-OfficeString($value) {
+        if ($value -is [IO.MemoryStream]) {
+            return [Text.Encoding]::UTF8.GetString($value.ToArray()).TrimEnd([char]0)
+        }
+        return [string]$value
+    }
+    $office = @{
+        formats = @($data.GetFormats($false))
+        text = [string]$data.GetData([Windows.DataFormats]::UnicodeText, $false)
+        rtf = Read-OfficeString ($data.GetData([Windows.DataFormats]::Rtf, $false))
+        html = Read-OfficeString ($data.GetData([Windows.DataFormats]::Html, $false))
+        row = if ($raw -is [IO.MemoryStream]) { [Convert]::ToBase64String($raw.ToArray()) }
+              elseif ($raw -is [byte[]]) { [Convert]::ToBase64String($raw) } else { '' }
+    }
+    return $office
+}
+
 $window.AddHandler([Windows.Input.Keyboard]::PreviewKeyDownEvent, [Windows.Input.KeyEventHandler]{
     param($sender, $eventArgs)
     if ($script:switchOnCopy -and $eventArgs.Key -eq 'C' -and
@@ -74,7 +111,8 @@ $timer.Add_Tick({
     try {
         $op = [IO.File]::ReadAllText($request) | ConvertFrom-Json
         if ($op -eq 'reset-first') { $first.Text = 'First: identical selection.' }
-        if ($op -eq 'external-copy') { [Windows.Clipboard]::SetText('identical selection') }
+        if ($op -eq 'office-copy') { Set-OfficeClipboard 'Clipboard before the fixture action' }
+        if ($op -eq 'external-copy') { Set-OfficeClipboard 'identical selection' }
         if ($op -eq 'switch-on-copy') { $script:switchOnCopy = $true }
         if ($op -eq 'other-document') {
             $other.Show()
@@ -107,6 +145,7 @@ $timer.Add_Tick({
             gridFocused = $grid.IsKeyboardFocusWithin; selectedRow = $grid.SelectedIndex
             gridPoint = @([int]$point.X, [int]$point.Y); keys = $events.ToArray()
         }
+        if ($op -in @('office-state', 'office-copy', 'external-copy')) { $state.office = Get-OfficeClipboard }
     } catch {
         $state = @{ error = $_.Exception.ToString() }
     }

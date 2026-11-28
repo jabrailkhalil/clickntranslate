@@ -77,8 +77,12 @@ def _read_selection_via_copy(*, validate_target=None):
 
         import pyperclip
 
+        from clipboard_formats import application_clipboard_formats
         from clipboard_preservation import ClipboardPreservation
-        preservation = ClipboardPreservation(pyperclip.paste, platform_support.copy_text)
+        preservation = ClipboardPreservation(pyperclip.paste, platform_support.copy_text,
+                                             formats=application_clipboard_formats())
+        if not preservation.has_snapshot():
+            return ""
         if validate_target is not None and not validate_target():
             return ""
         if not platform_support.copy_text(""):

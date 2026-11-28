@@ -1,4 +1,4 @@
-"""Restore temporary clipboard text only while that operation still owns it."""
+"""Restore temporary clipboard contents only while that operation still owns them."""
 
 from __future__ import annotations
 
@@ -23,22 +23,37 @@ def clipboard_sequence_number():
 
 
 class ClipboardPreservation:
-    """A text snapshot and the identity of this operation's last clipboard write.
+    """Previous clipboard representations and the identity of our last write.
 
     Every write/capture must be claimed before waiting for unrelated work.
     Failed reads or a changed sequence fail closed: a newer user copy is kept.
     """
 
-    def __init__(self, read_text, copy_text, sequence_number=None):
+    def __init__(self, read_text, copy_text, sequence_number=None, *, formats=None):
         self._read_text = read_text
         self._copy_text = copy_text
         self._sequence_number = sequence_number or clipboard_sequence_number
+        self._formats = formats
         self._owned_sequence = None
         self._owned_text = _UNKNOWN
+        self._capture_previous()
+
+    def _capture_previous(self):
+        self._previous_formats = None
+        self.previous = None
+        if self._formats is not None:
+            try:
+                self._previous_formats = self._formats.capture()
+            except Exception:
+                return False
         try:
-            self.previous = str(read_text() or "")
+            self.previous = str(self._read_text() or "")
         except Exception:
-            self.previous = None
+            pass
+        return self.has_snapshot()
+
+    def has_snapshot(self):
+        return self.previous is not None or self._previous_formats is not None
 
     def _sequence(self):
         try:
@@ -129,18 +144,17 @@ class ClipboardPreservation:
     def preserve_current_if_changed(self):
         """Keep a newer user copy before another temporary write, e.g. paste."""
         if self.owns_clipboard():
-            return
-        try:
-            self.previous = str(self._read_text() or "")
-        except Exception:
-            self.previous = None
+            return self.has_snapshot()
         self._owned_sequence = None
         self._owned_text = _UNKNOWN
+        return self._capture_previous()
 
     def restore(self):
-        if self.previous is None or not self.owns_clipboard():
+        if not self.has_snapshot() or not self.owns_clipboard():
             return False
         try:
+            if self._previous_formats is not None:
+                return self._formats.restore(self._previous_formats, self.owns_clipboard)
             return self._copy_text(self.previous) is not False
         except Exception:
             return False
