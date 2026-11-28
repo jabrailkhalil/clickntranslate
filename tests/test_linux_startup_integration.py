@@ -1,4 +1,5 @@
 import os
+import shlex
 import sys
 import tempfile
 import unittest
@@ -29,6 +30,28 @@ class AutostartSyncTest(unittest.TestCase):
               mock.patch.object(platform_support, 'IS_MAC', False),
               mock.patch.object(main.portable_paths, 'public_executable_path', return_value='/opt/new.AppImage')):
             return main.DarkThemeApp.sync_autostart_state(self.window, repair_stale=True)
+
+    def test_new_login_entry_obeys_shadow_preference_and_menu_remains_visible(self):
+        executable = '/opt/Release Candidate/ClicknTranslate.AppImage'
+        self.assertTrue(linux_desktop.set_autostart(True, executable))
+        login = Path(linux_desktop.autostart_path()).read_text(encoding='utf-8')
+        menu = linux_desktop.desktop_entry_text(executable)
+        for entry, shadow in ((login, True), (menu, False)):
+            command = next(line[5:] for line in entry.splitlines() if line.startswith('Exec='))
+            arguments = shlex.split(command)
+            self.assertEqual(arguments[0], executable)
+            with mock.patch.object(sys, 'argv', arguments):
+                self.assertEqual(main._should_start_in_shadow_mode(True), shadow)
+                self.assertFalse(main._should_start_in_shadow_mode(False))
+
+    def test_existing_enabled_login_entry_gains_the_startup_argument(self):
+        path = Path(linux_desktop.autostart_path())
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text('[Desktop Entry]\nExec=/opt/new.AppImage\nOnlyShowIn=KDE;\n', encoding='utf-8')
+        self.assertTrue(self.sync())
+        lines = path.read_text(encoding='utf-8').splitlines()
+        self.assertIn('Exec=/opt/new.AppImage --autostart', lines)
+        self.assertIn('OnlyShowIn=KDE;', lines)
 
     def test_moved_appimage_repairs_enabled_entry_and_preserves_desktop_options(self):
         linux_desktop.set_autostart(True, '/opt/old.AppImage')

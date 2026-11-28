@@ -87,7 +87,7 @@ def desktop_entry_text(executable, autostart=False, include_actions=True):
         f"Name={APP_NAME}",
         "GenericName=Screen translator",
         f"Comment={COMMENT}",
-        f"Exec={_exec_value(executable)}",
+        f"Exec={_exec_value(executable, '--autostart' if autostart else '')}",
         f"Icon={ICON_NAME}",
         "Terminal=false",
         # Keep one freedesktop main category.  Multiple main categories make
@@ -163,7 +163,7 @@ def repair_autostart(executable, restore_missing=False):
     """Follow a moved AppImage without overriding a desktop's disabled entry."""
     if not any(os.path.lexists(path) for path in _autostart_paths()):
         return set_autostart(True, executable) if restore_missing else False
-    command = _exec_value(executable)
+    command = _exec_value(executable, '--autostart')
     for path, entry in _autostart_entries():
         if entry.get('Desktop Entry', 'Exec', fallback='') == command:
             continue
