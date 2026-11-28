@@ -49,7 +49,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y xvfb xauth fonts-dejavu-core tesseract-ocr-eng tesseract-ocr \
             libegl1 libgl1 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 \
-            libxcb-shape0 libxcb-xinerama0 libxcb-util1 libxcb-cursor0 libxkbcommon-x11-0
+            libxcb-shape0 libxcb-xinerama0 libxcb-util1 libxcb-cursor0 libxkbcommon-x11-0 \
+            openbox trayer xdotool x11-utils libglib2.0-bin dbus-x11
       - id: deps
         name: Install platform dependencies
         run: |
@@ -72,6 +73,11 @@ jobs:
             tests/test_popup_design.py tests/test_language_search.py tests/test_package_presentation.py \
             tests/test_engine_center_actions.py tests/test_engine_center_stationary_layout.py \
             tests/test_guide_spotlight.py tests/test_companion_calm_menu.py tests/test_main_action_labels_i18n.py
+      - name: Start in the tray and open the same process from the applications menu
+        if: ${{ !cancelled() && runner.os == 'Linux' && steps.deps.outcome == 'success' }}
+        run: |
+          xvfb-run -a -s '-screen 0 1280x800x24' dbus-run-session -- \
+            python tools/qa_linux_shadow_launch.py --output build/ui-native/shadow-login
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -81,6 +87,7 @@ jobs:
             build/ui-native/checks/results.xml
             build/ui-native/checks/run.json
             build/ui-native/tmp/**/*.png
+            build/ui-native/shadow-login/
           if-no-files-found: warn
           retention-days: 7
 
