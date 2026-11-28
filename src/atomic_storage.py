@@ -51,7 +51,7 @@ def _publish_new_file(source, target):
             raise
 
 
-def write_text(path, text, *, unique=False):
+def _write_complete(path, write_content, *, unique):
     path = os.path.abspath(path)
     parent = os.path.dirname(path)
     os.makedirs(parent, exist_ok=True)
@@ -60,7 +60,7 @@ def write_text(path, text, *, unique=False):
         with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', dir=parent,
                                          prefix='.cnt-save-', suffix='.tmp', delete=False) as stream:
             temporary = stream.name
-            stream.write(text)
+            write_content(stream.file)
             stream.flush()
             os.fsync(stream.fileno())
         # Same-directory replacement stays on the same filesystem.
@@ -82,6 +82,17 @@ def write_text(path, text, *, unique=False):
                 pass
 
 
+def write_text(path, text, *, unique=False):
+    return _write_complete(path, lambda stream: stream.write(text), unique=unique)
+
+
 def write_json(path, payload, *, indent=None, unique=False):
-    # Serialization failures must also leave the previous file intact.
-    return write_text(path, json.dumps(payload, ensure_ascii=False, indent=indent), unique=unique)
+    if indent is None:
+        # Compact caches use the JSON encoder's fast whole-value path.
+        return write_text(path, json.dumps(payload, ensure_ascii=False), unique=unique)
+    # Histories and document sessions can contain very large multilingual
+    # records. Serialize them incrementally to the temporary file.
+    def write_content(stream):
+        json.dump(payload, stream, ensure_ascii=False, indent=indent)
+
+    return _write_complete(path, write_content, unique=unique)

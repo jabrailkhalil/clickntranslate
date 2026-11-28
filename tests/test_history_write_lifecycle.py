@@ -6,6 +6,7 @@ import subprocess
 import sys
 import threading
 import time
+import tracemalloc
 from types import SimpleNamespace
 
 import pytest
@@ -191,6 +192,36 @@ def test_a_slow_healthy_volume_retains_two_large_documents_and_a_burst_of_small_
     pending.pop()()
     assert [record['original'] for record in history_storage.read_records(path)] == large
     assert delivered == [str(i) for i in range(75)]
+
+
+def test_saving_a_multilingual_history_does_not_allocate_another_whole_document(tmp_path):
+    from atomic_storage import write_json
+    path = tmp_path / 'translation_history.json'
+    records = [{'original': 'A' * 2300 + str(i), 'translated': str(i), 'language': 'fr'} for i in range(500)]
+    records[-1]['translated'] = '🌍'
+    already_tracing = tracemalloc.is_tracing()
+    if not already_tracing:
+        tracemalloc.start()
+    try:
+        before, previous_peak = tracemalloc.get_traced_memory()
+        write_json(path, records, indent=4)
+        _, peak = tracemalloc.get_traced_memory()
+    finally:
+        if not already_tracing:
+            tracemalloc.stop()
+    if not already_tracing or peak > previous_peak:
+        assert peak - before < path.stat().st_size
+    assert history_storage.read_records(path) == records
+
+
+def test_failed_history_serialization_does_not_replace_the_previous_file(tmp_path):
+    path = tmp_path / 'translation_history.json'
+    history_storage.append_record(path, {'text': 'Обработано'})
+    previous = path.read_bytes()
+    with pytest.raises(TypeError):
+        history_storage.append_record(path, {'text': object()})
+    assert path.read_bytes() == previous
+    assert not list(tmp_path.glob('.cnt-save-*.tmp'))
 
 
 def test_overlapping_submissions_write_in_the_order_assigned_at_admission(monkeypatch):
