@@ -31,9 +31,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
@@ -743,22 +746,40 @@ internal fun ProviderSheet(editor: ProviderEditSession, viewModel: MobileViewMod
             if (saveStatus == ProviderSaveStatus.FAILED) item {
                 Text(stringResource(R.string.mobile_provider_save_error), color = MaterialTheme.colorScheme.error)
             }
-            item { Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedButton(onClick = { viewModel.test(draft) }, enabled = !saving && !testing && validConfig, modifier = Modifier.weight(1f).heightIn(min = 52.dp)) {
-                    if (testing) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                    else Text(stringResource(R.string.mobile_test))
-                }
-                Button(onClick = { saveAndConfirm(openAdvanced = false) }, enabled = !saving && !testing && validConfig,
-                    modifier = Modifier.weight(1f).heightIn(min = 52.dp).testTag("provider-save")) {
-                    if (saving) {
-                        CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                        Spacer(Modifier.width(8.dp))
+            item { BoxWithConstraints(Modifier.fillMaxWidth()) {
+                val testLabel = stringResource(R.string.mobile_test)
+                val saveLabel = stringResource(R.string.mobile_save)
+                val retryLabel = stringResource(R.string.mobile_provider_save_retry)
+                val savingLabel = stringResource(R.string.mobile_provider_saving)
+                val textMeasure = rememberTextMeasurer()
+                val textStyle = MaterialTheme.typography.labelLarge
+                val density = LocalDensity.current
+                val direction = LocalLayoutDirection.current
+                fun labelWidth(text: String) = with(density) { textMeasure.measure(text, textStyle).size.width.toDp() }
+                val padding = ButtonDefaults.ContentPadding
+                // Reserve both states up front to keep Test and Save in place while a save runs.
+                val requiredWidth = padding.calculateStartPadding(direction) + padding.calculateEndPadding(direction) +
+                    maxOf(labelWidth(testLabel), labelWidth(saveLabel), labelWidth(retryLabel), labelWidth(savingLabel) + 26.dp)
+                FlowRow(modifier = Modifier.fillMaxWidth(),
+                    maxItemsInEachRow = if ((maxWidth - 12.dp) / 2 >= requiredWidth) 2 else 1,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { viewModel.test(draft) }, enabled = !saving && !testing && validConfig,
+                        modifier = Modifier.weight(1f).heightIn(min = 52.dp)) {
+                        if (testing) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                        else Text(testLabel)
                     }
-                    Text(stringResource(when {
-                        saving -> R.string.mobile_provider_saving
-                        saveStatus == ProviderSaveStatus.FAILED -> R.string.mobile_provider_save_retry
-                        else -> R.string.mobile_save
-                    }))
+                    Button(onClick = { saveAndConfirm(openAdvanced = false) }, enabled = !saving && !testing && validConfig,
+                        modifier = Modifier.weight(1f).heightIn(min = 52.dp).testTag("provider-save")) {
+                        if (saving) {
+                            CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                            Spacer(Modifier.width(8.dp))
+                        }
+                        Text(when {
+                            saving -> savingLabel
+                            saveStatus == ProviderSaveStatus.FAILED -> retryLabel
+                            else -> saveLabel
+                        })
+                    }
                 }
             } }
             item { TextButton(onClick = { saveAndConfirm(openAdvanced = true) }, enabled = !saving && !testing,

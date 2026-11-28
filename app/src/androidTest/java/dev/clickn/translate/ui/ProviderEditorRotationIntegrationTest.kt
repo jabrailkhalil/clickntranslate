@@ -6,10 +6,13 @@ import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Rect
 import android.os.ParcelFileDescriptor
+import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -48,12 +51,24 @@ class ProviderEditorRotationIntegrationTest {
         fun keyboardVisible() = ui.windows.any { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD }
         fun saveOnScreen(): Rect? {
             val label = app.getString(R.string.mobile_save)
+            fun visibleButton(node: AccessibilityNodeInfo): Rect? {
+                if (node.isVisibleToUser && (node.text?.toString() == label || node.contentDescription?.toString() == label)) {
+                    val bounds = Rect().also(node::getBoundsInScreen)
+                    if (!bounds.isEmpty) return bounds
+                }
+                for (index in 0 until node.childCount) {
+                    val child = node.getChild(index) ?: continue
+                    visibleButton(child)?.let { return it }
+                }
+                return null
+            }
             for (window in ui.windows) {
                 if (window.type != AccessibilityWindowInfo.TYPE_APPLICATION) continue
                 val root = window.root ?: continue
                 if (root.packageName != app.packageName) continue
-                val node = root.findAccessibilityNodeInfosByText(label).firstOrNull { it.isVisibleToUser } ?: continue
-                return Rect().also(node::getBoundsInScreen).takeUnless { it.isEmpty }
+                // Compose exposes virtual children. A provider's platform text-search shortcut
+                // need not enumerate them even when those children are visible to TalkBack.
+                visibleButton(root)?.let { return it }
             }
             return null
         }
@@ -91,6 +106,14 @@ class ProviderEditorRotationIntegrationTest {
             serverField().performTextReplacement(syntheticServer)
             serverField().assertTextContains(syntheticServer)
             assertEquals(original.lingvaBaseUrl, runBlocking { app.settingsRepository.get().lingvaBaseUrl })
+            val testLabel = app.getString(R.string.mobile_test)
+            compose.onNodeWithTag("provider-form").performScrollToNode(hasText(testLabel))
+            compose.onNodeWithText(testLabel, useUnmergedTree = true)
+                .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { read ->
+                    val results = mutableListOf<TextLayoutResult>()
+                    assertTrue(read(results))
+                    assertEquals("The narrow button must not split connection across lines", 1, results.single().lineCount)
+                }
             capture("portrait")
 
             scenario.onActivity { it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE }
@@ -120,9 +143,9 @@ class ProviderEditorRotationIntegrationTest {
             serverField().performTextReplacement(syntheticServer)
             compose.onNodeWithTag("provider-form").performScrollToNode(hasTestTag("provider-save"))
             compose.onNodeWithTag("provider-save").assertIsDisplayed().assertIsEnabled()
-            compose.waitUntil(10_000) { saveOnScreen() != null }
             assertTrue("Keep the real keyboard open during Save", keyboardVisible())
             capture("landscape-ime")
+            compose.waitUntil(10_000) { saveOnScreen() != null }
             val button = requireNotNull(saveOnScreen())
             // A system input tap also verifies that the IME is not covering the touch target.
             shell("input tap ${button.centerX()} ${button.centerY()}")
@@ -138,7 +161,10 @@ class ProviderEditorRotationIntegrationTest {
         try {
             shell("settings put system font_scale 1.3")
             shell("settings put secure show_ime_with_hard_keyboard 1")
-            ui.serviceInfo = ui.serviceInfo.apply { flags = previousFlags or AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS }
+            ui.serviceInfo = ui.serviceInfo.apply {
+                flags = previousFlags or AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS or
+                    AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS
+            }
             exerciseForm()
         } finally {
             ui.serviceInfo = ui.serviceInfo.apply { flags = previousFlags }
