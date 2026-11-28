@@ -4,17 +4,78 @@ on:
   push:
     branches: [codex/test-candidates-20261025]
   workflow_dispatch:
+    inputs:
+      windows_transition:
+        description: Run the Windows migration suite only (portable candidate and public 1.8.2 updater)
+        type: boolean
+        default: false
 
 # This workflow can upload Actions artifacts, but cannot create a release/tag.
 permissions:
   contents: read
 
 concurrency:
-  group: test-candidates-${{ github.ref }}
+  group: test-candidates-${{ github.ref }}-${{ inputs.windows_transition && 'windows' || 'unix' }}
   cancel-in-progress: true
 
 jobs:
+  windows:
+    if: inputs.windows_transition
+    runs-on: windows-2022
+    timeout-minutes: 75
+    env:
+      PYTHONUTF8: '1'
+      PIP_DISABLE_PIP_VERSION_CHECK: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: tools/requirements/windows.txt
+      - name: Prepare the portable Windows candidate
+        shell: pwsh
+        run: |
+          python -m venv .venv
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          ./.venv/Scripts/python.exe -m pip install -r tools/requirements/windows.txt pyinstaller
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $candidateVersion = python -c "from src.app_version import APP_VERSION; print(APP_VERSION)"
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          ./tools/stage_release.ps1 -Version $candidateVersion -StageName transition-candidate
+      - name: Exercise the frozen application and bundled OCR workers
+        shell: python
+        run: |
+          import json, subprocess
+          from pathlib import Path
+          exe = Path('releases/transition-candidate/ClicknTranslate/app/ClicknTranslateApp.exe').resolve()
+          report = Path('build/windows-frozen/report.json').resolve()
+          subprocess.run([str(exe), '--candidate-smoke-test', str(report)], cwd=exe.parent, check=True, timeout=300)
+          data = json.loads(report.read_text(encoding='utf-8'))
+          assert data['frozen'] and data['status'] == 'passed', data
+      - name: Verify migration from the public 1.8.2 ZIP and recovery from a failed startup
+        shell: pwsh
+        run: ./.venv/Scripts/python.exe tools/qa_windows_candidate_transition.py
+      - name: Keep diagnostics and checksums
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-private-candidate-checks
+          retention-days: 7
+          if-no-files-found: warn
+          path: |
+            build/windows-frozen/
+            build/transition-fixtures/build-receipt.json
+            build/update-audit/*/result.json
+            build/update-audit/*/old-ready.txt
+            build/update-audit/*/restart-ready.txt
+            build/update-audit/*/application.log
+            build/update-audit/*/updater.log
+
   linux:
+    if: ${{ !inputs.windows_transition }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
@@ -98,6 +159,7 @@ jobs:
           if-no-files-found: error
 
   macos:
+    if: ${{ !inputs.windows_transition }}
     uses: ./.github/workflows/macos.yml
     with:
       architecture: all

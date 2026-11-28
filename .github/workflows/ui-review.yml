@@ -74,7 +74,8 @@ jobs:
           if [[ "$RUNNER_OS" == "Linux" ]]; then prefix=(xvfb-run -a -s '-screen 0 1920x1200x24'); fi
           "${prefix[@]}" python tools/run_regression_tests.py --qt-platform "$QT_QPA_PLATFORM" \
             --output build/ui-native/checks --basetemp build/ui-native/tmp \
-            tests/test_popup_design.py tests/test_language_search.py tests/test_package_presentation.py \
+            tests/test_popup_design.py tests/test_language_search.py tests/test_hotkey_language_picker.py \
+            tests/test_package_presentation.py \
             tests/test_engine_center_actions.py tests/test_engine_center_stationary_layout.py \
             tests/test_guide_spotlight.py tests/test_companion_calm_menu.py tests/test_main_action_labels_i18n.py
       - name: Start in the tray and open the same process from the applications menu
