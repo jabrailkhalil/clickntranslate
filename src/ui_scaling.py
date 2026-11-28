@@ -728,16 +728,15 @@ class MainWindowScaleController(QObject):
         return self.view.mapFromScene(self.proxy.mapToScene(QPointF(local)))
 
 
-def combo_popup_geometry(anchor, desired, bounds, gap, margin=0, *, prefer_below=False):
+def combo_popup_geometry(anchor, desired, bounds, gap, margin=0, *, prefer_below=False, minimum_height=1):
     """Fit a list beside its field, in one coordinate system and on one screen."""
     bounds = bounds.adjusted(margin, margin, -margin, -margin)
     below = anchor.y() + anchor.height() + gap
     below_space = max(0, bounds.y() + bounds.height() - below)
     above_space = max(0, anchor.y() - gap - bounds.y())
-    open_below = (below_space >= min(desired.height(), 100) if prefer_below else
-                  desired.height() <= below_space or below_space >= above_space)
-    room = below_space if open_below else above_space
-    height = max(1, min(desired.height(), room or bounds.height()))
+    open_below = prefer_below or desired.height() <= below_space or below_space >= above_space
+    room = max(below_space, minimum_height) if open_below else above_space
+    height = max(1, min(desired.height(), bounds.height(), room))
     width = max(1, min(desired.width(), bounds.width()))
     x = max(bounds.left(), min(anchor.x(), bounds.x() + bounds.width() - width))
     y = below if open_below else anchor.y() - gap - height
@@ -757,7 +756,7 @@ def is_embedded_combo_popup(combo, popup):
     return True
 
 
-def position_embedded_combo_popup(combo, popup, gap, desired_size=None):
+def position_embedded_combo_popup(combo, popup, gap, desired_size=None, *, minimum_height=1):
     """Fit scene-rendered lists to the canvas; native popups use screen bounds.
 
     Qt can retain a popup proxy on Windows after BypassGraphicsProxyWidget.
@@ -769,7 +768,8 @@ def position_embedded_combo_popup(combo, popup, gap, desired_size=None):
     root = combo.window()
     proxy = popup.graphicsProxyWidget()
     anchor = QRect(combo.mapTo(root, QPoint()), combo.size())
-    geometry = combo_popup_geometry(anchor, desired_size or popup.size(), root.rect(), gap, margin=4)
+    geometry = combo_popup_geometry(anchor, desired_size or popup.size(), root.rect(), gap, margin=4,
+                                   prefer_below=True, minimum_height=minimum_height)
     popup.resize(geometry.size())
     if popup.layout() is not None:
         popup.layout().activate()

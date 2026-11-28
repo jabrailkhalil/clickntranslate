@@ -87,12 +87,12 @@ def test_open_engine_center_retains_provider_drafts_across_language_change(windo
 
 
 @pytest.mark.parametrize('percent', (80, 100, 137))
-@pytest.mark.skipif(sys.platform != 'win32', reason='Windows native popup policy')
+@pytest.mark.skipif(sys.platform not in ('win32', 'darwin'), reason='Native popup outside the scaled canvas')
 def test_lower_main_language_lists_open_below_the_field_when_desktop_space_exists(window, app, percent):
     window.set_ui_scale_percent(percent)
     window.show_main_screen()
     app.processEvents()
-    for name in ('target_lang', 'hotkey_source_combo', 'hotkey_target_combo'):
+    for name in ('source_lang', 'target_lang', 'hotkey_mode_combo', 'hotkey_source_combo', 'hotkey_target_combo'):
         combo = getattr(window, name)
         with mock.patch.object(combo, '_available_screen_rect', return_value=QtCore.QRect(0, 0, 3200, 2000)):
             combo.showPopup()
@@ -114,10 +114,10 @@ def test_lower_main_language_lists_open_below_the_field_when_desktop_space_exist
                 combo.hidePopup()
 
 
-@pytest.mark.skipif(sys.platform != 'win32', reason='Windows native popup policy')
+@pytest.mark.skipif(sys.platform not in ('win32', 'darwin'), reason='Native popup outside the scaled canvas')
 def test_real_lower_list_follows_its_owner_on_each_connected_screen(window, app):
     if app.platformName() == 'offscreen':
-        pytest.skip('Native monitor coordinates require the Windows backend')
+        pytest.skip('Monitor coordinates require a native desktop')
     window.show_main_screen()
     combo = window.hotkey_target_combo
     for screen in app.screens():

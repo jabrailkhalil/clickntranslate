@@ -64,7 +64,12 @@ def test_open_search_popup_refits_changed_available_bounds_and_still_selects_wit
     settle(app)
     fitted = QtCore.QRect(popup.geometry())
     assert next_bounds.contains(fitted), (before, fitted, next_bounds)
-    assert fitted.bottom() < anchor.top()
+    below = anchor.bottom() + 1 + combo.POPUP_GAP
+    if next_bounds.bottom() + 1 - below >= combo._popup_minimum_height:
+        assert fitted.top() == below
+    else:
+        assert fitted.bottom() == next_bounds.bottom()
+        assert fitted.height() == combo._popup_minimum_height
     assert popup.isVisible()
 
     search = combo._language_search
@@ -73,7 +78,7 @@ def test_open_search_popup_refits_changed_available_bounds_and_still_selects_wit
     settle(app)
     filtered = QtCore.QRect(popup.geometry())
     assert filtered.topLeft() == fitted.topLeft()
-    assert filtered.width() == fitted.width() and filtered.height() < fitted.height()
+    assert filtered.width() == fitted.width() and filtered.height() <= fitted.height()
     assert next_bounds.contains(filtered)
     assert popup.rect().contains(search.geometry())
     QTest.keyClick(search, QtCore.Qt.Key_Down)

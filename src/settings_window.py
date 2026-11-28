@@ -777,7 +777,7 @@ class DropDownCombo(QComboBox):
         # Native child popups can use the desktop space beneath lower fields.
         popup = self.view().window()
         before = getattr(self, '_popup_native_factor', 1.)
-        if sys.platform == 'win32' and getattr(self.window(), '_ui_native_owner', None) is not None:
+        if sys.platform in ('win32', 'darwin') and getattr(self.window(), '_ui_native_owner', None) is not None:
             popup.setWindowFlag(Qt.BypassGraphicsProxyWidget, True)
             self._popup_native_factor = widget_global_rect(self).width() / max(1, self.width())
         else:
@@ -874,6 +874,9 @@ class DropDownCombo(QComboBox):
         chrome = margins.top()+margins.bottom()+sum(
             max(widget.minimumHeight(), min(widget.maximumHeight(), widget.sizeHint().height()))
             for widget in extras)+len(extras)*layout.spacing()
+        # At the physical screen edge the search bar and one complete item
+        # still have to fit. The remaining items are reached by scrolling.
+        self._popup_minimum_height = chrome + max(heights, default=0)
         scrollbar = view.verticalScrollBar().sizeHint().width() if len(heights)>visible else 0
         from combo_popup import popup_scale
         search = getattr(self, '_language_search', None)
@@ -901,12 +904,13 @@ class DropDownCombo(QComboBox):
             desired = stable_search_popup_size(self, desired)
             popup.setMinimumSize(0, 0)
             anchor = widget_global_rect(self)
-            embedded = position_embedded_combo_popup(self, popup, self.POPUP_GAP, desired)
+            embedded = position_embedded_combo_popup(self, popup, self.POPUP_GAP, desired,
+                                                     minimum_height=self._popup_minimum_height)
             if not embedded:
                 available = self._available_screen_rect()
-                popup.setGeometry(combo_popup_geometry(anchor, desired,
-                                                       available, self.POPUP_GAP,
-                                                       prefer_below=True))
+                popup.setGeometry(combo_popup_geometry(
+                    anchor, desired, available, self.POPUP_GAP,
+                    prefer_below=True, minimum_height=self._popup_minimum_height))
             search = getattr(self, '_language_search', None)
             if search is not None and not search.isHidden():
                 proxy = popup.graphicsProxyWidget() if embedded else None

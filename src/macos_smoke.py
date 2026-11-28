@@ -311,28 +311,38 @@ def dropdown_screenshots(main, app, window, report_path, screenshots):
     from PyQt5 import QtCore, QtWidgets
     from PyQt5.QtTest import QTest
     from settings_sections import PAGE_DYNAMIC, PAGE_OCR, PAGE_TRANSLATION
+    from ui_scaling import is_embedded_combo_popup, widget_global_rect
 
     checked = []
     def inspect(combo, name, requested, effective):
         _wait_for(combo.isVisible, name)
         previous = None
         for attempt in (1, 2):
-            combo.showPopup()
+            if attempt == 2 and '-main-hotkey_' in name:
+                viewport = window._ui_scale_controller.view.viewport()
+                QTest.mouseClick(viewport, QtCore.Qt.LeftButton,
+                                 pos=viewport.mapFromGlobal(widget_global_rect(combo).center()))
+            else:
+                combo.showPopup()
             QTest.qWait(100)
             popup, view = combo.view().window(), combo.view()
             assert popup.isVisible(), name
-            proxy = popup.graphicsProxyWidget()
+            proxy = popup.graphicsProxyWidget() if is_embedded_combo_popup(combo, popup) else None
             if proxy is not None:
                 root = combo.window()
                 geometry = proxy.mapRectToItem(root.graphicsProxyWidget(), proxy.boundingRect())
-                bounds = QtCore.QRectF(root.rect())
+                bounds = QtCore.QRectF(root.rect().adjusted(4, 4, -4, -4))
                 anchor = QtCore.QRectF(QtCore.QRect(combo.mapTo(root, QtCore.QPoint()), combo.size()))
             else:
                 geometry = QtCore.QRectF(popup.geometry())
                 bounds = QtCore.QRectF(combo._available_screen_rect())
-                anchor = QtCore.QRectF(QtCore.QRect(combo.mapToGlobal(QtCore.QPoint()), combo.size()))
+                anchor = QtCore.QRectF(widget_global_rect(combo))
             assert bounds.contains(geometry), (name, geometry, bounds)
-            assert not anchor.intersects(geometry), (name, anchor, geometry)
+            below = anchor.bottom() + combo.POPUP_GAP
+            if bounds.bottom() - below >= combo._popup_minimum_height:
+                assert geometry.top() == below, (name, anchor, geometry)
+            else:
+                assert geometry.height() <= combo._popup_minimum_height, (name, anchor, geometry)
             if previous is not None:
                 assert geometry == previous, (name, previous, geometry)
             previous = geometry
@@ -342,7 +352,9 @@ def dropdown_screenshots(main, app, window, report_path, screenshots):
                 assert picture.save(str(report_path.with_name(filename)))
                 screenshots.append({'file': filename, 'requested_percent': requested,
                                     'effective_percent': effective, 'width': picture.width(),
-                                    'height': picture.height(), 'dpr': picture.devicePixelRatioF()})
+                                    'height': picture.height(), 'dpr': picture.devicePixelRatioF(),
+                                    'anchor': anchor.getRect(), 'popup': geometry.getRect(),
+                                    'gap_below_field': geometry.top() - anchor.bottom()})
             view.scrollToBottom()
             app.processEvents()
             last = combo.model().index(combo.count() - 1, combo.modelColumn(), combo.rootModelIndex())
@@ -392,7 +404,7 @@ def dropdown_screenshots(main, app, window, report_path, screenshots):
                 dialog.deleteLater()
                 app.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)
     return {'cases': len(checked), 'openings': len(checked) * 2,
-            'checks': 'stable anchor, available bounds, last row reachable', 'names': checked}
+            'checks': 'below field, stable on reopen, available bounds, last row reachable', 'names': checked}
 
 
 def extended_screenshots(main, app, window, report_path, screenshots):

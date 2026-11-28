@@ -86,12 +86,27 @@ def test_popup_fits_a_small_available_area_and_all_rows_remain_reachable(picker,
 
 
 @pytest.mark.parametrize('bounds', [QtCore.QRect(-1280, -100, 1280, 700), QtCore.QRect(0, 25, 1280, 675)])
-def test_monitor_edges_include_negative_coordinates(bounds):
+def test_fixed_size_card_fits_above_at_the_monitor_edge_including_negative_coordinates(bounds):
     anchor = QtCore.QRect(bounds.right() - 149, bounds.bottom() - 31, 150, 32)
     result = combo_popup_geometry(anchor, QtCore.QSize(2000, 1000), bounds, 3)
     assert bounds.contains(result)
     assert result.bottom() == anchor.top() - 4
     assert result.right() == bounds.right()
+
+
+@pytest.mark.parametrize('space', [0, 18, 64, 95, 180, 450])
+def test_dropdown_stays_below_and_scrolls_in_the_space_left_on_its_own_monitor(space):
+    bounds = QtCore.QRect(-1200, -200, 1200, 800)
+    desired = QtCore.QSize(250, 300)
+    gap, one_searchable_row = 3, 64
+    anchor = QtCore.QRect(-400, bounds.bottom() + 1 - space - gap - 30, 140, 30)
+    result = combo_popup_geometry(anchor, desired, bounds, gap, prefer_below=True, minimum_height=one_searchable_row)
+    assert bounds.contains(result)
+    assert result.height() == min(desired.height(), max(space, one_searchable_row))
+    if space >= one_searchable_row:
+        assert result.top() == anchor.bottom() + 1 + gap
+    else:
+        assert result.bottom() == bounds.bottom()
 
 
 @pytest.mark.parametrize('rtl', (False, True))
