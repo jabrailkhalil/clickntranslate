@@ -419,7 +419,8 @@ def test_result_view_preferences_survive_reopen_and_are_isolated_by_mode(app, mo
     owner = QtWidgets.QWidget()
     owner.config = dict(main.DEFAULT_CONFIG, translator_engine='Google')
     owner.save_config = mock.Mock()
-    monkeypatch.setattr(main.TranslationResultDialog, '_start_retranslate', lambda self: None)
+    monkeypatch.setattr(main.TranslationResultDialog, '_start_retranslate',
+                        mock.create_autospec(main.TranslationResultDialog._start_retranslate))
     dialogs = []
     def open_result(mode):
         dialog = main.TranslationResultDialog(owner, 'Перевод', auto_copy=False, result_mode=mode,
