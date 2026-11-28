@@ -33,6 +33,12 @@ def test_repeated_navigation_and_idle_ownership(window, app, tmp_path):
         app.processEvents()
         gc.collect()
 
+    def wait_visible(widget):
+        deadline = time.monotonic() + 2
+        while not widget.isVisible() and time.monotonic() < deadline:
+            QtTest.QTest.qWait(10)
+        assert widget.isVisible(), widget.objectName()
+
     def sample():
         widgets = app.allWidgets()
         usage = process.cpu_times()
@@ -52,6 +58,7 @@ def test_repeated_navigation_and_idle_ownership(window, app, tmp_path):
     window.text_input.setPlainText(draft)
     baseline = sample()
     report['initial'] = baseline
+    save()
     with (mock.patch.object(OcrLanguageManagerDialog, '_start_runtime_probe'),
           mock.patch.object(OcrLanguageManagerDialog, '_start_argos_catalog_refresh'),
           mock.patch('provider_secrets.get_key', return_value='')):
@@ -74,13 +81,18 @@ def test_repeated_navigation_and_idle_ownership(window, app, tmp_path):
             assert current.isVisible() and current.lang == locale
             assert current.api_page.model.text() == draft
             current.close_btn.click()
+            assert not current.isVisible()
             window.show_main_screen()
             picker = window.target_lang
-            picker.showPopup()
-            app.processEvents()
+            # Changing page can briefly leave its controls unmapped. A real
+            # click can open a picker only after the home page is on screen.
+            wait_visible(picker)
+            window.activateWindow()
+            QtTest.QTest.qWait(30)
+            QtTest.QTest.mouseClick(picker, QtCore.Qt.LeftButton)
+            wait_visible(picker._language_search)
             picker._language_search.setText('qa-no-such-language')
-            app.processEvents()
-            assert picker._language_empty.isVisible()
+            wait_visible(picker._language_empty)
             picker.hidePopup()
             assert window.text_input.toPlainText() == draft
             QtTest.QTest.qWait(150)
